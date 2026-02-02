@@ -185,6 +185,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
             widget.category === 'finance' ? 'from-green-500/20 to-emerald-500/20' :
             widget.category === 'membership' ? 'from-blue-500/20 to-cyan-500/20' :
             widget.category === 'race' ? 'from-purple-500/20 to-pink-500/20' :
+            widget.category === 'communication' ? 'from-cyan-500/20 to-blue-500/20' :
             widget.category === 'analytics' ? 'from-orange-500/20 to-yellow-500/20' :
             'from-slate-500/20 to-slate-600/20'
           }`}>
@@ -192,13 +193,26 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
               widget.category === 'finance' ? 'text-green-400' :
               widget.category === 'membership' ? 'text-blue-400' :
               widget.category === 'race' ? 'text-purple-400' :
+              widget.category === 'communication' ? 'text-cyan-400' :
               widget.category === 'analytics' ? 'text-orange-400' :
               'text-slate-400'
             }`} size={size === 'small' ? 20 : 24} />
           </div>
-          <span className="text-xs font-medium text-slate-500 bg-slate-800/50 px-2 py-1 rounded-md">
-            {getSizeLabel(widget.defaultSize)}
-          </span>
+          <div className="flex flex-col gap-1 items-end">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+              widget.category === 'finance' ? 'bg-green-500/20 text-green-400' :
+              widget.category === 'membership' ? 'bg-blue-500/20 text-blue-400' :
+              widget.category === 'race' ? 'bg-purple-500/20 text-purple-400' :
+              widget.category === 'communication' ? 'bg-cyan-500/20 text-cyan-400' :
+              widget.category === 'analytics' ? 'bg-orange-500/20 text-orange-400' :
+              'bg-slate-500/20 text-slate-400'
+            }`}>
+              {categoryLabels[widget.category] || widget.category}
+            </span>
+            <span className="text-xs font-medium text-slate-500 bg-slate-800/50 px-2 py-0.5 rounded-md">
+              {getSizeLabel(widget.defaultSize)}
+            </span>
+          </div>
         </div>
 
         <h3 className={`font-semibold text-white mb-1 relative ${size === 'small' ? 'text-sm' : 'text-base'}`}>

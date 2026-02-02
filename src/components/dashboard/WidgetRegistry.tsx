@@ -66,6 +66,8 @@ import { PendingApplicationsWidget } from './widgets/PendingApplicationsWidget';
 import { UnreadCommunicationsWidget } from './widgets/UnreadCommunicationsWidget';
 import { RecentApplicationsWidget } from './widgets/RecentApplicationsWidget';
 import { MembershipRenewalsWidget } from './widgets/MembershipRenewalsWidget';
+import { MembershipTypesLargeWidget } from './widgets/MembershipTypesLargeWidget';
+import { MembersByClassLargeWidget } from './widgets/MembersByClassLargeWidget';
 
 export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
@@ -326,6 +328,17 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     requiredPermissions: ['admin', 'membership']
   },
   {
+    id: 'membership-types-large',
+    type: 'membership-types-large',
+    name: 'Membership Types (Large)',
+    description: 'Large detailed view of membership type distribution with percentages and totals',
+    icon: PieChart,
+    defaultSize: '2x2',
+    component: MembershipTypesLargeWidget,
+    category: 'membership',
+    requiredPermissions: ['admin', 'membership']
+  },
+  {
     id: 'members-by-class',
     type: 'members-by-class',
     name: 'Members by Class',
@@ -333,6 +346,17 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     icon: BarChart3,
     defaultSize: '2x1',
     component: MembersByClassWidget,
+    category: 'race',
+    requiredPermissions: ['admin', 'race_officer']
+  },
+  {
+    id: 'members-by-class-large',
+    type: 'members-by-class-large',
+    name: 'Members by Class (Large)',
+    description: 'Large detailed bar chart with boat class distribution, totals, and percentages',
+    icon: BarChart3,
+    defaultSize: '2x2',
+    component: MembersByClassLargeWidget,
     category: 'race',
     requiredPermissions: ['admin', 'race_officer']
   },
