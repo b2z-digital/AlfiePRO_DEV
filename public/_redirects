@@ -1,0 +1,5 @@
+# Remove trailing slashes for OAuth callbacks
+/stripe-oauth-callback/  /stripe-oauth-callback  301!
+
+# SPA fallback
+/*    /index.html    200

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Icon Generator - AlfiePRO</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .preview-item {
+            text-align: center;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        .preview-item canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .preview-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+        .success {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AlfiePRO PWA Icon Generator</h1>
+        <p class="subtitle">Generate all required PWA icons and splash screens for AlfiePRO</p>
+
+        <div class="info">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Click "Generate All Icons" to create placeholder icons</li>
+                <li>Right-click each icon and "Save image as..." to download</li>
+                <li>Place all downloaded icons in the <code>/public</code> folder</li>
+                <li>Replace placeholders with your actual logo for production</li>
+            </ol>
+        </div>
+
+        <button onclick="generateAllIcons()">Generate All Icons</button>
+        <button onclick="downloadAll()">Download All as ZIP (requires browser support)</button>
+
+        <div class="success" id="successMessage">
+            Icons generated successfully! Right-click each icon to save.
+        </div>
+
+        <div class="preview-grid" id="iconGrid"></div>
+    </div>
+
+    <script>
+        const sizes = [
+            { width: 16, height: 16, name: 'icon-16.png' },
+            { width: 32, height: 32, name: 'icon-32.png' },
+            { width: 72, height: 72, name: 'icon-72.png' },
+            { width: 96, height: 96, name: 'icon-96.png' },
+            { width: 128, height: 128, name: 'icon-128.png' },
+            { width: 144, height: 144, name: 'icon-144.png' },
+            { width: 152, height: 152, name: 'icon-152.png' },
+            { width: 167, height: 167, name: 'icon-167.png' },
+            { width: 180, height: 180, name: 'icon-180.png' },
+            { width: 192, height: 192, name: 'icon-192.png' },
+            { width: 384, height: 384, name: 'icon-384.png' },
+            { width: 512, height: 512, name: 'icon-512.png' },
+            { width: 192, height: 192, name: 'icon-maskable-192.png', maskable: true },
+            { width: 512, height: 512, name: 'icon-maskable-512.png', maskable: true }
+        ];
+
+        const splashSizes = [
+            { width: 750, height: 1334, name: 'splash-750x1334.png' },
+            { width: 1125, height: 2436, name: 'splash-1125x2436.png' },
+            { width: 1170, height: 2532, name: 'splash-1170x2532.png' },
+            { width: 1284, height: 2778, name: 'splash-1284x2778.png' },
+            { width: 1536, height: 2048, name: 'splash-1536x2048.png' },
+            { width: 1668, height: 2388, name: 'splash-1668x2388.png' },
+            { width: 2048, height: 2732, name: 'splash-2048x2732.png' }
+        ];
+
+        function drawIcon(canvas, size, maskable = false) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#3b82f6');
+            gradient.addColorStop(1, '#1e40af');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+
+            if (maskable) {
+                const padding = size * 0.1;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(padding, padding, size - padding * 2, size - padding * 2);
+            }
+
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${size * 0.4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', size / 2, size / 2);
+
+            ctx.font = `${size * 0.15}px Arial`;
+            ctx.fillText('PRO', size / 2, size * 0.75);
+        }
+
+        function drawSplash(canvas, width, height) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = width;
+            canvas.height = height;
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, '#0f172a');
+            gradient.addColorStop(1, '#1e293b');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+
+            const iconSize = Math.min(width, height) * 0.3;
+            const iconX = (width - iconSize) / 2;
+            const iconY = (height - iconSize) / 2;
+
+            const iconGradient = ctx.createLinearGradient(iconX, iconY, iconX + iconSize, iconY + iconSize);
+            iconGradient.addColorStop(0, '#3b82f6');
+            iconGradient.addColorStop(1, '#1e40af');
+            ctx.fillStyle = iconGradient;
+            ctx.fillRect(iconX, iconY, iconSize, iconSize);
+
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${iconSize * 0.4}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('A', width / 2, height / 2);
+
+            ctx.font = `${iconSize * 0.15}px Arial`;
+            ctx.fillText('PRO', width / 2, height / 2 + iconSize * 0.25);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.font = `${Math.min(width, height) * 0.04}px Arial`;
+            ctx.fillText('AlfiePRO', width / 2, height / 2 + iconSize * 0.6);
+        }
+
+        function generateAllIcons() {
+            const grid = document.getElementById('iconGrid');
+            grid.innerHTML = '';
+
+            sizes.forEach(size => {
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+
+                const canvas = document.createElement('canvas');
+                drawIcon(canvas, size.width, size.maskable);
+
+                const label = document.createElement('label');
+                label.textContent = size.name;
+
+                const download = document.createElement('button');
+                download.textContent = 'Download';
+                download.onclick = () => downloadCanvas(canvas, size.name);
+
+                item.appendChild(canvas);
+                item.appendChild(label);
+                item.appendChild(download);
+                grid.appendChild(item);
+            });
+
+            splashSizes.forEach(size => {
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+
+                const canvas = document.createElement('canvas');
+                drawSplash(canvas, size.width, size.height);
+                canvas.style.maxWidth = '160px';
+                canvas.style.height = 'auto';
+
+                const label = document.createElement('label');
+                label.textContent = size.name;
+
+                const download = document.createElement('button');
+                download.textContent = 'Download';
+                download.onclick = () => downloadCanvas(canvas, size.name);
+
+                item.appendChild(canvas);
+                item.appendChild(label);
+                item.appendChild(download);
+                grid.appendChild(item);
+            });
+
+            document.getElementById('successMessage').style.display = 'block';
+        }
+
+        function downloadCanvas(canvas, filename) {
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        window.onload = () => generateAllIcons();
+    </script>
+</body>
+</html>

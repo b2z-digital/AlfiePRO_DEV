@@ -1,0 +1,369 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mobile-optimized scrollbar utilities */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent text size adjustment on mobile */
+  .text-size-adjust-none {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Safe area insets for mobile devices */
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-area-inset-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  .safe-area-inset-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Disable text selection on interactive elements for native app feel */
+button,
+[role="button"],
+[draggable="true"],
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Image Protection - Prevent drag and copy on public pages */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* Circular Color Picker Styling */
+input[type="color"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border: none;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+/* Text Block Widget WYSIWYG Content Styles */
+.event-widget-text-block h1,
+.event-widget-text-block h2,
+.event-widget-text-block h3 {
+  font-weight: 700;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.event-widget-text-block h1 { font-size: 2em; }
+.event-widget-text-block h2 { font-size: 1.5em; }
+.event-widget-text-block h3 { font-size: 1.25em; }
+
+.event-widget-text-block p {
+  margin-bottom: 1em;
+}
+
+.event-widget-text-block ul,
+.event-widget-text-block ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.event-widget-text-block li {
+  margin-bottom: 0.25em;
+}
+
+.event-widget-text-block a {
+  color: #0ea5e9;
+  text-decoration: underline;
+}
+
+.event-widget-text-block a:hover {
+  color: #0284c7;
+}
+
+.event-widget-text-block strong {
+  font-weight: 700;
+}
+
+.event-widget-text-block em {
+  font-style: italic;
+}
+
+.event-widget-text-block u {
+  text-decoration: underline;
+}
+
+.event-widget-text-block s {
+  text-decoration: line-through;
+}
+
+/* Document preview list styles - matching PDF output */
+.document-preview-content ol,
+.document-preview-content ul {
+  margin: 0;
+  padding-left: 0;
+  list-style-position: outside;
+}
+
+.document-preview-content ol {
+  counter-reset: item;
+  list-style-type: none;
+}
+
+.document-preview-content ol > li {
+  margin-bottom: 0.3em;
+  padding-left: 0;
+}
+
+.document-preview-content ol > li:before {
+  display: inline-block;
+  width: 2em;
+  margin-left: -2em;
+  padding-right: 0.5em;
+  font-weight: inherit;
+  text-align: left;
+}
+
+.document-preview-content ul > li {
+  margin-bottom: 0.3em;
+  padding-left: 1.5em;
+}
+
+.document-preview-content p {
+  margin: 0 0 0.5em 0;
+  text-align: justify;
+}
+
+.document-preview-content strong {
+  font-weight: 600;
+}
+
+/* Slide-in animation for reconciliation panel */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* Wiggle animation for dashboard widgets in edit mode - disabled on hover for better UX */
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-1deg);
+  }
+  75% {
+    transform: rotate(1deg);
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 1s ease-in-out infinite;
+}
+
+.animate-wiggle:hover {
+  animation: none;
+}
+
+/* Force white icons and text on gradient backgrounds */
+.bg-gradient-to-br.from-blue-500.to-purple-600 svg,
+.bg-gradient-to-br.from-blue-500.to-purple-600 {
+  color: #ffffff !important;
+}
+
+.bg-gradient-to-br.from-blue-500.to-purple-600 * {
+  color: inherit;
+}
+
+/* Force white text on green gradient buttons */
+.bg-gradient-to-r.from-green-600.to-emerald-600,
+.bg-gradient-to-r.from-green-600.to-emerald-600 svg,
+.bg-gradient-to-r.from-green-600.to-emerald-600 span {
+  color: #ffffff !important;
+}
+
+/* Force white text on blue status badges */
+.bg-blue-500 .text-white,
+.bg-green-500 .text-white,
+.bg-blue-500\/90 .text-white,
+.bg-green-500\/90 .text-white {
+  color: #ffffff !important;
+}
+
+/* GLOBAL FIX: Force white text on ALL colored buttons (blue, green, emerald) in light mode */
+.bg-blue-500,
+.bg-blue-600,
+.bg-blue-700,
+.bg-green-500,
+.bg-green-600,
+.bg-green-700,
+.bg-emerald-500,
+.bg-emerald-600,
+.bg-emerald-700 {
+  color: #ffffff !important;
+}
+
+/* Force white text on hover states */
+.hover\:bg-blue-600:hover,
+.hover\:bg-blue-700:hover,
+.hover\:bg-green-600:hover,
+.hover\:bg-green-700:hover,
+.hover\:bg-emerald-600:hover,
+.hover\:bg-emerald-700:hover {
+  color: #ffffff !important;
+}
+
+/* Force white text in all gradient variants */
+.bg-gradient-to-r.from-blue-500,
+.bg-gradient-to-r.from-blue-600,
+.bg-gradient-to-r.from-green-500,
+.bg-gradient-to-r.from-green-600,
+.bg-gradient-to-r.from-emerald-500,
+.bg-gradient-to-r.from-emerald-600,
+.bg-gradient-to-br.from-blue-500,
+.bg-gradient-to-br.from-blue-600,
+.bg-gradient-to-br.from-green-500,
+.bg-gradient-to-br.from-green-600,
+.bg-gradient-to-br.from-emerald-500,
+.bg-gradient-to-br.from-emerald-600 {
+  color: #ffffff !important;
+}
+
+/* Code of Conduct HTML Content Styling */
+.code-of-conduct-content h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  line-height: 1.3;
+}
+
+.code-of-conduct-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.code-of-conduct-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.code-of-conduct-content h1:first-child,
+.code-of-conduct-content h2:first-child,
+.code-of-conduct-content h3:first-child {
+  margin-top: 0;
+}
+
+.code-of-conduct-content p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.code-of-conduct-content ul,
+.code-of-conduct-content ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+
+.code-of-conduct-content li {
+  margin-bottom: 0.5rem;
+}
+
+.code-of-conduct-content strong,
+.code-of-conduct-content b {
+  font-weight: 600;
+}
+
+.code-of-conduct-content em,
+.code-of-conduct-content i {
+  font-style: italic;
+}
+
+.code-of-conduct-content a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.code-of-conduct-content a:hover {
+  color: #2563eb;
+}
+
+.code-of-conduct-content blockquote {
+  border-left: 4px solid #cbd5e1;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+}
+
+.code-of-conduct-content pre {
+  background-color: #1e293b;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.code-of-conduct-content code {
+  background-color: #1e293b;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+  font-size: 0.9em;
+}

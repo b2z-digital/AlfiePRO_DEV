@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate App Icons</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #0f172a;
+      color: white;
+    }
+    h1 {
+      text-align: center;
+      color: #3b82f6;
+    }
+    .instructions {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .controls {
+      text-align: center;
+      margin: 20px 0;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 0 10px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 20px;
+      margin-top: 30px;
+    }
+    .preview-item {
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .preview-item canvas {
+      width: 100%;
+      height: auto;
+      border-radius: 4px;
+      background: white;
+    }
+    .preview-item p {
+      margin: 10px 0 0 0;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    #status {
+      text-align: center;
+      padding: 10px;
+      margin: 20px 0;
+      border-radius: 6px;
+      background: #1e293b;
+    }
+    .success { color: #10b981; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>AlfiePRO App Icon Generator</h1>
+
+  <div class="instructions">
+    <h2>Instructions:</h2>
+    <ol>
+      <li>Click "Generate All Icons" to create all required icon sizes</li>
+      <li>Click "Download All Icons" to save them to your downloads folder</li>
+      <li>Move the downloaded icons to the <code>/public</code> folder of your project</li>
+      <li>Icons will be automatically used for:
+        <ul>
+          <li>Browser favicon (icon-16.png, icon-32.png)</li>
+          <li>PWA app icons (icon-192.png, icon-512.png)</li>
+          <li>Apple Touch icons (icon-152.png, icon-180.png, etc.)</li>
+          <li>"Add to Home Screen" functionality</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="controls">
+    <button onclick="generateAllIcons()">Generate All Icons</button>
+    <button onclick="downloadAllIcons()">Download All Icons</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="preview-grid" id="previewGrid"></div>
+
+  <script>
+    const iconSizes = [
+      16, 32, 72, 96, 128, 144, 152, 167, 180, 192, 384, 512
+    ];
+
+    const maskableSizes = [192, 512];
+
+    // The sail logo SVG
+    const logoSVG = `
+      <svg viewBox="0 0 129.34 201.37" xmlns="http://www.w3.org/2000/svg">
+        <path
+          fill="#0066b4"
+          d="M92.55,0s-33.42,35.95-46.9,76.95-17.97,123.01-17.97,123.01c53.92-26.12,87.06-5.06,101.66,1.42C75.98,145.19,92.55,0,92.55,0Z"
+        />
+        <path
+          fill="#01a2e9"
+          d="M45.37,35.39s-23.87,31.11-37.35,61.22c-13.48,30.11-5.9,88.18-5.9,88.18,22.19-23.87,68.8-19.1,68.8-19.1C33.86,122.72,45.37,35.39,45.37,35.39Z"
+        />
+      </svg>
+    `;
+
+    const canvases = {};
+
+    function setStatus(message, isError = false) {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = isError ? 'error' : 'success';
+    }
+
+    function createCanvas(size, isMaskable = false) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Background color
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, size, size);
+
+      // Create SVG blob and image
+      const svgBlob = new Blob([logoSVG], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(svgBlob);
+      const img = new Image();
+
+      return new Promise((resolve) => {
+        img.onload = () => {
+          // Calculate dimensions to center the logo
+          const padding = isMaskable ? size * 0.2 : size * 0.1;
+          const logoSize = size - (padding * 2);
+
+          // Center the logo
+          const x = (size - logoSize) / 2;
+          const y = (size - logoSize) / 2;
+
+          ctx.drawImage(img, x, y, logoSize, logoSize);
+          URL.revokeObjectURL(url);
+          resolve(canvas);
+        };
+        img.src = url;
+      });
+    }
+
+    async function generateAllIcons() {
+      setStatus('Generating icons...');
+      const previewGrid = document.getElementById('previewGrid');
+      previewGrid.innerHTML = '';
+
+      try {
+        // Generate regular icons
+        for (const size of iconSizes) {
+          const canvas = await createCanvas(size, false);
+          canvases[`icon-${size}`] = canvas;
+
+          const previewItem = document.createElement('div');
+          previewItem.className = 'preview-item';
+          previewItem.innerHTML = `
+            <canvas id="preview-${size}"></canvas>
+            <p>icon-${size}.png</p>
+          `;
+          previewGrid.appendChild(previewItem);
+
+          const previewCanvas = previewItem.querySelector('canvas');
+          const ctx = previewCanvas.getContext('2d');
+          previewCanvas.width = size;
+          previewCanvas.height = size;
+          ctx.drawImage(canvas, 0, 0);
+        }
+
+        // Generate maskable icons
+        for (const size of maskableSizes) {
+          const canvas = await createCanvas(size, true);
+          canvases[`icon-maskable-${size}`] = canvas;
+
+          const previewItem = document.createElement('div');
+          previewItem.className = 'preview-item';
+          previewItem.innerHTML = `
+            <canvas id="preview-maskable-${size}"></canvas>
+            <p>icon-maskable-${size}.png (safe zone)</p>
+          `;
+          previewGrid.appendChild(previewItem);
+
+          const previewCanvas = previewItem.querySelector('canvas');
+          const ctx = previewCanvas.getContext('2d');
+          previewCanvas.width = size;
+          previewCanvas.height = size;
+          ctx.drawImage(canvas, 0, 0);
+        }
+
+        setStatus(`Successfully generated ${Object.keys(canvases).length} icons!`);
+      } catch (error) {
+        setStatus('Error generating icons: ' + error.message, true);
+      }
+    }
+
+    function downloadAllIcons() {
+      if (Object.keys(canvases).length === 0) {
+        setStatus('Please generate icons first!', true);
+        return;
+      }
+
+      setStatus('Downloading icons...');
+
+      let downloaded = 0;
+      for (const [name, canvas] of Object.entries(canvases)) {
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${name}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          downloaded++;
+          if (downloaded === Object.keys(canvases).length) {
+            setStatus(`Successfully downloaded ${downloaded} icons! Move them to the /public folder.`);
+          }
+        }, 'image/png');
+      }
+    }
+
+    // Auto-generate on load
+    window.addEventListener('load', () => {
+      generateAllIcons();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,391 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../utils/supabase';
+import { Users, TrendingUp, Award, Camera, UserPlus } from 'lucide-react';
+import PostCreationModal from '../components/social/PostCreationModal';
+import ActivityFeed from '../components/social/ActivityFeed';
+import GroupCard from '../components/social/GroupCard';
+import ConnectionCard from '../components/social/ConnectionCard';
+import ConnectionsModal from '../components/social/ConnectionsModal';
+import { socialStorage, SocialGroup, SocialConnection } from '../utils/socialStorage';
+
+interface CommunityPageProps {
+  darkMode?: boolean;
+}
+
+export default function CommunityPage({ darkMode = false }: CommunityPageProps) {
+  const { user, currentClub } = useAuth();
+  const lightMode = !darkMode;
+  const [profile, setProfile] = useState<any>(null);
+  const [coverImage, setCoverImage] = useState<string>('');
+  const [coverImagePosition, setCoverImagePosition] = useState({ x: 0, y: 0, scale: 1 });
+  const [showPostModal, setShowPostModal] = useState(false);
+  const [showConnectionsModal, setShowConnectionsModal] = useState(false);
+  const [groups, setGroups] = useState<SocialGroup[]>([]);
+  const [connections, setConnections] = useState<SocialConnection[]>([]);
+  const [activityPoints, setActivityPoints] = useState<any>(null);
+  const [clubName, setClubName] = useState<string>('');
+  const [activeUsers, setActiveUsers] = useState<any[]>([]);
+  const [defaultGroupId, setDefaultGroupId] = useState<string | undefined>();
+
+  useEffect(() => {
+    loadProfile();
+    loadGroups();
+    loadConnections();
+    loadActivityPoints();
+    loadActiveUsers();
+
+    // Update last_seen timestamp
+    updateLastSeen();
+
+    // Update last_seen every 5 minutes
+    const interval = setInterval(updateLastSeen, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const updateLastSeen = async () => {
+    if (!user) return;
+    try {
+      await supabase.rpc('update_user_last_seen');
+    } catch (error) {
+      console.error('Error updating last_seen:', error);
+    }
+  };
+
+  const loadProfile = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (data) {
+      setProfile(data);
+
+      const clubId = data.default_club_id || currentClub?.clubId;
+      if (clubId) {
+        const { data: club } = await supabase
+          .from('clubs')
+          .select('name, cover_image_url, cover_image_position_x, cover_image_position_y, cover_image_scale')
+          .eq('id', clubId)
+          .maybeSingle();
+
+        if (club) {
+          setClubName(club.name);
+          if (club.cover_image_url) {
+            setCoverImage(club.cover_image_url);
+            setCoverImagePosition({
+              x: club.cover_image_position_x || 0,
+              y: club.cover_image_position_y || 0,
+              scale: club.cover_image_scale || 1
+            });
+          }
+        }
+      }
+    }
+  };
+
+  const loadGroups = async () => {
+    try {
+      const data = await socialStorage.getGroups({ userId: user?.id });
+      setGroups(data?.slice(0, 3) || []);
+
+      // Find and set the default club group (the one matching current club)
+      const clubId = profile?.default_club_id || currentClub?.clubId;
+      if (clubId) {
+        const clubGroup = data?.find(g => g.club_id === clubId && g.group_type === 'club');
+        if (clubGroup) {
+          setDefaultGroupId(clubGroup.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading groups:', error);
+    }
+  };
+
+  const loadConnections = async () => {
+    try {
+      const data = await socialStorage.getConnections();
+      setConnections(data?.slice(0, 5) || []);
+    } catch (error) {
+      console.error('Error loading connections:', error);
+    }
+  };
+
+  const loadActivityPoints = async () => {
+    if (!user) return;
+
+    try {
+      const { data } = await supabase
+        .from('member_activity_points')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      setActivityPoints(data);
+    } catch (error) {
+      console.error('Error loading activity points:', error);
+    }
+  };
+
+  const loadActiveUsers = async () => {
+    if (!user) return;
+
+    try {
+      // Get users active in the last 15 minutes
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, last_seen')
+        .gte('last_seen', fifteenMinutesAgo)
+        .order('last_seen', { ascending: false })
+        .limit(20);
+
+      setActiveUsers(data || []);
+    } catch (error) {
+      console.error('Error loading active users:', error);
+    }
+  };
+
+  const handleJoinGroup = async (groupId: string) => {
+    try {
+      await socialStorage.joinGroup(groupId);
+      loadGroups();
+    } catch (error) {
+      console.error('Error joining group:', error);
+    }
+  };
+
+  const handleLeaveGroup = async (groupId: string) => {
+    try {
+      await socialStorage.leaveGroup(groupId);
+      loadGroups();
+    } catch (error) {
+      console.error('Error leaving group:', error);
+    }
+  };
+
+  const firstName = profile?.full_name?.split(' ')[0] || '';
+
+  return (
+    <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
+      {/* Hero Header Section - Same as Dashboard */}
+      <div className="relative h-[300px] overflow-hidden" style={{
+        backgroundImage: coverImage ? `url(${coverImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundSize: coverImage ? 'cover' : 'auto',
+        backgroundPosition: coverImage ? `${coverImagePosition.x}% ${coverImagePosition.y}%` : 'center',
+        transform: coverImage ? `scale(${coverImagePosition.scale})` : 'none',
+        transformOrigin: 'center'
+      }}>
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/70 to-transparent"></div>
+
+        {/* Welcome Header Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-8 lg:p-16">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {profile?.avatar_url && (
+              <img
+                src={profile.avatar_url}
+                alt={firstName || 'User'}
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border border-white/30"
+              />
+            )}
+            <div>
+              <h1
+                className="text-xl sm:text-2xl lg:text-3xl font-bold"
+                style={{
+                  color: '#ffffff',
+                  textShadow: '0 2px 8px rgba(0, 0, 0, 0.8), 0 4px 16px rgba(0, 0, 0, 0.6)'
+                }}
+              >
+                Welcome to Alfie Pro{firstName ? `, ${firstName}` : ''}!
+              </h1>
+              <p
+                className="text-sm sm:text-base mt-1"
+                style={{
+                  color: '#ffffff',
+                  opacity: 0.95,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.7)'
+                }}
+              >
+                The Ultimate Principal Race Officer & Club Mgt Tool for {clubName || 'your club'}.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-16">
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+          <div className="lg:col-span-7 space-y-6">
+            {/* Create Post Card - Match Dashboard Card Style */}
+            <div
+              className={`rounded-xl p-6 cursor-pointer transition-all hover:scale-[1.01] border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50 hover:shadow-xl' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl hover:border-slate-600/50'}`}
+              onClick={() => setShowPostModal(true)}
+            >
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                      {profile?.full_name?.charAt(0) || 'U'}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className={`w-full text-left px-4 py-3 rounded-full transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200' : 'bg-slate-700/50 hover:bg-slate-700/70'}`}>
+                    <span className={lightMode ? 'text-gray-500' : 'text-slate-400'}>What's on your mind?</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <ActivityFeed darkMode={darkMode} privacy={['public', 'friends', 'group']} />
+          </div>
+
+          <div className="lg:col-span-3 space-y-6">
+            {/* My Groups Card - Match Dashboard Card Style */}
+            <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className={`font-bold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Groups</h3>
+                <button className="text-blue-500 hover:text-blue-600 text-sm font-medium">
+                  See All
+                </button>
+              </div>
+              {groups.length > 0 ? (
+                <div className="space-y-3">
+                  {groups.map(group => (
+                    <div key={group.id} className={`flex items-center space-x-3 py-2 rounded-lg transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30'}`}>
+                      {group.avatar_url ? (
+                        <img
+                          src={group.avatar_url}
+                          alt={group.name}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                          {group.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</div>
+                        <div className={`text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count} members</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={`text-sm text-center py-4 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>No groups joined yet</p>
+              )}
+            </div>
+
+            {/* My Connections Card - Match Dashboard Card Style */}
+            <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className={`font-bold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Connections</h3>
+                <button
+                  onClick={() => setShowConnectionsModal(true)}
+                  className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 text-sm font-medium transition-colors"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>{connections.length}</span>
+                </button>
+              </div>
+              {connections.length > 0 ? (
+                <div className="flex flex-wrap -space-x-2">
+                  {connections.slice(0, 10).map(connection => (
+                    <div key={connection.id} className="relative group cursor-pointer" onClick={() => setShowConnectionsModal(true)}>
+                      {connection.connected_user?.avatar_url ? (
+                        <img
+                          src={connection.connected_user.avatar_url}
+                          alt={connection.connected_user.full_name}
+                          className={`w-10 h-10 rounded-full border-2 object-cover transition-transform hover:scale-110 ${lightMode ? 'border-white' : 'border-slate-700'}`}
+                          title={connection.connected_user.full_name}
+                        />
+                      ) : (
+                        <div
+                          className={`w-10 h-10 rounded-full border-2 bg-blue-500 flex items-center justify-center text-white text-xs font-bold transition-transform hover:scale-110 ${lightMode ? 'border-white' : 'border-slate-700'}`}
+                          title={connection.connected_user?.full_name}
+                        >
+                          {connection.connected_user?.full_name?.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className={`text-sm mb-3 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>No connections yet</p>
+                  <button
+                    onClick={() => setShowConnectionsModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Find Connections
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Active Now Card - Match Dashboard Card Style */}
+            <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+              <h3 className={`font-bold text-lg mb-4 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Active Now</h3>
+              {activeUsers.length > 0 ? (
+                <div className="flex flex-wrap -space-x-2">
+                  {activeUsers.slice(0, 15).map(activeUser => (
+                    <div key={activeUser.id} className="relative group">
+                      {activeUser.avatar_url ? (
+                        <img
+                          src={activeUser.avatar_url}
+                          alt={activeUser.full_name}
+                          className={`w-10 h-10 rounded-full border-2 object-cover ${lightMode ? 'border-white' : 'border-slate-700'}`}
+                          title={activeUser.full_name}
+                        />
+                      ) : (
+                        <div
+                          className={`w-10 h-10 rounded-full border-2 bg-blue-500 flex items-center justify-center text-white text-xs font-bold ${lightMode ? 'border-white' : 'border-slate-700'}`}
+                          title={activeUser.full_name}
+                        >
+                          {activeUser.full_name?.charAt(0)}
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={`text-sm text-center py-4 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>No one is active right now</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <PostCreationModal
+        isOpen={showPostModal}
+        onClose={() => setShowPostModal(false)}
+        groupId={defaultGroupId}
+        onPostCreated={() => {
+          setShowPostModal(false);
+        }}
+        darkMode={darkMode}
+      />
+
+      <ConnectionsModal
+        isOpen={showConnectionsModal}
+        onClose={() => {
+          setShowConnectionsModal(false);
+          loadConnections();
+        }}
+        darkMode={darkMode}
+      />
+    </div>
+  );
+}

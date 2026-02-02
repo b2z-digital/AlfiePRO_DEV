@@ -1,0 +1,705 @@
+import React, { useState, useEffect } from 'react';
+import {
+  CreditCard,
+  Calendar,
+  AlertCircle,
+  CheckCircle,
+  Mail,
+  Phone,
+  MapPin,
+  FileText,
+  Download,
+  Edit2,
+  Save,
+  X
+} from 'lucide-react';
+import { supabase } from '../../utils/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { formatDate } from '../../utils/date';
+
+interface MemberData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postcode: string;
+  is_financial: boolean;
+  renewal_date: string;
+  membership_level: string;
+  membership_level_custom?: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+}
+
+interface MembershipType {
+  id: string;
+  name: string;
+  description: string;
+  amount: number;
+  currency: string;
+  renewal_period: string;
+}
+
+interface MemberMembershipViewProps {
+  darkMode: boolean;
+}
+
+export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ darkMode }) => {
+  const { currentClub, user } = useAuth();
+  const { addNotification } = useNotifications();
+  const [loading, setLoading] = useState(true);
+  const [memberData, setMemberData] = useState<MemberData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedData, setEditedData] = useState<Partial<MemberData>>({});
+  const [showRenewalModal, setShowRenewalModal] = useState(false);
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
+  const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
+  const [processingPayment, setProcessingPayment] = useState(false);
+
+  useEffect(() => {
+    if (currentClub?.clubId && user?.id) {
+      fetchMemberData();
+      fetchMembershipTypes();
+    } else {
+      setLoading(false);
+    }
+  }, [currentClub, user]);
+
+  const fetchMemberData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from('members')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          street,
+          city,
+          state,
+          postcode,
+          is_financial,
+          renewal_date,
+          membership_level,
+          membership_level_custom,
+          emergency_contact_name,
+          emergency_contact_phone,
+          emergency_contact_relationship
+        `)
+        .eq('club_id', currentClub?.clubId)
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (data) {
+        setMemberData(data as MemberData);
+        setEditedData(data as MemberData);
+      } else {
+        setError('Member record not found');
+      }
+    } catch (err) {
+      console.error('Error fetching member data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load membership data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMembershipTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('membership_types')
+        .select('*')
+        .eq('club_id', currentClub?.clubId)
+        .eq('is_active', true)
+        .neq('name', 'Life Member')
+        .order('amount', { ascending: true });
+
+      if (error) throw error;
+      setMembershipTypes(data || []);
+    } catch (err) {
+      console.error('Error fetching membership types:', err);
+    }
+  };
+
+  const getMembershipStatus = () => {
+    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false };
+
+    if (!memberData.is_financial) {
+      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true };
+    }
+
+    if (!memberData.renewal_date) {
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false };
+    }
+
+    const renewalDate = new Date(memberData.renewal_date);
+    const today = new Date();
+    const daysUntilRenewal = Math.ceil((renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntilRenewal < 0) {
+      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true };
+    } else if (daysUntilRenewal <= 30) {
+      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true };
+    } else {
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false };
+    }
+  };
+
+  const handleSave = async () => {
+    if (!memberData) return;
+
+    try {
+      setIsSaving(true);
+
+      const { error: updateError } = await supabase
+        .from('members')
+        .update({
+          phone: editedData.phone,
+          street: editedData.street,
+          city: editedData.city,
+          state: editedData.state,
+          postcode: editedData.postcode,
+          emergency_contact_name: editedData.emergency_contact_name,
+          emergency_contact_phone: editedData.emergency_contact_phone,
+          emergency_contact_relationship: editedData.emergency_contact_relationship,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', memberData.id);
+
+      if (updateError) throw updateError;
+
+      addNotification('success', 'Profile updated successfully');
+      setMemberData({ ...memberData, ...editedData } as MemberData);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      addNotification('error', 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRenewal = async () => {
+    if (!memberData || !currentClub || !selectedMembershipType) {
+      addNotification('error', 'Please select a membership type');
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+
+      const selectedType = membershipTypes.find(t => t.id === selectedMembershipType);
+      if (!selectedType) {
+        throw new Error('Selected membership type not found');
+      }
+
+      if (selectedPaymentMethod === 'credit_card') {
+        // Stripe checkout flow
+        const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
+          body: {
+            club_id: currentClub.clubId,
+            member_id: memberData.id,
+            amount: selectedType.amount,
+            currency: selectedType.currency,
+            description: `${selectedType.name} Membership Renewal - ${currentClub.club?.name}`,
+            success_url: `${window.location.origin}/dashboard/membership?payment=success`,
+            cancel_url: `${window.location.origin}/dashboard/membership?payment=cancelled`,
+            metadata: {
+              type: 'membership_renewal',
+              member_id: memberData.id,
+              club_id: currentClub.clubId,
+              membership_type_id: selectedType.id,
+              membership_level: selectedType.name
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        if (data?.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
+      } else {
+        // Bank transfer flow - create pending renewal
+        const { error: renewalError } = await supabase
+          .from('membership_renewals')
+          .insert({
+            member_id: memberData.id,
+            membership_type_id: selectedType.id,
+            renewal_date: new Date().toISOString().split('T')[0],
+            expiry_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+            amount_paid: selectedType.amount,
+            payment_method: 'bank_transfer',
+            payment_reference: null
+          });
+
+        if (renewalError) throw renewalError;
+
+        // Create finance transaction
+        const { data: financeData, error: financeError } = await supabase.functions.invoke('create-membership-transaction', {
+          body: {
+            clubId: currentClub.clubId,
+            memberId: memberData.id,
+            membershipTypeId: selectedType.id,
+            memberName: `${memberData.first_name} ${memberData.last_name}`,
+            membershipTypeName: selectedType.name,
+            amount: selectedType.amount,
+            paymentMethod: 'bank_transfer'
+          }
+        });
+
+        if (financeError) {
+          console.error('Failed to create finance transaction:', financeError);
+          // Don't fail the renewal if finance transaction fails
+        }
+
+        addNotification('success', 'Renewal request submitted! Please complete the bank transfer and notify your club administrator.');
+        setShowRenewalModal(false);
+        setProcessingPayment(false);
+        fetchMemberData(); // Refresh data
+      }
+    } catch (err: any) {
+      console.error('Error creating payment:', err);
+      addNotification('error', err.message || 'Failed to start renewal process');
+      setProcessingPayment(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="p-16">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="text-slate-400">Loading your membership...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !memberData) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="p-16">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center max-w-md mx-auto">
+              <AlertCircle size={48} className="mx-auto mb-4 text-yellow-400" />
+              <h2 className="text-xl font-semibold text-white mb-2">No Membership Record Found</h2>
+              <p className="text-slate-400 mb-4">
+                You don't have a membership record yet for {currentClub?.club?.name || 'this club'}.
+              </p>
+              <div className={`p-4 rounded-lg mb-4 ${
+                darkMode ? 'bg-slate-800/50 border border-slate-700' : 'bg-slate-50 border border-slate-200'
+              }`}>
+                <p className="text-sm text-slate-300 mb-2">To get started:</p>
+                <ul className="text-sm text-slate-400 text-left space-y-2">
+                  <li>• Contact your club administrator to add you as a member</li>
+                  <li>• Ask them to link your account to your membership record</li>
+                  <li>• Once linked, you'll be able to view and manage your membership here</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const membershipStatus = getMembershipStatus();
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-16">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">My Membership</h1>
+              <p className="text-slate-400">Manage your membership and view your details</p>
+            </div>
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors"
+              >
+                <Edit2 size={18} />
+                Edit Details
+              </button>
+            )}
+          </div>
+
+          {/* Membership Status Card */}
+          <div className={`rounded-xl border p-6 ${
+            darkMode
+              ? 'bg-slate-800/50 border-slate-700/50'
+              : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-1">
+                  {memberData.first_name} {memberData.last_name}
+                </h2>
+                <p className="text-sm text-slate-400">{memberData.membership_level_custom || memberData.membership_level || 'Member'}</p>
+              </div>
+              <div className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                membershipStatus.color === 'green'
+                  ? 'bg-green-500/20 text-green-400'
+                  : membershipStatus.color === 'yellow'
+                  ? 'bg-yellow-500/20 text-yellow-400'
+                  : 'bg-red-500/20 text-red-400'
+              }`}>
+                {membershipStatus.status === 'active' && <CheckCircle size={18} />}
+                {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={18} />}
+                <span className="font-medium">{membershipStatus.text}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="flex items-start gap-3">
+                <Calendar className="text-slate-400 mt-0.5" size={18} />
+                <div>
+                  <p className="text-sm text-slate-400">Renewal Date</p>
+                  <p className="text-white font-medium">{memberData.renewal_date ? formatDate(memberData.renewal_date) : 'N/A'}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Mail className="text-slate-400 mt-0.5" size={18} />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-400">Email</p>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      value={editedData.email || ''}
+                      onChange={(e) => setEditedData({ ...editedData, email: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  ) : (
+                    <p className="text-white font-medium">{memberData.email}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <Phone className="text-slate-400 mt-0.5" size={18} />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-400">Phone</p>
+                  {isEditing ? (
+                    <input
+                      type="tel"
+                      value={editedData.phone || ''}
+                      onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  ) : (
+                    <p className="text-white font-medium">{memberData.phone || 'Not provided'}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <MapPin className="text-slate-400 mt-0.5" size={18} />
+                <div className="flex-1">
+                  <p className="text-sm text-slate-400">Address</p>
+                  {isEditing ? (
+                    <div className="mt-1 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Street"
+                        value={editedData.street || ''}
+                        onChange={(e) => setEditedData({ ...editedData, street: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="City"
+                          value={editedData.city || ''}
+                          onChange={(e) => setEditedData({ ...editedData, city: e.target.value })}
+                          className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="State"
+                          value={editedData.state || ''}
+                          onChange={(e) => setEditedData({ ...editedData, state: e.target.value })}
+                          className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Postcode"
+                        value={editedData.postcode || ''}
+                        onChange={(e) => setEditedData({ ...editedData, postcode: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-white font-medium">
+                      {memberData.street && memberData.street}
+                      {(memberData.city || memberData.state || memberData.postcode) && (
+                        <span className="block">
+                          {[memberData.city, memberData.state, memberData.postcode].filter(Boolean).join(', ')}
+                        </span>
+                      )}
+                      {!memberData.street && !memberData.city && 'Not provided'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Emergency Contact Section */}
+            {isEditing && (
+              <div className="border-t border-slate-700 pt-6 mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Emergency Contact</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={editedData.emergency_contact_name || ''}
+                      onChange={(e) => setEditedData({ ...editedData, emergency_contact_name: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">Phone</label>
+                    <input
+                      type="tel"
+                      value={editedData.emergency_contact_phone || ''}
+                      onChange={(e) => setEditedData({ ...editedData, emergency_contact_phone: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-2">Relationship</label>
+                    <input
+                      type="text"
+                      value={editedData.emergency_contact_relationship || ''}
+                      onChange={(e) => setEditedData({ ...editedData, emergency_contact_relationship: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {membershipStatus.needsRenewal && !isEditing && (
+              <div className={`p-4 rounded-lg mb-4 ${
+                membershipStatus.color === 'yellow'
+                  ? 'bg-yellow-500/10 border border-yellow-500/20'
+                  : 'bg-red-500/10 border border-red-500/20'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={20} className={membershipStatus.color === 'yellow' ? 'text-yellow-400' : 'text-red-400'} />
+                  <div className="flex-1">
+                    <p className={`font-medium mb-1 ${membershipStatus.color === 'yellow' ? 'text-yellow-400' : 'text-red-400'}`}>
+                      {membershipStatus.status === 'expiring' ? 'Membership Expiring Soon' : 'Membership Expired'}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      {membershipStatus.status === 'expiring'
+                        ? 'Your membership will expire soon. Renew now to maintain your benefits.'
+                        : 'Your membership has expired. Renew now to continue enjoying club benefits.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditedData(memberData);
+                    }}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                  >
+                    <X size={18} />
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save size={18} />
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  {membershipStatus.needsRenewal && (
+                    <button
+                      onClick={() => setShowRenewalModal(true)}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+                    >
+                      <CreditCard size={18} />
+                      Renew Membership
+                    </button>
+                  )}
+                  <button
+                    className="flex items-center gap-2 px-6 py-2.5 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                  >
+                    <Download size={18} />
+                    Download Invoice
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Payment History */}
+          <div className={`rounded-xl border p-6 ${
+            darkMode
+              ? 'bg-slate-800/50 border-slate-700/50'
+              : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="text-blue-400" size={20} />
+              <h3 className="text-lg font-semibold text-white">Payment History</h3>
+            </div>
+
+            <p className="text-slate-400 text-center py-8">
+              No payment history available
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Renewal Modal */}
+      {showRenewalModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`max-w-2xl w-full rounded-xl shadow-xl ${
+            darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white'
+          }`}>
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-white">Renew Your Membership</h3>
+                <button
+                  onClick={() => setShowRenewalModal(false)}
+                  className="p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <p className="text-slate-400 mb-6">
+                Choose your membership type to continue with renewal:
+              </p>
+
+              <div className="space-y-3 mb-6">
+                {membershipTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedMembershipType(type.id)}
+                    className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                      selectedMembershipType === type.id
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-white mb-1">{type.name}</h4>
+                        {type.description && (
+                          <p className="text-sm text-slate-400">{type.description}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-white">
+                          ${type.amount}
+                        </p>
+                        <p className="text-xs text-slate-400">{type.currency}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-300 mb-3">
+                  Payment Method
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setSelectedPaymentMethod('credit_card')}
+                    className={`p-4 rounded-lg border text-left transition-colors ${
+                      selectedPaymentMethod === 'credit_card'
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                    <h4 className="font-medium text-white mb-1">Credit Card</h4>
+                    <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedPaymentMethod('bank_transfer')}
+                    className={`p-4 rounded-lg border text-left transition-colors ${
+                      selectedPaymentMethod === 'bank_transfer'
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-700 hover:border-slate-600'
+                    }`}
+                  >
+                    <Calendar className={`mb-2 ${selectedPaymentMethod === 'bank_transfer' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                    <h4 className="font-medium text-white mb-1">Bank Transfer</h4>
+                    <p className="text-xs text-slate-400">Pay via direct deposit</p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRenewalModal(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRenewal}
+                  disabled={!selectedMembershipType || processingPayment}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {processingPayment ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Processing...
+                    </div>
+                  ) : (
+                    selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Renewal Request'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

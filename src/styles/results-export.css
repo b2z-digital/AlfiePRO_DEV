@@ -1,0 +1,522 @@
+/* Results Export Stylesheet */
+.results-export-container {
+  font-family: Arial, sans-serif;
+  color: #000;
+  background-color: #fff;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 20px 8px;
+}
+
+.results-export-container table {
+  width: auto;
+  border-collapse: collapse;
+  border: 0.5px solid #12192a;
+  margin-bottom: 20px;
+  table-layout: fixed;
+}
+
+/* Fixed column widths for export */
+.results-export-container th:nth-child(1),
+.results-export-container td:nth-child(1) { width: 40px; } /* Pos */
+.results-export-container th:nth-child(2),
+.results-export-container td:nth-child(2) { width: 50px; } /* Sail */
+.results-export-container th:nth-child(3),
+.results-export-container td:nth-child(3) { width: 120px; } /* Skipper */
+.results-export-container th:nth-child(4),
+.results-export-container td:nth-child(4) { width: 70px; } /* Club */
+.results-export-container th:nth-child(5),
+.results-export-container td:nth-child(5) { width: 70px; } /* Design */
+
+/* Race columns - fixed 60px width */
+.results-export-container th:nth-child(n+6):not(:nth-last-child(-n+2)),
+.results-export-container td:nth-child(n+6):not(:nth-last-child(-n+2)) {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+}
+
+/* Gross and Net columns */
+.results-export-container th:nth-last-child(2),
+.results-export-container td:nth-last-child(2) { width: 50px; } /* Gross */
+.results-export-container th:nth-last-child(1),
+.results-export-container td:nth-last-child(1) { width: 50px; } /* Net */
+
+.results-export-container th,
+.results-export-container td {
+  border: 0.5px solid #12192a;
+  padding: 0 8px !important;
+  text-align: center;
+  vertical-align: middle !important;
+  line-height: 44px !important;
+  height: 44px !important;
+  background-color: #ffffff !important;
+  color: #000 !important;
+}
+
+.results-export-container th {
+  background-color: #12192a !important;
+  color: white !important;
+  font-weight: bold;
+  height: 44px !important;
+  padding: 0 8px !important;
+  line-height: 44px !important;
+}
+
+.results-export-container tbody tr {
+  background-color: #ffffff !important;
+}
+
+.results-export-container tbody tr:nth-child(even) {
+  background-color: #ffffff !important;
+}
+
+.results-export-container tbody tr:nth-child(odd) {
+  background-color: #ffffff !important;
+}
+
+.results-export-container .dropped-score {
+  background-color: #848484 !important;
+  color: white !important;
+  vertical-align: middle !important;
+}
+
+.results-export-container td:nth-child(3) {
+  text-align: left;
+  vertical-align: middle !important;
+}
+
+/* Ensure nested elements don't interfere with vertical alignment */
+.results-export-container td > div:not(.split-cell-content) {
+  line-height: inherit;
+}
+
+.results-export-container td * {
+  vertical-align: middle;
+}
+
+.results-export-container .event-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.results-export-container .event-subtitle {
+  font-size: 16px;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.results-export-container .event-details {
+  font-size: 14px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.results-export-container .footer {
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  margin-top: 20px;
+}
+
+/* Hide icons in export mode */
+.results-export-container .position-icon {
+  display: none;
+}
+
+/* Letter scores styling - removed as letter scores should only be gray if dropped */
+
+/* Net total column highlighting */
+.results-export-container .net-total {
+  font-weight: bold;
+  background-color: #e8f4f8 !important;
+  font-size: 16px;
+}
+
+/* Split cell styles for handicap format */
+.results-export-container .split-cell {
+  padding: 0 !important;
+  position: relative !important;
+  height: 44px !important;
+  line-height: normal !important;
+  overflow: visible !important;
+  vertical-align: middle !important;
+  background-color: #ffffff !important;
+}
+
+.results-export-container .split-cell > div,
+.results-export-container .split-cell .split-cell-content,
+.results-export-container .split-cell .relative {
+  display: block !important;
+  position: relative !important;
+  width: 100% !important;
+  height: 44px !important;
+  min-height: 44px !important;
+}
+
+.results-export-container .split-cell > div > div,
+.results-export-container .split-cell .split-cell-content > div,
+.results-export-container .split-cell .relative > div {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+.results-export-container .split-cell span {
+  position: absolute !important;
+  line-height: 1 !important;
+  display: inline-block !important;
+}
+
+.results-export-container .split-cell span.absolute {
+  position: absolute !important;
+}
+
+/* Position number in bottom-left */
+.results-export-container .split-cell .bottom-0,
+.results-export-container .split-cell span[class*="bottom-0"],
+.results-export-container .split-cell span.bottom-0,
+.results-export-container .split-cell .left-1,
+.results-export-container .split-cell-content .bottom-0,
+.results-export-container .split-cell-content span[class*="bottom-0"] {
+  bottom: 4px !important;
+  left: 6px !important;
+  font-size: 18px !important;
+  font-weight: bold !important;
+  color: #000 !important;
+}
+
+/* Handicap value in top-right */
+.results-export-container .split-cell .top-0,
+.results-export-container .split-cell span[class*="top-0"],
+.results-export-container .split-cell span.top-0,
+.results-export-container .split-cell .right-1,
+.results-export-container .split-cell-content .top-0,
+.results-export-container .split-cell-content span[class*="top-0"],
+.results-export-container .split-cell-content .right-1 {
+  top: 4px !important;
+  right: 6px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: #333 !important;
+  opacity: 1 !important;
+}
+
+/* Diagonal line in split cells - CRITICAL: Must show in export */
+.results-export-container .split-cell .diagonal-line,
+.results-export-container .split-cell .export-diagonal,
+.results-export-container .split-cell div.diagonal-line,
+.results-export-container .split-cell div.export-diagonal,
+.results-export-container .split-cell div[class*="diagonal"],
+.results-export-container .split-cell > div > div:first-child,
+.results-export-container .split-cell .relative > div:first-child,
+.results-export-container .split-cell .split-cell-content > div:first-child,
+.results-export-container td.split-cell .diagonal-line,
+.results-export-container td.split-cell .export-diagonal,
+.results-export-container td.split-cell div.diagonal-line,
+.results-export-container td.split-cell div.export-diagonal,
+.results-export-container td.split-cell div[class*="diagonal"] {
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    rgba(0, 0, 0, 0.4) calc(50% - 0.75px),
+    rgba(0, 0, 0, 0.4) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  ) !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  z-index: 1 !important;
+}
+
+/* Ensure text appears above the diagonal line */
+.results-export-container .split-cell span {
+  z-index: 2 !important;
+  position: absolute !important;
+}
+
+/* Screen display diagonal line */
+.screen-diagonal {
+  background: linear-gradient(to top right, transparent calc(50% - 0.5px), rgba(148, 163, 184, 0.3) calc(50% - 0.5px), rgba(148, 163, 184, 0.3) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+}
+
+/* Dropped split cell styling */
+.results-export-container td.dropped-score.split-cell {
+  background-color: #848484 !important;
+}
+
+.results-export-container td.dropped-score.split-cell span {
+  color: white !important;
+}
+
+.results-export-container td.dropped-score.split-cell .diagonal-line,
+.results-export-container td.dropped-score.split-cell div[class*="diagonal"] {
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    rgba(255, 255, 255, 0.3) calc(50% - 0.75px),
+    rgba(255, 255, 255, 0.3) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  ) !important;
+}
+
+/* Handicap carryover bonus row styling */
+.results-export-container thead tr:last-child th {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 4px 8px !important;
+  vertical-align: middle !important;
+  background-color: #12192a !important;
+  border-bottom: 1px solid #12192a !important;
+}
+
+.results-export-container thead tr:last-child th div {
+  font-style: italic !important;
+  color: #aaa !important;
+  font-size: 10px !important;
+  font-weight: normal !important;
+  line-height: 1 !important;
+}
+
+.results-export-container thead tr:last-child th i {
+  font-style: italic !important;
+  color: #aaa !important;
+}
+
+/* Series Leaderboard Export Styles */
+.series-export-container {
+  font-family: Arial, sans-serif;
+  color: #000;
+  background-color: #fff;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.series-export-container table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 0.5px solid #12192a;
+  margin-bottom: 20px;
+  font-size: 11px;
+}
+
+.series-export-container th,
+.series-export-container td {
+  border: 0.5px solid #12192a;
+  padding: 4px 6px !important;
+  text-align: center;
+  vertical-align: middle !important;
+  line-height: 32px !important;
+  height: 32px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.series-export-container th {
+  background-color: #12192a;
+  color: white;
+  font-weight: bold;
+  height: 36px !important;
+  padding: 4px 6px !important;
+  line-height: 36px !important;
+  font-size: 12px;
+}
+
+.series-export-container tr:nth-child(even) {
+  background-color: #eeeeee;
+}
+
+.series-export-container tr:nth-child(odd) {
+  background-color: #ffffff;
+}
+
+.series-export-container .dropped-score {
+  background-color: #848484 !important;
+  color: white !important;
+  text-decoration: none;
+  vertical-align: middle !important;
+}
+
+.series-export-container td:nth-child(3) {
+  text-align: left;
+  vertical-align: middle !important;
+  max-width: 150px;
+}
+
+/* Compact column widths for series */
+.series-export-container td:nth-child(1),
+.series-export-container th:nth-child(1) {
+  width: 40px;
+  min-width: 40px;
+}
+
+.series-export-container td:nth-child(2),
+.series-export-container th:nth-child(2) {
+  width: 50px;
+  min-width: 50px;
+}
+
+.series-export-container td:nth-child(3),
+.series-export-container th:nth-child(3) {
+  width: 150px;
+  min-width: 100px;
+  max-width: 150px;
+}
+
+.series-export-container td:nth-child(4),
+.series-export-container th:nth-child(4) {
+  width: 80px;
+  min-width: 60px;
+  max-width: 80px;
+}
+
+.series-export-container td:nth-child(5),
+.series-export-container th:nth-child(5) {
+  width: 80px;
+  min-width: 60px;
+  max-width: 80px;
+}
+
+/* Round columns - compact */
+.series-export-container td:nth-child(n+6):nth-last-child(n+2),
+.series-export-container th:nth-child(n+6):nth-last-child(n+2) {
+  width: 45px;
+  min-width: 45px;
+  max-width: 45px;
+}
+
+/* Total column */
+.series-export-container td:last-child,
+.series-export-container th:last-child {
+  width: 60px;
+  min-width: 60px;
+  font-weight: bold;
+}
+
+.series-export-container td > div {
+  display: inline;
+  line-height: inherit;
+}
+
+.series-export-container td * {
+  vertical-align: middle;
+}
+
+.series-export-container .event-title {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.series-export-container .event-subtitle {
+  font-size: 14px;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.series-export-container .footer {
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+  margin-top: 20px;
+}
+
+.series-export-container .position-icon {
+  display: none;
+}
+
+/* Letter scores styling - removed as letter scores should only be gray if dropped */
+
+.series-export-container .net-total {
+  font-weight: bold;
+  background-color: #e8f4f8 !important;
+  font-size: 13px;
+}
+
+/* Split cell styles for handicap format in series */
+.series-export-container .split-cell {
+  padding: 0 !important;
+  position: relative !important;
+  height: 32px !important;
+  line-height: normal !important;
+  overflow: visible !important;
+  vertical-align: middle !important;
+}
+
+.series-export-container .split-cell > div {
+  display: block !important;
+  position: relative !important;
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+}
+
+.series-export-container .split-cell > div > div {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+.series-export-container .split-cell span {
+  position: absolute !important;
+  line-height: 1 !important;
+  display: inline-block !important;
+}
+
+.series-export-container .split-cell span.absolute {
+  position: absolute !important;
+}
+
+.series-export-container .split-cell .bottom-0,
+.series-export-container .split-cell span[class*="bottom-0"] {
+  bottom: 3px !important;
+  left: 4px !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+}
+
+.series-export-container .split-cell .top-0,
+.series-export-container .split-cell span[class*="top-0"] {
+  top: 3px !important;
+  right: 4px !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+}
+
+/* Diagonal line in split cells - multiple selectors to ensure it applies */
+.series-export-container .split-cell > div > div:first-child,
+.series-export-container .split-cell .relative > div:first-child,
+.series-export-container .split-cell div[class*="absolute"][class*="inset-0"] {
+  background: linear-gradient(to top right, transparent calc(50% - 0.5px), rgba(100, 100, 100, 0.5) calc(50% - 0.5px), rgba(100, 100, 100, 0.5) calc(50% + 0.5px), transparent calc(50% + 0.5px)) !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Dropped split cell styling */
+.series-export-container td.dropped-score.split-cell span {
+  color: white !important;
+}

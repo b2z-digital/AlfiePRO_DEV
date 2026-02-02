@@ -1,0 +1,840 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe } from 'lucide-react';
+import { supabase } from '../../utils/supabase';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { BoatType, MembershipLevel } from '../../types/member';
+import { Avatar } from '../ui/Avatar';
+import { AvatarCropModal } from '../ui/AvatarCropModal';
+import imageCompression from 'browser-image-compression';
+import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
+
+interface MemberEditModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  memberId: string;
+  clubId: string;
+  darkMode?: boolean;
+  onSuccess?: () => void;
+}
+
+interface MemberData {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  street: string;
+  city: string;
+  state: string;
+  postcode: string;
+  membership_level: string;
+  is_financial: boolean;
+  date_joined: string;
+  renewal_date: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+  user_id: string;
+  avatar_url?: string;
+  country?: string;
+  country_code?: string;
+  category?: string;
+  boats?: Array<{
+    id: string;
+    boat_type: string;
+    sail_number: string;
+    hull: string;
+    handicap?: number;
+  }>;
+}
+
+export const MemberEditModal: React.FC<MemberEditModalProps> = ({
+  isOpen,
+  onClose,
+  memberId,
+  clubId,
+  darkMode = true,
+  onSuccess
+}) => {
+  const { addNotification } = useNotifications();
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [memberData, setMemberData] = useState<MemberData | null>(null);
+  const [boats, setBoats] = useState<Array<{ id?: string; boat_type: string; sail_number: string; hull: string; handicap?: number }>>([]);
+  const [activeTab, setActiveTab] = useState<'details' | 'boats' | 'membership'>('details');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    if (isOpen && memberId) {
+      fetchMemberData();
+      fetchMembershipTypes();
+    }
+  }, [isOpen, memberId, clubId]);
+
+  const fetchMemberData = async () => {
+    try {
+      setLoading(true);
+
+      const { data: member, error: memberError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('id', memberId)
+        .single();
+
+      if (memberError) throw memberError;
+
+      const { data: memberBoats, error: boatsError } = await supabase
+        .from('member_boats')
+        .select('*')
+        .eq('member_id', memberId);
+
+      if (boatsError) throw boatsError;
+
+      if (member.user_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', member.user_id)
+          .single();
+
+        member.avatar_url = profile?.avatar_url;
+      }
+
+      setMemberData(member);
+      setBoats(memberBoats || [{ boat_type: '', sail_number: '', hull: '' }]);
+    } catch (error: any) {
+      console.error('Error fetching member:', error);
+      addNotification('error', 'Failed to load member data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMembershipTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('membership_types')
+        .select('id, name')
+        .eq('club_id', clubId)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+
+      setMembershipTypes(data || []);
+    } catch (error: any) {
+      console.error('Error fetching membership types:', error);
+    }
+  };
+
+  const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !memberData) return;
+
+    if (!file.type.startsWith('image/')) {
+      addNotification('error', 'Please select an image file');
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setShowCropModal(true);
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleCroppedImage = async (croppedBlob: Blob) => {
+    if (!memberData) return;
+
+    try {
+      setUploadingAvatar(true);
+      setShowCropModal(false);
+
+      const fileName = `${memberId}-${Date.now()}.jpg`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, croppedBlob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'image/jpeg'
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('members')
+        .update({ avatar_url: publicUrl })
+        .eq('id', memberId);
+
+      if (updateError) throw updateError;
+
+      if (memberData.user_id) {
+        await supabase
+          .from('profiles')
+          .update({ avatar_url: publicUrl })
+          .eq('id', memberData.user_id);
+      }
+
+      setMemberData({ ...memberData, avatar_url: publicUrl });
+      addNotification('success', 'Avatar uploaded successfully');
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      addNotification('error', 'Failed to upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+      setSelectedImageFile(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberData) return;
+
+    setSubmitting(true);
+
+    try {
+      const { error: updateError } = await supabase
+        .from('members')
+        .update({
+          first_name: memberData.first_name,
+          last_name: memberData.last_name,
+          email: memberData.email,
+          phone: memberData.phone,
+          street: memberData.street,
+          city: memberData.city,
+          state: memberData.state,
+          postcode: memberData.postcode,
+          membership_level: memberData.membership_level,
+          is_financial: memberData.is_financial,
+          emergency_contact_name: memberData.emergency_contact_name,
+          emergency_contact_phone: memberData.emergency_contact_phone,
+          emergency_contact_relationship: memberData.emergency_contact_relationship,
+          country: memberData.country,
+          country_code: memberData.country_code,
+          category: memberData.category,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', memberId);
+
+      if (updateError) throw updateError;
+
+      const existingBoatIds = boats.filter(b => b.id).map(b => b.id);
+      const { data: currentBoats } = await supabase
+        .from('member_boats')
+        .select('id')
+        .eq('member_id', memberId);
+
+      const boatsToDelete = currentBoats?.filter(b => !existingBoatIds.includes(b.id)).map(b => b.id) || [];
+      if (boatsToDelete.length > 0) {
+        await supabase
+          .from('member_boats')
+          .delete()
+          .in('id', boatsToDelete);
+      }
+
+      for (const boat of boats) {
+        if (!boat.boat_type || !boat.sail_number) continue;
+
+        if (boat.id) {
+          await supabase
+            .from('member_boats')
+            .update({
+              boat_type: boat.boat_type,
+              sail_number: boat.sail_number,
+              hull: boat.hull,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', boat.id);
+        } else {
+          await supabase
+            .from('member_boats')
+            .insert({
+              member_id: memberId,
+              boat_type: boat.boat_type,
+              sail_number: boat.sail_number,
+              hull: boat.hull,
+            });
+        }
+      }
+
+      addNotification('success', 'Member updated successfully');
+      onSuccess?.();
+      onClose();
+    } catch (error: any) {
+      console.error('Error updating member:', error);
+      addNotification('error', error.message || 'Failed to update member');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const addBoat = () => {
+    setBoats([...boats, { boat_type: '', sail_number: '', hull: '', handicap: 0 }]);
+  };
+
+  const removeBoat = (index: number) => {
+    setBoats(boats.filter((_, i) => i !== index));
+  };
+
+  const updateBoat = (index: number, field: string, value: string | number) => {
+    const newBoats = [...boats];
+    newBoats[index] = { ...newBoats[index], [field]: value };
+    setBoats(newBoats);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border ${
+        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+      }`}>
+        {/* Blue Banner Header */}
+        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
+          <div className="flex items-center gap-4 relative z-10">
+            {memberData && (
+              <div className="relative group">
+                <Avatar
+                  name={`${memberData.first_name} ${memberData.last_name}`}
+                  imageUrl={memberData.avatar_url}
+                  size="xl"
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  {uploadingAvatar ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  ) : (
+                    <Camera size={24} className="text-white" />
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarSelect}
+                  className="hidden"
+                />
+              </div>
+            )}
+            <div>
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
+                Edit Member
+              </h2>
+              {memberData && (
+                <p className="text-blue-100 text-sm mt-0.5">
+                  {memberData.first_name} {memberData.last_name}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300 relative z-10"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className={`border-b ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex gap-2 px-6 py-4">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'details'
+                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
+                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <User size={16} className="inline mr-2" />
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab('boats')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'boats'
+                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
+                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <Sailboat size={16} className="inline mr-2" />
+              Boats
+            </button>
+            <button
+              onClick={() => setActiveTab('membership')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                activeTab === 'membership'
+                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
+                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <DollarSign size={16} className="inline mr-2" />
+              Membership
+            </button>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Loading...
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+            {activeTab === 'details' && memberData && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={memberData.first_name}
+                      onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      value={memberData.last_name}
+                      onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={memberData.email}
+                      onChange={(e) => setMemberData({ ...memberData, email: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={memberData.phone}
+                      onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Street Address
+                  </label>
+                  <input
+                    type="text"
+                    value={memberData.street}
+                    onChange={(e) => setMemberData({ ...memberData, street: e.target.value })}
+                    className={`w-full px-4 py-2 rounded-lg ${
+                      darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                    } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      value={memberData.city}
+                      onChange={(e) => setMemberData({ ...memberData, city: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      value={memberData.state}
+                      onChange={(e) => setMemberData({ ...memberData, state: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Postcode
+                    </label>
+                    <input
+                      type="text"
+                      value={memberData.postcode}
+                      onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Country
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={memberData.country_code || 'AU'}
+                        onChange={(e) => {
+                          const country = SAILING_NATIONS.find(c => c.code === e.target.value);
+                          setMemberData({
+                            ...memberData,
+                            country_code: e.target.value,
+                            country: country?.name || e.target.value
+                          });
+                        }}
+                        className={`w-full pl-12 pr-4 py-2 rounded-lg ${
+                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none`}
+                      >
+                        {SAILING_NATIONS.map((country) => (
+                          <option key={country.code} value={country.code}>
+                            {country.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-2xl pointer-events-none">
+                        {getCountryFlag(memberData.country_code || 'AU')}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Category
+                    </label>
+                    <select
+                      value={memberData.category || ''}
+                      onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-lg ${
+                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    >
+                      <option value="">Select Category</option>
+                      <option value="Junior">Junior</option>
+                      <option value="Open">Open</option>
+                      <option value="Master">Master</option>
+                      <option value="Grand Master">Grand Master</option>
+                      <option value="Legend">Legend</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className={`border-t pt-4 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Emergency Contact
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        value={memberData.emergency_contact_name}
+                        onChange={(e) => setMemberData({ ...memberData, emergency_contact_name: e.target.value })}
+                        className={`w-full px-4 py-2 rounded-lg ${
+                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={memberData.emergency_contact_phone}
+                        onChange={(e) => setMemberData({ ...memberData, emergency_contact_phone: e.target.value })}
+                        className={`w-full px-4 py-2 rounded-lg ${
+                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Relationship
+                      </label>
+                      <input
+                        type="text"
+                        value={memberData.emergency_contact_relationship}
+                        onChange={(e) => setMemberData({ ...memberData, emergency_contact_relationship: e.target.value })}
+                        className={`w-full px-4 py-2 rounded-lg ${
+                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'boats' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    Boats
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={addBoat}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Add Boat
+                  </button>
+                </div>
+
+                {boats.map((boat, index) => (
+                  <div key={index} className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50'}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Boat {index + 1}
+                      </span>
+                      {boats.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeBoat(index)}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Boat Type
+                        </label>
+                        <select
+                          value={boat.boat_type}
+                          onChange={(e) => updateBoat(index, 'boat_type', e.target.value)}
+                          className={`w-full px-3 py-2 rounded-lg ${
+                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                        >
+                          <option value="">Select boat type</option>
+                          <option value="10R">10R</option>
+                          <option value="IOM">IOM</option>
+                          <option value="DF65">DF65</option>
+                          <option value="DF95">DF95</option>
+                          <option value="Marblehead">Marblehead</option>
+                          <option value="A Class">A Class</option>
+                          <option value="RC Laser">RC Laser</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Sail Number
+                        </label>
+                        <input
+                          type="text"
+                          value={boat.sail_number}
+                          onChange={(e) => updateBoat(index, 'sail_number', e.target.value)}
+                          placeholder="e.g., 911"
+                          className={`w-full px-3 py-2 rounded-lg ${
+                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Hull Name
+                        </label>
+                        <input
+                          type="text"
+                          value={boat.hull}
+                          onChange={(e) => updateBoat(index, 'hull', e.target.value)}
+                          placeholder="e.g., Trance"
+                          className={`w-full px-3 py-2 rounded-lg ${
+                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Handicap
+                          <span className={`ml-2 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                            (Auto-updated after races)
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          value={boat.handicap || 0}
+                          onChange={(e) => updateBoat(index, 'handicap', parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          min="0"
+                          step="1"
+                          className={`w-full px-3 py-2 rounded-lg ${
+                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'membership' && memberData && (
+              <div className="space-y-6">
+                <div className={`p-6 rounded-lg ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50'}`}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Membership Type
+                      </label>
+                      <select
+                        value={memberData.membership_level || ''}
+                        onChange={(e) => setMemberData({ ...memberData, membership_level: e.target.value })}
+                        className={`w-full px-4 py-2 rounded-lg ${
+                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="">Not set</option>
+                        {membershipTypes.map(type => (
+                          <option key={type.id} value={type.name}>
+                            {type.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Financial Status
+                      </label>
+                      <select
+                        value={memberData.is_financial ? 'financial' : 'unfinancial'}
+                        onChange={(e) => setMemberData({ ...memberData, is_financial: e.target.value === 'financial' })}
+                        className={`w-full px-4 py-2 rounded-lg ${
+                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
+                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      >
+                        <option value="financial">Financial</option>
+                        <option value="unfinancial">Unfinancial</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Date Joined
+                      </label>
+                      <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {new Date(memberData.date_joined).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Renewal Date
+                      </label>
+                      <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {memberData.renewal_date ? new Date(memberData.renewal_date).toLocaleDateString() : 'Not set'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-4">
+                  <div className="flex items-center gap-2">
+                    {memberData.is_financial ? (
+                      <span className="flex items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm font-medium">
+                        <CheckCircle size={16} />
+                        Financial
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-sm font-medium">
+                        <Clock size={16} />
+                        Unfinancial
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6 pt-6 border-t border-slate-700">
+              <button
+                type="button"
+                onClick={onClose}
+                className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                  darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                {submitting ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {selectedImageFile && (
+        <AvatarCropModal
+          isOpen={showCropModal}
+          imageFile={selectedImageFile}
+          onClose={() => {
+            setShowCropModal(false);
+            setSelectedImageFile(null);
+          }}
+          onCrop={handleCroppedImage}
+          darkMode={darkMode}
+        />
+      )}
+    </div>
+  );
+};

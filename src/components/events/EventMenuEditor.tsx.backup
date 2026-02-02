@@ -1,0 +1,663 @@
+import React, { useState, useEffect } from 'react';
+import { GripVertical, Plus, Trash2, Save, Loader2, ExternalLink, Menu as MenuIcon, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { EventMenuConfig, EventMenuItem, EventHeaderConfig } from '../../types/eventWidgets';
+import { supabase } from '../../utils/supabase';
+import { v4 as uuidv4 } from 'uuid';
+
+interface Props {
+  websiteId: string;
+  headerConfig: EventHeaderConfig;
+  config: Record<string, any>;
+  onSave: (config: EventMenuConfig) => void;
+  saving: boolean;
+  darkMode?: boolean;
+}
+
+interface SortableMenuItemProps {
+  item: EventMenuItem;
+  onUpdate: (item: EventMenuItem) => void;
+  onDelete: () => void;
+  darkMode?: boolean;
+  pages: Array<{ id: string; title: string; slug: string }>;
+}
+
+const SortableMenuItem: React.FC<SortableMenuItemProps> = ({ item, onUpdate, onDelete, darkMode, pages }) => {
+  const [expanded, setExpanded] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
+  };
+
+  const handleTypeChange = (newType: EventMenuItem['type']) => {
+    onUpdate({ ...item, type: newType, url: '' });
+  };
+
+  const handlePageSelect = (pageSlug: string) => {
+    onUpdate({ ...item, url: `/${pageSlug}` });
+  };
+
+  const getTypeColor = () => {
+    switch (item.type) {
+      case 'page': return 'text-blue-500';
+      case 'external': return 'text-green-500';
+      case 'section': return 'text-purple-500';
+      default: return 'text-slate-500';
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group rounded-lg border transition-all ${
+        darkMode ? 'bg-slate-800/30 border-slate-700 hover:border-slate-600' : 'bg-white border-slate-200 hover:border-slate-300'
+      } ${isDragging ? 'shadow-lg ring-2 ring-cyan-500/50' : ''}`}
+    >
+      <div className="flex items-center gap-2 p-3">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+          <GripVertical size={18} className={`transition-colors ${darkMode ? 'text-slate-600 group-hover:text-slate-400' : 'text-slate-300 group-hover:text-slate-500'}`} />
+        </div>
+
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className={`p-1 rounded transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
+        >
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+
+        <input
+          type="text"
+          value={item.label}
+          onChange={(e) => onUpdate({ ...item, label: e.target.value })}
+          placeholder="Menu label"
+          className={`flex-1 px-3 py-2 rounded-lg border font-medium ${
+            darkMode
+              ? 'bg-slate-700/50 border-slate-600 text-white placeholder-slate-500'
+              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+          } focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
+        />
+
+        <span className={`text-xs font-semibold px-2 py-1 rounded ${getTypeColor()}`}>
+          {item.type.toUpperCase()}
+        </span>
+
+        {item.type === 'external' && item.url && <ExternalLink size={14} className="text-slate-400" />}
+
+        <button
+          onClick={onDelete}
+          className={`p-2 rounded-lg transition-all ${
+            darkMode
+              ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+              : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+          }`}
+          title="Delete menu item"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className={`p-4 pt-0 space-y-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+          <div>
+            <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Link Type
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {['page', 'external', 'section'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => handleTypeChange(type as EventMenuItem['type'])}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    item.type === type
+                      ? 'bg-cyan-500 text-white shadow-sm'
+                      : darkMode
+                      ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              {item.type === 'page' ? 'Select Page' : item.type === 'external' ? 'External URL' : 'Section ID'}
+            </label>
+            {item.type === 'page' ? (
+              <select
+                value={item.url}
+                onChange={(e) => handlePageSelect(e.target.value)}
+                className={`w-full px-3 py-2 rounded-lg border ${
+                  darkMode
+                    ? 'bg-slate-700/50 border-slate-600 text-white'
+                    : 'bg-white border-slate-200 text-slate-900'
+                } focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
+              >
+                <option value="">Select a page...</option>
+                {pages.map((page) => (
+                  <option key={page.id} value={page.slug}>
+                    {page.title}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={item.url}
+                onChange={(e) => onUpdate({ ...item, url: e.target.value })}
+                placeholder={item.type === 'external' ? 'https://example.com' : '#section-id'}
+                className={`w-full px-3 py-2 rounded-lg border ${
+                  darkMode
+                    ? 'bg-slate-700/50 border-slate-600 text-white placeholder-slate-500'
+                    : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                } focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const EventMenuEditor: React.FC<Props> = ({ websiteId, headerConfig, config, onSave, saving, darkMode = false }) => {
+  const [menuConfig, setMenuConfig] = useState<EventMenuConfig>({
+    items: config.items || [],
+    style: config.style || 'horizontal',
+    menu_position: config.menu_position || 'right',
+    background_color: config.background_color || '#ffffff',
+    text_color: config.text_color || '#000000',
+    hover_color: config.hover_color || '#0891b2',
+    hamburger_color: config.hamburger_color || '#000000',
+    position: config.position || 'sticky'
+  });
+  const [pages, setPages] = useState<Array<{ id: string; title: string; slug: string }>>([]);
+  const [previewMenuOpen, setPreviewMenuOpen] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  );
+
+  useEffect(() => {
+    loadPages();
+  }, [websiteId]);
+
+  const loadPages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_page_layouts')
+        .select('id, title, slug')
+        .eq('website_id', websiteId)
+        .eq('is_published', true)
+        .order('title');
+
+      if (error) throw error;
+      setPages(data || []);
+    } catch (error) {
+      console.error('Error loading pages:', error);
+    }
+  };
+
+  const handleAddItem = () => {
+    const newItem: EventMenuItem = {
+      id: uuidv4(),
+      label: 'New Item',
+      url: '',
+      type: 'page',
+      order: menuConfig.items.length
+    };
+
+    setMenuConfig(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+  };
+
+  const handleUpdateItem = (index: number, updatedItem: EventMenuItem) => {
+    setMenuConfig(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => i === index ? updatedItem : item)
+    }));
+  };
+
+  const handleDeleteItem = (index: number) => {
+    setMenuConfig(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      setMenuConfig(prev => {
+        const oldIndex = prev.items.findIndex(item => item.id === active.id);
+        const newIndex = prev.items.findIndex(item => item.id === over.id);
+
+        const newItems = arrayMove(prev.items, oldIndex, newIndex);
+        return {
+          ...prev,
+          items: newItems.map((item, index) => ({ ...item, order: index }))
+        };
+      });
+    }
+  };
+
+  const handleChange = (field: keyof EventMenuConfig, value: any) => {
+    setMenuConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = () => {
+    onSave(menuConfig);
+  };
+
+  const renderHeaderPreview = () => {
+    if (headerConfig.logo_type === 'upload' && headerConfig.logo_url) {
+      return (
+        <img
+          src={headerConfig.logo_url}
+          alt="Event Logo"
+          style={{ height: `${headerConfig.logo_size}px` }}
+          className="object-contain"
+        />
+      );
+    } else if (headerConfig.logo_type === 'club' && headerConfig.logo_url) {
+      return (
+        <img
+          src={headerConfig.logo_url}
+          alt="Club Logo"
+          style={{ height: `${headerConfig.logo_size}px` }}
+          className="object-contain"
+        />
+      );
+    } else if (headerConfig.logo_type === 'text' && headerConfig.header_text) {
+      return (
+        <span
+          className="font-bold"
+          style={{ fontSize: `${headerConfig.text_size}px` }}
+        >
+          {headerConfig.header_text}
+        </span>
+      );
+    }
+    return <span className="text-xl font-bold">Logo</span>;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Navigation Style & Position - Compact */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            Menu Style
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleChange('style', 'horizontal')}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                menuConfig.style === 'horizontal'
+                  ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600'
+                  : darkMode
+                  ? 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              Horizontal
+            </button>
+            <button
+              onClick={() => handleChange('style', 'dropdown')}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                menuConfig.style === 'dropdown'
+                  ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600'
+                  : darkMode
+                  ? 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              Hamburger
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            Position
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleChange('menu_position', 'left')}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                menuConfig.menu_position === 'left'
+                  ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600'
+                  : darkMode
+                  ? 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              Left
+            </button>
+            <button
+              onClick={() => handleChange('menu_position', 'right')}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                menuConfig.menu_position === 'right'
+                  ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600'
+                  : darkMode
+                  ? 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              Right
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Scroll Behavior - Compact */}
+      <div>
+        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          Scroll Behavior
+        </label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleChange('position', 'top')}
+            className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+              menuConfig.position === 'top'
+                ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600'
+                : darkMode
+                ? 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            Static
+          </button>
+          <button
+            onClick={() => handleChange('position', 'sticky')}
+            className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+              menuConfig.position === 'sticky'
+                ? 'border-cyan-500 bg-cyan-500/10 text-cyan-600'
+                : darkMode
+                ? 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            Sticky
+          </button>
+        </div>
+      </div>
+
+      {/* Colors - Compact Grid */}
+      <div>
+        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          Colors
+        </label>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={menuConfig.background_color}
+              onChange={(e) => handleChange('background_color', e.target.value)}
+              className="w-10 h-10 rounded cursor-pointer"
+              title="Background"
+            />
+            <div className="flex-1">
+              <label className="text-xs text-slate-500">Background</label>
+              <input
+                type="text"
+                value={menuConfig.background_color}
+                onChange={(e) => handleChange('background_color', e.target.value)}
+                className={`w-full px-2 py-1 rounded border text-xs font-mono ${
+                  darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                }`}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={menuConfig.text_color}
+              onChange={(e) => handleChange('text_color', e.target.value)}
+              className="w-10 h-10 rounded cursor-pointer"
+              title="Text"
+            />
+            <div className="flex-1">
+              <label className="text-xs text-slate-500">Text</label>
+              <input
+                type="text"
+                value={menuConfig.text_color}
+                onChange={(e) => handleChange('text_color', e.target.value)}
+                className={`w-full px-2 py-1 rounded border text-xs font-mono ${
+                  darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                }`}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={menuConfig.hover_color}
+              onChange={(e) => handleChange('hover_color', e.target.value)}
+              className="w-10 h-10 rounded cursor-pointer"
+              title="Hover"
+            />
+            <div className="flex-1">
+              <label className="text-xs text-slate-500">Hover</label>
+              <input
+                type="text"
+                value={menuConfig.hover_color}
+                onChange={(e) => handleChange('hover_color', e.target.value)}
+                className={`w-full px-2 py-1 rounded border text-xs font-mono ${
+                  darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                }`}
+              />
+            </div>
+          </div>
+
+          {menuConfig.style === 'dropdown' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={menuConfig.hamburger_color}
+                onChange={(e) => handleChange('hamburger_color', e.target.value)}
+                className="w-10 h-10 rounded cursor-pointer"
+                title="Hamburger Icon"
+              />
+              <div className="flex-1">
+                <label className="text-xs text-slate-500">Hamburger</label>
+                <input
+                  type="text"
+                  value={menuConfig.hamburger_color}
+                  onChange={(e) => handleChange('hamburger_color', e.target.value)}
+                  className={`w-full px-2 py-1 rounded border text-xs font-mono ${
+                    darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                  }`}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Menu Items - Compact */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+            Menu Items ({menuConfig.items.length})
+          </label>
+          <button
+            onClick={handleAddItem}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors text-sm font-medium"
+          >
+            <Plus size={16} />
+            Add Item
+          </button>
+        </div>
+
+        {menuConfig.items.length === 0 ? (
+          <div className={`text-center py-8 rounded-lg border-2 border-dashed ${
+            darkMode ? 'border-slate-700 bg-slate-800/20' : 'border-slate-200 bg-slate-50'
+          }`}>
+            <MenuIcon size={40} className={`mx-auto mb-2 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              No menu items. Click "Add Item" to get started.
+            </p>
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={menuConfig.items.map(item => item.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {menuConfig.items.map((item, index) => (
+                  <SortableMenuItem
+                    key={item.id}
+                    item={item}
+                    onUpdate={(updatedItem) => handleUpdateItem(index, updatedItem)}
+                    onDelete={() => handleDeleteItem(index)}
+                    darkMode={darkMode}
+                    pages={pages}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
+
+      {/* Compact Preview with Header */}
+      <div>
+        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          Preview
+        </label>
+
+        <div className="rounded-lg overflow-hidden border-2 border-slate-300 shadow-lg">
+          {/* Header Preview */}
+          <div
+            style={{
+              backgroundColor: headerConfig.background_color,
+              color: headerConfig.text_color,
+              height: `${headerConfig.height}px`
+            }}
+            className="flex items-center px-6 relative"
+          >
+            {/* Left side hamburger */}
+            {menuConfig.style === 'dropdown' && menuConfig.menu_position === 'left' && (
+              <button
+                onClick={() => setPreviewMenuOpen(!previewMenuOpen)}
+                className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-black/5 transition-colors absolute left-4"
+                style={{ color: menuConfig.hamburger_color }}
+              >
+                <MenuIcon size={20} />
+                <span className="text-[9px] font-semibold tracking-wider">MENU</span>
+              </button>
+            )}
+
+            {/* Center logo - always centered */}
+            <div className={`flex items-center w-full ${
+              headerConfig.logo_position === 'center' ? 'justify-center' : 'justify-start pl-16'
+            }`}>
+              {renderHeaderPreview()}
+            </div>
+
+            {/* Horizontal menu */}
+            {menuConfig.style === 'horizontal' && (
+              <div className={`flex items-center gap-4 absolute ${
+                menuConfig.menu_position === 'left' ? 'left-20' : 'right-6'
+              }`}>
+                {menuConfig.items.slice(0, 4).map((item) => (
+                  <div
+                    key={item.id}
+                    className="text-sm font-medium cursor-pointer hover:opacity-75 transition-opacity flex items-center gap-1"
+                    style={{ color: menuConfig.text_color }}
+                  >
+                    {item.label}
+                    {item.type === 'external' && <ExternalLink size={12} />}
+                  </div>
+                ))}
+                {menuConfig.items.length > 4 && (
+                  <span className="text-xs opacity-50" style={{ color: menuConfig.text_color }}>
+                    +{menuConfig.items.length - 4}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Right side hamburger */}
+            {menuConfig.style === 'dropdown' && menuConfig.menu_position === 'right' && (
+              <button
+                onClick={() => setPreviewMenuOpen(!previewMenuOpen)}
+                className="flex flex-col items-center gap-0.5 p-2 rounded-lg hover:bg-black/5 transition-colors absolute right-4"
+                style={{ color: menuConfig.hamburger_color }}
+              >
+                <MenuIcon size={20} />
+                <span className="text-[9px] font-semibold tracking-wider">MENU</span>
+              </button>
+            )}
+          </div>
+
+          {/* Dropdown Menu Sidebar */}
+          {menuConfig.style === 'dropdown' && previewMenuOpen && (
+            <div className="relative h-48 bg-slate-100">
+              <div
+                className={`absolute top-0 ${menuConfig.menu_position === 'left' ? 'left-0' : 'right-0'} w-64 h-full bg-white shadow-2xl`}
+              >
+                <div className="bg-slate-100 px-4 py-5">
+                  <button
+                    onClick={() => setPreviewMenuOpen(false)}
+                    className="w-full text-center text-slate-900 font-semibold text-xs tracking-[0.2em] hover:text-slate-600 transition-colors"
+                  >
+                    CLOSE MENU
+                  </button>
+                </div>
+
+                <nav className="space-y-0">
+                  {menuConfig.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="py-3 text-center text-slate-900 font-medium text-xs tracking-[0.15em] hover:text-slate-600 transition-colors border-b border-slate-200 flex items-center justify-center gap-2"
+                    >
+                      {item.label.toUpperCase()}
+                      {item.type === 'external' && <ExternalLink size={12} />}
+                    </div>
+                  ))}
+                </nav>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={handleSubmit}
+          disabled={saving}
+          className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <>
+              <Save size={18} />
+              <span>Save Navigation</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};

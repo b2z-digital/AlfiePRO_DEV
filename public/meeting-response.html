@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Response</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      animation: slideUp 0.5s ease-out;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .icon {
+      font-size: 72px;
+      margin-bottom: 24px;
+      animation: bounce 1s ease-in-out;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    h1 {
+      margin: 0 0 16px 0;
+      color: #1a202c;
+      font-size: 32px;
+      font-weight: 700;
+    }
+
+    p {
+      color: #4a5568;
+      line-height: 1.6;
+      margin: 12px 0;
+      font-size: 16px;
+    }
+
+    .meeting-name {
+      font-weight: 600;
+      color: #667eea;
+      margin: 24px 0;
+      font-size: 20px;
+      padding: 16px;
+      background: #f7fafc;
+      border-radius: 8px;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      margin: 24px 0;
+      font-size: 18px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .status.attending {
+      background: #10b981;
+      color: white;
+    }
+
+    .status.not_attending {
+      background: #ef4444;
+      color: white;
+    }
+
+    .status.maybe {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .close-hint {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #e2e8f0;
+      color: #718096;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon" id="statusIcon"></div>
+    <h1>Response Recorded</h1>
+    <p>Your attendance has been updated for:</p>
+    <div class="meeting-name" id="meetingName"></div>
+    <div class="status" id="statusBadge"></div>
+    <p class="close-hint">You can close this window now.</p>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const meetingName = urlParams.get('meeting');
+
+    const statusConfig = {
+      attending: {
+        icon: '✓',
+        message: "You're attending",
+        class: 'attending'
+      },
+      not_attending: {
+        icon: '✗',
+        message: "You're not attending",
+        class: 'not_attending'
+      },
+      maybe: {
+        icon: '?',
+        message: "You might attend",
+        class: 'maybe'
+      }
+    };
+
+    const config = statusConfig[status] || statusConfig.attending;
+
+    document.getElementById('statusIcon').textContent = config.icon;
+    document.getElementById('meetingName').textContent = decodeURIComponent(meetingName || 'Meeting');
+
+    const badge = document.getElementById('statusBadge');
+    badge.textContent = config.message;
+    badge.className = 'status ' + config.class;
+  </script>
+</body>
+</html>

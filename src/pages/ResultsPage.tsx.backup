@@ -1,0 +1,1573 @@
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Trophy, FileImage, TrendingUp, Search, Filter, ChevronRight, Facebook, ChevronDown, Calendar, MapPin, Users, CheckCircle2, Clock, List, Grid, LayoutGrid, X, XCircle, Download, FileText, Table } from 'lucide-react';
+import jsPDF from 'jspdf';
+import Papa from 'papaparse';
+import { RaceSeries, RaceEvent } from '../types/race';
+import { getStoredRaceSeries, getStoredRaceEvents, combineAllDayResults } from '../utils/raceStorage';
+import { formatDate } from '../utils/date';
+import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
+import { LetterScore } from '../types';
+import { boatTypeColors, defaultColorScheme } from '../constants/colors';
+import EventResultsDisplay from '../components/EventResultsDisplay';
+import SeriesResultsDisplay from '../components/SeriesResultsDisplay';
+import html2canvas from 'html2canvas';
+import { getStoredVenues } from '../utils/venueStorage';
+import { Venue } from '../types/venue';
+import { PublishToMetaModal } from '../components/PublishToMetaModal';
+import { supabase } from '../utils/supabase';
+import { EventDetails } from '../components/EventDetails';
+import { CreateReportSplitButton } from '../components/CreateReportSplitButton';
+import { RaceReportModal } from '../components/RaceReportModal';
+
+type ViewMode = 'list' | 'grid' | 'compact';
+type TimeFilter = 'all' | 'completed' | 'in-progress';
+
+export const ResultsPage: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentClub } = useAuth();
+  const { can } = usePermissions();
+
+  // Helper function to get letter score value
+  const getLetterScoreValue = (
+    letterScore: LetterScore | undefined,
+    numFinishers: number,
+    totalCompetitors: number
+  ): number => {
+    if (!letterScore) return 0;
+
+    switch (letterScore) {
+      case 'DNF':
+      case 'RET':
+        return numFinishers + 1;
+      case 'DNS':
+      case 'DNC':
+        return totalCompetitors + 1;
+      case 'DSQ':
+      case 'DGM':
+        return totalCompetitors + 2;
+      case 'BFD':
+      case 'DND':
+      case 'OCS':
+        return totalCompetitors + 1;
+      case 'UFD':
+        return totalCompetitors + 1;
+      case 'DNE':
+        return totalCompetitors + 2;
+      case 'RDGfix':
+        return 0;
+      default:
+        return totalCompetitors + 1;
+    }
+  };
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [series, setSeries] = useState<RaceSeries | null>(null);
+  const [event, setEvent] = useState<RaceEvent | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // For filtering
+  const [allEvents, setAllEvents] = useState<RaceEvent[]>([]);
+  const [allSeries, setAllSeries] = useState<RaceSeries[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterFormat, setFilterFormat] = useState<string>('all');
+  const [filterClass, setFilterClass] = useState<string>('all');
+  const [boatClasses, setBoatClasses] = useState<string[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<RaceEvent[]>([]);
+  const [filteredSeries, setFilteredSeries] = useState<RaceSeries[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+
+  // New modern UI state
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [showSearch, setShowSearch] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+  // For Meta integration
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [metaConnected, setMetaConnected] = useState(false);
+  const [metaPageName, setMetaPageName] = useState('');
+  const [metaPageId, setMetaPageId] = useState('');
+
+  // For event details modal
+  const [showEventDetails, setShowEventDetails] = useState(false);
+
+  // For race report modal
+  const [showRaceReportModal, setShowRaceReportModal] = useState(false);
+  const [existingRaceReport, setExistingRaceReport] = useState<any>(null);
+  const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [eventMediaFromDb, setEventMediaFromDb] = useState<any[]>([]);
+
+  // Add a key to force re-render when navigating
+  const [renderKey, setRenderKey] = useState(0);
+
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Helper to check if event has results
+  const hasResults = (event: RaceEvent): boolean => {
+    return Boolean(event.raceResults && event.raceResults.length > 0);
+  };
+
+  // Helper to check if event is in progress
+  const isInProgress = (event: RaceEvent): boolean => {
+    if (!event.raceResults || event.raceResults.length === 0) return false;
+    if (event.completed) return false;
+    return event.skippers && event.skippers.length > 0;
+  };
+
+  // Helper to check if series has any results
+  const seriesHasResults = (s: RaceSeries): boolean => {
+    return s.rounds.some(round =>
+      (round.results && round.results.length > 0) ||
+      (round.raceResults && round.raceResults.length > 0) ||
+      (round.lastCompletedRace && round.lastCompletedRace > 0) ||
+      (round.skippers && round.skippers.length > 0)
+    );
+  };
+
+  // Helper to check if series is in progress
+  const seriesIsInProgress = (s: RaceSeries): boolean => {
+    const hasCompletedRounds = s.rounds.some(round => round.completed);
+    const hasIncompleteRounds = s.rounds.some(round => !round.completed);
+    return hasCompletedRounds && hasIncompleteRounds;
+  };
+
+  // Helper to get number of completed rounds in series
+  const getCompletedRoundsCount = (s: RaceSeries): number => {
+    return s.rounds.filter(round => round.completed).length;
+  };
+
+  // Fetch existing race report
+  const fetchRaceReport = async () => {
+    if (!event && !series) return;
+
+    const eventId = event?.id || series?.id;
+    const eventType = series ? 'race_series' : event?.isPublicEvent ? 'public_event' : 'quick_race';
+
+    const { data, error } = await supabase
+      .from('race_reports')
+      .select('*')
+      .eq('event_id', eventId)
+      .eq('event_type', eventType)
+      .maybeSingle();
+
+    if (!error && data) {
+      setExistingRaceReport(data);
+    } else {
+      setExistingRaceReport(null);
+    }
+  };
+
+  useEffect(() => {
+    if (currentClub?.clubId) {
+      checkMetaIntegration();
+    }
+  }, [currentClub]);
+
+  useEffect(() => {
+    if (event || series) {
+      fetchRaceReport();
+      fetchEventMedia();
+    }
+  }, [event, series]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setShowExportDropdown(false);
+      }
+    };
+
+    if (showFilterDropdown || showExportDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFilterDropdown, showExportDropdown]);
+
+  const checkMetaIntegration = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('club_integrations')
+        .select('*')
+        .eq('club_id', currentClub?.clubId)
+        .eq('provider', 'meta')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setMetaConnected(true);
+        setMetaPageName(data.page_name || '');
+        setMetaPageId(data.page_id || '');
+      } else {
+        setMetaConnected(false);
+      }
+    } catch (err) {
+      console.error('Error checking Meta integration:', err);
+    }
+  };
+
+  // Auto-collapse sidebar when viewing individual results
+  useEffect(() => {
+    if (id && (series || event)) {
+      // We're viewing individual results - collapse sidebar
+      const currentState = localStorage.getItem('sidebarCollapsed');
+
+      // Save the current state before we change it
+      if (previousSidebarState === null) {
+        setPreviousSidebarState(currentState);
+      }
+
+      // Force collapse
+      localStorage.setItem('sidebarCollapsed', 'true');
+      window.dispatchEvent(new Event('storage'));
+    } else {
+      // We're not viewing results anymore - restore previous state
+      if (previousSidebarState !== null) {
+        if (previousSidebarState) {
+          localStorage.setItem('sidebarCollapsed', previousSidebarState);
+        } else {
+          localStorage.removeItem('sidebarCollapsed');
+        }
+        window.dispatchEvent(new Event('storage'));
+        setPreviousSidebarState(null);
+      }
+    }
+  }, [id, series, event]);
+
+  // Enrich series with round data from race_series_rounds table
+  const enrichSeriesWithRoundData = async (series: RaceSeries[]): Promise<RaceSeries[]> => {
+    try {
+      if (!currentClub?.clubId || series.length === 0) {
+        return series;
+      }
+
+      // Fetch all rounds from race_series_rounds table for these series
+      const seriesIds = series.map(s => s.id);
+      const { data: roundsData, error: roundsError } = await supabase
+        .from('race_series_rounds')
+        .select('series_id, round_name, skippers, race_results, last_completed_race, completed')
+        .eq('club_id', currentClub.clubId)
+        .in('series_id', seriesIds);
+
+      if (roundsError || !roundsData) {
+        console.error('Error fetching round data for results:', roundsError);
+        return series;
+      }
+
+      // Fetch series-level skippers from race_series table
+      const { data: seriesData, error: seriesError} = await supabase
+        .from('race_series')
+        .select('id, skippers')
+        .eq('club_id', currentClub.clubId)
+        .in('id', seriesIds);
+
+      const seriesSkippersMap: Record<string, any[]> = {};
+      if (seriesData && !seriesError) {
+        seriesData.forEach(s => {
+          seriesSkippersMap[s.id] = s.skippers || [];
+        });
+      }
+
+      // Create a map of series_id + round_name to round data
+      const roundDataMap: Record<string, any> = {};
+      roundsData.forEach(round => {
+        const key = `${round.series_id}-${round.round_name}`;
+        roundDataMap[key] = round;
+      });
+
+      // Enrich series rounds with data from race_series_rounds table
+      return series.map(s => ({
+        ...s,
+        skippers: seriesSkippersMap[s.id] || s.skippers || [],
+        rounds: s.rounds.map(round => {
+          const key = `${s.id}-${round.name}`;
+          const roundData = roundDataMap[key];
+          if (roundData) {
+            return {
+              ...round,
+              skippers: roundData.skippers || round.skippers || [],
+              raceResults: roundData.race_results || round.raceResults || [],
+              lastCompletedRace: roundData.last_completed_race || round.lastCompletedRace || 0,
+              completed: roundData.completed !== undefined ? roundData.completed : round.completed
+            };
+          }
+          return round;
+        })
+      }));
+    } catch (err) {
+      console.error('Error enriching series with round data:', err);
+      return series;
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        const [raceEvents, raceSeries, venuesData] = await Promise.all([
+          getStoredRaceEvents(),
+          getStoredRaceSeries(),
+          getStoredVenues()
+        ]);
+
+        // Enrich series with round data from race_series_rounds table
+        const enrichedSeries = await enrichSeriesWithRoundData(raceSeries);
+
+        setAllSeries(enrichedSeries);
+        setAllEvents(raceEvents);
+        setVenues(venuesData);
+
+        // Extract unique boat classes
+        const classes = new Set<string>();
+        raceEvents.forEach(e => {
+          if (e.raceClass) classes.add(e.raceClass);
+        });
+        enrichedSeries.forEach(s => {
+          if (s.raceClass) classes.add(s.raceClass);
+        });
+        setBoatClasses(Array.from(classes));
+
+        if (id) {
+          const foundSeries = enrichedSeries.find(s => s.id === id);
+
+          if (foundSeries) {
+            setSeries(foundSeries);
+          } else {
+            const foundEvent = raceEvents.find(e => e.id === id);
+
+            if (foundEvent) {
+              setEvent(foundEvent);
+            } else {
+              setError('Event or series not found');
+            }
+          }
+        } else {
+          // Filter events and series with results
+          applyFilters(raceEvents, enrichedSeries);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setError('Failed to load results. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    if (!id && location.pathname === '/results') {
+      setSeries(null);
+      setEvent(null);
+    }
+  }, [id, location.pathname, renderKey]);
+
+  // Apply filters when filter criteria change
+  useEffect(() => {
+    applyFilters(allEvents, allSeries);
+  }, [searchTerm, timeFilter, filterFormat, filterClass, allEvents, allSeries]);
+
+  const applyFilters = (
+    events: RaceEvent[],
+    seriesData: RaceSeries[]
+  ) => {
+    // Filter events - only include standalone events with results
+    let filteredEvts = events.filter(e => !e.isSeriesEvent);
+
+    // Apply time filter
+    if (timeFilter === 'completed') {
+      filteredEvts = filteredEvts.filter(e => hasResults(e) && e.completed);
+    } else if (timeFilter === 'in-progress') {
+      filteredEvts = filteredEvts.filter(e => isInProgress(e));
+    } else {
+      // 'all' - show events with any results
+      filteredEvts = filteredEvts.filter(e => hasResults(e) || isInProgress(e));
+    }
+
+    if (searchTerm) {
+      filteredEvts = filteredEvts.filter(e =>
+        e.eventName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.clubName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.venue.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (filterFormat !== 'all') {
+      filteredEvts = filteredEvts.filter(e => e.raceFormat === filterFormat);
+    }
+
+    if (filterClass !== 'all') {
+      filteredEvts = filteredEvts.filter(e => e.raceClass === filterClass);
+    }
+
+    // Filter series - only include series with at least some results
+    let filteredSrs = seriesData.filter(s => seriesHasResults(s));
+
+    // Apply time filter
+    if (timeFilter === 'completed') {
+      filteredSrs = filteredSrs.filter(s => s.rounds.every(r => r.completed));
+    } else if (timeFilter === 'in-progress') {
+      filteredSrs = filteredSrs.filter(s => seriesIsInProgress(s));
+    }
+
+    if (searchTerm) {
+      filteredSrs = filteredSrs.filter(s =>
+        s.seriesName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.clubName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (filterFormat !== 'all') {
+      filteredSrs = filteredSrs.filter(s => s.raceFormat === filterFormat);
+    }
+
+    if (filterClass !== 'all') {
+      filteredSrs = filteredSrs.filter(s => s.raceClass === filterClass);
+    }
+
+    // Sort by date (most recent first)
+    filteredEvts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    filteredSrs.sort((a, b) => {
+      const aDate = a.rounds[0]?.date || '';
+      const bDate = b.rounds[0]?.date || '';
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    });
+
+    setFilteredEvents(filteredEvts);
+    setFilteredSeries(filteredSrs);
+  };
+
+  const handleExportJPG = async () => {
+    if (!series && !event) return;
+
+    try {
+      const tempDiv = document.createElement('div');
+      tempDiv.className = 'results-export-container';
+      document.body.appendChild(tempDiv);
+
+      const root = document.createElement('div');
+      tempDiv.appendChild(root);
+
+      if (series) {
+        ReactDOM.render(
+          <SeriesResultsDisplay series={series} darkMode={false} isExportMode={true} />,
+          root
+        );
+      } else if (event) {
+        const displayEvent = event.multiDay && event.dayResults
+          ? {
+              ...event,
+              raceResults: combineAllDayResults(event)
+            }
+          : event;
+
+        ReactDOM.render(
+          <EventResultsDisplay event={displayEvent} darkMode={false} isExportMode={true} />,
+          root
+        );
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+      });
+
+      document.body.removeChild(tempDiv);
+
+      const link = document.createElement('a');
+      link.download = `${series ? series.seriesName : event?.eventName || 'race'}_results.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.9);
+      link.click();
+    } catch (error) {
+      console.error('Error exporting JPG:', error);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!series && !event) return;
+
+    try {
+      const tempDiv = document.createElement('div');
+      tempDiv.className = 'results-export-container';
+      document.body.appendChild(tempDiv);
+
+      const root = document.createElement('div');
+      tempDiv.appendChild(root);
+
+      if (series) {
+        ReactDOM.render(
+          <SeriesResultsDisplay series={series} darkMode={false} isExportMode={true} />,
+          root
+        );
+      } else if (event) {
+        const displayEvent = event.multiDay && event.dayResults
+          ? {
+              ...event,
+              raceResults: combineAllDayResults(event)
+            }
+          : event;
+
+        ReactDOM.render(
+          <EventResultsDisplay event={displayEvent} darkMode={false} isExportMode={true} />,
+          root
+        );
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+      });
+
+      document.body.removeChild(tempDiv);
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${series ? series.seriesName : event?.eventName || 'race'}_results.pdf`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!series && !event) return;
+
+    try {
+      let csvData: any[] = [];
+
+      if (event) {
+        const results = event.raceResults || [];
+        // Sort by points to get correct positions
+        const sortedResults = [...results].sort((a, b) => (a.points || 0) - (b.points || 0));
+
+        csvData = sortedResults.map((result) => {
+          const rowData: any = {
+            Position: result.position || '-',
+            'Sail Number': result.sailNo || '',
+            Skipper: result.skipperName || '',
+            Club: result.club || '',
+            Design: result.boatType || '',
+            Points: result.points || 0
+          };
+
+          // Add individual race results
+          if (result.races && result.races.length > 0) {
+            result.races.forEach((race, idx) => {
+              rowData[`R${idx + 1}`] = race !== null ? race : '';
+            });
+          }
+
+          return rowData;
+        });
+      } else if (series) {
+        const allResults = series.rounds.flatMap(round =>
+          (round.results || []).map(result => ({
+            Round: round.roundName || round.date,
+            Position: result.position || '-',
+            'Sail Number': result.sailNo || '',
+            Skipper: result.skipperName || '',
+            Points: result.points || 0
+          }))
+        );
+        csvData = allResults;
+      }
+
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${series ? series.seriesName : event?.eventName || 'race'}_results.csv`;
+      link.click();
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+    }
+  };
+
+  const handleSelectEvent = (eventId: string) => {
+    navigate(`/results/${eventId}`);
+  };
+
+  const handleSelectSeries = (seriesId: string) => {
+    navigate(`/results/${seriesId}`);
+  };
+
+  // Get venue image for a venue name
+  const getVenueImage = (venueName: string): string | null => {
+    const venue = venues.find(v => v.name === venueName);
+    return venue?.image || null;
+  };
+
+  // Get most used venue for a series
+  const getMostUsedVenueForSeries = (series: RaceSeries): string | null => {
+    if (!series.rounds || series.rounds.length === 0) return null;
+
+    const venueCounts: Record<string, number> = {};
+    series.rounds.forEach(round => {
+      if (!round.venue) return;
+      venueCounts[round.venue] = (venueCounts[round.venue] || 0) + 1;
+    });
+
+    let mostUsedVenue = '';
+    let highestCount = 0;
+
+    Object.entries(venueCounts).forEach(([venue, count]) => {
+      if (count > highestCount) {
+        mostUsedVenue = venue;
+        highestCount = count;
+      }
+    });
+
+    return mostUsedVenue;
+  };
+
+  // Extract event results and skippers for the PublishToMetaModal
+  const getEventResultsAndSkippers = () => {
+    if (event) {
+      return {
+        eventResults: event.raceResults || [],
+        eventSkippers: event.skippers || []
+      };
+    } else if (series) {
+      const completedRounds = series.rounds.filter(round => round.completed && round.results && round.results.length > 0);
+      if (completedRounds.length > 0) {
+        const skipperResultsMap = new Map<string, any>();
+
+        completedRounds.forEach(round => {
+          round.results.forEach(result => {
+            const key = result.skipperName;
+            if (!skipperResultsMap.has(key)) {
+              skipperResultsMap.set(key, {
+                skipperName: result.skipperName,
+                sailNo: result.sailNo,
+                totalPoints: 0,
+                races: []
+              });
+            }
+            const skipperData = skipperResultsMap.get(key);
+            skipperData.totalPoints += result.points || 0;
+            skipperData.races.push(...(result.races || []));
+          });
+        });
+
+        const combinedResults = Array.from(skipperResultsMap.values())
+          .sort((a, b) => a.totalPoints - b.totalPoints);
+
+        return {
+          eventResults: combinedResults,
+          eventSkippers: series.skippers || []
+        };
+      }
+    }
+
+    return {
+      eventResults: [],
+      eventSkippers: []
+    };
+  };
+
+  // Fetch media for the current event from the database
+  const fetchEventMedia = async () => {
+    if (!currentClub?.clubId || (!event && !series)) return;
+
+    try {
+      const eventId = event?.id || series?.id;
+      if (!eventId) return;
+
+      const dbEventId = eventId.includes('-') ? eventId.split('-').pop() : eventId;
+
+      const { data, error } = await supabase
+        .from('event_media')
+        .select('*')
+        .eq('club_id', currentClub.clubId)
+        .eq('event_ref_id', dbEventId)
+        .eq('media_type', 'image')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching event media:', error);
+        return;
+      }
+
+      setEventMediaFromDb(data || []);
+    } catch (err) {
+      console.error('Error in fetchEventMedia:', err);
+    }
+  };
+
+  // Handle event data updates
+  const handleEventDataUpdated = async (eventId: string) => {
+    try {
+      setLoading(true);
+
+      if (event && event.id === eventId) {
+        const events = await getStoredRaceEvents();
+        const updatedEvent = events.find(e => e.id === eventId);
+
+        if (updatedEvent) {
+          setEvent(updatedEvent);
+        }
+      } else if (series) {
+        const seriesData = await getStoredRaceSeries();
+        const updatedSeries = seriesData.find(s => s.id === series.id);
+
+        if (updatedSeries) {
+          setSeries(updatedSeries);
+        }
+      }
+
+      await fetchEventMedia();
+    } catch (error) {
+      console.error('Error refreshing event data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderEventCard = (e: RaceEvent, isGrid: boolean) => {
+    const colors = e.raceClass ? boatTypeColors[e.raceClass] || defaultColorScheme : defaultColorScheme;
+    const venueImage = getVenueImage(e.venue);
+    const inProgress = isInProgress(e);
+    const completed = e.completed;
+
+    if (isGrid) {
+      return (
+        <button
+          key={e.id}
+          onClick={() => handleSelectEvent(e.id)}
+          className="group relative overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 hover:scale-[1.02]"
+        >
+          {/* Image */}
+          <div className="relative h-48 overflow-hidden bg-slate-900">
+            {venueImage ? (
+              <img
+                src={venueImage}
+                alt={e.venue}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                <Trophy className="text-slate-600" size={48} />
+              </div>
+            )}
+
+            {/* Status Badge */}
+            {inProgress && (
+              <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/90 text-white backdrop-blur-sm">
+                <Clock size={12} />
+                In Progress
+              </div>
+            )}
+            {completed && !inProgress && (
+              <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/90 text-white backdrop-blur-sm">
+                <CheckCircle2 size={12} />
+                Completed
+              </div>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="p-4">
+            <h4 className="text-white font-medium mb-2 line-clamp-2">{e.eventName || e.clubName}</h4>
+
+            <div className="flex flex-wrap gap-2 mb-3">
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors.darkBg} ${colors.darkText}`}>
+                {e.raceClass}
+              </div>
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                e.raceFormat === 'handicap'
+                  ? 'bg-purple-900/30 text-purple-400'
+                  : 'bg-blue-900/30 text-blue-400'
+              }`}>
+                {e.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <Calendar size={12} />
+                <span>{formatDate(e.date)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MapPin size={12} />
+                <span className="line-clamp-1">{e.venue}</span>
+              </div>
+              {e.skippers && e.skippers.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Users size={12} />
+                  <span>{e.skippers.length} competitors</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </button>
+      );
+    }
+
+    // List view
+    return (
+      <button
+        key={e.id}
+        onClick={() => handleSelectEvent(e.id)}
+        className="group flex overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 text-left"
+      >
+        {venueImage && (
+          <div className="w-48 h-32 flex-shrink-0 overflow-hidden bg-slate-900">
+            <img
+              src={venueImage}
+              alt={e.venue}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+          </div>
+        )}
+        <div className="flex-1 p-4 flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-white font-medium">{e.eventName || e.clubName}</h4>
+              {inProgress && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400">
+                  <Clock size={12} />
+                  In Progress
+                </div>
+              )}
+              {completed && !inProgress && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                  <CheckCircle2 size={12} />
+                  Completed
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-2">
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors.darkBg} ${colors.darkText}`}>
+                {e.raceClass}
+              </div>
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                e.raceFormat === 'handicap'
+                  ? 'bg-purple-900/30 text-purple-400'
+                  : 'bg-blue-900/30 text-blue-400'
+              }`}>
+                {e.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 text-sm text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <Calendar size={14} />
+                <span>{formatDate(e.date)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MapPin size={14} />
+                <span>{e.venue}</span>
+              </div>
+              {e.skippers && e.skippers.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Users size={14} />
+                  <span>{e.skippers.length} competitors</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <ChevronRight className="text-slate-400 group-hover:text-slate-300 flex-shrink-0" size={20} />
+        </div>
+      </button>
+    );
+  };
+
+  const renderSeriesCard = (s: RaceSeries, isGrid: boolean) => {
+    const colors = s.raceClass ? boatTypeColors[s.raceClass] || defaultColorScheme : defaultColorScheme;
+    const mostUsedVenue = getMostUsedVenueForSeries(s);
+    const venueImage = mostUsedVenue ? getVenueImage(mostUsedVenue) : null;
+    const completedCount = getCompletedRoundsCount(s);
+    const inProgress = seriesIsInProgress(s);
+    const completed = s.rounds.every(r => r.completed);
+
+    if (isGrid) {
+      return (
+        <button
+          key={s.id}
+          onClick={() => handleSelectSeries(s.id)}
+          className="group relative overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 hover:scale-[1.02]"
+        >
+          {/* Image */}
+          <div className="relative h-48 overflow-hidden bg-slate-900">
+            {venueImage ? (
+              <img
+                src={venueImage}
+                alt={mostUsedVenue}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900/20 to-slate-900">
+                <TrendingUp className="text-slate-600" size={48} />
+              </div>
+            )}
+
+            {/* Series Badge */}
+            <div className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium bg-purple-500/90 text-white backdrop-blur-sm">
+              Series Leaderboard
+            </div>
+
+            {/* Status Badge */}
+            {inProgress && (
+              <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-500/90 text-white backdrop-blur-sm">
+                <Clock size={12} />
+                In Progress
+              </div>
+            )}
+            {completed && (
+              <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500/90 text-white backdrop-blur-sm">
+                <CheckCircle2 size={12} />
+                Completed
+              </div>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="p-4">
+            <h4 className="text-white font-medium mb-2 line-clamp-2">{s.seriesName}</h4>
+
+            <div className="flex flex-wrap gap-2 mb-3">
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors.darkBg} ${colors.darkText}`}>
+                {s.raceClass}
+              </div>
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                s.raceFormat === 'handicap'
+                  ? 'bg-purple-900/30 text-purple-400'
+                  : 'bg-blue-900/30 text-blue-400'
+              }`}>
+                {s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-xs text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <Trophy size={12} />
+                <span>{completedCount} of {s.rounds.length} rounds completed</span>
+              </div>
+              {mostUsedVenue && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={12} />
+                  <span className="line-clamp-1">{mostUsedVenue}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </button>
+      );
+    }
+
+    // List view
+    return (
+      <button
+        key={s.id}
+        onClick={() => handleSelectSeries(s.id)}
+        className="group flex overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 text-left"
+      >
+        {venueImage && (
+          <div className="w-48 h-32 flex-shrink-0 overflow-hidden bg-slate-900">
+            <img
+              src={venueImage}
+              alt={mostUsedVenue}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            />
+          </div>
+        )}
+        <div className="flex-1 p-4 flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/30 text-purple-400">
+                Series Leaderboard
+              </div>
+              <h4 className="text-white font-medium">{s.seriesName}</h4>
+              {inProgress && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400">
+                  <Clock size={12} />
+                  In Progress
+                </div>
+              )}
+              {completed && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
+                  <CheckCircle2 size={12} />
+                  Completed
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-2">
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors.darkBg} ${colors.darkText}`}>
+                {s.raceClass}
+              </div>
+              <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                s.raceFormat === 'handicap'
+                  ? 'bg-purple-900/30 text-purple-400'
+                  : 'bg-blue-900/30 text-blue-400'
+              }`}>
+                {s.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 text-sm text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <Trophy size={14} />
+                <span>{completedCount} of {s.rounds.length} rounds completed</span>
+              </div>
+              {mostUsedVenue && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={14} />
+                  <span>{mostUsedVenue}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <ChevronRight className="text-slate-400 group-hover:text-slate-300 flex-shrink-0" size={20} />
+        </div>
+      </button>
+    );
+  };
+
+  const renderEventList = () => {
+    if (filteredEvents.length === 0 && filteredSeries.length === 0) {
+      return (
+        <div className="flex items-center justify-center min-h-[500px]">
+          <div className="text-center max-w-md">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-32 h-32 bg-green-500/10 rounded-full animate-pulse"></div>
+              </div>
+              <div className="relative">
+                <Trophy size={64} className="mx-auto text-green-400/80" strokeWidth={1.5} />
+              </div>
+            </div>
+
+            <h3 className="text-2xl font-bold text-white mb-3">No Results Available</h3>
+            <p className="text-slate-400 mb-6 leading-relaxed">
+              {searchTerm || timeFilter !== 'all' || filterFormat !== 'all' || filterClass !== 'all'
+                ? 'No results match your current filters. Try adjusting your search or filter criteria.'
+                : 'Results will appear here once races have been scored and completed.'
+              }
+            </p>
+
+            {(searchTerm || timeFilter !== 'all' || filterFormat !== 'all' || filterClass !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setTimeFilter('all');
+                  setFilterFormat('all');
+                  setFilterClass('all');
+                }}
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const isGrid = viewMode === 'grid';
+
+    return (
+      <div className="space-y-8">
+        {/* Single Events */}
+        {filteredEvents.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Trophy size={20} className="text-green-400" />
+              Single Events
+              <span className="text-sm font-normal text-slate-400">({filteredEvents.length})</span>
+            </h3>
+            <div className={isGrid ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+              {filteredEvents.map(e => renderEventCard(e, isGrid))}
+            </div>
+          </div>
+        )}
+
+        {/* Series Leaderboards */}
+        {filteredSeries.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <TrendingUp size={20} className="text-purple-400" />
+              Series Leaderboards
+              <span className="text-sm font-normal text-slate-400">({filteredSeries.length})</span>
+            </h3>
+            <div className={isGrid ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+              {filteredSeries.map(s => renderSeriesCard(s, isGrid))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="bg-red-900/20 border border-red-900/30 rounded-lg p-6 text-center">
+          <h2 className="text-xl font-bold text-white mb-2">Error</h2>
+          <p className="text-red-300">{error}</p>
+        </div>
+      );
+    }
+
+    if (series) {
+      return (
+        <div className="relative">
+          <div id="results-export-container" ref={resultsRef}>
+            <SeriesResultsDisplay series={series} darkMode={true} isExportMode={false} />
+          </div>
+        </div>
+      );
+    }
+
+    if (event) {
+      const displayEvent = event.multiDay && event.dayResults
+        ? {
+            ...event,
+            raceResults: combineAllDayResults(event)
+          }
+        : event;
+
+      return (
+        <div className="relative">
+          <div id="results-export-container" ref={resultsRef}>
+            <EventResultsDisplay event={displayEvent} darkMode={true} isExportMode={false} />
+          </div>
+        </div>
+      );
+    }
+
+    return renderEventList();
+  };
+
+  const { eventResults, eventSkippers } = getEventResultsAndSkippers();
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-4 sm:p-6 lg:p-16">
+        {/* Header with filters - only show when not viewing specific event/series */}
+        {!series && !event && (
+          <>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+                  <Trophy className="text-white" size={28} />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-white">Results</h1>
+                  <p className="text-sm text-slate-400">
+                    {filteredEvents.length + filteredSeries.length} {filteredEvents.length + filteredSeries.length === 1 ? 'result' : 'results'} available
+                  </p>
+                </div>
+              </div>
+
+              {/* Toolbar */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search */}
+                {showSearch ? (
+                  <div className="relative flex-1 sm:w-64">
+                    <Search
+                      size={18}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search results..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-10 py-2 rounded-lg bg-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setShowSearch(false);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowSearch(true)}
+                    className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                    title="Search"
+                  >
+                    <Search size={18} />
+                  </button>
+                )}
+
+                {/* Filters Dropdown */}
+                <div className="relative" ref={filterDropdownRef}>
+                  <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                  >
+                    <Filter size={18} />
+                    Filters
+                    <ChevronDown size={16} />
+                  </button>
+
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 mt-2 w-80 rounded-lg shadow-xl border bg-slate-800 border-slate-700 z-50">
+                      <div className="p-4 space-y-4">
+                        {/* Race Format */}
+                        <div>
+                          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                            Race Format
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setFilterFormat('all')}
+                              className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                filterFormat === 'all'
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                              }`}
+                            >
+                              All
+                            </button>
+                            <button
+                              onClick={() => setFilterFormat('handicap')}
+                              className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                filterFormat === 'handicap'
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                              }`}
+                            >
+                              Handicap
+                            </button>
+                            <button
+                              onClick={() => setFilterFormat('scratch')}
+                              className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                filterFormat === 'scratch'
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                              }`}
+                            >
+                              Scratch
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Boat Class */}
+                        {boatClasses.length > 0 && (
+                          <div>
+                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                              Boat Class
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => setFilterClass('all')}
+                                className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                                  filterClass === 'all'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                }`}
+                              >
+                                All Classes
+                              </button>
+                              {boatClasses.map(boatClass => {
+                                const colors = boatTypeColors[boatClass] || defaultColorScheme;
+                                return (
+                                  <button
+                                    key={boatClass}
+                                    onClick={() => setFilterClass(filterClass === boatClass ? 'all' : boatClass)}
+                                    className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                                      filterClass === boatClass
+                                        ? `${colors.darkBg} ${colors.darkText}`
+                                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                    }`}
+                                  >
+                                    {boatClass}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex rounded-lg bg-slate-700 p-1">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 rounded transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-slate-600 text-white'
+                        : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                    title="List view"
+                  >
+                    <List size={18} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 rounded transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-slate-600 text-white'
+                        : 'text-slate-400 hover:text-slate-300'
+                    }`}
+                    title="Grid view"
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Time Filter Tabs - Centered */}
+            <div className="flex justify-center items-center gap-2 mb-6 overflow-x-auto pb-2">
+              {[
+                { value: 'all', label: 'All Results', count: filteredEvents.length + filteredSeries.length },
+                {
+                  value: 'completed',
+                  label: 'Completed',
+                  count: filteredEvents.filter(e => e.completed).length + filteredSeries.filter(s => s.rounds.every(r => r.completed)).length
+                },
+                {
+                  value: 'in-progress',
+                  label: 'In Progress',
+                  count: filteredEvents.filter(e => isInProgress(e)).length + filteredSeries.filter(s => seriesIsInProgress(s)).length
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setTimeFilter(tab.value as TimeFilter)}
+                  className={`
+                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap
+                    ${timeFilter === tab.value
+                      ? 'bg-green-600 text-white shadow-sm shadow-green-600/20'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }
+                  `}
+                >
+                  {tab.label}
+                  <span className={`
+                    px-2 py-0.5 rounded-full text-xs font-semibold
+                    ${timeFilter === tab.value
+                      ? 'bg-white/20 text-white'
+                      : 'bg-slate-600 text-slate-300'
+                    }
+                  `}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Export and Share buttons for series or event view */}
+        {(series || event) && (() => {
+          const hasResultsData = event
+            ? (event.skippers && event.skippers.length > 0 && event.raceResults && event.raceResults.length > 0)
+            : (series && series.skippers && series.skippers.length > 0 && series.rounds.some(r => r.completed));
+
+          return (
+            <div className="flex justify-end items-center mb-6">
+              <div className="flex gap-2">
+                {/* Export Results Dropdown Button */}
+                <div className="relative" ref={exportDropdownRef}>
+                  <button
+                    onClick={() => hasResultsData && setShowExportDropdown(!showExportDropdown)}
+                    disabled={!hasResultsData}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      hasResultsData
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-slate-800/50 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Download size={18} />
+                    <span>Export Results</span>
+                    <ChevronDown size={16} />
+                  </button>
+
+                  {showExportDropdown && hasResultsData && (
+                    <div className="absolute right-0 mt-2 w-72 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
+                      <button
+                        onClick={() => {
+                          handleExportJPG();
+                          setShowExportDropdown(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                      >
+                        <div className="p-2 rounded-lg bg-blue-600/20">
+                          <FileImage className="text-blue-400" size={20} />
+                        </div>
+                        <div>
+                          <div className="text-white font-medium text-sm">Export as JPG</div>
+                          <div className="text-slate-400 text-xs">Download results as image</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleExportPDF();
+                          setShowExportDropdown(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                      >
+                        <div className="p-2 rounded-lg bg-red-600/20">
+                          <FileText className="text-red-400" size={20} />
+                        </div>
+                        <div>
+                          <div className="text-white font-medium text-sm">Export as PDF</div>
+                          <div className="text-slate-400 text-xs">Download results as PDF document</div>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          handleExportCSV();
+                          setShowExportDropdown(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                      >
+                        <div className="p-2 rounded-lg bg-green-600/20">
+                          <Table className="text-green-400" size={20} />
+                        </div>
+                        <div>
+                          <div className="text-white font-medium text-sm">Export as CSV</div>
+                          <div className="text-slate-400 text-xs">Download results as spreadsheet</div>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Event Details Button */}
+                {event && (
+                  <button
+                    onClick={() => setShowEventDetails(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors"
+                  >
+                    <Trophy size={18} />
+                    Event Details
+                  </button>
+                )}
+
+                {/* Create Race Report Button */}
+                {can('reports.create') && (
+                  <div className={!hasResultsData ? 'opacity-50 cursor-not-allowed' : ''}>
+                    <CreateReportSplitButton
+                      onGenerateSocialReport={() => hasResultsData && setShowPublishModal(true)}
+                      onGenerateRaceReport={() => hasResultsData && setShowRaceReportModal(true)}
+                      darkMode={true}
+                    />
+                  </div>
+                )}
+
+                {/* Exit Button */}
+                <button
+                  onClick={() => navigate('/results')}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <XCircle size={18} />
+                  Exit
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {renderContent()}
+
+        {/* Modals */}
+        {showPublishModal && (series || event) && (
+          <PublishToMetaModal
+            isOpen={showPublishModal}
+            onClose={() => setShowPublishModal(false)}
+            darkMode={true}
+            pageName={metaPageName}
+            pageId={metaPageId}
+            eventData={{
+              title: series ? series.seriesName : (event?.eventName || event?.clubName || ''),
+              date: series ? (series.rounds[0]?.date || '') : (event?.date || ''),
+              venue: series ? (series.rounds[0]?.venue || '') : (event?.venue || ''),
+              raceClass: series ? series.raceClass : (event?.raceClass || ''),
+              raceFormat: series ? series.raceFormat : (event?.raceFormat || ''),
+              clubId: series ? series.clubId : event?.clubId
+            }}
+            resultsRef={resultsRef}
+            eventResults={eventResults}
+            eventSkippers={eventSkippers}
+            eventMedia={[...(event?.media || series?.media || []), ...eventMediaFromDb]}
+          />
+        )}
+
+        {showRaceReportModal && (series || event) && (
+          <RaceReportModal
+            isOpen={showRaceReportModal}
+            onClose={() => setShowRaceReportModal(false)}
+            darkMode={true}
+            eventId={event?.id || series?.id || ''}
+            eventType={series ? 'race_series' : event?.isPublicEvent ? 'public_event' : 'quick_race'}
+            clubId={currentClub?.clubId || ''}
+            eventData={{
+              title: series ? series.seriesName : (event?.eventName || event?.clubName || ''),
+              date: series ? (series.rounds[0]?.date || '') : (event?.date || ''),
+              venue: series ? (series.rounds[0]?.venue || '') : (event?.venue || ''),
+              raceClass: series ? series.raceClass : (event?.raceClass || ''),
+              raceFormat: series ? series.raceFormat : (event?.raceFormat || '')
+            }}
+            raceResults={eventResults}
+            skippers={eventSkippers}
+            existingReport={existingRaceReport}
+            onReportGenerated={fetchRaceReport}
+          />
+        )}
+
+        {showEventDetails && event && (
+          <EventDetails
+            event={event}
+            darkMode={true}
+            onClose={() => setShowEventDetails(false)}
+            onEventDataUpdated={handleEventDataUpdated}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ResultsPage;

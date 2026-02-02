@@ -1,0 +1,450 @@
+import { supabase } from './supabase';
+import { Meeting, MeetingAgendaItem, MeetingFormData, MeetingAttendee, MeetingGuest } from '../types/meeting';
+
+// Get all meetings for a club or association
+export const getMeetings = async (
+  clubId?: string,
+  associationId?: string,
+  associationType?: 'state' | 'national'
+): Promise<Meeting[]> => {
+  try {
+    let query = supabase
+      .from('meetings')
+      .select(`
+        *,
+        chairperson:chairperson_id(first_name, last_name, avatar_url),
+        minute_taker:minute_taker_id(first_name, last_name, avatar_url)
+      `);
+
+    if (clubId) {
+      query = query.eq('club_id', clubId);
+    } else if (associationId && associationType) {
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      query = query.eq(idColumn, associationId);
+    } else {
+      throw new Error('Either clubId or associationId with associationType must be provided');
+    }
+
+    const { data, error } = await query.order('date', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching meetings:', error);
+    throw error;
+  }
+};
+
+// Get a single meeting by ID
+export const getMeetingById = async (meetingId: string): Promise<Meeting | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('meetings')
+      .select(`
+        *,
+        chairperson:chairperson_id(first_name, last_name, avatar_url),
+        minute_taker:minute_taker_id(first_name, last_name, avatar_url)
+      `)
+      .eq('id', meetingId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // No meeting found
+      }
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error fetching meeting:', error);
+    throw error;
+  }
+};
+
+// Create a new meeting
+export const createMeeting = async (
+  clubId: string | undefined,
+  meetingData: MeetingFormData,
+  associationId?: string,
+  associationType?: 'state' | 'national'
+): Promise<Meeting> => {
+  try {
+    // First, create the meeting
+    const insertData: any = {
+      name: meetingData.name,
+      location: meetingData.location,
+      date: meetingData.date,
+      start_time: meetingData.start_time,
+      end_time: meetingData.end_time,
+      conferencing_url: meetingData.conferencing_url,
+      description: meetingData.description,
+      chairperson_id: meetingData.chairperson_id,
+      minute_taker_id: meetingData.minute_taker_id,
+      status: 'upcoming',
+      minutes_status: 'not_started',
+      members_present: [],
+      guests_present: []
+    };
+
+    if (clubId) {
+      insertData.club_id = clubId;
+    } else if (associationId && associationType) {
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      insertData[idColumn] = associationId;
+    } else {
+      throw new Error('Either clubId or associationId with associationType must be provided');
+    }
+
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (meetingError) throw meetingError;
+
+    // Then, create the agenda items
+    if (meetingData.agenda_items && meetingData.agenda_items.length > 0) {
+      const agendaItems = meetingData.agenda_items.map(item => ({
+        meeting_id: meeting.id,
+        item_number: item.item_number,
+        item_name: item.item_name,
+        owner_id: item.owner_id,
+        type: item.type,
+        duration: item.duration,
+        minutes_content: ''
+      }));
+
+      const { error: agendaError } = await supabase
+        .from('meeting_agendas')
+        .insert(agendaItems);
+
+      if (agendaError) throw agendaError;
+    }
+
+    return meeting;
+  } catch (error) {
+    console.error('Error creating meeting:', error);
+    throw error;
+  }
+};
+
+// Update an existing meeting
+export const updateMeeting = async (meetingId: string, meetingData: MeetingFormData): Promise<Meeting> => {
+  try {
+    // First, update the meeting
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .update({
+        name: meetingData.name,
+        location: meetingData.location,
+        date: meetingData.date,
+        start_time: meetingData.start_time,
+        end_time: meetingData.end_time,
+        conferencing_url: meetingData.conferencing_url,
+        description: meetingData.description,
+        chairperson_id: meetingData.chairperson_id,
+        minute_taker_id: meetingData.minute_taker_id
+      })
+      .eq('id', meetingId)
+      .select()
+      .single();
+
+    if (meetingError) throw meetingError;
+
+    // Delete existing agenda items
+    const { error: deleteError } = await supabase
+      .from('meeting_agendas')
+      .delete()
+      .eq('meeting_id', meetingId);
+
+    if (deleteError) throw deleteError;
+
+    // Create new agenda items
+    if (meetingData.agenda_items && meetingData.agenda_items.length > 0) {
+      const agendaItems = meetingData.agenda_items.map(item => ({
+        meeting_id: meetingId,
+        item_number: item.item_number,
+        item_name: item.item_name,
+        owner_id: item.owner_id,
+        type: item.type,
+        duration: item.duration,
+        minutes_content: ''
+      }));
+
+      const { error: agendaError } = await supabase
+        .from('meeting_agendas')
+        .insert(agendaItems);
+
+      if (agendaError) throw agendaError;
+    }
+
+    return meeting;
+  } catch (error) {
+    console.error('Error updating meeting:', error);
+    throw error;
+  }
+};
+
+// Delete a meeting
+export const deleteMeeting = async (meetingId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meetings')
+      .delete()
+      .eq('id', meetingId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting meeting:', error);
+    throw error;
+  }
+};
+
+// Get agenda items for a meeting
+export const getMeetingAgenda = async (meetingId: string): Promise<MeetingAgendaItem[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('meeting_agendas')
+      .select(`
+        *,
+        owner:owner_id(first_name, last_name, avatar_url)
+      `)
+      .eq('meeting_id', meetingId)
+      .order('item_number', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching meeting agenda:', error);
+    throw error;
+  }
+};
+
+// Update meeting status
+export const updateMeetingStatus = async (meetingId: string, status: 'upcoming' | 'completed' | 'cancelled'): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meetings')
+      .update({ status })
+      .eq('id', meetingId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating meeting status:', error);
+    throw error;
+  }
+};
+
+// Start a meeting (update minutes_status and record attendees)
+export const startMeeting = async (
+  meetingId: string, 
+  membersPresent: { id: string; name: string }[], 
+  guestsPresent: { name: string }[]
+): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meetings')
+      .update({
+        minutes_status: 'in_progress',
+        members_present: membersPresent,
+        guests_present: guestsPresent
+      })
+      .eq('id', meetingId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error starting meeting:', error);
+    throw error;
+  }
+};
+
+// Update minutes for an agenda item
+export const updateAgendaItemMinutes = async (
+  agendaItemId: string, 
+  minutesContent: string,
+  minutesDecision?: string,
+  minutesTasks?: string,
+  minutesAttachments?: any[]
+): Promise<void> => {
+  try {
+    const updates: any = { minutes_content: minutesContent };
+    
+    if (minutesDecision !== undefined) {
+      updates.minutes_decision = minutesDecision;
+    }
+    
+    if (minutesTasks !== undefined) {
+      updates.minutes_tasks = minutesTasks;
+    }
+    
+    if (minutesAttachments !== undefined) {
+      updates.minutes_attachments = minutesAttachments;
+    }
+    
+    const { error } = await supabase
+      .from('meeting_agendas')
+      .update(updates)
+      .eq('id', agendaItemId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating agenda item minutes:', error);
+    throw error;
+  }
+};
+
+// Complete meeting minutes
+export const completeMeetingMinutes = async (meetingId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meetings')
+      .update({
+        minutes_status: 'completed',
+        status: 'completed'
+      })
+      .eq('id', meetingId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error completing meeting minutes:', error);
+    throw error;
+  }
+};
+
+// Lock meeting minutes
+export const lockMeetingMinutes = async (meetingId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meetings')
+      .update({
+        minutes_locked: true
+      })
+      .eq('id', meetingId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error locking meeting minutes:', error);
+    throw error;
+  }
+};
+
+// Add a new agenda item during a meeting
+export const addAgendaItemToMeeting = async (
+  meetingId: string,
+  item: {
+    item_number: number;
+    item_name: string;
+    owner_id?: string;
+    type: 'for_noting' | 'for_action' | 'for_discussion';
+    duration?: number;
+  }
+): Promise<MeetingAgendaItem> => {
+  try {
+    const { data, error } = await supabase
+      .from('meeting_agendas')
+      .insert({
+        meeting_id: meetingId,
+        item_number: item.item_number,
+        item_name: item.item_name,
+        owner_id: item.owner_id,
+        type: item.type,
+        duration: item.duration,
+        minutes_content: ''
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error adding agenda item:', error);
+    throw error;
+  }
+};
+
+// Update an existing agenda item
+export const updateAgendaItem = async (
+  agendaItemId: string,
+  updates: Partial<MeetingAgendaItem>
+): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meeting_agendas')
+      .update(updates)
+      .eq('id', agendaItemId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating agenda item:', error);
+    throw error;
+  }
+};
+
+// Delete an agenda item
+export const deleteAgendaItem = async (agendaItemId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('meeting_agendas')
+      .delete()
+      .eq('id', agendaItemId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error deleting agenda item:', error);
+    throw error;
+  }
+};
+
+// Get club members for meeting attendance
+export const getClubMembersForMeeting = async (
+  clubId?: string,
+  associationId?: string,
+  associationType?: 'state' | 'national'
+): Promise<MeetingAttendee[]> => {
+  try {
+    if (clubId) {
+      // Get club members
+      const { data, error } = await supabase
+        .from('members')
+        .select('id, first_name, last_name, avatar_url')
+        .eq('club_id', clubId)
+        .order('first_name', { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map(member => ({
+        id: member.id,
+        name: `${member.first_name} ${member.last_name}`,
+        avatar_url: member.avatar_url,
+        isPresent: false
+      }));
+    } else if (associationId && associationType) {
+      // Get association admins from user_associations tables
+      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+      const { data, error } = await supabase
+        .from(tableName)
+        .select(`
+          user_id,
+          profiles:user_id(id, first_name, last_name)
+        `)
+        .eq(idColumn, associationId);
+
+      if (error) throw error;
+
+      return (data || []).map((item: any) => ({
+        id: item.profiles.id,
+        name: `${item.profiles.first_name} ${item.profiles.last_name}`,
+        isPresent: false
+      }));
+    } else {
+      throw new Error('Either clubId or associationId with associationType must be provided');
+    }
+  } catch (error) {
+    console.error('Error fetching members:', error);
+    throw error;
+  }
+};

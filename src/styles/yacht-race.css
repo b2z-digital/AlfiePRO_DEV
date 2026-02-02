@@ -1,0 +1,435 @@
+/* Race Table Container */
+.race-table-container {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Scrollbar styling for dark theme */
+.race-table-container::-webkit-scrollbar {
+  height: 12px;
+}
+
+.race-table-container::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 6px;
+}
+
+.race-table-container::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8);
+  border-radius: 6px;
+  border: 2px solid rgba(15, 23, 42, 0.5);
+}
+
+.race-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(51, 65, 85, 0.8);
+}
+
+/* Firefox scrollbar */
+.race-table-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(51, 65, 85, 0.8) rgba(15, 23, 42, 0.5);
+}
+
+.race-table-container.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  border-radius: 0;
+  padding: 2rem;
+  background-color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.race-table {
+  border-collapse: collapse;
+  font-size: 14px;
+  background-color: var(--table-bg);
+  width: 100%;
+  min-width: max-content;
+  border: 1px solid var(--border-color);
+}
+
+:root {
+  --table-bg: rgba(15, 23, 42, 0.95);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --header-bg: #2c5282;
+  --header-color: white;
+  --cell-bg: rgba(15, 23, 42, 0.95);
+  --cell-hover-bg: rgba(30, 41, 59, 0.95);
+  --text-color: #e2e8f0;
+  --text-secondary: #94a3b8;
+}
+
+.race-table-container.fullscreen .race-table {
+  --table-bg: white;
+  --border-color: #e5e7eb;
+  --header-bg: #f3f4f6;
+  --header-color: #1f2937;
+  --cell-bg: white;
+  --cell-hover-bg: #f9fafb;
+  --text-color: #1f2937;
+  --text-secondary: #6b7280;
+}
+
+.race-table th {
+  background-color: var(--header-bg);
+  color: var(--header-color);
+  font-weight: 500;
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  position: relative;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.race-table-container.fullscreen .race-table th {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Sticky columns */
+.race-table th.sticky-col,
+.race-table td.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background-color: var(--cell-bg);
+  width: 60px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.race-table th.sticky-col-2,
+.race-table td.sticky-col-2 {
+  position: sticky;
+  left: 60px;
+  z-index: 19;
+  background-color: var(--cell-bg);
+  width: 180px;
+  min-width: 180px;
+  text-align: left;
+  padding-left: 1rem;
+}
+
+.race-table th.sticky-col-3,
+.race-table td.sticky-col-3 {
+  position: sticky;
+  left: 240px;
+  z-index: 18;
+  background-color: var(--cell-bg);
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.race-table th.sticky-col-4,
+.race-table td.sticky-col-4 {
+  position: sticky;
+  left: 320px;
+  z-index: 17;
+  background-color: var(--cell-bg);
+  width: 80px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.race-table th.sticky-end,
+.race-table td.sticky-end {
+  position: sticky;
+  right: 0;
+  z-index: 16;
+  background-color: var(--cell-bg);
+  border-left: 1px solid var(--border-color);
+  width: 60px;
+  min-width: 60px;
+  text-align: center;
+}
+
+.race-table td {
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--cell-bg);
+  position: relative;
+  color: var(--text-color);
+}
+
+.race-table-container.fullscreen .race-table td {
+  background-color: white;
+  color: #1f2937;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.race-table tr:hover td {
+  background-color: var(--cell-hover-bg);
+}
+
+.race-table-container.fullscreen .race-table tr:hover td {
+  background-color: #f9fafb;
+}
+
+.race-table tr:hover td.sticky-col,
+.race-table tr:hover td.sticky-col-2,
+.race-table tr:hover td.sticky-col-3,
+.race-table tr:hover td.sticky-col-4,
+.race-table tr:hover td.sticky-end {
+  background-color: var(--cell-hover-bg);
+}
+
+.race-table-container.fullscreen .race-table tr:hover td.sticky-col,
+.race-table-container.fullscreen .race-table tr:hover td.sticky-col-2,
+.race-table-container.fullscreen .race-table tr:hover td.sticky-col-3,
+.race-table-container.fullscreen .race-table tr:hover td.sticky-col-4,
+.race-table-container.fullscreen .race-table tr:hover td.sticky-end {
+  background-color: #f9fafb;
+}
+
+/* Race Cell Styles */
+.race-table td.race-col {
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+  padding: 0;
+  position: relative;
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+}
+
+.race-table td.race-col.editing {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.race-table td.race-col.completed-race {
+  position: relative;
+  overflow: visible !important;
+  animation: completedRace 0.5s ease forwards;
+}
+
+.race-table td.race-col.dropped .position-overlay {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+@keyframes completedRace {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  50% {
+    background-color: rgba(34, 197, 94, 0.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    background-color: transparent;
+  }
+}
+
+/* Split cell display */
+.race-table td.race-col .sub-cell {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  z-index: 5;
+}
+
+.race-table td.race-col .position-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-color);
+  z-index: 5;
+}
+
+.race-table-container.fullscreen .race-table td.race-col .position-overlay {
+  color: #1f2937;
+}
+
+.race-table td.completed-race::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Input Styles */
+.race-table .handicap-input {
+  width: 65px;
+  text-align: center;
+  padding: 0.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  transition: all 0.2s;
+  background-color: var(--cell-bg);
+  color: var(--text-color);
+}
+
+.race-table .handicap-input:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+}
+
+.race-table .handicap-input:disabled {
+  background-color: var(--cell-bg);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+/* Shadow indicators for scrolling */
+.race-table-container::before,
+.race-table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 15px;
+  pointer-events: none;
+  z-index: 21;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.race-table-container::before {
+  left: 500px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.2), transparent);
+}
+
+.race-table-container::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.2), transparent);
+}
+
+.race-table-container.can-scroll-left::before {
+  opacity: 1;
+}
+
+.race-table-container.can-scroll-right::after {
+  opacity: 1;
+}
+
+/* Scroll indicator */
+.scroll-indicator {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(59, 130, 246, 0.9);
+  color: white;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 30;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.race-table-container.can-scroll-right .scroll-indicator {
+  opacity: 1;
+  animation: pulseIndicator 2s ease-in-out infinite;
+}
+
+@keyframes pulseIndicator {
+  0%, 100% { transform: translateY(-50%) scale(1); opacity: 0.9; }
+  50% { transform: translateY(-50%) scale(1.05); opacity: 1; }
+}
+
+/* Fullscreen button */
+.fullscreen-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 31;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background-color: var(--header-bg);
+  color: white;
+  transition: all 0.2s;
+}
+
+.fullscreen-button:hover {
+  background-color: #1e40af;
+}
+
+.race-table-container.fullscreen .fullscreen-button {
+  background-color: #e5e7eb;
+  color: #1f2937;
+}
+
+.race-table-container.fullscreen .fullscreen-button:hover {
+  background-color: #d1d5db;
+}
+
+/* Touch input mode */
+.touch-input-cell {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 10;
+}
+
+/* Delete result button */
+.delete-result-btn {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  z-index: 25;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: var(--cell-bg);
+}
+
+.race-col:hover .delete-result-btn {
+  opacity: 1;
+}
+
+/* Dropped results */
+.race-table td.race-col.dropped .position-overlay {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Export mode */
+.race-table-container.exporting {
+  position: static !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.race-table-container.exporting .race-table {
+  width: auto !important;
+  height: auto !important;
+}
+
+.race-table-container.exporting .scroll-indicator,
+.race-table-container.exporting .fullscreen-button {
+  display: none !important;
+}

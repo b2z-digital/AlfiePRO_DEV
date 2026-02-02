@@ -1,0 +1,1083 @@
+import React, { useState, useEffect } from 'react';
+import { Mail, Send, Inbox, Search, User, Clock, Check, AlertTriangle, X, Plus, Users, Filter, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../utils/supabase';
+
+interface Notification {
+  id: string;
+  user_id: string;
+  club_id: string | null;
+  type: string;
+  subject: string;
+  body: string;
+  read: boolean;
+  sent_at: string;
+  email_status: string;
+  email_error_message: string | null;
+  sender_name?: string;
+  sender_avatar_url?: string;
+  recipient_name?: string;
+  recipient_avatar_url?: string;
+}
+
+interface Member {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  avatar_url?: string;
+}
+
+interface MemberNotificationComponentProps {
+  darkMode: boolean;
+}
+
+export const MemberNotificationComponent: React.FC<MemberNotificationComponentProps> = ({ darkMode }) => {
+  const { user, currentClub } = useAuth();
+  const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'compose'>('inbox');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [sentNotifications, setSentNotifications] = useState<Notification[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingNotifications, setDeletingNotifications] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [notificationsPerPage] = useState(10);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string;
+  } | null>(null);
+
+  // Compose form state
+  const [composeForm, setComposeForm] = useState({
+    recipients: [] as string[],
+    subject: '',
+    body: '',
+    type: 'message',
+    send_email: true
+  });
+
+  // Calculate pagination
+  const indexOfLastNotification = currentPage * notificationsPerPage;
+  const indexOfFirstNotification = indexOfLastNotification - notificationsPerPage;
+  const currentNotifications = notifications.slice(indexOfFirstNotification, indexOfLastNotification);
+  const totalPages = Math.ceil(notifications.length / notificationsPerPage);
+
+  useEffect(() => {
+    if (currentClub?.clubId) {
+      fetchNotifications();
+      fetchMembers();
+      fetchCurrentUserProfile();
+    }
+  }, [currentClub, user]);
+
+  const fetchCurrentUserProfile = async () => {
+    if (!user) return;
+    
+    try {
+      // First try to get from profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error fetching profile:', profileError);
+      }
+      
+      // If no profile data, try to get from members table
+      if (!profileData?.first_name && currentClub?.clubId) {
+        const { data: memberData, error: memberError } = await supabase
+          .from('members')
+          .select('first_name, last_name')
+          .eq('user_id', user.id)
+          .eq('club_id', currentClub.clubId)
+          .maybeSingle();
+        
+        if (memberError && memberError.code !== 'PGRST116') {
+          console.error('Error fetching member data:', memberError);
+        }
+        
+        setCurrentUserProfile({
+          first_name: memberData?.first_name || user.user_metadata?.first_name || '',
+          last_name: memberData?.last_name || user.user_metadata?.last_name || '',
+          avatar_url: profileData?.avatar_url || user.user_metadata?.avatar_url || null
+        });
+      } else {
+        setCurrentUserProfile({
+          first_name: profileData?.first_name || user.user_metadata?.first_name || '',
+          last_name: profileData?.last_name || user.user_metadata?.last_name || '',
+          avatar_url: profileData?.avatar_url || user.user_metadata?.avatar_url || null
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching current user profile:', err);
+      // Fallback to user metadata
+      setCurrentUserProfile({
+        first_name: user.user_metadata?.first_name || '',
+        last_name: user.user_metadata?.last_name || '',
+        avatar_url: user.user_metadata?.avatar_url || null
+      });
+    }
+  };
+
+  const fetchNotifications = async () => {
+    if (!user || !currentClub?.clubId) return;
+
+    try {
+      setLoading(true);
+      
+      // Fetch inbox notifications (received by current user)
+      const { data: inboxData, error: inboxError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('club_id', currentClub.clubId)
+        .order('sent_at', { ascending: false });
+
+      if (inboxError) throw inboxError;
+
+      // Fetch sent notifications (if user is admin/editor)
+      const { data: userClub } = await supabase
+        .from('user_clubs')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('club_id', currentClub.clubId)
+        .single();
+
+      let sentData = [];
+      if (userClub && ['admin', 'editor'].includes(userClub.role)) {
+        const { data, error: sentError } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('club_id', currentClub.clubId)
+          .order('sent_at', { ascending: false });
+
+        if (sentError) throw sentError;
+        sentData = data || [];
+      }
+
+      // Get sender names for notifications
+      const allNotifications = [...(inboxData || []), ...sentData];
+      const userIds = [...new Set(allNotifications.map(n => n.user_id))];
+      
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', userIds);
+
+        const profileMap = new Map();
+        profiles?.forEach(profile => {
+          profileMap.set(profile.id, {
+            name: `${profile.first_name} ${profile.last_name}`.trim(),
+            avatar_url: profile.avatar_url
+          });
+        });
+
+        // Add sender names and avatars to notifications
+        const enrichedInbox = (inboxData || []).map(notification => {
+          const profile = profileMap.get(notification.user_id);
+          return {
+            ...notification,
+            sender_name: profile?.name || 'Unknown',
+            sender_avatar_url: profile?.avatar_url
+          };
+        });
+
+        const enrichedSent = sentData.map(notification => {
+          const profile = profileMap.get(notification.user_id);
+          return {
+            ...notification,
+            sender_name: profile?.name || 'Unknown',
+            sender_avatar_url: profile?.avatar_url
+          };
+        });
+
+        setNotifications(enrichedInbox);
+        setSentNotifications(enrichedSent);
+      } else {
+        setNotifications(inboxData || []);
+        setSentNotifications(sentData);
+      }
+
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMembers = async () => {
+    if (!currentClub?.clubId) return;
+
+    try {
+      // Fetch members with their user profiles to get avatar URLs
+      const { data: membersData, error } = await supabase
+        .from('members')
+        .select('id, user_id, first_name, last_name, email')
+        .eq('club_id', currentClub.clubId)
+        .order('first_name');
+
+      if (error) throw error;
+
+      // Fetch avatar URLs from profiles
+      const userIds = membersData?.filter(m => m.user_id).map(m => m.user_id) || [];
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, avatar_url')
+          .in('id', userIds);
+
+        const avatarMap = new Map();
+        profiles?.forEach(profile => {
+          avatarMap.set(profile.id, profile.avatar_url);
+        });
+
+        // Enrich members with avatar URLs
+        const enrichedMembers = membersData?.map(member => ({
+          ...member,
+          avatar_url: member.user_id ? avatarMap.get(member.user_id) : null
+        }));
+
+        setMembers(enrichedMembers || []);
+      } else {
+        setMembers(membersData || []);
+      }
+    } catch (err) {
+      console.error('Error fetching members:', err);
+    }
+  };
+
+  const getSenderName = () => {
+    if (currentUserProfile?.first_name && currentUserProfile?.last_name) {
+      return `${currentUserProfile.first_name} ${currentUserProfile.last_name}`;
+    }
+    if (user?.user_metadata?.first_name && user?.user_metadata?.last_name) {
+      return `${user.user_metadata.first_name} ${user.user_metadata.last_name}`;
+    }
+    return user?.email || 'Unknown User';
+  };
+
+  const getDisplayName = (notification: any, isInbox: boolean) => {
+    // For inbox items, show sender name
+    if (isInbox) {
+      if (notification.sender_name && notification.sender_name !== 'null null') {
+        return notification.sender_name;
+      }
+      // Fallback to extracting from user_id if sender_name is not available
+      return 'Unknown Sender';
+    } else {
+      // For sent items, show recipient name
+      if (notification.recipient_name && notification.recipient_name !== 'null null') {
+        return notification.recipient_name;
+      }
+      // Fallback to extracting from the recipients list
+      if (composeForm.recipients && composeForm.recipients.length > 0) {
+        const recipientUserId = composeForm.recipients[0];
+        const recipientMember = members.find(m => m.user_id === recipientUserId);
+        if (recipientMember) {
+          return `${recipientMember.first_name} ${recipientMember.last_name}`;
+        }
+      }
+      return 'Unknown Recipient';
+    }
+  };
+
+  const getSenderInitials = () => {
+    const firstName = currentUserProfile?.first_name || user?.user_metadata?.first_name || '';
+    const lastName = currentUserProfile?.last_name || user?.user_metadata?.last_name || '';
+    
+    if (firstName || lastName) {
+      return `${currentUserProfile.first_name?.charAt(0) || ''}${currentUserProfile.last_name?.charAt(0) || ''}`.toUpperCase();
+    }
+    
+    const email = user?.email || '';
+    return email.charAt(0).toUpperCase() || 'U';
+  };
+
+  const handleDeleteNotification = async (notificationId: string, isSent: boolean = false) => {
+    try {
+      setDeletingNotifications(prev => new Set(prev).add(notificationId));
+      
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      if (isSent) {
+        setSentNotifications(prev => prev.filter(n => n.id !== notificationId));
+      } else {
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      }
+      
+      // If we're on the last page and it becomes empty, go to previous page
+      if (currentNotifications.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete notification');
+    } finally {
+      setDeletingNotifications(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(notificationId);
+        return newSet;
+      });
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setNotifications(notifications.map(n => 
+        n.id === notificationId ? { ...n, read: true } : n
+      ));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const sendNotification = async () => {
+    if (!composeForm.recipients.length || !composeForm.subject || !composeForm.body) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setSending(true);
+      setError(null);
+
+      const selectedRecipients = composeForm.recipients;
+      const recipientsData = selectedRecipients.map(id => {
+        const member = members.find(m => m.user_id === id);
+        return {
+          id: member?.id,
+          user_id: member?.user_id,
+          email: member?.email,
+          name: `${member?.first_name || ''} ${member?.last_name || ''}`.trim() || member?.email || 'Unknown'
+        };
+      });
+
+      const { error } = await supabase.functions.invoke('send-notification', {
+        body: {
+          recipients: recipientsData,
+          subject: composeForm.subject,
+          body: composeForm.body,
+          type: composeForm.type,
+          club_id: currentClub?.clubId,
+          send_email: composeForm.send_email,
+          sender_name: getSenderName(),
+          sender_avatar: currentUserProfile?.avatar_url || user?.user_metadata?.avatar_url,
+          club_name: currentClub.club?.name,
+          sender_first_name: currentUserProfile?.first_name || user?.user_metadata?.first_name || '',
+          sender_last_name: currentUserProfile?.last_name || user?.user_metadata?.last_name || ''
+        }
+      });
+
+      if (error) throw error;
+
+      setSuccess(`Notification sent to ${composeForm.recipients.length} recipient(s)`);
+      setComposeForm({
+        recipients: [],
+        subject: '',
+        body: '',
+        type: 'message',
+        send_email: true
+      });
+      setActiveTab('sent');
+      
+      // Refresh notifications
+      await fetchNotifications();
+
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (err) {
+      console.error('Error sending notification:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send notification');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const filteredNotifications = notifications.filter(notification =>
+    notification.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    notification.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (notification.sender_name && notification.sender_name.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const filteredSentNotifications = sentNotifications.filter(notification =>
+    notification.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    notification.body.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getEmailStatusIcon = (status: string) => {
+    switch (status) {
+      case 'sent':
+        return <Check size={14} className="text-green-400" />;
+      case 'failed':
+        return <AlertTriangle size={14} className="text-red-400" />;
+      case 'pending':
+        return <Clock size={14} className="text-amber-400" />;
+      default:
+        return null;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } else if (diffInHours < 168) { // 7 days
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      });
+    } else {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+  };
+
+  // Avatar component helper
+  const UserAvatar: React.FC<{
+    name: string;
+    avatarUrl?: string;
+    size?: number;
+    isRead?: boolean;
+  }> = ({ name, avatarUrl, size = 40, isRead = false }) => {
+    const initials = name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+
+    if (avatarUrl) {
+      return (
+        <img
+          src={avatarUrl}
+          alt={name}
+          className={`rounded-full object-cover ${isRead ? 'opacity-75' : ''}`}
+          style={{ width: size, height: size }}
+          onError={(e) => {
+            // Fallback to initials if image fails to load
+            e.currentTarget.style.display = 'none';
+            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+          }}
+        />
+      );
+    }
+
+    return (
+      <div
+        className={`rounded-full flex items-center justify-center text-white font-medium ${
+          isRead ? 'bg-slate-600' : 'bg-blue-600'
+        }`}
+        style={{ width: size, height: size, fontSize: size * 0.4 }}
+      >
+        {initials}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Tab Navigation */}
+      <div className="flex border-b border-slate-700">
+        <button
+          onClick={() => setActiveTab('inbox')}
+          className={`
+            flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2
+            ${activeTab === 'inbox' 
+              ? 'border-blue-500 text-blue-400' 
+              : 'border-transparent text-slate-400 hover:text-slate-300'}
+          `}
+        >
+          <Inbox size={16} />
+          <span>Inbox</span>
+          {unreadCount > 0 && (
+            <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+        
+        <button
+          onClick={() => setActiveTab('sent')}
+          className={`
+            flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2
+            ${activeTab === 'sent' 
+              ? 'border-blue-500 text-blue-400' 
+              : 'border-transparent text-slate-400 hover:text-slate-300'}
+          `}
+        >
+          <Send size={16} />
+          <span>Sent</span>
+        </button>
+        
+        <button
+          onClick={() => setActiveTab('compose')}
+          className={`
+            flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2
+            ${activeTab === 'compose' 
+              ? 'border-blue-500 text-blue-400' 
+              : 'border-transparent text-slate-400 hover:text-slate-300'}
+          `}
+        >
+          <Plus size={16} />
+          <span>Compose</span>
+        </button>
+      </div>
+
+      {/* Error/Success Messages */}
+      {error && (
+        <div className="p-4 rounded-lg bg-red-900/20 border border-red-900/30 flex items-start gap-3">
+          <AlertTriangle className="text-red-400 mt-0.5" size={18} />
+          <div>
+            <h3 className="text-red-400 font-medium">Error</h3>
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-red-400 hover:text-red-300"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div className="p-4 rounded-lg bg-green-900/20 border border-green-900/30 flex items-start gap-3">
+          <Check className="text-green-400 mt-0.5" size={18} />
+          <div>
+            <h3 className="text-green-400 font-medium">Success</h3>
+            <p className="text-green-300 text-sm">{success}</p>
+          </div>
+          <button
+            onClick={() => setSuccess(null)}
+            className="ml-auto text-green-400 hover:text-green-300"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Search Bar */}
+      {(activeTab === 'inbox' || activeTab === 'sent') && (
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search messages..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={`
+              w-full pl-10 pr-4 py-2 rounded-lg transition-colors
+              ${darkMode 
+                ? 'bg-slate-700 text-slate-200 placeholder-slate-400 border border-slate-600' 
+                : 'bg-white text-slate-800 placeholder-slate-400 border border-slate-200'}
+            `}
+          />
+        </div>
+      )}
+
+      {/* Content */}
+      {activeTab === 'inbox' && (
+        <div>
+          {/* Notifications List */}
+          <div className="space-y-3 mb-4" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-slate-400">Loading notifications...</p>
+              </div>
+            ) : currentNotifications.length === 0 ? (
+              <div className="text-center py-12">
+                <Inbox size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
+                <p className="text-slate-400 mb-2">No notifications</p>
+                <p className="text-sm text-slate-500">
+                  {searchTerm ? 'No notifications match your search' : 'You have no notifications yet'}
+                </p>
+              </div>
+            ) : (
+              currentNotifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  onClick={() => {
+                    setSelectedNotification(notification);
+                    if (!notification.read) {
+                      markAsRead(notification.id);
+                    }
+                  }}
+                  className={`
+                    p-4 rounded-lg border cursor-pointer transition-all hover:scale-[1.01]
+                    ${notification.read
+                      ? darkMode 
+                        ? 'bg-slate-700/50 border-slate-600' 
+                        : 'bg-slate-50 border-slate-200'
+                      : darkMode 
+                        ? 'bg-slate-700 border-slate-600 ring-1 ring-blue-500/20' 
+                        : 'bg-white border-slate-200 ring-1 ring-blue-500/20'
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      <UserAvatar
+                        name={getDisplayName(notification, true)}
+                        avatarUrl={notification.sender_avatar_url}
+                        size={40}
+                        isRead={notification.read}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className={`font-medium ${notification.read ? 'text-slate-400' : 'text-white'}`}>
+                            {getDisplayName(notification, true)}
+                          </p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            notification.type === 'message' 
+                              ? 'bg-blue-900/30 text-blue-400'
+                              : notification.type === 'alert'
+                                ? 'bg-red-900/30 text-red-400'
+                                : 'bg-slate-700 text-slate-300'
+                          }`}>
+                            {notification.type}
+                          </span>
+                          {getEmailStatusIcon(notification.email_status)}
+                        </div>
+                        <p className={`font-medium mb-1 ${notification.read ? 'text-slate-300' : 'text-white'}`}>
+                          {notification.subject}
+                        </p>
+                        <p className={`text-sm line-clamp-2 ${notification.read ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {notification.body}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right flex items-start gap-2">
+                      <div>
+                        <p className="text-xs text-slate-400">
+                          {formatDate(notification.sent_at)}
+                        </p>
+                        {!notification.read && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 ml-auto"></div>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNotification(notification.id);
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                        title="Delete notification"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="text-center py-8">
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                
+                <span className="px-4 py-2 text-slate-300 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'sent' && (
+        <div className="space-y-3">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="text-slate-400">Loading sent notifications...</p>
+            </div>
+          ) : filteredSentNotifications.length === 0 ? (
+            <div className="text-center py-12">
+              <Send size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
+              <p className="text-slate-400 mb-2">No sent notifications</p>
+              <p className="text-sm text-slate-500">
+                {searchTerm ? 'No sent notifications match your search' : 'You have not sent any notifications yet'}
+              </p>
+            </div>
+          ) : (
+            filteredSentNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`
+                  p-4 rounded-lg border
+                  ${darkMode 
+                    ? 'bg-slate-700/50 border-slate-600' 
+                    : 'bg-slate-50 border-slate-200'}
+                `}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-white">{notification.subject}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        notification.type === 'message' 
+                          ? 'bg-blue-900/30 text-blue-400'
+                          : notification.type === 'alert'
+                            ? 'bg-red-900/30 text-red-400'
+                            : 'bg-slate-700 text-slate-300'
+                      }`}>
+                        {notification.type}
+                      </span>
+                      {getEmailStatusIcon(notification.email_status)}
+                    </div>
+                    <p className="text-sm text-slate-400 line-clamp-2 mb-2">
+                      {notification.body}
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span>To: {notification.sender_name || 'Member'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        notification.email_status === 'sent' 
+                          ? 'bg-green-900/30 text-green-400' 
+                          : notification.email_status === 'failed'
+                            ? 'bg-red-900/30 text-red-400'
+                            : 'bg-amber-900/30 text-amber-400'
+                      }`}>
+                        Email: {notification.email_status}
+                      </span>
+                      {notification.email_status === 'failed' && notification.email_error_message && (
+                        <span className="text-xs text-red-400" title={notification.email_error_message}>
+                          Error
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNotification(notification.id);
+                        }}
+                        className="p-1 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Delete message"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {formatDate(notification.sent_at)}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'compose' && (
+        <div className={`
+          p-6 rounded-lg border
+          ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-white border-slate-200'}
+        `}>
+          <h3 className="text-lg font-semibold text-white mb-4">Compose Notification</h3>
+          
+          <div className="space-y-4">
+            {/* Recipients */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Recipients *
+              </label>
+              <div className="space-y-2">
+                <div className="flex gap-2 mb-2">
+                  <button
+                    onClick={() => setComposeForm({
+                      ...composeForm,
+                      recipients: members.filter(m => m.user_id).map(m => m.user_id)
+                    })}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Select All Members
+                  </button>
+                  <button
+                    onClick={() => setComposeForm({ ...composeForm, recipients: [] })}
+                    className="px-3 py-1 text-xs bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="max-h-40 overflow-y-auto border border-slate-600 rounded-lg">
+                  {members.filter(m => m.user_id).map((member) => (
+                    <label
+                      key={member.id}
+                      className="flex items-center gap-3 p-3 hover:bg-slate-700/50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={composeForm.recipients.includes(member.user_id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setComposeForm({
+                              ...composeForm,
+                              recipients: [...composeForm.recipients, member.user_id]
+                            });
+                          } else {
+                            setComposeForm({
+                              ...composeForm,
+                              recipients: composeForm.recipients.filter(id => id !== member.user_id)
+                            });
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded flex-shrink-0"
+                      />
+                      <UserAvatar
+                        name={`${member.first_name} ${member.last_name}`}
+                        avatarUrl={member.avatar_url}
+                        size={32}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">
+                          {member.first_name} {member.last_name}
+                        </p>
+                        <p className="text-slate-400 text-xs truncate">{member.email}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400">
+                  {composeForm.recipients.length} recipient(s) selected
+                </p>
+              </div>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Subject *
+              </label>
+              <input
+                type="text"
+                value={composeForm.subject}
+                onChange={(e) => setComposeForm({ ...composeForm, subject: e.target.value })}
+                className={`
+                  w-full px-3 py-2 rounded-lg border
+                  ${darkMode 
+                    ? 'bg-slate-700 border-slate-600 text-white' 
+                    : 'bg-white border-slate-300 text-slate-900'}
+                `}
+                placeholder="Enter notification subject"
+              />
+            </div>
+
+            {/* Message Body */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Message *
+              </label>
+              <textarea
+                value={composeForm.body}
+                onChange={(e) => setComposeForm({ ...composeForm, body: e.target.value })}
+                rows={6}
+                className={`
+                  w-full px-3 py-2 rounded-lg border
+                  ${darkMode 
+                    ? 'bg-slate-700 border-slate-600 text-white' 
+                    : 'bg-white border-slate-300 text-slate-900'}
+                `}
+                placeholder="Enter your message here..."
+              />
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Notification Type
+                </label>
+                <select
+                  value={composeForm.type}
+                  onChange={(e) => setComposeForm({ ...composeForm, type: e.target.value })}
+                  className={`
+                    w-full px-3 py-2 rounded-lg border
+                    ${darkMode 
+                      ? 'bg-slate-700 border-slate-600 text-white' 
+                      : 'bg-white border-slate-300 text-slate-900'}
+                  `}
+                >
+                  <option value="message">Message</option>
+                  <option value="announcement">Announcement</option>
+                  <option value="alert">Alert</option>
+                  <option value="reminder">Reminder</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={composeForm.send_email}
+                    onChange={(e) => setComposeForm({ ...composeForm, send_email: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-slate-300">Also send via email</span>
+                </label>
+                <p className="text-xs text-slate-400 mt-1">
+                  When enabled, recipients will receive both an in-app notification and an email
+                </p>
+              </div>
+            </div>
+
+            {/* Send Button */}
+            <div className="flex justify-end pt-4">
+              <button
+                onClick={sendNotification}
+                disabled={sending || !composeForm.recipients.length || !composeForm.subject || !composeForm.body}
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} />
+                    Send Notification
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Detail Modal */}
+      {selectedNotification && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`
+            w-full max-w-2xl rounded-xl shadow-xl overflow-hidden
+            ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-800 border-slate-700'}
+          `}>
+            <div className={`
+              flex items-center justify-between p-6 border-b
+              ${darkMode ? 'border-slate-700' : 'border-slate-200'}
+            `}>
+              <div className="flex items-center gap-3">
+                <UserAvatar
+                  name={selectedNotification.sender_name || 'System'}
+                  avatarUrl={selectedNotification.sender_avatar_url}
+                  size={48}
+                />
+                <div>
+                  <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                    {selectedNotification.subject}
+                  </h2>
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    From: {selectedNotification.sender_name || 'System'} • {formatDate(selectedNotification.sent_at)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedNotification(null)}
+                className={`
+                  rounded-full p-2 transition-colors
+                  ${darkMode 
+                    ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
+                `}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  selectedNotification.type === 'message' 
+                    ? 'bg-blue-900/30 text-blue-400'
+                    : selectedNotification.type === 'alert'
+                      ? 'bg-red-900/30 text-red-400'
+                      : 'bg-slate-700 text-slate-300'
+                }`}>
+                  {selectedNotification.type}
+                </span>
+                {getEmailStatusIcon(selectedNotification.email_status)}
+                <span className="text-xs text-slate-400">
+                  Email: {selectedNotification.email_status}
+                </span>
+              </div>
+              
+              <div className={`
+                prose max-w-none
+                ${darkMode ? 'prose-invert' : ''}
+              `}>
+                <div className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                  {selectedNotification.body.split('\n').map((line, index) => (
+                    <p key={index} className="mb-2">{line}</p>
+                  ))}
+                </div>
+              </div>
+
+              {selectedNotification.email_error_message && (
+                <div className="mt-4 p-3 rounded-lg bg-red-900/20 border border-red-900/30">
+                  <p className="text-red-400 text-sm">
+                    <strong>Email Error:</strong> {selectedNotification.email_error_message}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+export default MemberNotificationComponent;

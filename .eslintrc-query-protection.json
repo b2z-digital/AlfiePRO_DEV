@@ -1,0 +1,15 @@
+{
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "AwaitExpression[argument.callee.object.name='supabase'][argument.callee.property.name='from']",
+        "message": "❌ Direct supabase queries are not allowed! Use protectedQuery() from 'src/utils/queryHelpers.ts' to ensure timeout protection and retry logic. See QUERY_PROTECTION_GUIDELINES.md for examples."
+      },
+      {
+        "selector": "CallExpression[callee.object.name='supabase'][callee.property.name='from']",
+        "message": "❌ Direct supabase queries are not allowed! Use protectedQuery() from 'src/utils/queryHelpers.ts' to ensure timeout protection and retry logic. See QUERY_PROTECTION_GUIDELINES.md for examples."
+      }
+    ]
+  }
+}
