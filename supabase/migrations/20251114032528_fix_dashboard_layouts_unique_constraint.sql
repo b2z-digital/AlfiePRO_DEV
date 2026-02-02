@@ -14,23 +14,23 @@
 DROP INDEX IF EXISTS idx_user_dashboard_layouts_user_club;
 
 -- Add unique constraint
-DO $$ 
+DO $$
 BEGIN
   -- First, ensure no duplicates exist
   DELETE FROM user_dashboard_layouts a
   USING user_dashboard_layouts b
-  WHERE a.id > b.id 
-    AND a.user_id = b.user_id 
+  WHERE a.id > b.id
+    AND a.user_id = b.user_id
     AND (a.club_id = b.club_id OR (a.club_id IS NULL AND b.club_id IS NULL))
     AND a.is_default = b.is_default;
 
   -- Add unique constraint
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint 
+    SELECT 1 FROM pg_constraint
     WHERE conname = 'user_dashboard_layouts_user_club_default_key'
   ) THEN
     ALTER TABLE user_dashboard_layouts
-    ADD CONSTRAINT user_dashboard_layouts_user_club_default_key 
+    ADD CONSTRAINT user_dashboard_layouts_user_club_default_key
     UNIQUE (user_id, club_id, is_default);
   END IF;
 END $$;

@@ -306,11 +306,17 @@ export const CustomizableDashboard: React.FC = () => {
       const result = await saveDashboardLayout(user.id, context, layout);
       if (result.success) {
         console.log('✅ Layout saved successfully');
+        addNotification('success', 'Dashboard layout saved successfully');
+        return true;
       } else {
         console.error('❌ Layout save failed:', result.error);
+        addNotification('error', 'Failed to save dashboard layout');
+        return false;
       }
     } catch (error) {
       console.error('❌ Exception during layout save:', error);
+      addNotification('error', 'An error occurred while saving dashboard layout');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -646,8 +652,10 @@ export const CustomizableDashboard: React.FC = () => {
   };
 
   const handleSaveAndExit = async () => {
-    await saveLayout();
-    setIsEditMode(false);
+    const success = await saveLayout();
+    if (success) {
+      setIsEditMode(false);
+    }
   };
 
   const handleCancelEdit = () => {

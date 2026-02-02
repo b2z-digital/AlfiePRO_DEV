@@ -21,29 +21,82 @@ export async function saveDashboardLayout(
       rows: layout.rows?.map(r => ({ id: r.id, columns: r.columns, height: r.height }))
     });
 
-    const { data, error } = await supabase
+    // First, try to find an existing layout
+    let query = supabase
       .from('user_dashboard_layouts')
-      .upsert({
-        user_id: userId,
-        club_id: context.clubId || null,
-        state_association_id: context.stateAssociationId || null,
-        national_association_id: context.nationalAssociationId || null,
-        layout_data: layout,
-        is_default: true,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,club_id,state_association_id,national_association_id,is_default',
-        ignoreDuplicates: false
-      })
-      .select()
-      .single();
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_default', true);
 
-    if (error) {
-      console.error('❌ Error saving dashboard layout:', error);
-      throw error;
+    // Apply organization filters
+    if (context.clubId) {
+      query = query.eq('club_id', context.clubId)
+        .is('state_association_id', null)
+        .is('national_association_id', null);
+    } else if (context.stateAssociationId) {
+      query = query.eq('state_association_id', context.stateAssociationId)
+        .is('club_id', null)
+        .is('national_association_id', null);
+    } else if (context.nationalAssociationId) {
+      query = query.eq('national_association_id', context.nationalAssociationId)
+        .is('club_id', null)
+        .is('state_association_id', null);
+    } else {
+      query = query.is('club_id', null)
+        .is('state_association_id', null)
+        .is('national_association_id', null);
     }
 
-    console.log('✅ Dashboard layout saved successfully:', data);
+    const { data: existing, error: findError } = await query.maybeSingle();
+
+    if (findError) {
+      console.error('❌ Error finding existing layout:', findError);
+      throw findError;
+    }
+
+    const layoutData = {
+      user_id: userId,
+      club_id: context.clubId || null,
+      state_association_id: context.stateAssociationId || null,
+      national_association_id: context.nationalAssociationId || null,
+      layout_data: layout,
+      is_default: true,
+      updated_at: new Date().toISOString()
+    };
+
+    let result;
+    if (existing) {
+      // Update existing layout
+      console.log('📝 Updating existing layout:', existing.id);
+      const { data, error } = await supabase
+        .from('user_dashboard_layouts')
+        .update(layoutData)
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error updating dashboard layout:', error);
+        throw error;
+      }
+      result = data;
+    } else {
+      // Insert new layout
+      console.log('➕ Creating new layout');
+      const { data, error } = await supabase
+        .from('user_dashboard_layouts')
+        .insert(layoutData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error inserting dashboard layout:', error);
+        throw error;
+      }
+      result = data;
+    }
+
+    console.log('✅ Dashboard layout saved successfully:', result);
     return { success: true };
   } catch (error) {
     console.error('❌ Exception saving dashboard layout:', error);
