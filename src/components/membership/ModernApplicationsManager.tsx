@@ -22,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
+import { ApplicationSummaryView } from './ApplicationSummaryView';
 
 interface Application {
   id: string;
@@ -511,19 +512,29 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
       {selectedApplication && !showRejectModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div
-            className={`max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${
+            className={`max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-2xl ${
               darkMode ? 'bg-slate-800/95 backdrop-blur-xl border border-slate-700/50' : 'bg-white/95 backdrop-blur-xl border border-slate-200'
             } shadow-2xl`}
           >
-            <div className={`sticky top-0 p-6 border-b ${darkMode ? 'border-slate-700/50 bg-slate-800/95 backdrop-blur-xl' : 'border-slate-200 bg-white/95 backdrop-blur-xl'}`}>
+            <div className={`sticky top-0 p-6 border-b ${darkMode ? 'border-slate-700/50 bg-slate-800/95 backdrop-blur-xl' : 'border-slate-200 bg-white/95 backdrop-blur-xl'} z-10`}>
               <div className="flex justify-between items-start">
-                <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Application Details
-                </h3>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                    <Users className="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      Review Application
+                    </h3>
+                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      {selectedApplication.first_name} {selectedApplication.last_name}
+                    </p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setSelectedApplication(null)}
                   className={`p-2 rounded-lg transition-colors ${
-                    darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                    darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                 >
                   <X size={20} />
@@ -531,154 +542,22 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="flex items-center gap-4">
-                {selectedApplication.avatar_url ? (
-                  <img
-                    src={selectedApplication.avatar_url}
-                    alt={`${selectedApplication.first_name} ${selectedApplication.last_name}`}
-                    className="w-20 h-20 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
-                    darkMode ? 'bg-slate-800' : 'bg-slate-200'
-                  }`}>
-                    <Users size={40} className={darkMode ? 'text-slate-600' : 'text-slate-400'} />
-                  </div>
-                )}
-                <div>
-                  <h4 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {selectedApplication.first_name} {selectedApplication.last_name}
-                  </h4>
-                  {getStatusBadge(selectedApplication.status)}
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                  <h5 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Contact Information
-                  </h5>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Mail size={14} className="text-blue-500" />
-                      <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                        {selectedApplication.email}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone size={14} className="text-green-500" />
-                      <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                        {selectedApplication.phone}
-                      </span>
-                    </div>
-                    {selectedApplication.street && (
-                      <div className="flex items-start gap-2">
-                        <MapPin size={14} className="text-red-500 mt-1" />
-                        <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                          {selectedApplication.street}, {selectedApplication.city} {selectedApplication.state}{' '}
-                          {selectedApplication.postcode}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                  <h5 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Emergency Contact
-                  </h5>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle size={14} className="text-amber-500" />
-                      <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                        {selectedApplication.emergency_contact_name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone size={14} className="text-green-500" />
-                      <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                        {selectedApplication.emergency_contact_phone}
-                      </span>
-                    </div>
-                    <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                      {selectedApplication.emergency_contact_relationship}
-                    </div>
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                  <h5 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Membership
-                  </h5>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Award size={14} className="text-purple-500" />
-                      <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                        {selectedApplication.membership_type_name}
-                      </span>
-                    </div>
-                    {selectedApplication.membership_amount && (
-                      <div className="flex items-center gap-2">
-                        <CreditCard size={14} className="text-blue-500" />
-                        <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                          ${selectedApplication.membership_amount} AUD/year
-                        </span>
-                      </div>
-                    )}
-                    <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                      Payment: {selectedApplication.payment_method === 'card' ? 'Card' : 'Bank Transfer'}
-                    </div>
-                  </div>
-                </div>
-
-                {selectedApplication.boats && selectedApplication.boats.length > 0 && (
-                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-slate-50 border border-slate-200'}`}>
-                    <h5 className={`font-semibold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Boats
-                    </h5>
-                    <div className="space-y-2 text-sm">
-                      {selectedApplication.boats.map((boat, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <Anchor size={14} className="text-cyan-500 mt-1" />
-                          <div>
-                            <div className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                              {boat.type} #{boat.sailNumber}
-                            </div>
-                            {boat.hullName && (
-                              <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                                {boat.hullName}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {selectedApplication.status === 'pending' && (
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => handleApprove(selectedApplication)}
-                    disabled={processing === selectedApplication.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
-                  >
-                    <Check size={20} />
-                    Approve Application
-                  </button>
-
-                  <button
-                    onClick={() => setShowRejectModal(true)}
-                    disabled={processing === selectedApplication.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors disabled:opacity-50"
-                  >
-                    <X size={20} />
-                    Reject Application
-                  </button>
-                </div>
-              )}
+            <div className="p-6">
+              <ApplicationSummaryView
+                darkMode={darkMode}
+                application={selectedApplication}
+                club={currentClub?.club ? {
+                  name: currentClub.club.name,
+                  logo: currentClub.club.logo,
+                  bank_name: currentClub.club.bank_name,
+                  bsb: currentClub.club.bsb,
+                  account_number: currentClub.club.account_number,
+                } : undefined}
+                mode={selectedApplication.status === 'pending' ? 'admin' : 'review'}
+                onApprove={selectedApplication.status === 'pending' ? () => handleApprove(selectedApplication) : undefined}
+                onReject={selectedApplication.status === 'pending' ? () => setShowRejectModal(true) : undefined}
+                processing={processing === selectedApplication.id}
+              />
             </div>
           </div>
         </div>

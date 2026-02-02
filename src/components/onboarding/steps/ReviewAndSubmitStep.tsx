@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Send, Edit2, CheckCircle, User, MapPin, Award, Anchor, AlertCircle, CreditCard } from 'lucide-react';
+import { Send, Edit2, CheckCircle } from 'lucide-react';
 import { OnboardingData } from '../OnboardingWizard';
-import { Avatar } from '../../ui/Avatar';
+import { ApplicationSummaryView } from '../../membership/ApplicationSummaryView';
 
 interface ReviewAndSubmitStepProps {
   darkMode: boolean;
@@ -23,32 +23,6 @@ export const ReviewAndSubmitStep: React.FC<ReviewAndSubmitStepProps> = ({
     await onSubmit({});
   };
 
-  const InfoSection = ({ icon: Icon, title, children, iconColor, rightContent }: any) => (
-    <div className="p-4 sm:p-5 md:p-6 rounded-xl bg-slate-700/30 backdrop-blur-sm border border-slate-600/30">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${iconColor} flex items-center justify-center flex-shrink-0`}>
-            <Icon className="text-white w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-          <h3 className={`font-semibold text-base sm:text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            {title}
-          </h3>
-        </div>
-        {rightContent && <div className="sm:ml-auto">{rightContent}</div>}
-      </div>
-      {children}
-    </div>
-  );
-
-  const InfoRow = ({ label, value }: { label: string; value: string | undefined }) => (
-    <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b border-slate-700/30 last:border-0 gap-1 sm:gap-2">
-      <span className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{label}:</span>
-      <span className={`font-medium text-sm sm:text-base ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-        {value || 'Not specified'}
-      </span>
-    </div>
-  );
-
   return (
     <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-4xl mx-auto">
@@ -64,169 +38,36 @@ export const ReviewAndSubmitStep: React.FC<ReviewAndSubmitStepProps> = ({
           </p>
         </div>
 
-        <div className="space-y-4 sm:space-y-6">
-          <InfoSection
-            icon={MapPin}
-            title="Club"
-            iconColor="bg-green-500"
-            rightContent={
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-slate-700/50 flex items-center justify-center flex-shrink-0">
-                  {formData.clubLogo ? (
-                    <img
-                      src={formData.clubLogo}
-                      alt={formData.clubName}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.innerHTML = `<span class="text-white font-semibold text-base sm:text-xl">${formData.clubName?.charAt(0) || 'C'}</span>`;
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="text-white font-semibold text-base sm:text-xl">{formData.clubName?.charAt(0) || 'C'}</span>
-                  )}
-                </div>
-                <div className={`font-medium text-sm sm:text-base ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                  {formData.clubName || 'Not selected'}
-                </div>
-              </div>
-            }
-          >
-            <div className="text-xs sm:text-sm text-slate-400">
-              Your selected sailing club
-            </div>
-          </InfoSection>
-
-          <InfoSection
-            icon={User}
-            title="Personal Information"
-            iconColor="bg-purple-500"
-            rightContent={
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Avatar
-                  firstName={formData.firstName}
-                  lastName={formData.lastName}
-                  imageUrl={formData.avatarUrl}
-                  size="md"
-                />
-                <div className={`font-medium text-sm sm:text-lg ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                  {formData.firstName} {formData.lastName}
-                </div>
-              </div>
-            }
-          >
-            <InfoRow label="Email" value={formData.email} />
-            <InfoRow label="Phone" value={formData.phone} />
-            {formData.street && (
-              <InfoRow
-                label="Address"
-                value={`${formData.street}, ${formData.city} ${formData.state} ${formData.postcode}`}
-              />
-            )}
-          </InfoSection>
-
-          <InfoSection icon={Award} title="Membership" iconColor="bg-green-500">
-            <InfoRow label="Type" value={formData.membershipTypeName} />
-            <InfoRow
-              label="Amount"
-              value={formData.membershipAmount ? `$${formData.membershipAmount} AUD/year` : undefined}
-            />
-          </InfoSection>
-
-          {formData.boats && formData.boats.length > 0 && (
-            <InfoSection icon={Anchor} title="Boat(s)" iconColor="bg-cyan-500">
-              <div className="space-y-2 sm:space-y-3">
-                {formData.boats.map((boat, index) => (
-                  <div
-                    key={index}
-                    className="p-2.5 sm:p-3 rounded-lg bg-slate-700/30 backdrop-blur-sm border border-slate-600/30"
-                  >
-                    <div className={`font-medium mb-0.5 sm:mb-1 text-sm sm:text-base ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                      {boat.type} - #{boat.sailNumber}
-                    </div>
-                    {boat.hullName && (
-                      <div className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {boat.hullName}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </InfoSection>
-          )}
-
-          <InfoSection icon={AlertCircle} title="Emergency Contact" iconColor="bg-red-500">
-            <InfoRow label="Name" value={formData.emergencyContactName} />
-            <InfoRow label="Phone" value={formData.emergencyContactPhone} />
-            <InfoRow label="Relationship" value={formData.emergencyContactRelationship} />
-          </InfoSection>
-
-          <InfoSection icon={CreditCard} title="Payment Method" iconColor="bg-amber-500">
-            <InfoRow
-              label="Method"
-              value={formData.paymentMethod === 'card' ? 'Online Card Payment' : 'Bank Transfer'}
-            />
-            {formData.paymentMethod === 'bank_transfer' && (
-              <>
-                <div className={`mt-2 sm:mt-3 p-2.5 sm:p-3 rounded-lg text-xs sm:text-sm ${
-                  darkMode ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-800'
-                }`}>
-                  Please transfer the membership fee to the club's bank account using your name as the reference.
-                </div>
-                {(formData.clubBankName || formData.clubBsb || formData.clubAccountNumber) && (
-                  <div className={`mt-2 sm:mt-3 p-3 sm:p-4 rounded-lg border ${
-                    darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-white border-slate-200'
-                  }`}>
-                    <div className={`font-semibold mb-2 sm:mb-3 text-sm sm:text-base ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                      Bank Details
-                    </div>
-                    {formData.clubBankName && (
-                      <div className="mb-1.5 sm:mb-2">
-                        <span className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Bank Name: </span>
-                        <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                          {formData.clubBankName}
-                        </span>
-                      </div>
-                    )}
-                    {formData.clubBsb && (
-                      <div className="mb-1.5 sm:mb-2">
-                        <span className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>BSB: </span>
-                        <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                          {formData.clubBsb}
-                        </span>
-                      </div>
-                    )}
-                    {formData.clubAccountNumber && (
-                      <div>
-                        <span className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Account Number: </span>
-                        <span className={`font-medium text-xs sm:text-sm ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                          {formData.clubAccountNumber}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </InfoSection>
-
-          <div className={`p-3 sm:p-4 rounded-lg ${darkMode ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'}`}>
-            <div className="flex items-start gap-2 sm:gap-3">
-              <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5 w-4 h-4 sm:w-5 sm:h-5" />
-              <div>
-                <p className={`font-medium mb-0.5 sm:mb-1 text-sm sm:text-base ${darkMode ? 'text-green-300' : 'text-green-800'}`}>
-                  Code of Conduct Accepted
-                </p>
-                <p className={`text-xs sm:text-sm ${darkMode ? 'text-green-400' : 'text-green-700'}`}>
-                  You've agreed to abide by the club's code of conduct
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ApplicationSummaryView
+          darkMode={darkMode}
+          application={{
+            first_name: formData.firstName || '',
+            last_name: formData.lastName || '',
+            email: formData.email || '',
+            phone: formData.phone || '',
+            street: formData.street,
+            city: formData.city,
+            state: formData.state,
+            postcode: formData.postcode,
+            avatar_url: formData.avatarUrl,
+            membership_type_name: formData.membershipTypeName,
+            membership_amount: formData.membershipAmount,
+            boats: formData.boats,
+            emergency_contact_name: formData.emergencyContactName || '',
+            emergency_contact_phone: formData.emergencyContactPhone || '',
+            emergency_contact_relationship: formData.emergencyContactRelationship || '',
+            payment_method: formData.paymentMethod || '',
+            code_of_conduct_accepted: formData.codeOfConductAccepted,
+          }}
+          club={formData.clubName ? {
+            name: formData.clubName,
+            logo: formData.clubLogo,
+            bank_name: formData.clubBankName,
+            bsb: formData.clubBsb,
+            account_number: formData.clubAccountNumber,
+          } : undefined}
+          mode="review"
+        />
 
         <div className={`mt-6 sm:mt-8 p-4 sm:p-5 md:p-6 rounded-xl ${darkMode ? 'bg-green-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
           <h4 className={`font-semibold mb-2 text-sm sm:text-base ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>
