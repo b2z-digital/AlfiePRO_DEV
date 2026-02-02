@@ -62,6 +62,10 @@ import { MemberRetentionWidget } from './widgets/MemberRetentionWidget';
 import { UpcomingMeetingsWidget } from './widgets/UpcomingMeetingsWidget';
 import { MeetingsCountWidget } from './widgets/MeetingsCountWidget';
 import { PendingEventsWidget } from './widgets/PendingEventsWidget';
+import { PendingApplicationsWidget } from './widgets/PendingApplicationsWidget';
+import { UnreadCommunicationsWidget } from './widgets/UnreadCommunicationsWidget';
+import { RecentApplicationsWidget } from './widgets/RecentApplicationsWidget';
+import { MembershipRenewalsWidget } from './widgets/MembershipRenewalsWidget';
 
 export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
@@ -83,6 +87,49 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     defaultSize: '1x1',
     component: PendingEventsWidget,
     category: 'overview'
+  },
+  {
+    id: 'pending-applications',
+    type: 'pending-applications',
+    name: 'Pending Applications',
+    description: 'Membership applications awaiting review',
+    icon: UserCheck,
+    defaultSize: '1x1',
+    component: PendingApplicationsWidget,
+    category: 'membership',
+    requiredPermissions: ['admin', 'membership']
+  },
+  {
+    id: 'unread-communications',
+    type: 'unread-communications',
+    name: 'Unread Messages',
+    description: 'Count of unread messages and notifications',
+    icon: MessageSquare,
+    defaultSize: '1x1',
+    component: UnreadCommunicationsWidget,
+    category: 'communication'
+  },
+  {
+    id: 'recent-applications',
+    type: 'recent-applications',
+    name: 'Recent Applications',
+    description: 'Latest membership applications with quick review',
+    icon: Users,
+    defaultSize: '2x2',
+    component: RecentApplicationsWidget,
+    category: 'membership',
+    requiredPermissions: ['admin', 'membership']
+  },
+  {
+    id: 'membership-renewals',
+    type: 'membership-renewals',
+    name: 'Renewals Due Soon',
+    description: 'Members with renewals due in the next 60 days',
+    icon: AlertCircle,
+    defaultSize: '1x1',
+    component: MembershipRenewalsWidget,
+    category: 'membership',
+    requiredPermissions: ['admin', 'membership']
   },
   {
     id: 'members-count',

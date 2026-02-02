@@ -98,6 +98,42 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
     }
   },
   {
+    id: 'secretary',
+    name: 'Club Secretary',
+    description: 'Perfect for Club Secretaries - focuses on applications, communications, and administrative tasks',
+    icon: 'Clipboard',
+    rowConfigs: [
+      { row: 0, height: 'compact' },
+      { row: 1, height: 'default' },
+    ],
+    defaultLayouts: {
+      lg: [
+        { type: 'pending-applications', row: 0, col: 0, width: 4, height: 1, settings: {}, colorTheme: 'amber', position: { x: 0, y: 0, w: 4, h: 1 } },
+        { type: 'unread-communications', row: 0, col: 4, width: 4, height: 1, settings: {}, colorTheme: 'blue', position: { x: 4, y: 0, w: 4, h: 1 } },
+        { type: 'membership-renewals', row: 0, col: 8, width: 4, height: 1, settings: {}, colorTheme: 'orange', position: { x: 8, y: 0, w: 4, h: 1 } },
+        { type: 'recent-applications', row: 1, col: 0, width: 4, height: 2, settings: {}, colorTheme: 'default', position: { x: 0, y: 1, w: 4, h: 2 } },
+        { type: 'latest-news', row: 1, col: 4, width: 4, height: 2, settings: {}, colorTheme: 'default', position: { x: 4, y: 1, w: 4, h: 2 } },
+        { type: 'upcoming-meetings', row: 1, col: 8, width: 4, height: 2, settings: {}, colorTheme: 'default', position: { x: 8, y: 1, w: 4, h: 2 } },
+      ],
+      md: [
+        { id: uuidv4(), type: 'pending-applications', row: 0, col: 0, width: 4, height: 1, settings: {} },
+        { id: uuidv4(), type: 'unread-communications', row: 0, col: 4, width: 4, height: 1, settings: {} },
+        { id: uuidv4(), type: 'membership-renewals', row: 0, col: 8, width: 4, height: 1, settings: {} },
+        { id: uuidv4(), type: 'recent-applications', row: 1, col: 0, width: 6, height: 2, settings: {} },
+        { id: uuidv4(), type: 'latest-news', row: 1, col: 6, width: 6, height: 2, settings: {} },
+        { id: uuidv4(), type: 'upcoming-meetings', row: 3, col: 0, width: 12, height: 2, settings: {} },
+      ],
+      sm: [
+        { id: uuidv4(), type: 'pending-applications', row: 0, col: 0, width: 4, height: 1, settings: {} },
+        { id: uuidv4(), type: 'unread-communications', row: 1, col: 0, width: 4, height: 1, settings: {} },
+        { id: uuidv4(), type: 'membership-renewals', row: 2, col: 0, width: 4, height: 1, settings: {} },
+        { id: uuidv4(), type: 'recent-applications', row: 3, col: 0, width: 4, height: 2, settings: {} },
+        { id: uuidv4(), type: 'latest-news', row: 5, col: 0, width: 4, height: 2, settings: {} },
+        { id: uuidv4(), type: 'upcoming-meetings', row: 7, col: 0, width: 4, height: 2, settings: {} },
+      ]
+    }
+  },
+  {
     id: 'full',
     name: 'Full Overview',
     description: 'Perfect for Commodores and Admins - comprehensive view of all club activities',
@@ -139,7 +175,7 @@ export const ROLE_TO_TEMPLATE_MAP: Record<string, string> = {
   'vice_commodore': 'full',
   'rear_commodore': 'full',
   'treasurer': 'finance',
-  'secretary': 'membership',
+  'secretary': 'secretary',
   'race_officer': 'race',
   'sailing_master': 'race',
   'membership_officer': 'membership',
