@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingDown, TrendingUp } from 'lucide-react';
+import { TrendingDown, TrendingUp, X } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
-import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
+import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { formatCurrency } from '../../../utils/formatCurrency';
 
 interface TotalExpensesWidgetProps {
@@ -24,6 +24,7 @@ export const TotalExpensesWidget: React.FC<TotalExpensesWidgetProps> = ({
   const [loading, setLoading] = useState(true);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [changePercent, setChangePercent] = useState(0);
+  const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -77,47 +78,42 @@ export const TotalExpensesWidget: React.FC<TotalExpensesWidgetProps> = ({
   const isIncrease = changePercent > 0;
 
   return (
-    <div className="h-full rounded-xl border backdrop-blur-sm p-6 bg-slate-800/30 border-slate-700/50 relative">
-      {isEditMode && (
+    <div className="relative w-full h-full">
+      {isEditMode && onRemove && (
         <button
-          onClick={onRemove}
-          className="absolute top-2 right-2 p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors"
-          title="Remove widget"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onRemove();
+          }}
+          className="absolute -top-2 -right-2 z-[60] bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg transition-colors pointer-events-auto"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X size={16} />
         </button>
       )}
-
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-lg bg-red-600/20">
-          <TrendingDown className="text-red-400" size={20} />
+      <div className={`relative rounded-2xl p-4 w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background}`}>
+        <div className="flex-shrink-0">
+          <div className="p-3 rounded-xl bg-red-500/20">
+            <TrendingDown className="text-red-400" size={24} />
+          </div>
         </div>
-        <h3 className="text-lg font-semibold text-white">Total Expenses</h3>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-slate-400 mb-0.5">Total Expenses</p>
+          {loading ? (
+            <p className="text-2xl font-bold text-white">...</p>
+          ) : (
+            <>
+              <p className="text-2xl font-bold text-white mb-0.5">
+                ${formatCurrency(totalExpenses)}
+              </p>
+              <p className={`text-xs flex items-center gap-1 ${isIncrease ? 'text-red-400' : 'text-green-400'}`}>
+                {isIncrease ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {isIncrease ? '+' : ''}{changePercent.toFixed(1)}% from previous 30 days
+              </p>
+            </>
+          )}
+        </div>
       </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center h-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        </div>
-      ) : (
-        <div className="flex flex-col">
-          <div className="text-3xl font-bold text-white mb-2">
-            ${formatCurrency(totalExpenses)}
-          </div>
-          <div className="flex items-center gap-1 text-sm">
-            {isIncrease ? (
-              <TrendingUp size={16} className="text-red-400" />
-            ) : (
-              <TrendingDown size={16} className="text-green-400" />
-            )}
-            <span className={isIncrease ? 'text-red-400' : 'text-green-400'}>
-              {isIncrease ? '+' : ''}{changePercent.toFixed(1)}% from previous 30 days
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
