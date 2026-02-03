@@ -4,6 +4,8 @@ import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
 
 export const MemberEngagementWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
+  const themeColors = useWidgetTheme(colorTheme);
+
   return (
     <div className={`relative rounded-2xl p-6 w-full h-full border backdrop-blur-sm ${themeColors.background}`}>
       {isEditMode && onRemove && (
