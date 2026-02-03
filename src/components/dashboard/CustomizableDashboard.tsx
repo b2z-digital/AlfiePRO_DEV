@@ -583,6 +583,8 @@ export const CustomizableDashboard: React.FC = () => {
         const templateLayout = dbTemplate.template_data?.lg || [];
         const rowConfigs = dbTemplate.template_data?.row_configs || [];
         console.log('Widget count:', templateLayout.length);
+        console.log('Row configs found:', rowConfigs.length);
+        console.log('Row configs detail:', rowConfigs);
         console.log('Widgets with themes:', templateLayout.filter((w: any) => w.colorTheme && w.colorTheme !== 'default').map((w: any) => ({ type: w.type, theme: w.colorTheme })));
 
         const rowMap = new Map<number, DashboardRow>();
@@ -596,6 +598,8 @@ export const CustomizableDashboard: React.FC = () => {
             const rowConfig = rowConfigs.find((r: any) => r.row === rowNum);
             // Use the saved columns value, fall back to counting widgets if not available
             const columns = rowConfig?.columns || rowWidgets.length;
+
+            console.log(`Row ${rowNum}: rowConfig found:`, rowConfig, 'columns:', columns, 'widget count:', rowWidgets.length);
 
             rowMap.set(rowNum, {
               id: `row-${uuidv4()}`,
