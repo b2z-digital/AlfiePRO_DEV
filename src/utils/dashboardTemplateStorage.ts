@@ -26,6 +26,32 @@ export async function saveTemplate(
   isPublic: boolean = false
 ): Promise<SavedDashboardTemplate | null> {
   try {
+    // Convert the current layout format to the template format expected by handleApplyTemplate
+    const templateWidgets = layout.widgets.map(widget => {
+      const row = layout.rows.find(r => r.id === widget.rowId);
+      return {
+        type: widget.type,
+        row: row?.order || 0,
+        col: widget.columnIndex,
+        width: widget.position.w,
+        height: widget.position.h,
+        settings: widget.settings,
+        colorTheme: widget.colorTheme
+      };
+    });
+
+    const rowConfigs = layout.rows.map(row => ({
+      row: row.order,
+      height: row.height,
+      columns: row.columns
+    }));
+
+    const templateData = {
+      lg: templateWidgets,
+      row_configs: rowConfigs,
+      version: layout.version || 1
+    };
+
     const { data, error } = await supabase
       .from('dashboard_templates')
       .insert({
@@ -34,7 +60,7 @@ export async function saveTemplate(
         icon,
         is_default: false,
         is_public: isPublic,
-        template_data: layout,
+        template_data: templateData,
         club_id: clubId,
         created_by: (await supabase.auth.getUser()).data.user?.id
       })
@@ -60,9 +86,41 @@ export async function updateTemplate(
   }
 ): Promise<SavedDashboardTemplate | null> {
   try {
+    // If template_data is being updated, convert it to the expected format
+    let processedUpdates = { ...updates };
+    if (updates.template_data) {
+      const layout = updates.template_data;
+      const templateWidgets = layout.widgets.map(widget => {
+        const row = layout.rows.find(r => r.id === widget.rowId);
+        return {
+          type: widget.type,
+          row: row?.order || 0,
+          col: widget.columnIndex,
+          width: widget.position.w,
+          height: widget.position.h,
+          settings: widget.settings,
+          colorTheme: widget.colorTheme
+        };
+      });
+
+      const rowConfigs = layout.rows.map(row => ({
+        row: row.order,
+        height: row.height,
+        columns: row.columns
+      }));
+
+      const templateData = {
+        lg: templateWidgets,
+        row_configs: rowConfigs,
+        version: layout.version || 1
+      };
+
+      processedUpdates.template_data = templateData as any;
+    }
+
     const { data, error} = await supabase
       .from('dashboard_templates')
-      .update(updates)
+      .update(processedUpdates)
       .eq('id', templateId)
       .select()
       .single();
@@ -150,9 +208,35 @@ export async function updateDefaultTemplate(
   layout: DashboardLayout
 ): Promise<boolean> {
   try {
+    // Convert the layout format
+    const templateWidgets = layout.widgets.map(widget => {
+      const row = layout.rows.find(r => r.id === widget.rowId);
+      return {
+        type: widget.type,
+        row: row?.order || 0,
+        col: widget.columnIndex,
+        width: widget.position.w,
+        height: widget.position.h,
+        settings: widget.settings,
+        colorTheme: widget.colorTheme
+      };
+    });
+
+    const rowConfigs = layout.rows.map(row => ({
+      row: row.order,
+      height: row.height,
+      columns: row.columns
+    }));
+
+    const templateData = {
+      lg: templateWidgets,
+      row_configs: rowConfigs,
+      version: layout.version || 1
+    };
+
     const { error } = await supabase
       .from('dashboard_templates')
-      .update({ template_data: layout })
+      .update({ template_data: templateData })
       .eq('id', templateId)
       .eq('is_default', true);
 
