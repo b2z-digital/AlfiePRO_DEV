@@ -611,7 +611,14 @@ export const CustomizableDashboard: React.FC = () => {
           }
 
           const row = rowMap.get(rowNum)!;
-          const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
+
+          // Skip widgets that are positioned beyond the configured column count
+          if (widgetConfig.col >= row.columns) {
+            console.warn(`⚠️ Skipping widget ${widgetConfig.type} at col ${widgetConfig.col} - row ${rowNum} only has ${row.columns} columns`);
+            return;
+          }
+
+          const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum && w.col < row.columns);
           const sortedRowWidgets = rowWidgets.sort((a: any, b: any) => a.col - b.col);
           const columnIndex = sortedRowWidgets.findIndex((w: any) => w.col === widgetConfig.col);
 
@@ -753,18 +760,31 @@ export const CustomizableDashboard: React.FC = () => {
       setSaving(true);
 
       // Convert current layout to template format
-      const templateWidgets = widgets.map(widget => {
-        const row = rows.find(r => r.id === widget.rowId);
-        return {
-          type: widget.type,
-          row: row?.order || 0,
-          col: widget.columnIndex,
-          width: widget.position.w,
-          height: widget.position.h,
-          settings: widget.settings,
-          colorTheme: widget.colorTheme
-        };
-      });
+      // Filter out widgets that are positioned beyond their row's column count
+      const templateWidgets = widgets
+        .filter(widget => {
+          const row = rows.find(r => r.id === widget.rowId);
+          if (!row) return false;
+
+          // Only include widgets within the configured column count
+          if (widget.columnIndex >= row.columns) {
+            console.warn(`⚠️ Excluding widget ${widget.type} at col ${widget.columnIndex} - row only has ${row.columns} columns`);
+            return false;
+          }
+          return true;
+        })
+        .map(widget => {
+          const row = rows.find(r => r.id === widget.rowId);
+          return {
+            type: widget.type,
+            row: row?.order || 0,
+            col: widget.columnIndex,
+            width: widget.position.w,
+            height: widget.position.h,
+            settings: widget.settings,
+            colorTheme: widget.colorTheme
+          };
+        });
 
       // Convert rows to row configs
       const rowConfigs = rows.map(row => ({
