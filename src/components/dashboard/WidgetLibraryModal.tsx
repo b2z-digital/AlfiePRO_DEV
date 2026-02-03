@@ -80,7 +80,13 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
   };
 
   const handleTemplateClick = (templateId: string) => {
-    if (!onApplyTemplate) return;
+    console.log('handleTemplateClick called with ID:', templateId);
+    console.log('onApplyTemplate exists:', !!onApplyTemplate);
+
+    if (!onApplyTemplate) {
+      console.error('onApplyTemplate callback is undefined!');
+      return;
+    }
 
     if (existingWidgets.length > 0) {
       setPendingTemplateId(templateId);

@@ -29,6 +29,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { supabase } from '../../utils/supabase';
 
 interface DroppableSlotProps {
   rowId: string;
@@ -562,6 +563,8 @@ export const CustomizableDashboard: React.FC = () => {
   };
 
   const handleApplyTemplate = async (templateId: string) => {
+    console.log('handleApplyTemplate called with ID:', templateId);
+
     // First check if it's a hardcoded template
     const hardcodedTemplate = DASHBOARD_TEMPLATES.find(t => t.id === templateId);
 
