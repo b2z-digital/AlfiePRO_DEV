@@ -8,6 +8,8 @@ export interface SavedDashboardTemplate {
   icon: string;
   is_default: boolean;
   is_public: boolean;
+  is_system_template?: boolean;
+  is_editable_by_super_admin?: boolean;
   template_data: DashboardLayout;
   club_id: string | null;
   created_by: string | null;
@@ -81,9 +83,9 @@ export async function getTemplates(clubId?: string): Promise<SavedDashboardTempl
       .order('created_at', { ascending: false });
 
     if (clubId) {
-      query = query.or(`is_default.eq.true,is_public.eq.true,club_id.eq.${clubId}`);
+      query = query.or(`is_system_template.eq.true,is_default.eq.true,is_public.eq.true,club_id.eq.${clubId}`);
     } else {
-      query = query.eq('is_default', true);
+      query = query.or('is_system_template.eq.true,is_default.eq.true');
     }
 
     const { data, error } = await query;
@@ -92,6 +94,22 @@ export async function getTemplates(clubId?: string): Promise<SavedDashboardTempl
     return data || [];
   } catch (error) {
     console.error('Error fetching templates:', error);
+    return [];
+  }
+}
+
+export async function getSystemTemplates(): Promise<SavedDashboardTemplate[]> {
+  try {
+    const { data, error } = await supabase
+      .from('dashboard_templates')
+      .select('*')
+      .eq('is_system_template', true)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching system templates:', error);
     return [];
   }
 }

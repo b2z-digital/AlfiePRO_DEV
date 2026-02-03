@@ -3,7 +3,7 @@ import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save
 import { WIDGET_REGISTRY, getAllCategories, getWidgetsByCategory } from './WidgetRegistry';
 import { WidgetConfig, DashboardLayout } from '../../types/dashboard';
 import { DASHBOARD_TEMPLATES } from '../../constants/dashboardTemplates';
-import { getTemplates, SavedDashboardTemplate, updateTemplate } from '../../utils/dashboardTemplateStorage';
+import { getTemplates, getSystemTemplates, SavedDashboardTemplate, updateTemplate } from '../../utils/dashboardTemplateStorage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -35,6 +35,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
   const [previewWidget, setPreviewWidget] = useState<any>(null);
   const [savedTemplates, setSavedTemplates] = useState<SavedDashboardTemplate[]>([]);
+  const [systemTemplates, setSystemTemplates] = useState<SavedDashboardTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const categories = getAllCategories();
 
@@ -43,6 +44,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
   useEffect(() => {
     if (isOpen && activeTab === 'templates') {
       loadSavedTemplates();
+      loadSystemTemplates();
     }
   }, [isOpen, activeTab, currentClub]);
 
@@ -55,6 +57,15 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
       console.error('Error loading templates:', error);
     } finally {
       setLoadingTemplates(false);
+    }
+  };
+
+  const loadSystemTemplates = async () => {
+    try {
+      const templates = await getSystemTemplates();
+      setSystemTemplates(templates);
+    } catch (error) {
+      console.error('Error loading system templates:', error);
     }
   };
 
@@ -361,87 +372,95 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                 {/* Default Templates */}
                 <div>
                   <h3 className="text-white font-semibold text-lg mb-4">Default Templates</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {DASHBOARD_TEMPLATES.map((template) => {
-                      const IconComponent = template.icon === 'Calendar' ? Calendar :
-                                           template.icon === 'DollarSign' ? DollarSign :
-                                           template.icon === 'Users' ? Users :
-                                           LayoutGrid;
+                  {systemTemplates.length === 0 && !loadingTemplates ? (
+                    <div className="text-center py-8 text-slate-400">
+                      No system templates available
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {systemTemplates.map((template) => {
+                        const IconComponent = template.icon === 'Calendar' ? Calendar :
+                                             template.icon === 'DollarSign' ? DollarSign :
+                                             template.icon === 'Users' ? Users :
+                                             LayoutGrid;
 
-                      return (
-                        <div
-                          key={template.id}
-                          className="relative bg-slate-700/40 backdrop-blur-sm border border-slate-600/50 rounded-2xl p-6 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-200 group overflow-hidden"
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        const widgets = template.template_data?.lg || [];
 
-                          <div className="flex items-start gap-4 mb-4 relative">
-                            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20">
-                              <IconComponent className="text-blue-400" size={28} />
+                        return (
+                          <div
+                            key={template.id}
+                            className="relative bg-slate-700/40 backdrop-blur-sm border border-slate-600/50 rounded-2xl p-6 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-200 group overflow-hidden"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                            <div className="flex items-start gap-4 mb-4 relative">
+                              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20">
+                                <IconComponent className="text-blue-400" size={28} />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-white text-lg mb-1">{template.name}</h3>
+                                <p className="text-sm text-slate-400">{template.description}</p>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-white text-lg mb-1">{template.name}</h3>
-                              <p className="text-sm text-slate-400">{template.description}</p>
+
+                            <div className="relative mb-4">
+                              <div className="text-xs text-slate-500 mb-2">Includes:</div>
+                              <div className="flex flex-wrap gap-2">
+                                {widgets.slice(0, 5).map((widget: any, idx: number) => (
+                                  <span
+                                    key={idx}
+                                    className="text-xs px-2 py-1 bg-slate-800/50 text-slate-400 rounded"
+                                  >
+                                    {WIDGET_REGISTRY.find(w => w.type === widget.type)?.name || widget.type}
+                                  </span>
+                                ))}
+                                {widgets.length > 5 && (
+                                  <span className="text-xs px-2 py-1 bg-slate-800/50 text-slate-400 rounded">
+                                    +{widgets.length - 5} more
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
 
-                          <div className="relative mb-4">
-                            <div className="text-xs text-slate-500 mb-2">Includes:</div>
-                            <div className="flex flex-wrap gap-2">
-                              {template.defaultLayouts.lg.slice(0, 5).map((widget, idx) => (
-                                <span
-                                  key={idx}
-                                  className="text-xs px-2 py-1 bg-slate-800/50 text-slate-400 rounded"
-                                >
-                                  {WIDGET_REGISTRY.find(w => w.type === widget.type)?.name || widget.type}
-                                </span>
-                              ))}
-                              {template.defaultLayouts.lg.length > 5 && (
-                                <span className="text-xs px-2 py-1 bg-slate-800/50 text-slate-400 rounded">
-                                  +{template.defaultLayouts.lg.length - 5} more
-                                </span>
-                              )}
-                        </div>
-                      </div>
-
-                          <div className="flex gap-2 justify-end">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTemplateClick(template.id);
-                              }}
-                              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
-                            >
-                              Apply Template
-                            </button>
-                            {isSuperAdmin && onEditSystemTemplate && (
+                            <div className="flex gap-2 justify-end">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onEditSystemTemplate(template.id);
-                                  onClose();
+                                  handleTemplateClick(template.id);
                                 }}
-                                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
-                                title="Edit this default template (Super Admin only)"
+                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
                               >
-                                <Edit2 size={14} />
-                                Edit
+                                Apply Template
                               </button>
-                            )}
+                              {isSuperAdmin && onEditSystemTemplate && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditSystemTemplate(template.id);
+                                    onClose();
+                                  }}
+                                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
+                                  title="Edit this default template (Super Admin only)"
+                                >
+                                  <Edit2 size={14} />
+                                  Edit
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Saved Templates */}
-                {savedTemplates.filter(t => !t.is_default && (t.club_id === currentClub?.clubId || t.is_public)).length > 0 && (
+                {savedTemplates.filter(t => !t.is_default && !t.is_system_template && (t.club_id === currentClub?.clubId || t.is_public)).length > 0 && (
                   <div>
                     <h3 className="text-white font-semibold text-lg mb-4">Your Templates</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {savedTemplates
-                        .filter(t => !t.is_default && (t.club_id === currentClub?.clubId || t.is_public))
+                        .filter(t => !t.is_default && !t.is_system_template && (t.club_id === currentClub?.clubId || t.is_public))
                         .map((template) => {
                           const IconComponent = LayoutGrid;
 
