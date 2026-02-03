@@ -783,17 +783,22 @@ export const CustomizableDashboard: React.FC = () => {
       console.log('  - Row configs:', rowConfigs.length);
       console.log('  - Rows:', templateRows.length);
 
+      // Construct the exact data we're sending to database
+      const dataToSave = {
+        lg: templateWidgets,
+        md: templateWidgets,
+        sm: templateWidgets,
+        rows: templateRows,
+        row_configs: rowConfigs
+      };
+
+      console.log('🔍 DATA BEING SENT TO DATABASE:', JSON.stringify(dataToSave, null, 2));
+
       // Save to dashboard_templates table - include BOTH rows and row_configs
       const { error } = await supabase
         .from('dashboard_templates')
         .update({
-          template_data: {
-            lg: templateWidgets,
-            md: templateWidgets,
-            sm: templateWidgets,
-            rows: templateRows,
-            row_configs: rowConfigs
-          },
+          template_data: dataToSave,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingSystemTemplate)
@@ -820,6 +825,8 @@ export const CustomizableDashboard: React.FC = () => {
         console.log('🔍 Verified saved template data:');
         console.log('  - Widget count:', verifyTemplate?.template_data?.lg?.length || 0);
         console.log('  - Row configs:', verifyTemplate?.template_data?.row_configs?.length || 0);
+        console.log('  - Widgets with themes in DB:', verifyTemplate?.template_data?.lg?.filter((w: any) => w.colorTheme && w.colorTheme !== 'default').map((w: any) => ({ type: w.type, theme: w.colorTheme })) || []);
+        console.log('  - First 2 widgets from DB:', JSON.stringify(verifyTemplate?.template_data?.lg?.slice(0, 2), null, 2));
         console.log('  - Full data:', JSON.stringify(verifyTemplate?.template_data, null, 2));
       }
 
