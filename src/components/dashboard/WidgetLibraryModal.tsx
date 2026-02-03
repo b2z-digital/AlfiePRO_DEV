@@ -38,7 +38,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const categories = getAllCategories();
 
-  const isSuperAdmin = user?.is_super_admin || false;
+  const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
 
   useEffect(() => {
     if (isOpen && activeTab === 'templates') {
