@@ -566,11 +566,73 @@ export const CustomizableDashboard: React.FC = () => {
   const handleApplyTemplate = async (templateId: string) => {
     console.log('handleApplyTemplate called with ID:', templateId);
 
-    // First check if it's a hardcoded template
+    // First try to load from database (this allows edited system templates to work)
+    try {
+      const { data: dbTemplate, error } = await supabase
+        .from('dashboard_templates')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+
+      if (dbTemplate && !error) {
+        console.log('Loading template from database:', dbTemplate.name);
+        // Load from database template_data
+        const templateLayout = dbTemplate.template_data?.lg || [];
+        const rowConfigs = dbTemplate.template_data?.row_configs || [];
+
+        const rowMap = new Map<number, DashboardRow>();
+        const newWidgets: WidgetConfig[] = [];
+
+        templateLayout.forEach((widgetConfig: any) => {
+          const rowNum = widgetConfig.row;
+
+          if (!rowMap.has(rowNum)) {
+            const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
+            const columns = rowWidgets.length;
+            const rowConfig = rowConfigs.find((r: any) => r.row === rowNum);
+
+            rowMap.set(rowNum, {
+              id: `row-${uuidv4()}`,
+              columns,
+              widgetIds: [],
+              order: rowNum,
+              height: rowConfig?.height || 'default'
+            });
+          }
+
+          const row = rowMap.get(rowNum)!;
+          const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
+          const sortedRowWidgets = rowWidgets.sort((a: any, b: any) => a.col - b.col);
+          const columnIndex = sortedRowWidgets.findIndex((w: any) => w.col === widgetConfig.col);
+
+          const newWidget: WidgetConfig = {
+            id: uuidv4(),
+            type: widgetConfig.type,
+            settings: widgetConfig.settings || {},
+            colorTheme: widgetConfig.colorTheme || 'default',
+            rowId: row.id,
+            columnIndex: columnIndex,
+            position: { x: widgetConfig.col, y: rowNum, w: widgetConfig.width, h: widgetConfig.height }
+          };
+
+          newWidgets.push(newWidget);
+          row.widgetIds.push(newWidget.id);
+        });
+
+        const newRows = Array.from(rowMap.values()).sort((a, b) => a.order - b.order);
+        setRows(newRows);
+        setWidgets(newWidgets);
+        return;
+      }
+    } catch (error) {
+      console.warn('Could not load template from database, trying hardcoded templates:', error);
+    }
+
+    // Fallback to hardcoded templates if not in database
     const hardcodedTemplate = DASHBOARD_TEMPLATES.find(t => t.id === templateId);
 
     if (hardcodedTemplate) {
-      // Use existing logic for hardcoded templates
+      console.log('Loading hardcoded template:', hardcodedTemplate.name);
       const templateLayout = hardcodedTemplate.defaultLayouts.lg;
       const rowMap = new Map<number, DashboardRow>();
       const newWidgets: WidgetConfig[] = [];
@@ -617,68 +679,7 @@ export const CustomizableDashboard: React.FC = () => {
       return;
     }
 
-    // If not hardcoded, load from database
-    try {
-      const { data: dbTemplate, error } = await supabase
-        .from('dashboard_templates')
-        .select('*')
-        .eq('id', templateId)
-        .single();
-
-      if (error || !dbTemplate) {
-        console.error('Failed to load template:', error);
-        return;
-      }
-
-      // Load from database template_data
-      const templateLayout = dbTemplate.template_data?.lg || [];
-      const rowConfigs = dbTemplate.template_data?.row_configs || [];
-
-      const rowMap = new Map<number, DashboardRow>();
-      const newWidgets: WidgetConfig[] = [];
-
-      templateLayout.forEach((widgetConfig: any) => {
-        const rowNum = widgetConfig.row;
-
-        if (!rowMap.has(rowNum)) {
-          const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
-          const columns = rowWidgets.length;
-          const rowConfig = rowConfigs.find((r: any) => r.row === rowNum);
-
-          rowMap.set(rowNum, {
-            id: `row-${uuidv4()}`,
-            columns,
-            widgetIds: [],
-            order: rowNum,
-            height: rowConfig?.height || 'default'
-          });
-        }
-
-        const row = rowMap.get(rowNum)!;
-        const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
-        const sortedRowWidgets = rowWidgets.sort((a: any, b: any) => a.col - b.col);
-        const columnIndex = sortedRowWidgets.findIndex((w: any) => w.col === widgetConfig.col);
-
-        const newWidget: WidgetConfig = {
-          id: uuidv4(),
-          type: widgetConfig.type,
-          settings: widgetConfig.settings || {},
-          colorTheme: widgetConfig.colorTheme || 'default',
-          rowId: row.id,
-          columnIndex: columnIndex,
-          position: { x: widgetConfig.col, y: rowNum, w: widgetConfig.width, h: widgetConfig.height }
-        };
-
-        newWidgets.push(newWidget);
-        row.widgetIds.push(newWidget.id);
-      });
-
-      const newRows = Array.from(rowMap.values()).sort((a, b) => a.order - b.order);
-      setRows(newRows);
-      setWidgets(newWidgets);
-    } catch (error) {
-      console.error('Error loading template:', error);
-    }
+    console.error('Template not found:', templateId);
   };
 
   const handleEditSystemTemplate = (templateId: string) => {
