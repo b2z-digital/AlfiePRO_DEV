@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, UserPlus, Shield, Trash2, Edit2, GripVertical, Plus,
-  Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown
+  Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, LayoutGrid
 } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,6 +35,8 @@ interface PositionDefinition {
   description: string;
   display_order: number;
   is_executive: boolean;
+  dashboard_template_id?: string | null;
+  position_priority?: number | null;
 }
 
 interface PositionAssignment {
@@ -150,6 +152,8 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             position_name: positionData.position_name,
             description: positionData.description,
             is_executive: positionData.is_executive,
+            dashboard_template_id: positionData.dashboard_template_id,
+            position_priority: positionData.position_priority,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingPosition.id);
@@ -169,7 +173,9 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             position_name: positionData.position_name,
             description: positionData.description,
             is_executive: false,
-            display_order: maxOrder + 1
+            display_order: maxOrder + 1,
+            dashboard_template_id: positionData.dashboard_template_id,
+            position_priority: positionData.position_priority
           });
 
         if (error) throw error;
@@ -551,11 +557,43 @@ interface PositionFormProps {
   onCancel: () => void;
 }
 
+interface DashboardTemplate {
+  id: string;
+  name: string;
+  description: string;
+}
+
 const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel }) => {
+  const { currentClub } = useAuth();
   const [formData, setFormData] = useState({
     position_name: position?.position_name || '',
-    description: position?.description || ''
+    description: position?.description || '',
+    dashboard_template_id: position?.dashboard_template_id || null,
+    position_priority: position?.position_priority || 50
   });
+  const [templates, setTemplates] = useState<DashboardTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('dashboard_templates')
+        .select('id, name, description')
+        .eq('is_system_template', true)
+        .order('name');
+
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -563,49 +601,121 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-800/30 rounded-lg border border-slate-700/50 p-4 space-y-4">
-      <h3 className="text-lg font-semibold text-white">
-        {position ? 'Edit Position' : 'Add Position'}
-      </h3>
+    <form onSubmit={handleSubmit} className="bg-slate-800/30 rounded-lg border border-slate-700/50 p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-white">
+          {position ? 'Edit Position' : 'Add Position'}
+        </h3>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-slate-400 hover:text-white transition-colors"
+        >
+          <X size={20} />
+        </button>
+      </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-300 mb-2">
           Position Name *
         </label>
         <input
           type="text"
           value={formData.position_name}
           onChange={(e) => setFormData({ ...formData, position_name: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-          placeholder="e.g., Commodore, Treasurer"
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+          placeholder="e.g., Commodore, Treasurer, Race Officer"
           required
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">
+        <label className="block text-sm font-medium text-slate-300 mb-2">
           Description
         </label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
-          placeholder="Brief description of the role"
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+          placeholder="Brief description of the role and responsibilities"
           rows={2}
         />
       </div>
 
-      <div className="flex gap-2">
+      <div>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+          <LayoutGrid size={16} />
+          Dashboard Template
+        </label>
+        <p className="text-xs text-slate-400 mb-2">
+          Members with this position will see this dashboard layout by default
+        </p>
+        {loadingTemplates ? (
+          <div className="text-slate-400 text-sm">Loading templates...</div>
+        ) : (
+          <select
+            value={formData.dashboard_template_id || ''}
+            onChange={(e) => setFormData({ ...formData, dashboard_template_id: e.target.value || null })}
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+          >
+            <option value="">No template (use club default)</option>
+            {templates.map(template => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+                {template.description && ` - ${template.description}`}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div>
+        <label className="flex items-center justify-between text-sm font-medium text-slate-300 mb-2">
+          <span>Position Priority</span>
+          <span className="text-blue-400 font-semibold">{formData.position_priority}</span>
+        </label>
+        <p className="text-xs text-slate-400 mb-3">
+          When a member has multiple positions, the highest priority determines their dashboard (0-100)
+        </p>
+        <div className="flex items-center gap-4">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value={formData.position_priority}
+            onChange={(e) => setFormData({ ...formData, position_priority: parseInt(e.target.value) })}
+            className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+            style={{
+              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${formData.position_priority}%, #334155 ${formData.position_priority}%, #334155 100%)`
+            }}
+          />
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={formData.position_priority}
+            onChange={(e) => setFormData({ ...formData, position_priority: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+            className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-center text-sm focus:outline-none focus:border-blue-500"
+          />
+        </div>
+        <div className="flex justify-between text-xs text-slate-500 mt-1">
+          <span>Lower priority</span>
+          <span>Higher priority</span>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-slate-700 flex gap-3">
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
         >
-          Save
+          {position ? 'Save Changes' : 'Create Position'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
         >
           Cancel
         </button>

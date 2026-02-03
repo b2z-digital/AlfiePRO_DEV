@@ -18,7 +18,7 @@ import {
 import { Edit2, Check, Plus, RotateCcw, Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { WidgetConfig, DashboardLayout, DashboardRow } from '../../types/dashboard';
-import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout } from '../../utils/dashboardStorage';
+import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout, getTemplateForUser } from '../../utils/dashboardStorage';
 import { getWidgetDefinition } from './WidgetRegistry';
 import { SortableWidget } from './SortableWidget';
 import { WidgetLibraryModal } from './WidgetLibraryModal';
@@ -189,7 +189,10 @@ export const CustomizableDashboard: React.FC = () => {
   const [targetRowId, setTargetRowId] = useState<string | null>(null);
   const [targetColumnIndex, setTargetColumnIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [editingSystemTemplate, setEditingSystemTemplate] = useState<string | null>(null);
   const newRowRef = useRef<HTMLDivElement | null>(null);
+
+  const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -616,6 +619,72 @@ export const CustomizableDashboard: React.FC = () => {
     setWidgets(newWidgets);
   };
 
+  const handleEditSystemTemplate = (templateId: string) => {
+    if (!isSuperAdmin) return;
+
+    // Load the template layout
+    handleApplyTemplate(templateId);
+
+    // Set state to indicate we're editing a system template
+    setEditingSystemTemplate(templateId);
+    setIsEditMode(true);
+
+    addNotification('info', 'Editing system template. Your changes will update the default template for all users.');
+  };
+
+  const handleSaveSystemTemplate = async () => {
+    if (!editingSystemTemplate || !isSuperAdmin) return;
+
+    try {
+      setSaving(true);
+
+      // Convert current layout to template format
+      const templateWidgets = widgets.map(widget => {
+        const row = rows.find(r => r.id === widget.rowId);
+        return {
+          type: widget.type,
+          row: row?.order || 0,
+          col: widget.columnIndex,
+          width: widget.position.w,
+          height: widget.position.h,
+          settings: widget.settings,
+          colorTheme: widget.colorTheme
+        };
+      });
+
+      // Save to dashboard_templates table
+      const { error } = await supabase
+        .from('dashboard_templates')
+        .update({
+          template_data: {
+            lg: templateWidgets,
+            md: templateWidgets,
+            sm: templateWidgets
+          },
+          row_configs: rows.map(row => ({
+            row: row.order,
+            columns: row.columns,
+            height: row.height || 'default'
+          })),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingSystemTemplate)
+        .eq('is_system_template', true)
+        .eq('is_editable_by_super_admin', true);
+
+      if (error) throw error;
+
+      addNotification('success', 'System template updated successfully!');
+      setEditingSystemTemplate(null);
+      setIsEditMode(false);
+    } catch (error: any) {
+      console.error('Error saving system template:', error);
+      addNotification('error', 'Failed to save system template');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAddRow = (columns: number) => {
     const newRow: DashboardRow = {
       id: `row-${Date.now()}`,
@@ -652,15 +721,27 @@ export const CustomizableDashboard: React.FC = () => {
   };
 
   const handleSaveAndExit = async () => {
-    const success = await saveLayout();
-    if (success) {
-      setIsEditMode(false);
+    if (editingSystemTemplate) {
+      await handleSaveSystemTemplate();
+    } else {
+      const success = await saveLayout();
+      if (success) {
+        setIsEditMode(false);
+      }
     }
   };
 
   const handleCancelEdit = () => {
-    loadLayout();
-    setIsEditMode(false);
+    if (editingSystemTemplate) {
+      if (confirm('Discard changes to system template?')) {
+        setEditingSystemTemplate(null);
+        loadLayout();
+        setIsEditMode(false);
+      }
+    } else {
+      loadLayout();
+      setIsEditMode(false);
+    }
   };
 
   const handleResetLayout = async () => {
@@ -727,6 +808,17 @@ export const CustomizableDashboard: React.FC = () => {
 
   return (
     <div className="relative">
+      {editingSystemTemplate && (
+        <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+          <Pencil className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <h4 className="font-medium text-amber-300 mb-1">Editing System Template</h4>
+            <p className="text-sm text-amber-200/80">
+              You are editing a system-wide default template. Changes will affect all users who use this template or are assigned to positions using this template.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-end gap-2 mb-2">
         {isEditMode && (
           <>
@@ -868,6 +960,7 @@ export const CustomizableDashboard: React.FC = () => {
         }}
         onAddWidget={handleAddWidget}
         onApplyTemplate={handleApplyTemplate}
+        onEditSystemTemplate={handleEditSystemTemplate}
         existingWidgets={widgets}
         currentLayout={{ widgets, rows, version: 1 }}
       />

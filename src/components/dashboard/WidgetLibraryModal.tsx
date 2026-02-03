@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save } from 'lucide-react';
+import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save, Edit2 } from 'lucide-react';
 import { WIDGET_REGISTRY, getAllCategories, getWidgetsByCategory } from './WidgetRegistry';
 import { WidgetConfig, DashboardLayout } from '../../types/dashboard';
 import { DASHBOARD_TEMPLATES } from '../../constants/dashboardTemplates';
@@ -12,6 +12,7 @@ interface WidgetLibraryModalProps {
   onClose: () => void;
   onAddWidget: (widgetType: string) => void;
   onApplyTemplate?: (templateId: string) => void;
+  onEditSystemTemplate?: (templateId: string) => void;
   existingWidgets: WidgetConfig[];
   currentLayout?: DashboardLayout;
 }
@@ -21,6 +22,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
   onClose,
   onAddWidget,
   onApplyTemplate,
+  onEditSystemTemplate,
   existingWidgets,
   currentLayout
 }) => {
@@ -412,16 +414,18 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                             >
                               Apply Template
                             </button>
-                            {isSuperAdmin && currentLayout && savedTemplates.find(t => t.id === template.id && t.is_default) && (
+                            {isSuperAdmin && onEditSystemTemplate && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleUpdateDefaultTemplate(savedTemplates.find(t => t.name === template.name && t.is_default)?.id || '');
+                                  onEditSystemTemplate(template.id);
+                                  onClose();
                                 }}
-                                className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
+                                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
+                                title="Edit this default template (Super Admin only)"
                               >
-                                <Save size={14} />
-                                Update
+                                <Edit2 size={14} />
+                                Edit
                               </button>
                             )}
                           </div>

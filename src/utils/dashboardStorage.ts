@@ -270,6 +270,86 @@ export function getDefaultLayout(): DashboardLayout {
   };
 }
 
+export async function getTemplateForUser(
+  clubId: string,
+  userId: string
+): Promise<{ template_id: string; name: string; description: string } | null> {
+  try {
+    console.log('🔍 Looking for position-based template for user:', userId);
+
+    // Find the user's committee positions in this club
+    const { data: positions, error: positionsError } = await supabase
+      .from('committee_positions')
+      .select(`
+        position_definition_id,
+        committee_position_definitions (
+          dashboard_template_id,
+          position_priority,
+          position_name
+        )
+      `)
+      .eq('club_id', clubId)
+      .eq('user_id', userId)
+      .not('committee_position_definitions.dashboard_template_id', 'is', null);
+
+    if (positionsError) {
+      console.error('Error fetching user positions:', positionsError);
+      return null;
+    }
+
+    if (!positions || positions.length === 0) {
+      console.log('No committee positions with templates found for user');
+      return null;
+    }
+
+    // Find the position with the highest priority
+    let highestPriorityPosition = null;
+    let highestPriority = -1;
+
+    for (const position of positions) {
+      const def = position.committee_position_definitions as any;
+      if (def && def.position_priority !== null && def.position_priority !== undefined) {
+        if (def.position_priority > highestPriority) {
+          highestPriority = def.position_priority;
+          highestPriorityPosition = def;
+        }
+      }
+    }
+
+    if (!highestPriorityPosition || !highestPriorityPosition.dashboard_template_id) {
+      console.log('No valid template found for user positions');
+      return null;
+    }
+
+    // Fetch the template details
+    const { data: template, error: templateError } = await supabase
+      .from('dashboard_templates')
+      .select('id, name, description')
+      .eq('id', highestPriorityPosition.dashboard_template_id)
+      .maybeSingle();
+
+    if (templateError || !template) {
+      console.error('Error fetching template:', templateError);
+      return null;
+    }
+
+    console.log('✅ Found position-based template:', {
+      template: template.name,
+      position: highestPriorityPosition.position_name,
+      priority: highestPriority
+    });
+
+    return {
+      template_id: template.id,
+      name: template.name,
+      description: template.description
+    };
+  } catch (error) {
+    console.error('Exception getting template for user:', error);
+    return null;
+  }
+}
+
 export async function resetDashboardLayout(
   userId: string,
   context: OrganizationContext
