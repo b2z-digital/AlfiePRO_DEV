@@ -741,6 +741,10 @@ export const CustomizableDashboard: React.FC = () => {
         height: row.height || 'default'
       }));
 
+      console.log('Saving template with ID:', editingSystemTemplate);
+      console.log('Template widgets:', templateWidgets);
+      console.log('Row configs:', rowConfigs);
+
       // Save to dashboard_templates table - include row_configs in template_data
       const { error } = await supabase
         .from('dashboard_templates')
@@ -757,8 +761,12 @@ export const CustomizableDashboard: React.FC = () => {
         .eq('is_system_template', true)
         .eq('is_editable_by_super_admin', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error saving template:', error);
+        throw error;
+      }
 
+      console.log('Template saved successfully!');
       addNotification('success', 'System template updated successfully!');
 
       // Restore the original dashboard layout

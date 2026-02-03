@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
   {
-    id: 'race',
+    id: 'a1111111-1111-1111-1111-111111111111',
     name: 'Race Management',
     description: 'Perfect for Race Officers - focuses on events, weather, and race results',
     icon: 'Calendar',
@@ -46,7 +46,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
     }
   },
   {
-    id: 'finance',
+    id: 'b2222222-2222-2222-2222-222222222222',
     name: 'Finance Management',
     description: 'Perfect for Treasurers - focuses on financial health and transactions',
     icon: 'DollarSign',
@@ -71,7 +71,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
     }
   },
   {
-    id: 'membership',
+    id: 'c3333333-3333-3333-3333-333333333333',
     name: 'Membership Management',
     description: 'Perfect for Membership Officers - focuses on members and engagement',
     icon: 'Users',
@@ -98,7 +98,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
     }
   },
   {
-    id: 'secretary',
+    id: 'd4444444-4444-4444-4444-444444444444',
     name: 'Club Secretary',
     description: 'Perfect for Club Secretaries - focuses on applications, communications, and administrative tasks',
     icon: 'Clipboard',
@@ -134,7 +134,7 @@ export const DASHBOARD_TEMPLATES: DashboardTemplate[] = [
     }
   },
   {
-    id: 'full',
+    id: 'e5555555-5555-5555-5555-555555555555',
     name: 'Full Overview',
     description: 'Perfect for Commodores and Admins - comprehensive view of all club activities',
     icon: 'LayoutGrid',
