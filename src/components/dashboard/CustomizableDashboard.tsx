@@ -766,11 +766,21 @@ export const CustomizableDashboard: React.FC = () => {
         height: row.height || 'default'
       }));
 
-      console.log('Saving template with ID:', editingSystemTemplate);
-      console.log('Template widgets:', templateWidgets);
-      console.log('Row configs:', rowConfigs);
+      // Convert rows to template format (for backwards compatibility)
+      const templateRows = rows.map(row => ({
+        id: `row-${row.order + 1}`,
+        order: row.order,
+        height: row.height || 'default',
+        columns: row.columns,
+        widgetIds: []
+      }));
 
-      // Save to dashboard_templates table - include row_configs in template_data
+      console.log('💾 Saving template with ID:', editingSystemTemplate);
+      console.log('  - Template widgets:', templateWidgets.length);
+      console.log('  - Row configs:', rowConfigs.length);
+      console.log('  - Rows:', templateRows.length);
+
+      // Save to dashboard_templates table - include BOTH rows and row_configs
       const { error } = await supabase
         .from('dashboard_templates')
         .update({
@@ -778,6 +788,7 @@ export const CustomizableDashboard: React.FC = () => {
             lg: templateWidgets,
             md: templateWidgets,
             sm: templateWidgets,
+            rows: templateRows,
             row_configs: rowConfigs
           },
           updated_at: new Date().toISOString()
@@ -791,16 +802,23 @@ export const CustomizableDashboard: React.FC = () => {
         throw error;
       }
 
-      console.log('Template saved successfully!');
+      console.log('✅ Template saved successfully!');
 
       // Verify the save by fetching the template again
-      const { data: verifyTemplate } = await supabase
+      const { data: verifyTemplate, error: verifyError } = await supabase
         .from('dashboard_templates')
         .select('template_data')
         .eq('id', editingSystemTemplate)
         .single();
 
-      console.log('Verified saved template:', verifyTemplate);
+      if (verifyError) {
+        console.error('❌ Error verifying saved template:', verifyError);
+      } else {
+        console.log('🔍 Verified saved template data:');
+        console.log('  - Widget count:', verifyTemplate?.template_data?.lg?.length || 0);
+        console.log('  - Row configs:', verifyTemplate?.template_data?.row_configs?.length || 0);
+        console.log('  - Full data:', JSON.stringify(verifyTemplate?.template_data, null, 2));
+      }
 
       addNotification('success', 'System template updated successfully!');
 
