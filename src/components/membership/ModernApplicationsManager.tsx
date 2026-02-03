@@ -53,9 +53,10 @@ interface Application {
 
 interface ModernApplicationsManagerProps {
   darkMode: boolean;
+  initialApplicationId?: string;
 }
 
-export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps> = ({ darkMode }) => {
+export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps> = ({ darkMode, initialApplicationId }) => {
   const { currentClub } = useAuth();
   const { addNotification } = useNotifications();
   const [applications, setApplications] = useState<Application[]>([]);
@@ -64,6 +65,7 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [processing, setProcessing] = useState<string | null>(null);
@@ -77,6 +79,19 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
   useEffect(() => {
     filterApplications();
   }, [applications, searchQuery, statusFilter]);
+
+  // Auto-select application if initialApplicationId is provided
+  useEffect(() => {
+    if (initialApplicationId && applications.length > 0 && !hasInitialized) {
+      const app = applications.find(a => a.id === initialApplicationId);
+      if (app) {
+        setSelectedApplication(app);
+        // Set status filter to match the application's status so it's visible
+        setStatusFilter(app.status as any);
+      }
+      setHasInitialized(true);
+    }
+  }, [initialApplicationId, applications, hasInitialized]);
 
   const fetchApplications = async () => {
     if (!currentClub?.clubId) return;

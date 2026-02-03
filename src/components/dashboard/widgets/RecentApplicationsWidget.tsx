@@ -110,9 +110,9 @@ export const RecentApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEd
           <Users className="text-amber-400" size={20} />
           <h2 className="text-lg font-semibold text-white">Recent Applications</h2>
         </div>
-        {!isEditMode && currentClub?.clubId && (
+        {!isEditMode && (
           <button
-            onClick={() => navigate(`/membership/${currentClub.clubId}`, { state: { activeTab: 'applications' } })}
+            onClick={() => navigate('/membership-dashboard', { state: { activeTab: 'applications' } })}
             className="flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300"
           >
             View all
@@ -136,8 +136,8 @@ export const RecentApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEd
             <div
               key={app.id}
               onClick={() => {
-                if (!isEditMode && currentClub?.clubId) {
-                  navigate(`/membership/${currentClub.clubId}`, { state: { activeTab: 'applications', selectedApplicationId: app.id } });
+                if (!isEditMode) {
+                  navigate('/membership-dashboard', { state: { activeTab: 'applications', selectedApplicationId: app.id } });
                 }
               }}
               className={`

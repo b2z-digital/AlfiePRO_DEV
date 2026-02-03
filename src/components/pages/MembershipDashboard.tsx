@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { 
   Users, 
   TrendingUp, 
@@ -66,8 +66,10 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
     return <MemberMembershipView darkMode={darkMode} />;
   }
   const [searchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as MembershipTab) || 'dashboard';
+  const location = useLocation();
+  const initialTab = (location.state?.activeTab as MembershipTab) || (searchParams.get('tab') as MembershipTab) || 'dashboard';
   const [activeTab, setActiveTab] = useState<MembershipTab>(initialTab);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | undefined>(location.state?.selectedApplicationId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
@@ -978,7 +980,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
   );
 
   const renderApplications = () => (
-    <ModernApplicationsManager darkMode={darkMode} />
+    <ModernApplicationsManager darkMode={darkMode} initialApplicationId={selectedApplicationId} />
   );
 
   const renderPayments = () => (
