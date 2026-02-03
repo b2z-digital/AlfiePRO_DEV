@@ -42,6 +42,16 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
   const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
 
   useEffect(() => {
+    if (isOpen) {
+      console.log('🔐 Super Admin Status:', {
+        isSuperAdmin,
+        userMetadata: user?.user_metadata,
+        editButtonWillShow: isSuperAdmin && !!onEditSystemTemplate
+      });
+    }
+  }, [isOpen, isSuperAdmin, user, onEditSystemTemplate]);
+
+  useEffect(() => {
     if (isOpen && activeTab === 'templates') {
       loadSavedTemplates();
       loadSystemTemplates();
@@ -377,7 +387,21 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
               <div className="space-y-6 max-w-4xl mx-auto">
                 {/* Default Templates */}
                 <div>
-                  <h3 className="text-white font-semibold text-lg mb-4">Default Templates</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold text-lg">Default Templates</h3>
+                    {isSuperAdmin && onEditSystemTemplate && (
+                      <span className="text-xs px-3 py-1 bg-amber-600/20 text-amber-400 border border-amber-600/30 rounded-full">
+                        Super Admin Mode
+                      </span>
+                    )}
+                  </div>
+                  {isSuperAdmin && onEditSystemTemplate && (
+                    <div className="mb-4 p-3 bg-blue-900/20 border border-blue-600/30 rounded-lg">
+                      <p className="text-xs text-blue-300">
+                        💡 <strong>Tip:</strong> Click <span className="text-amber-400 font-semibold">"Edit"</span> to modify the global template, or <span className="text-blue-400 font-semibold">"Apply Template"</span> to use it in your personal dashboard.
+                      </p>
+                    </div>
+                  )}
                   {systemTemplates.length === 0 && !loadingTemplates ? (
                     <div className="text-center py-8 text-slate-400">
                       No system templates available
@@ -429,6 +453,21 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                             </div>
 
                             <div className="flex gap-2 justify-end">
+                              {isSuperAdmin && onEditSystemTemplate && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    console.log('🎨 Editing system template:', template.id);
+                                    onEditSystemTemplate(template.id);
+                                    onClose();
+                                  }}
+                                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-900/50 flex items-center gap-2"
+                                  title="Edit this system template globally (affects all position assignments)"
+                                >
+                                  <Edit2 size={14} />
+                                  Edit Template
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -436,22 +475,8 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                                 }}
                                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
                               >
-                                Apply Template
+                                {isSuperAdmin ? 'Apply to Dashboard' : 'Apply Template'}
                               </button>
-                              {isSuperAdmin && onEditSystemTemplate && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditSystemTemplate(template.id);
-                                    onClose();
-                                  }}
-                                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
-                                  title="Edit this default template (Super Admin only)"
-                                >
-                                  <Edit2 size={14} />
-                                  Edit
-                                </button>
-                              )}
                             </div>
                           </div>
                         );
