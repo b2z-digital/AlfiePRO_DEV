@@ -191,6 +191,7 @@ export const CustomizableDashboard: React.FC = () => {
   const [targetColumnIndex, setTargetColumnIndex] = useState<number | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingSystemTemplate, setEditingSystemTemplate] = useState<string | null>(null);
+  const [originalLayoutBeforeEdit, setOriginalLayoutBeforeEdit] = useState<{ widgets: WidgetConfig[], rows: DashboardRow[] } | null>(null);
   const newRowRef = useRef<HTMLDivElement | null>(null);
 
   const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
@@ -683,6 +684,12 @@ export const CustomizableDashboard: React.FC = () => {
   const handleEditSystemTemplate = (templateId: string) => {
     if (!isSuperAdmin) return;
 
+    // Save the current dashboard layout before editing the template
+    setOriginalLayoutBeforeEdit({
+      widgets: [...widgets],
+      rows: [...rows]
+    });
+
     // Load the template layout
     handleApplyTemplate(templateId);
 
@@ -690,7 +697,20 @@ export const CustomizableDashboard: React.FC = () => {
     setEditingSystemTemplate(templateId);
     setIsEditMode(true);
 
-    addNotification('info', 'Editing system template. Your changes will update the default template for all users.');
+    addNotification('info', 'Editing system template. Your changes will update the template for position assignments.');
+  };
+
+  const handleCancelSystemTemplateEdit = () => {
+    // Restore the original dashboard layout
+    if (originalLayoutBeforeEdit) {
+      setWidgets(originalLayoutBeforeEdit.widgets);
+      setRows(originalLayoutBeforeEdit.rows);
+      setOriginalLayoutBeforeEdit(null);
+    }
+
+    setEditingSystemTemplate(null);
+    setIsEditMode(false);
+    addNotification('info', 'Template editing cancelled');
   };
 
   const handleSaveSystemTemplate = async () => {
@@ -739,6 +759,14 @@ export const CustomizableDashboard: React.FC = () => {
       if (error) throw error;
 
       addNotification('success', 'System template updated successfully!');
+
+      // Restore the original dashboard layout
+      if (originalLayoutBeforeEdit) {
+        setWidgets(originalLayoutBeforeEdit.widgets);
+        setRows(originalLayoutBeforeEdit.rows);
+        setOriginalLayoutBeforeEdit(null);
+      }
+
       setEditingSystemTemplate(null);
       setIsEditMode(false);
     } catch (error: any) {
@@ -798,9 +826,7 @@ export const CustomizableDashboard: React.FC = () => {
   const handleCancelEdit = () => {
     if (editingSystemTemplate) {
       if (confirm('Discard changes to system template?')) {
-        setEditingSystemTemplate(null);
-        loadLayout();
-        setIsEditMode(false);
+        handleCancelSystemTemplateEdit();
       }
     } else {
       loadLayout();
