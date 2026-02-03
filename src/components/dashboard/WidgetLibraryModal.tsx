@@ -197,7 +197,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
           ${size === 'small' ? 'p-4' : size === 'medium' ? 'p-5' : 'p-6'}
         `}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
         <div className="flex items-start justify-between mb-3 relative">
           <div className={`p-2.5 rounded-xl bg-gradient-to-br ${
@@ -397,7 +397,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                             key={template.id}
                             className="relative bg-slate-700/40 backdrop-blur-sm border border-slate-600/50 rounded-2xl p-6 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-200 group overflow-hidden"
                           >
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
                             <div className="flex items-start gap-4 mb-4 relative">
                               <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20">
@@ -476,7 +476,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                               onClick={() => handleApplySavedTemplate(template)}
                               className="relative bg-slate-700/40 backdrop-blur-sm border border-slate-600/50 rounded-2xl p-6 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 cursor-pointer group overflow-hidden"
                             >
-                              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
                               <div className="flex items-start gap-4 mb-4 relative">
                                 <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/20 to-blue-500/20">
