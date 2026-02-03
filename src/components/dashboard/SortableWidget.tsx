@@ -26,7 +26,8 @@ export const SortableWidget: React.FC<SortableWidgetProps> = ({
   const [isHoveringHandle, setIsHoveringHandle] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const currentTheme = (widget.settings?.colorTheme as WidgetColorTheme) || 'default';
+  // Check top-level colorTheme first, fallback to settings.colorTheme for backwards compatibility
+  const currentTheme = widget.colorTheme || (widget.settings?.colorTheme as WidgetColorTheme) || 'default';
 
   const {
     attributes,

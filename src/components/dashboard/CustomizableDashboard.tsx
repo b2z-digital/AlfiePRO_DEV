@@ -523,9 +523,10 @@ export const CustomizableDashboard: React.FC = () => {
       if (widget.id === widgetId) {
         return {
           ...widget,
+          colorTheme: theme,  // Update top-level colorTheme property
           settings: {
             ...widget.settings,
-            colorTheme: theme
+            colorTheme: theme  // Keep both for backwards compatibility
           }
         };
       }
@@ -777,6 +778,8 @@ export const CustomizableDashboard: React.FC = () => {
 
       console.log('💾 Saving template with ID:', editingSystemTemplate);
       console.log('  - Template widgets:', templateWidgets.length);
+      console.log('  - Widgets with colorTheme:', templateWidgets.filter(w => w.colorTheme && w.colorTheme !== 'default'));
+      console.log('  - Full widget data sample:', JSON.stringify(templateWidgets.slice(0, 2), null, 2));
       console.log('  - Row configs:', rowConfigs.length);
       console.log('  - Rows:', templateRows.length);
 
