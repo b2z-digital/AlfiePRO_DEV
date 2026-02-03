@@ -576,9 +576,12 @@ export const CustomizableDashboard: React.FC = () => {
 
       if (dbTemplate && !error) {
         console.log('Loading template from database:', dbTemplate.name);
+        console.log('Template data:', JSON.stringify(dbTemplate.template_data, null, 2));
         // Load from database template_data
         const templateLayout = dbTemplate.template_data?.lg || [];
         const rowConfigs = dbTemplate.template_data?.row_configs || [];
+        console.log('Widget count:', templateLayout.length);
+        console.log('Widgets with themes:', templateLayout.filter((w: any) => w.colorTheme && w.colorTheme !== 'default').map((w: any) => ({ type: w.type, theme: w.colorTheme })));
 
         const rowMap = new Map<number, DashboardRow>();
         const newWidgets: WidgetConfig[] = [];
@@ -767,6 +770,16 @@ export const CustomizableDashboard: React.FC = () => {
       }
 
       console.log('Template saved successfully!');
+
+      // Verify the save by fetching the template again
+      const { data: verifyTemplate } = await supabase
+        .from('dashboard_templates')
+        .select('template_data')
+        .eq('id', editingSystemTemplate)
+        .single();
+
+      console.log('Verified saved template:', verifyTemplate);
+
       addNotification('success', 'System template updated successfully!');
 
       // Restore the original dashboard layout
@@ -918,6 +931,21 @@ export const CustomizableDashboard: React.FC = () => {
           </div>
         </div>
       )}
+      {editingSystemTemplate && isEditMode && (
+        <div className="mb-4 p-4 bg-amber-900/20 border border-amber-600/30 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-600/20 rounded-lg">
+              <Sparkles size={20} className="text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold">Editing System Template</h3>
+              <p className="text-slate-400 text-sm">
+                Changes will update the template for all position assignments. Click "Save System Template" when done.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-end gap-2 mb-2">
         {isEditMode && (
           <>
@@ -975,20 +1003,42 @@ export const CustomizableDashboard: React.FC = () => {
               <RotateCcw size={16} />
               <span className="text-sm">Reset</span>
             </button>
-            <button
-              onClick={handleCancelEdit}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
-            >
-              <span className="text-sm">Cancel</span>
-            </button>
-            <button
-              onClick={handleSaveAndExit}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
-            >
-              <Check size={16} />
-              <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>
-            </button>
+            {editingSystemTemplate ? (
+              <>
+                <button
+                  onClick={handleCancelSystemTemplateEdit}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
+                >
+                  <X size={16} />
+                  <span className="text-sm">Cancel Template Edit</span>
+                </button>
+                <button
+                  onClick={handleSaveSystemTemplate}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                >
+                  <Check size={16} />
+                  <span className="text-sm">{saving ? 'Saving Template...' : 'Save System Template'}</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-white transition-colors"
+                >
+                  <span className="text-sm">Cancel</span>
+                </button>
+                <button
+                  onClick={handleSaveAndExit}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                >
+                  <Check size={16} />
+                  <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>
+                </button>
+              </>
+            )}
           </>
         )}
         {!isEditMode && (
