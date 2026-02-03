@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
   arrayMove
 } from '@dnd-kit/sortable';
-import { Edit2, Check, Plus, RotateCcw, Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save } from 'lucide-react';
+import { Edit2, Check, Plus, RotateCcw, Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { WidgetConfig, DashboardLayout, DashboardRow } from '../../types/dashboard';
 import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout, getTemplateForUser } from '../../utils/dashboardStorage';
@@ -192,6 +192,7 @@ export const CustomizableDashboard: React.FC = () => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingSystemTemplate, setEditingSystemTemplate] = useState<string | null>(null);
   const [originalLayoutBeforeEdit, setOriginalLayoutBeforeEdit] = useState<{ widgets: WidgetConfig[], rows: DashboardRow[] } | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
   const newRowRef = useRef<HTMLDivElement | null>(null);
 
   const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
@@ -685,23 +686,44 @@ export const CustomizableDashboard: React.FC = () => {
     console.error('Template not found:', templateId);
   };
 
-  const handleEditSystemTemplate = (templateId: string) => {
-    if (!isSuperAdmin) return;
+  const handleEditSystemTemplate = async (templateId: string) => {
+    if (!isSuperAdmin) {
+      console.error('Not a super admin');
+      return;
+    }
 
-    // Save the current dashboard layout before editing the template
-    setOriginalLayoutBeforeEdit({
-      widgets: [...widgets],
-      rows: [...rows]
-    });
+    try {
+      console.log('🎨 Starting system template edit:', templateId);
+      setLoadingTemplate(true);
 
-    // Load the template layout
-    handleApplyTemplate(templateId);
+      // Save the current dashboard layout before editing the template
+      setOriginalLayoutBeforeEdit({
+        widgets: [...widgets],
+        rows: [...rows]
+      });
 
-    // Set state to indicate we're editing a system template
-    setEditingSystemTemplate(templateId);
-    setIsEditMode(true);
+      console.log('💾 Saved original layout');
 
-    addNotification('info', 'Editing system template. Your changes will update the template for position assignments.');
+      // Load the template layout (wait for it to complete)
+      await handleApplyTemplate(templateId);
+
+      console.log('✅ Template loaded, entering edit mode');
+
+      // Set state to indicate we're editing a system template
+      setEditingSystemTemplate(templateId);
+      setIsEditMode(true);
+
+      addNotification('info', 'Editing system template. Your changes will update the template for position assignments.');
+    } catch (error) {
+      console.error('❌ Error loading template for editing:', error);
+      addNotification('error', 'Failed to load template for editing: ' + (error as Error).message);
+
+      // Reset state on error
+      setOriginalLayoutBeforeEdit(null);
+      setEditingSystemTemplate(null);
+    } finally {
+      setLoadingTemplate(false);
+    }
   };
 
   const handleCancelSystemTemplateEdit = () => {
@@ -910,10 +932,15 @@ export const CustomizableDashboard: React.FC = () => {
       .sort((a, b) => (a.columnIndex ?? 0) - (b.columnIndex ?? 0));
   };
 
-  if (loading) {
+  if (loading || loadingTemplate) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          {loadingTemplate && (
+            <p className="text-slate-400">Loading template for editing...</p>
+          )}
+        </div>
       </div>
     );
   }
