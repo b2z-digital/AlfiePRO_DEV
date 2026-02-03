@@ -593,8 +593,9 @@ export const CustomizableDashboard: React.FC = () => {
 
           if (!rowMap.has(rowNum)) {
             const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
-            const columns = rowWidgets.length;
             const rowConfig = rowConfigs.find((r: any) => r.row === rowNum);
+            // Use the saved columns value, fall back to counting widgets if not available
+            const columns = rowConfig?.columns || rowWidgets.length;
 
             rowMap.set(rowNum, {
               id: `row-${uuidv4()}`,
@@ -647,8 +648,9 @@ export const CustomizableDashboard: React.FC = () => {
 
         if (!rowMap.has(rowNum)) {
           const rowWidgets = templateLayout.filter(w => w.row === rowNum);
-          const columns = rowWidgets.length;
           const rowConfig = hardcodedTemplate.rowConfigs?.find(r => r.row === rowNum);
+          // Use the saved columns value, fall back to counting widgets if not available
+          const columns = rowConfig?.columns || rowWidgets.length;
 
           rowMap.set(rowNum, {
             id: `row-${uuidv4()}`,
