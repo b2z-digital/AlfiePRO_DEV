@@ -794,8 +794,18 @@ export const CustomizableDashboard: React.FC = () => {
 
       console.log('🔍 DATA BEING SENT TO DATABASE:', JSON.stringify(dataToSave, null, 2));
 
+      // First, check what's currently in the database
+      const { data: beforeUpdate, error: beforeError } = await supabase
+        .from('dashboard_templates')
+        .select('id, name, is_system_template, is_editable_by_super_admin')
+        .eq('id', editingSystemTemplate)
+        .single();
+
+      console.log('📋 Template BEFORE update:', beforeUpdate);
+      if (beforeError) console.error('❌ Error fetching template before update:', beforeError);
+
       // Save to dashboard_templates table - include BOTH rows and row_configs
-      const { error } = await supabase
+      const { data: updateResult, error, count } = await supabase
         .from('dashboard_templates')
         .update({
           template_data: dataToSave,
@@ -803,11 +813,22 @@ export const CustomizableDashboard: React.FC = () => {
         })
         .eq('id', editingSystemTemplate)
         .eq('is_system_template', true)
-        .eq('is_editable_by_super_admin', true);
+        .eq('is_editable_by_super_admin', true)
+        .select();
+
+      console.log('📊 Update result:', { updateResult, error, count, rowsAffected: updateResult?.length });
 
       if (error) {
-        console.error('Error saving template:', error);
+        console.error('❌ Error saving template:', error);
         throw error;
+      }
+
+      if (!updateResult || updateResult.length === 0) {
+        console.error('❌ No rows updated! The WHERE clause did not match any rows.');
+        console.error('   - ID:', editingSystemTemplate);
+        console.error('   - is_system_template: true');
+        console.error('   - is_editable_by_super_admin: true');
+        throw new Error('Failed to update template - no matching rows found');
       }
 
       console.log('✅ Template saved successfully!');
