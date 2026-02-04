@@ -112,18 +112,40 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         return;
       }
 
-      console.log('✅ Loading observers for round', heatManagement.currentRound);
-      console.log('   Current round data:', heatManagement.rounds.find(r => r.round === heatManagement.currentRound));
       setLoadingObservers(true);
       try {
-        const { currentRound, rounds } = heatManagement;
-        const currentRoundData = rounds.find(r => r.round === currentRound);
+        const { currentRound, rounds, roundJustCompleted } = heatManagement;
 
-        if (!currentRoundData) {
-          console.warn('⚠️ No round data found for round', currentRound);
+        // Determine which round to load observers for
+        // Priority:
+        // 1. If currentRound > roundJustCompleted, we've advanced to a new round - use currentRound
+        // 2. If a round was just completed and we haven't advanced yet, use that completed round
+        // 3. Otherwise, use the next uncompleted round or current round
+        let roundToLoadObserversFor;
+        if (roundJustCompleted && currentRound > roundJustCompleted) {
+          // We've advanced to a new round after completing a previous round
+          roundToLoadObserversFor = rounds.find(r => r.round === currentRound);
+          console.log('📈 Advanced to new round', currentRound);
+        } else if (roundJustCompleted) {
+          // Still showing the completed round
+          roundToLoadObserversFor = rounds.find(r => r.round === roundJustCompleted);
+          console.log('🏁 Showing completed round', roundJustCompleted);
+        } else {
+          // Normal case: show next uncompleted or current round
+          roundToLoadObserversFor = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
+          console.log('➡️ Showing current/next round', roundToLoadObserversFor?.round);
+        }
+
+        console.log('✅ Loading observers for round', roundToLoadObserversFor?.round);
+        console.log('   Round data:', roundToLoadObserversFor);
+
+        if (!roundToLoadObserversFor) {
+          console.warn('⚠️ No round data found');
           setObserversByHeat(new Map());
           return;
         }
+
+        const currentRoundData = roundToLoadObserversFor;
 
         // Load observers PER HEAT
         const newObserversByHeat = new Map<number, ObserverAssignment[]>();
@@ -138,10 +160,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           a.heatDesignation.localeCompare(b.heatDesignation)
         );
 
+        // Use results from the round we're displaying
+        const roundResults = currentRoundData.results || [];
+
         // Check which heats are completed to determine observer assignment
         // Heats complete from bottom to top (B -> A for 2 heats, C -> B -> A for 3 heats)
         const heatCompletionStatus = sortedHeats.map((heat, idx) => {
-          const heatResults = results.filter(r => r.heatDesignation === heat.heatDesignation);
+          const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
           const isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
             const result = heatResults.find(r => r.skipperIndex === skipperIdx);
             return result && (result.position !== null || result.letterScore || result.markedAsUP);
@@ -284,7 +309,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     };
 
     loadObservers();
-  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, heatManagement.currentRound, skippers]);
+  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds, skippers]);
 
   if (!isOpen) return null;
 
