@@ -421,9 +421,18 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const handleSave = async () => {
     let finalHeatManagement = currentHeatManagement;
 
+    console.log('🎯 HandleSave called - Heat Racing Enabled?', isHeatRacingEnabled);
+    console.log('🎯 Current heat management:', currentHeatManagement ? {
+      configHeats: currentHeatManagement.configuration.numberOfHeats,
+      roundHeats: currentHeatManagement.rounds[0]?.heatAssignments.length
+    } : 'null');
+
     if (isHeatRacingEnabled) {
       // Validate configuration
       const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : 'manual';
+      console.log('🎯 numHeats being used:', numHeats, '(manualHeatCount:', manualHeatCount, ', recommended:', optimalHeats.numberOfHeats, ')');
+      console.log('🎯 promotionCount being used:', promotionCount, '(manualPromotionCount:', manualPromotionCount, ')');
+
       const config: HMSConfig = {
         numberOfHeats: numHeats,
         promotionCount: promotionCount,
@@ -598,6 +607,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         finalHeatManagement = null;
       }
     }
+
+    console.log('📤 About to save settings with finalHeatManagement:', {
+      enabled: finalHeatManagement?.configuration.enabled,
+      configuredHeats: finalHeatManagement?.configuration.numberOfHeats,
+      actualHeatsInRound: finalHeatManagement?.rounds[0]?.heatAssignments.length,
+      heatDesignations: finalHeatManagement?.rounds[0]?.heatAssignments.map(h => h.heatDesignation)
+    });
 
     onSaveSettings({
       numRaces: currentNumRaces,
