@@ -154,9 +154,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         // Determine which heat should have observers (the first uncompleted heat from bottom to top)
         // Reverse to check from bottom (last) to top (first)
         const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
-        const lastCompletedHeat = [...heatCompletionStatus].reverse().find(h => h.isCompleted);
         console.log('🎯 Next heat to score:', nextHeatToScore?.heatDesignation || 'All heats completed');
-        console.log('🏁 Last completed heat:', lastCompletedHeat?.heatDesignation || 'None');
+
+        // Get all completed heats to show their previous observers
+        const completedHeats = heatCompletionStatus.filter(h => h.isCompleted);
+        console.log('🏁 Completed heats:', completedHeats.map(h => h.heatDesignation).join(', ') || 'None');
 
         // Process each heat separately
         for (let i = 0; i < sortedHeats.length; i++) {
@@ -166,18 +168,18 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           console.log(`\n🔍 Heat ${heat.heatDesignation} (heat ${heatNumber}):`);
 
           // Assign observers to:
-          // 1. The next heat that needs scoring
-          // 2. The last completed heat (to show previous observers)
+          // 1. The next heat that needs scoring (active observers)
+          // 2. ALL completed heats (to show previous observers)
           const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
-          const isLastCompletedHeat = lastCompletedHeat && lastCompletedHeat.heatNumber === heatNumber;
+          const isCompletedHeat = heatCompletionStatus[i].isCompleted;
 
-          if (!isNextHeatToScore && !isLastCompletedHeat) {
-            console.log(`  ⏭️ Skipping observer assignment - this heat is ${heatCompletionStatus[i].isCompleted ? 'already completed' : 'not relevant'}`);
+          if (!isNextHeatToScore && !isCompletedHeat) {
+            console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet`);
             continue;
           }
 
-          if (isLastCompletedHeat) {
-            console.log(`  ✅ This is the last completed heat - loading previous observers`);
+          if (isCompletedHeat) {
+            console.log(`  ✅ This is a completed heat - loading previous observers`);
           }
 
           console.log(`  ✅ This is the next heat to score - assigning observers`);
