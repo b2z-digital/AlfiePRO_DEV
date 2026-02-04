@@ -1080,9 +1080,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {heatObservers.map((observer, idx) => {
-                const observerSkipper = skippers[observer.skipper_index];
-                if (!observerSkipper) return null;
-
                 return (
                   <div
                     key={idx}
@@ -1092,9 +1089,9 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                         : 'bg-slate-100 text-slate-700 border border-slate-200'
                     }`}
                   >
-                    <span className="font-medium">{observerSkipper.name}</span>
+                    <span className="font-medium">{observer.skipper_name}</span>
                     <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
-                      #{observerSkipper.sailNumber || observerSkipper.sailNo}
+                      #{observer.skipper_sail_number}
                     </span>
                   </div>
                 );

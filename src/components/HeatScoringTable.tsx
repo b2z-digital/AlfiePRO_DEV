@@ -983,6 +983,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             numRaces={12}
             isHeatScoring={true}
             raceResults={mappedRaceResults}
+            heatObservers={currentHeatObservers}
             updateRaceResults={(updatedResults) => {
               const currentRace = heatManagement.currentRound;
               console.log('🔄 TouchMode callback - Race:', currentRace, 'Total results:', updatedResults.length);
@@ -1037,7 +1038,6 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               const updatedSkipper = { ...heatSkippers[index], ...updates };
               onUpdateSkipper(index, updatedSkipper);
             } : undefined}
-            heatObservers={currentHeatObservers}
           />
         ) : (
           <ScratchRaceTable
