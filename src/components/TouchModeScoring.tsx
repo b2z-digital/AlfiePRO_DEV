@@ -1064,46 +1064,45 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                 );
               })}
             </div>
-
-            {/* Observers Section - Fixed to bottom */}
-            {heatObservers.length > 0 && (
-              <div className={`mt-6 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} pt-4`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Eye size={16} className="text-purple-400" />
-                  <h5 className={`text-sm font-semibold ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
-                    Observers ({heatObservers.length})
-                  </h5>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {heatObservers.map((observer, idx) => {
-                    const observerSkipper = skippers[observer.skipper_index];
-                    if (!observerSkipper) return null;
-
-                    return (
-                      <div
-                        key={idx}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
-                          darkMode
-                            ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50'
-                            : 'bg-purple-50 text-purple-900 border border-purple-200'
-                        }`}
-                      >
-                        <Eye size={14} className="text-purple-400 flex-shrink-0" />
-                        <span className="font-medium truncate flex-1 text-left text-sm">
-                          {observerSkipper.name}
-                        </span>
-                        <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          #{observerSkipper.sailNumber || observerSkipper.sailNo}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Observers Section - At bottom above info bar */}
+      {heatObservers.length > 0 && (
+        <div className={`px-4 py-2 border-t ${darkMode ? 'bg-slate-800/20 border-slate-700/50' : 'bg-slate-50/50 border-slate-200'} flex-shrink-0`}>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Eye size={14} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+              <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Observers ({heatObservers.length}):
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {heatObservers.map((observer, idx) => {
+                const observerSkipper = skippers[observer.skipper_index];
+                if (!observerSkipper) return null;
+
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs ${
+                      darkMode
+                        ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    <span className="font-medium">{observerSkipper.name}</span>
+                    <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                      #{observerSkipper.sailNumber || observerSkipper.sailNo}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Info Bar - Skipper Count and Scoring System */}
       <div className={`px-4 py-3 flex items-center justify-between border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>

@@ -704,11 +704,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       try {
         // Get the heat number (A=1, B=2, C=3, etc.)
         const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+        console.log(`🔍 Loading observers for Heat ${selectedHeat} (heat_number=${heatNumber}, round=${heatManagement.currentRound})`);
         const observers = await getObserverAssignments(
           currentEvent.id,
           heatNumber,                    // Heat number goes SECOND
           heatManagement.currentRound     // Round number goes THIRD
         );
+        console.log(`✅ Loaded ${observers?.length || 0} observers:`, observers);
         setCurrentHeatObservers(observers || []);
       } catch (error) {
         console.error('Error loading observers for current heat:', error);
