@@ -220,15 +220,36 @@ export async function toggleObserver(
   timesServed: number
 ): Promise<boolean> {
   try {
+    // For custom observers (skipper_index = -1), check by name instead of index
+    // since there could be multiple custom observers
+    const isCustomObserver = skipperIndex === -1;
+
     // Check if observer already exists
-    const { data: existing } = await supabase
-      .from('heat_observers')
-      .select('*')
-      .eq('event_id', eventId)
-      .eq('heat_number', heatNumber)
-      .eq('race_number', raceNumber)
-      .eq('skipper_index', skipperIndex)
-      .maybeSingle();
+    let existing;
+    if (isCustomObserver) {
+      // For custom observers, check by name and sail number
+      const { data } = await supabase
+        .from('heat_observers')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('heat_number', heatNumber)
+        .eq('race_number', raceNumber)
+        .eq('skipper_index', -1)
+        .eq('skipper_name', skipperName)
+        .maybeSingle();
+      existing = data;
+    } else {
+      // For registered skippers, check by skipper_index
+      const { data } = await supabase
+        .from('heat_observers')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('heat_number', heatNumber)
+        .eq('race_number', raceNumber)
+        .eq('skipper_index', skipperIndex)
+        .maybeSingle();
+      existing = data;
+    }
 
     if (existing) {
       // Remove the observer
@@ -241,6 +262,7 @@ export async function toggleObserver(
         console.error('Error removing observer:', error);
         return false;
       }
+      console.log(`✅ Removed observer: ${skipperName}`);
     } else {
       // Add the observer
       const { error } = await supabase
@@ -253,13 +275,14 @@ export async function toggleObserver(
           skipper_name: skipperName,
           skipper_sail_number: skipperSailNumber,
           is_manual_assignment: true,
-          times_served: timesServed + 1
+          times_served: isCustomObserver ? 0 : (timesServed + 1)
         });
 
       if (error) {
         console.error('Error adding observer:', error);
         return false;
       }
+      console.log(`✅ Added observer: ${skipperName} ${skipperSailNumber ? `#${skipperSailNumber}` : ''}`);
     }
 
     return true;
