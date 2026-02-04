@@ -706,8 +706,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
         const observers = await getObserverAssignments(
           currentEvent.id,
-          heatManagement.currentRound,
-          heatNumber
+          heatNumber,                    // Heat number goes SECOND
+          heatManagement.currentRound     // Round number goes THIRD
         );
         setCurrentHeatObservers(observers || []);
       } catch (error) {

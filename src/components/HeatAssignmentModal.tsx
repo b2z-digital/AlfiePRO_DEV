@@ -262,7 +262,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           // Also check if ALL observers are still available (not promoted/relegated)
           const observersStillInHeat = existingObservers?.filter(obs => {
-            const skipperStillExists = skippers.some(s => s && s.index === obs.skipper_index);
+            // The skipper_index is the array position, so just check if that index is valid
+            const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
             if (!skipperStillExists) {
               console.log(`     ⚠️ Observer ${obs.skipper_name} (index ${obs.skipper_index}) no longer exists in skipper list`);
             }
