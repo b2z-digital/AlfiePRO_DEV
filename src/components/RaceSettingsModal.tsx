@@ -458,17 +458,20 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       if (currentHeatManagement) {
-        // Check if number of heats changed or if there are no scores yet
-        const heatCountChanged = currentHeatManagement.configuration.numberOfHeats !== numHeats;
+        // CRITICAL: Compare against ACTUAL number of heats in assignments, not stored config
+        // The config might have been saved incorrectly before, so we need to check reality
+        const actualHeatCount = currentHeatManagement.rounds[0]?.heatAssignments?.length || 0;
+        const heatCountChanged = actualHeatCount !== numHeats;
         const hasAnyRoundResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
 
         // When reducing heat count, we MUST regenerate even if there are results
         // because we can't have 3 heats in assignments when config says 2 heats
-        const isReducingHeats = currentHeatManagement.configuration.numberOfHeats > numHeats;
+        const isReducingHeats = actualHeatCount > numHeats;
         const shouldRegenerate = heatCountChanged && (!hasAnyRoundResults || isReducingHeats);
 
         console.log('🔍 Heat regeneration check:', {
-          currentHeats: currentHeatManagement.configuration.numberOfHeats,
+          storedConfigHeats: currentHeatManagement.configuration.numberOfHeats,
+          actualHeatsInAssignments: actualHeatCount,
           newHeats: numHeats,
           heatCountChanged,
           hasAnyRoundResults,
