@@ -129,7 +129,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
   // Initialize manual overrides from existing heat management configuration
   useEffect(() => {
-    if (initialHeatManagement?.configuration) {
+    // Only load manual overrides if heat racing is currently enabled
+    if (initialHeatManagement?.configuration && initialHeatManagement.configuration.enabled) {
       const config = initialHeatManagement.configuration;
       // If the saved config differs from auto-calculated, it means user manually overrode it
       if (config.numberOfHeats !== optimalHeats.numberOfHeats) {
@@ -142,6 +143,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       } else {
         setManualPromotionCount(null);
       }
+    } else {
+      // If heat racing is not enabled, reset manual overrides
+      setManualHeatCount(null);
+      setManualPromotionCount(null);
     }
   }, [initialHeatManagement, optimalHeats.numberOfHeats, optimalHeats.promotionCount]);
 
@@ -307,6 +312,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     } else if (!enabled) {
       // Disabling heat racing
       setIsHeatRacingEnabled(false);
+
+      // Reset manual overrides so they start fresh when re-enabled
+      setManualHeatCount(null);
+      setManualPromotionCount(null);
 
       // If current scoring system is a heat racing system, switch to RRS
       if (currentDropRules === 'hms' || currentDropRules === 'shrs') {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award, Eye } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -11,6 +11,7 @@ import { FloatingHandicapViewer } from './touch-mode/FloatingHandicapViewer';
 import { HandicapChangeBadge } from './touch-mode/HandicapChangeBadge';
 import { HandicapProgressionModal } from './touch-mode/HandicapProgressionModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
+import type { ObserverAssignment } from '../utils/observerUtils';
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -25,6 +26,7 @@ interface TouchModeScoringProps {
   isHeatScoring?: boolean;
   onConfirmResults?: () => void; // Called when user confirms the finish order
   updateSkipper?: (skipperIndex: number, updates: Partial<Skipper>) => void;
+  heatObservers?: ObserverAssignment[]; // Observers for the current heat
 }
 
 interface FinishingEntry {
@@ -48,7 +50,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   currentEvent,
   isHeatScoring = false,
   onConfirmResults,
-  updateSkipper
+  updateSkipper,
+  heatObservers = []
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
   const [finishOrder, setFinishOrder] = useState<FinishingEntry[]>([]);
@@ -1003,6 +1006,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             <div className={`grid ${gridCols} gap-6 sm:gap-8`}>
               {skippers.map((skipper, index) => {
                 const isFinished = usedSkipperIndices.has(index);
+                const isObserver = heatObservers.some(obs => obs.skipper_index === index);
                 return (
                   <button
                     key={index}
@@ -1047,6 +1051,16 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                     {isFinished && (
                       <div className="absolute top-0.5 right-0.5 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
                         <Check size={14} className="text-white" strokeWidth={3} />
+                      </div>
+                    )}
+                    {!isFinished && isObserver && (
+                      <div className={`absolute bottom-1 right-1 px-2 py-1 rounded-md flex items-center gap-1 ${
+                        darkMode
+                          ? 'bg-purple-600/90 text-purple-100'
+                          : 'bg-purple-600 text-white'
+                      } shadow-md`}>
+                        <Eye size={12} strokeWidth={2.5} />
+                        <span className="text-[10px] font-semibold">OBS</span>
                       </div>
                     )}
                     {!isFinished && (
