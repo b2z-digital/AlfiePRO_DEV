@@ -268,14 +268,17 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   // Debug logging for button visibility
   useEffect(() => {
-    const shouldShowButton = finishOrder.length === skippers.length && !isConfirmed;
+    const racingSkippersCount = skippers.length - heatObservers.length;
+    const shouldShowButton = finishOrder.length === racingSkippersCount && !isConfirmed;
     console.log('🔘 Confirm button visibility:', shouldShowButton, {
       finishOrderLength: finishOrder.length,
       skippersLength: skippers.length,
+      observersLength: heatObservers.length,
+      racingSkippersCount,
       isConfirmed,
       currentRace
     });
-  }, [finishOrder.length, skippers.length, isConfirmed, currentRace]);
+  }, [finishOrder.length, skippers.length, heatObservers.length, isConfirmed, currentRace]);
 
   const handleSailNumberClick = (skipperIndex: number) => {
     console.log('👆 Sail number clicked:', skipperIndex, 'Sail:', skippers[skipperIndex]?.sailNumber);
@@ -425,9 +428,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       console.log('➕ Added result:', newResult);
     });
 
-    // Check if all skippers now have results
-    const allSkippersScored = entries.length === skippers.length;
-    console.log('📊 All skippers scored?', allSkippersScored, `(${entries.length}/${skippers.length})`);
+    // Check if all skippers now have results (excluding observers)
+    const racingSkippersCount = skippers.length - heatObservers.length;
+    const allSkippersScored = entries.length === racingSkippersCount;
+    console.log('📊 All skippers scored?', allSkippersScored, `(${entries.length}/${racingSkippersCount} racing skippers, ${heatObservers.length} observers)`);
     if (allSkippersScored) {
       console.log('✅ All skippers scored - Confirm button should appear');
     }
@@ -947,7 +951,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           </div>
 
           {/* Confirm Button - appears when all skippers scored but not confirmed */}
-          {finishOrder.length === skippers.length && !isConfirmed && (
+          {finishOrder.length === (skippers.length - heatObservers.length) && !isConfirmed && (
             <div className={`px-4 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
               <button
                 onClick={(e) => {
