@@ -999,7 +999,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           style={{ width: `${rightPanelWidth}%` }}
         >
           <div className={`px-4 py-3 font-semibold border-b flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
-            Scheduled Entries ({skippers.length})
+            Scheduled Entries ({skippers.length - heatObservers.length})
           </div>
 
           <div className={`flex-1 overflow-y-auto p-6 min-h-0 ${darkMode ? 'bg-slate-800/20' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
@@ -1007,6 +1007,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
               {skippers.map((skipper, index) => {
                 const isFinished = usedSkipperIndices.has(index);
                 const isObserver = heatObservers.some(obs => obs.skipper_index === index);
+
+                // Don't show observers in the racing grid
+                if (isObserver) return null;
+
                 return (
                   <button
                     key={index}
@@ -1053,16 +1057,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                         <Check size={14} className="text-white" strokeWidth={3} />
                       </div>
                     )}
-                    {!isFinished && isObserver && (
-                      <div className={`absolute bottom-1 right-1 px-2 py-1 rounded-md flex items-center gap-1 ${
-                        darkMode
-                          ? 'bg-purple-600/90 text-purple-100'
-                          : 'bg-purple-600 text-white'
-                      } shadow-md`}>
-                        <Eye size={12} strokeWidth={2.5} />
-                        <span className="text-[10px] font-semibold">OBS</span>
-                      </div>
-                    )}
                     {!isFinished && (
                       <div className={`absolute inset-0 rounded-xl transition-all duration-200 ${darkMode ? 'bg-gradient-to-br from-cyan-500/0 to-blue-500/0 hover:from-cyan-500/5 hover:to-blue-500/5' : 'bg-gradient-to-br from-blue-500/0 to-cyan-500/0 hover:from-blue-500/3 hover:to-cyan-500/3'}`} />
                     )}
@@ -1070,6 +1064,43 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                 );
               })}
             </div>
+
+            {/* Observers Section - Fixed to bottom */}
+            {heatObservers.length > 0 && (
+              <div className={`mt-6 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} pt-4`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye size={16} className="text-purple-400" />
+                  <h5 className={`text-sm font-semibold ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                    Observers ({heatObservers.length})
+                  </h5>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {heatObservers.map((observer, idx) => {
+                    const observerSkipper = skippers[observer.skipper_index];
+                    if (!observerSkipper) return null;
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                          darkMode
+                            ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50'
+                            : 'bg-purple-50 text-purple-900 border border-purple-200'
+                        }`}
+                      >
+                        <Eye size={14} className="text-purple-400 flex-shrink-0" />
+                        <span className="font-medium truncate flex-1 text-left text-sm">
+                          {observerSkipper.name}
+                        </span>
+                        <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          #{observerSkipper.sailNumber || observerSkipper.sailNo}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1081,7 +1112,13 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           darkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
         }`}>
           <Users size={14} />
-          <span className="text-xs">{skippers.length} skippers</span>
+          <span className="text-xs">{skippers.length - heatObservers.length} skippers</span>
+          {heatObservers.length > 0 && (
+            <>
+              <span className="text-xs">•</span>
+              <span className="text-xs">{heatObservers.length} {heatObservers.length === 1 ? 'observer' : 'observers'}</span>
+            </>
+          )}
           <span className="text-xs">•</span>
           <span className="text-xs">{getCompletedRacesCount()} of {numRaces} races completed</span>
         </div>
