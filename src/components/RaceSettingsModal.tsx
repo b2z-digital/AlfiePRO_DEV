@@ -453,8 +453,30 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         const heatCountChanged = currentHeatManagement.configuration.numberOfHeats !== numHeats;
         const hasAnyRoundResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
 
-        if (heatCountChanged && !hasAnyRoundResults) {
-          // Number of heats changed and no scores - regenerate heats
+        // When reducing heat count, we MUST regenerate even if there are results
+        // because we can't have 3 heats in assignments when config says 2 heats
+        const isReducingHeats = currentHeatManagement.configuration.numberOfHeats > numHeats;
+        const shouldRegenerate = heatCountChanged && (!hasAnyRoundResults || isReducingHeats);
+
+        console.log('🔍 Heat regeneration check:', {
+          currentHeats: currentHeatManagement.configuration.numberOfHeats,
+          newHeats: numHeats,
+          heatCountChanged,
+          hasAnyRoundResults,
+          isReducingHeats,
+          shouldRegenerate,
+          roundsData: currentHeatManagement.rounds.map(r => ({
+            round: r.round,
+            resultsCount: r.results?.length || 0,
+            heatCount: r.heatAssignments?.length || 0
+          }))
+        });
+
+        if (shouldRegenerate) {
+          // Regenerate heats when count changes (especially when reducing)
+          if (hasAnyRoundResults) {
+            console.log('⚠️ Regenerating heats will clear existing results!');
+          }
           console.log('🔄 Heat count changed from', currentHeatManagement.configuration.numberOfHeats, 'to', numHeats, '- regenerating heats');
 
           let heatAssignments;
@@ -475,6 +497,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             // Use HMS seeding
             heatAssignments = seedInitialHeats(skippers, config);
           }
+
+          console.log('✅ Generated', heatAssignments.length, 'heat assignments:', heatAssignments.map(h => h.heatDesignation));
 
           finalHeatManagement = {
             configuration: {
@@ -497,7 +521,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             ]
           };
         } else {
-          // If heats already seeded and has scores, just update configuration
+          // Only update configuration without regenerating heats
+          // This happens when increasing heat count with existing results
+          console.log('ℹ️ Updating configuration only - preserving existing heat assignments and results');
           finalHeatManagement = {
             ...currentHeatManagement,
             configuration: {
