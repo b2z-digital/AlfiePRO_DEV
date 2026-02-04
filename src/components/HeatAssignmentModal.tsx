@@ -309,7 +309,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     };
 
     loadObservers();
-  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds, skippers]);
+  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, heatManagement.currentRound, heatManagement.roundJustCompleted, JSON.stringify(heatManagement.rounds), skippers]);
 
   if (!isOpen) return null;
 

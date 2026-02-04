@@ -10,7 +10,8 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand } from 'lucide-react';
+import { Hand, Eye } from 'lucide-react';
+import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -103,6 +104,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [manualSelection, setManualSelection] = useState(false); // Track manual heat selection
   const [touchMode, setTouchMode] = useState(true); // Touch mode scoring state - default to Touch mode
   const [touchModeResultsConfirmed, setTouchModeResultsConfirmed] = useState(false); // Track if touch mode results are confirmed
+  const [currentHeatObservers, setCurrentHeatObservers] = useState<ObserverAssignment[]>([]);
   const manualSelectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Track the round number to detect actual round changes (not just object reference changes)
@@ -691,6 +693,32 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     setShowManualAssignModal(true);
   };
 
+  // Load observers for the current heat
+  React.useEffect(() => {
+    const loadObservers = async () => {
+      if (!currentEvent?.id || !selectedHeat || !currentEvent.enable_observers) {
+        setCurrentHeatObservers([]);
+        return;
+      }
+
+      try {
+        // Get the heat number (A=1, B=2, C=3, etc.)
+        const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+        const observers = await getObserverAssignments(
+          currentEvent.id,
+          heatManagement.currentRound,
+          heatNumber
+        );
+        setCurrentHeatObservers(observers || []);
+      } catch (error) {
+        console.error('Error loading observers for current heat:', error);
+        setCurrentHeatObservers([]);
+      }
+    };
+
+    loadObservers();
+  }, [currentEvent?.id, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers]);
+
   // Don't render until a heat is selected
   if (!selectedHeat) {
     return (
@@ -940,6 +968,38 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Observer Display - Show who is observing this heat */}
+        {currentEvent?.enable_observers && currentHeatObservers.length > 0 && (
+          <div className={`mx-6 mt-4 p-4 rounded-lg border ${
+            darkMode
+              ? 'bg-purple-900/20 border-purple-700/50'
+              : 'bg-purple-50 border-purple-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <Eye className={`w-5 h-5 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+              <div className="flex-1">
+                <div className={`font-semibold text-sm ${darkMode ? 'text-purple-300' : 'text-purple-900'}`}>
+                  Observers for Heat {selectedHeat}
+                </div>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {currentHeatObservers.map((observer, index) => (
+                    <div
+                      key={`${observer.skipper_index}-${index}`}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                        darkMode
+                          ? 'bg-purple-800/60 text-purple-200 border border-purple-600'
+                          : 'bg-purple-200 text-purple-900 border border-purple-300'
+                      }`}
+                    >
+                      {observer.skipper_name} #{observer.sail_number || observer.skipper_index}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {touchMode ? (
           <TouchModeScoring
