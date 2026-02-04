@@ -140,12 +140,14 @@ export const MembershipTypesLargeWidget: React.FC<MembershipTypesLargeWidgetProp
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       ) : chartData ? (
-        <div className="relative h-96 p-6">
-          <Doughnut data={chartData} options={options} />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-white">{totalMembers}</div>
-              <div className="text-sm text-slate-400 mt-1">Total Members</div>
+        <div className="h-96 p-6">
+          <div className="relative h-full">
+            <Doughnut data={chartData} options={options} />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-white">{totalMembers}</div>
+                <div className="text-sm text-slate-400 mt-1">Total Members</div>
+              </div>
             </div>
           </div>
         </div>
