@@ -1084,6 +1084,22 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
+
+          // Reload observers after modal closes to ensure they're up to date
+          const reloadObservers = async () => {
+            if (currentEvent?.id && selectedHeat && currentEvent.enable_observers) {
+              const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+              console.log(`🔄 Reloading observers after modal close for Heat ${selectedHeat} (heat_number=${heatNumber})`);
+              const observers = await getObserverAssignments(
+                currentEvent.id,
+                heatNumber,
+                heatManagement.currentRound
+              );
+              console.log(`✅ Reloaded ${observers?.length || 0} observers:`, observers);
+              setCurrentHeatObservers(observers || []);
+            }
+          };
+          reloadObservers();
         }}
         heatManagement={heatManagement}
         skippers={skippers}

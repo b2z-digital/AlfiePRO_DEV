@@ -265,6 +265,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           // Also check if ALL observers are still available (not promoted/relegated)
           const observersStillInHeat = existingObservers?.filter(obs => {
+            // Custom observers (skipper_index = -1) always exist
+            if (obs.skipper_index === -1) {
+              return true;
+            }
+
             // The skipper_index is the array position, so just check if that index is valid
             const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
             if (!skipperStillExists) {
@@ -955,13 +960,27 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     // Check if this is a completed heat showing previous observers
                     const isPreviousHeatObservers = heatCompleted;
 
-                    // Only render if there are observers OR if this heat should have observers (show loading)
-                    // Show loading for uncompleted heats that should have observers
-                    const shouldShowObserversSection = heatObservers.length > 0 || (!isPreviousHeatObservers && loadingObservers);
+                    console.log(`🔍 Heat ${heatDesignation} observer check:`, {
+                      heatNumber,
+                      observersCount: heatObservers.length,
+                      isPreviousHeat: isPreviousHeatObservers,
+                      heatCompleted: heatCompleted,
+                      loadingObservers,
+                      observersByHeatSize: observersByHeat.size,
+                      observers: heatObservers.map(o => ({ index: o.skipper_index, name: o.skipper_name }))
+                    });
+
+                    // Always show the observer section for active (uncompleted) heats
+                    // Also show for completed heats if they have observers (previous observers)
+                    const shouldShowObserversSection = !isPreviousHeatObservers || heatObservers.length > 0 || loadingObservers;
 
                     if (!shouldShowObserversSection) {
+                      console.log(`⏭️ Skipping observer section for Heat ${heatDesignation}`);
                       return null;
                     }
+
+                    console.log(`✅ Showing observer section for Heat ${heatDesignation}`);
+
 
                     return (
                       <div className={`mt-auto border-t ${
