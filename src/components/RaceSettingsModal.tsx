@@ -440,18 +440,67 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       if (currentHeatManagement) {
-        // If heats already seeded, just update configuration
-        finalHeatManagement = {
-          ...currentHeatManagement,
-          configuration: {
-            enabled: true,
-            numberOfHeats: numHeats,
-            promotionCount: promotionCount,
-            seedingMethod,
-            autoAssign: initialAssignment === 'random',
-            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+        // Check if number of heats changed or if there are no scores yet
+        const heatCountChanged = currentHeatManagement.configuration.numberOfHeats !== numHeats;
+        const hasAnyRoundResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
+
+        if (heatCountChanged && !hasAnyRoundResults) {
+          // Number of heats changed and no scores - regenerate heats
+          console.log('🔄 Heat count changed from', currentHeatManagement.configuration.numberOfHeats, 'to', numHeats, '- regenerating heats');
+
+          let heatAssignments;
+
+          if (currentDropRules === 'shrs') {
+            // Use SHRS-specific seeding (zigzag pattern)
+            const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
+            const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+            heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
+              const heatIndex = Number(heatNum) - 1;
+              return {
+                heatDesignation: heatLabels[heatIndex] as any,
+                skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => sk.sailNumber === s.sailNumber))
+              };
+            });
+          } else {
+            // Use HMS seeding
+            heatAssignments = seedInitialHeats(skippers, config);
           }
-        };
+
+          finalHeatManagement = {
+            configuration: {
+              enabled: true,
+              numberOfHeats: numHeats,
+              promotionCount: promotionCount,
+              seedingMethod,
+              autoAssign: initialAssignment === 'random',
+              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+            },
+            currentRound: 1,
+            currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
+            rounds: [
+              {
+                round: 1,
+                heatAssignments,
+                results: [],
+                completed: false
+              }
+            ]
+          };
+        } else {
+          // If heats already seeded and has scores, just update configuration
+          finalHeatManagement = {
+            ...currentHeatManagement,
+            configuration: {
+              enabled: true,
+              numberOfHeats: numHeats,
+              promotionCount: promotionCount,
+              seedingMethod,
+              autoAssign: initialAssignment === 'random',
+              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+            }
+          };
+        }
       } else {
         // For manual assignment, show the manual assignment modal
         if (initialAssignment === 'manual') {
