@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments } from '../types/heat';
@@ -59,14 +59,41 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     }
   }, [isOpen]);
 
+  // Create a stable key that represents the state of rounds that should trigger observer reload
+  const roundDataKey = useMemo(() => {
+    const { currentRound, roundJustCompleted, rounds } = heatManagement;
+
+    // Determine which round we're displaying
+    let targetRound;
+    if (roundJustCompleted && currentRound > roundJustCompleted) {
+      targetRound = currentRound;
+    } else if (roundJustCompleted) {
+      targetRound = roundJustCompleted;
+    } else {
+      const nextUncompleted = rounds.find(r => !r.completed);
+      targetRound = nextUncompleted?.round || currentRound;
+    }
+
+    const roundData = rounds.find(r => r.round === targetRound);
+    if (!roundData) return `${currentRound}-no-data`;
+
+    // Create a hash of the round state that matters for observers
+    const heatCount = roundData.heatAssignments.length;
+    const resultCount = roundData.results?.length || 0;
+    const completionStatus = roundData.completed ? 'complete' : 'incomplete';
+
+    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}`;
+  }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds]);
+
   // Load and select observers when modal opens
   useEffect(() => {
     const loadObservers = async () => {
-      console.log('🔍 HeatAssignmentModal - Checking observer conditions:', {
+      console.log('�� HeatAssignmentModal - Checking observer conditions:', {
         isOpen,
         hasEventId: !!currentEvent?.id,
         enable_observers: currentEvent?.enable_observers,
         observers_per_heat: currentEvent?.observers_per_heat,
+        roundDataKey,
         currentEvent
       });
 
@@ -309,7 +336,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     };
 
     loadObservers();
-  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, heatManagement.currentRound, heatManagement.roundJustCompleted, JSON.stringify(heatManagement.rounds), skippers]);
+  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
 
   if (!isOpen) return null;
 
