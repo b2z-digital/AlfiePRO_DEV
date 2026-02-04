@@ -144,9 +144,13 @@ export const MembershipTypesLargeWidget: React.FC<MembershipTypesLargeWidgetProp
           <div className="h-96 p-6">
             <Doughnut data={chartData} options={options} />
           </div>
-          <div className="absolute top-1/2 left-1/4 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-            <div className="text-4xl font-bold text-white">{totalMembers}</div>
-            <div className="text-sm text-slate-400 mt-1">Total Members</div>
+          <div className="absolute inset-0 flex items-center pointer-events-none">
+            <div className="w-[60%] flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-white">{totalMembers}</div>
+                <div className="text-sm text-slate-400 mt-1">Total Members</div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
