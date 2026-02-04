@@ -154,7 +154,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         // Determine which heat should have observers (the first uncompleted heat from bottom to top)
         // Reverse to check from bottom (last) to top (first)
         const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
+        const lastCompletedHeat = [...heatCompletionStatus].reverse().find(h => h.isCompleted);
         console.log('🎯 Next heat to score:', nextHeatToScore?.heatDesignation || 'All heats completed');
+        console.log('🏁 Last completed heat:', lastCompletedHeat?.heatDesignation || 'None');
 
         // Process each heat separately
         for (let i = 0; i < sortedHeats.length; i++) {
@@ -163,11 +165,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           console.log(`\n🔍 Heat ${heat.heatDesignation} (heat ${heatNumber}):`);
 
-          // Only assign observers to the next heat that needs scoring (sequential completion)
+          // Assign observers to:
+          // 1. The next heat that needs scoring
+          // 2. The last completed heat (to show previous observers)
           const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
-          if (!isNextHeatToScore) {
-            console.log(`  ⏭️ Skipping observer assignment - this heat is ${heatCompletionStatus[i].isCompleted ? 'already completed' : 'not the next heat to score'}`);
+          const isLastCompletedHeat = lastCompletedHeat && lastCompletedHeat.heatNumber === heatNumber;
+
+          if (!isNextHeatToScore && !isLastCompletedHeat) {
+            console.log(`  ⏭️ Skipping observer assignment - this heat is ${heatCompletionStatus[i].isCompleted ? 'already completed' : 'not relevant'}`);
             continue;
+          }
+
+          if (isLastCompletedHeat) {
+            console.log(`  ✅ This is the last completed heat - loading previous observers`);
           }
 
           console.log(`  ✅ This is the next heat to score - assigning observers`);
@@ -878,8 +888,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   </div>
 
                   {/* Observers Section - Fixed to bottom using mt-auto */}
-                  {/* Only show observers for uncompleted heats that have observers assigned */}
-                  {currentEvent?.enable_observers && !heatCompleted && (() => {
+                  {/* Show observers for uncompleted heats AND previous heat observers */}
+                  {currentEvent?.enable_observers && (() => {
                     const heatIndex = ['A', 'B', 'C', 'D', 'E', 'F'].indexOf(heatDesignation);
                     const heatNumber = heatIndex + 1;
                     const heatObservers = observersByHeat.get(heatNumber) || [];
@@ -888,6 +898,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     if (heatObservers.length === 0) {
                       return null;
                     }
+
+                    // Check if this is a completed heat showing previous observers
+                    const isPreviousHeatObservers = heatCompleted;
 
                     return (
                       <div className={`mt-auto border-t ${
@@ -898,34 +911,75 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         }`}>
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              <Eye size={16} className="text-purple-400" />
+                              <Eye size={16} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
                               <h5 className={`text-sm font-semibold ${
-                                darkMode ? 'text-purple-300' : 'text-purple-700'
+                                isPreviousHeatObservers
+                                  ? (darkMode ? 'text-slate-300' : 'text-slate-700')
+                                  : (darkMode ? 'text-purple-300' : 'text-purple-700')
                               }`}>
-                                Observers ({heatObservers.length})
+                                {isPreviousHeatObservers ? 'Previous Observers' : 'Observers'} ({heatObservers.length})
                               </h5>
                             </div>
-                            <button
-                              onClick={() => {
-                                setSelectedHeatForObserver(heatNumber);
-                                setShowObserverSelector(true);
-                              }}
-                              className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
-                                darkMode
-                                  ? 'bg-purple-700 text-purple-200 hover:bg-purple-600'
-                                  : 'bg-purple-600 text-white hover:bg-purple-700'
-                              }`}
-                              title="Add observer"
-                            >
-                              <UserPlus size={12} />
-                              <span>Add</span>
-                            </button>
+                            {!isPreviousHeatObservers && (
+                              <button
+                                onClick={() => {
+                                  setSelectedHeatForObserver(heatNumber);
+                                  setShowObserverSelector(true);
+                                }}
+                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
+                                  darkMode
+                                    ? 'bg-purple-700 text-purple-200 hover:bg-purple-600'
+                                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                                }`}
+                                title="Add observer"
+                              >
+                                <UserPlus size={12} />
+                                <span>Add</span>
+                              </button>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {heatObservers.map((observer, idx) => {
                               const observerSkipper = skippers[observer.skipper_index];
                               if (!observerSkipper) return null;
 
+                              // Style previous observers like regular skipper cards, active observers with purple
+                              if (isPreviousHeatObservers) {
+                                // Previous observers - styled like regular skipper cards (no purple, not clickable)
+                                return (
+                                  <div
+                                    key={observer.skipper_index}
+                                    className={`flex items-center gap-2 p-2 rounded border-2 ${
+                                      darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
+                                    }`}
+                                  >
+                                    <Eye size={14} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
+                                    {observerSkipper.avatarUrl ? (
+                                      <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                        <img
+                                          src={observerSkipper.avatarUrl}
+                                          alt={observerSkipper.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                                        darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
+                                      }`}>
+                                        {observerSkipper.name.split(' ').map(n => n[0]).join('')}
+                                      </div>
+                                    )}
+                                    <span className={`font-medium truncate flex-1 text-xs ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                      {observerSkipper.name}
+                                    </span>
+                                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      #{observerSkipper.sailNo}
+                                    </span>
+                                  </div>
+                                );
+                              }
+
+                              // Active observers - purple styling, clickable to remove
                               return (
                                 <button
                                   key={observer.skipper_index}

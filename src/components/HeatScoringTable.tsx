@@ -101,7 +101,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [shouldAutoShuffle, setShouldAutoShuffle] = useState(false);
   const [editingSkipperIndex, setEditingSkipperIndex] = useState<number | null>(null);
   const [manualSelection, setManualSelection] = useState(false); // Track manual heat selection
-  const [touchMode, setTouchMode] = useState(false); // Touch mode scoring state
+  const [touchMode, setTouchMode] = useState(true); // Touch mode scoring state - default to Touch mode
   const [touchModeResultsConfirmed, setTouchModeResultsConfirmed] = useState(false); // Track if touch mode results are confirmed
   const manualSelectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
