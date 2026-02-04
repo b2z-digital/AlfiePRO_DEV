@@ -2976,8 +2976,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           initialNumRaces={currentNumRaces}
           initialDropRules={currentDropRules}
           currentEvent={selectedEvent}
-          onSaveSettings={(settings) => {
-            handleSaveRaceSettings(settings);
+          onSaveSettings={async (settings) => {
+            await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);
           }}
           onManageSkippers={() => {
