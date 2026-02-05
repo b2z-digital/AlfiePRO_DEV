@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation } from '../types/heat';
 import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
+import { supabase } from '../utils/supabase';
 
 interface HeatRaceResultsModalProps {
   isOpen: boolean;
@@ -42,10 +43,21 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   // Fetch observers for all heats and rounds
   useEffect(() => {
     const fetchObservers = async () => {
-      if (!isOpen || !currentEvent?.id) return;
+      if (!isOpen || !currentEvent?.id) {
+        console.log('[HeatRaceResultsModal] NOT fetching observers - isOpen:', isOpen, 'currentEvent:', currentEvent?.id);
+        return;
+      }
 
-      console.log('[HeatRaceResultsModal] Starting observer fetch');
+      console.log('[HeatRaceResultsModal] Starting observer fetch for event:', currentEvent.id);
       const observersMap = new Map<string, ObserverAssignment[]>();
+
+      // Debug: Check what's in the database for this event
+      const { data: allObservers, error: dbError } = await supabase
+        .from('heat_observers')
+        .select('*')
+        .eq('event_id', currentEvent.id);
+
+      console.log('[HeatRaceResultsModal] ALL observers in database for this event:', allObservers, 'Error:', dbError);
 
       // Get all completed rounds
       const completedRounds = heatManagement.rounds.filter(r => r.completed);
