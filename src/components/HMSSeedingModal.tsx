@@ -94,6 +94,13 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
         // Get all rankings for this class
         const allRankings = await getRankingsByClass(nationalAssociationId, yachtClassName);
 
+        console.log('Fuzzy matching data:', {
+          skipperNames: skippers.map(s => s.name),
+          rankingNames: allRankings.map(r => r.skipper_name),
+          totalSkippers: skippers.length,
+          totalRankings: allRankings.length
+        });
+
         // Try to match skippers to rankings by name
         for (const skipper of skippers) {
           if (!skipper.memberId) continue;
@@ -123,7 +130,10 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
           });
 
           if (matchedRanking) {
+            console.log(`✓ Matched "${skipper.name}" to "${matchedRanking.skipper_name}" (rank #${matchedRanking.rank})`);
             rankingsMap.set(skipper.memberId, matchedRanking);
+          } else {
+            console.log(`✗ No match for "${skipper.name}"`);
           }
         }
 
