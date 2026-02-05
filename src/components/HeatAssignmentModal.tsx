@@ -82,6 +82,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       hasEventId: !!currentEvent?.id,
       currentRound: heatManagement.currentRound,
       roundJustCompleted: heatManagement.roundJustCompleted,
+      skippersCount: skippers?.length || 0,
       dependencies: {
         isOpen,
         eventId: currentEvent?.id,
@@ -104,6 +105,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
       if (!isOpen || !currentEvent?.id) {
         console.log('⏭️ Skipping observer load - no event or modal closed');
+        setObserversByHeat(new Map());
+        return;
+      }
+
+      // CRITICAL: Don't load observers until skippers are actually loaded
+      if (!skippers || skippers.length === 0) {
+        console.log('⏳ Waiting for skippers to load before assigning observers...');
         setObserversByHeat(new Map());
         return;
       }
