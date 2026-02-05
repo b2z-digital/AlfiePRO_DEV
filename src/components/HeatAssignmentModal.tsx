@@ -87,8 +87,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
   // Load and select observers when modal opens
   useEffect(() => {
+    console.log('🔵 HeatAssignmentModal useEffect TRIGGERED:', {
+      isOpen,
+      hasEventId: !!currentEvent?.id,
+      roundDataKey,
+      dependencies: {
+        isOpen,
+        eventId: currentEvent?.id,
+        enable_observers: currentEvent?.enable_observers,
+        observers_per_heat: currentEvent?.observers_per_heat,
+        skipperCount: skippers?.length
+      }
+    });
+
     const loadObservers = async () => {
-      console.log('�� HeatAssignmentModal - Checking observer conditions:', {
+      console.log('🎯 HeatAssignmentModal - Checking observer conditions:', {
         isOpen,
         hasEventId: !!currentEvent?.id,
         enable_observers: currentEvent?.enable_observers,
