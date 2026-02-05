@@ -1531,7 +1531,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         ${hasHeatScores
                           ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : initialAssignment === 'hms'
-                            ? 'bg-purple-600 text-white shadow-md'
+                            ? 'bg-green-600 text-white shadow-md'
                             : darkMode
                               ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -1539,7 +1539,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       `}
                     >
                       <Award size={18} />
-                      <span className="text-xs">HMS Seeding</span>
+                      <span className="text-xs">National Rankings</span>
                     </button>
                   </div>
                 </div>
@@ -1693,7 +1693,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         darkMode={darkMode}
       />
 
-      {/* HMS Seeding Modal */}
+      {/* National Rankings Modal */}
       {showHMSSeedingModal && console.log('Rendering HMSSeedingModal with props:', {
         nationalAssociationId,
         yachtClassName: currentEvent?.raceClass,

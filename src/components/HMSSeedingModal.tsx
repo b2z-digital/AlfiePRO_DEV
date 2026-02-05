@@ -233,12 +233,12 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
           darkMode ? 'border-slate-700' : 'border-gray-200'
         }`}>
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Award className="w-6 h-6 text-blue-600" />
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Award className="w-6 h-6 text-green-600" />
             </div>
             <div>
               <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                HMS Seeding Assignment
+                Ranking Allocation
               </h2>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 Assign skippers based on national rankings
@@ -368,7 +368,7 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
                         >
                           <div className="flex items-center space-x-3">
                             {skipper.rank ? (
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 font-bold text-sm">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-800 font-bold text-sm">
                                 {skipper.rank}
                               </div>
                             ) : (
@@ -390,7 +390,7 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
                           </div>
 
                           {skipper.rank && (
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
                               Ranked #{skipper.rank}
                             </span>
                           )}
@@ -422,9 +422,9 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
           <button
             onClick={handleConfirm}
             disabled={!preview || loading || (validation && !validation.valid)}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
           >
-            Apply HMS Seeding
+            Apply Rankings
           </button>
         </div>
       </div>
