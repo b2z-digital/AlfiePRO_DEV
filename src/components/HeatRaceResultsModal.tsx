@@ -669,6 +669,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                           const key = `${heat}-${round.round}`;
                           const observers = observersByHeatRound.get(key) || [];
 
+                          console.log(`[HeatRaceResultsModal RENDER] Heat ${heat}, Round ${round.round}, Key: ${key}, Observers:`, observers, 'Map has key:', observersByHeatRound.has(key));
+
                           return (
                             <td
                               key={round.round}

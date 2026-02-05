@@ -175,6 +175,8 @@ export async function getObserverAssignments(
   raceNumber: number
 ): Promise<ObserverAssignment[]> {
   try {
+    console.log(`[getObserverAssignments] Querying for eventId=${eventId}, heatNumber=${heatNumber}, raceNumber=${raceNumber}`);
+
     const { data, error } = await supabase
       .from('heat_observers')
       .select('*')
@@ -183,9 +185,11 @@ export async function getObserverAssignments(
       .eq('race_number', raceNumber);
 
     if (error) {
-      console.error('Error fetching observers:', error);
+      console.error('[getObserverAssignments] Error fetching observers:', error);
       return [];
     }
+
+    console.log(`[getObserverAssignments] Found ${data?.length || 0} observers:`, data);
 
     return data?.map(observer => ({
       id: observer.id,
@@ -193,10 +197,11 @@ export async function getObserverAssignments(
       skipper_name: observer.skipper_name,
       skipper_sail_number: observer.skipper_sail_number,
       times_served: observer.times_served,
-      is_manual_assignment: observer.is_manual_assignment
+      is_manual_assignment: observer.is_manual_assignment,
+      is_custom_observer: observer.is_custom_observer
     })) || [];
   } catch (err) {
-    console.error('Error getting observers:', err);
+    console.error('[getObserverAssignments] Error getting observers:', err);
     return [];
   }
 }
