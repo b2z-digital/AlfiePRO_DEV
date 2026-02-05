@@ -173,6 +173,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }
 
         const currentRoundData = roundToLoadObserversFor;
+        const roundNumberToLoad = currentRoundData.round; // Use the round we're displaying, not currentRound
 
         // Load observers PER HEAT
         const newObserversByHeat = new Map<number, ObserverAssignment[]>();
@@ -255,7 +256,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           const existingObservers = await getObserverAssignments(
             currentEvent.id,
             heatNumber,
-            currentRound
+            roundNumberToLoad
           );
 
           // Validate existing observers:
@@ -314,7 +315,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             const observersForThisHeat = await selectObservers(
               currentEvent.id,
               heatNumber,
-              currentRound,
+              roundNumberToLoad,
               heat.skipperIndices, // Only exclude skippers in THIS heat
               skippers,
               observersPerHeat
@@ -327,7 +328,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               await saveObserverAssignments(
                 currentEvent.id,
                 heatNumber,
-                currentRound,
+                roundNumberToLoad,
                 observersForThisHeat
               );
               newObserversByHeat.set(heatNumber, observersForThisHeat);
@@ -1062,7 +1063,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     const success = await toggleObserver(
                                       currentEvent.id,
                                       heatNumber,
-                                      heatManagement.currentRound,
+                                      round, // Use the round being displayed
                                       observer.skipper_index,
                                       observerSkipper.name,
                                       observerSkipper.sailNo,
@@ -1074,7 +1075,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                       const updatedObservers = await getObserverAssignments(
                                         currentEvent.id,
                                         heatNumber,
-                                        heatManagement.currentRound
+                                        round // Use the round being displayed
                                       );
 
                                       // Update state
@@ -1296,8 +1297,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
       {/* Observer Selector Modal */}
       {showObserverSelector && currentEvent && (() => {
-        // Get current round data
-        const currentRoundData = heatManagement.rounds.find(r => r.round === heatManagement.currentRound);
+        // Get current round data - use the round being displayed, not currentRound
+        const currentRoundData = heatManagement.rounds.find(r => r.round === round);
         if (!currentRoundData) return null;
 
         // Get the heat assignment for the selected heat
@@ -1366,7 +1367,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         const success = await toggleObserver(
                           currentEvent.id,
                           selectedHeatForObserver,
-                          heatManagement.currentRound,
+                          round, // Use the round being displayed
                           index,
                           skipper.name,
                           skipper.sailNo,
@@ -1378,7 +1379,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           const updatedObservers = await getObserverAssignments(
                             currentEvent.id,
                             selectedHeatForObserver,
-                            heatManagement.currentRound
+                            round // Use the round being displayed
                           );
 
                           // Update state
