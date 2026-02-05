@@ -1128,6 +1128,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
       {/* Heat Assignment Modal */}
       <HeatAssignmentModal
+        key={`${heatManagement.currentRound}-${showHeatAssignments ? 'open' : 'closed'}`}
         isOpen={showHeatAssignments}
         onClose={() => {
           console.log('🔄 Heat Assignment Modal closing - triggering observer reload');
