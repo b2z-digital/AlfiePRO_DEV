@@ -246,7 +246,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           console.log(`  isNextHeatToScore: ${isNextHeatToScore}, isCompletedHeat: ${isCompletedHeat}`);
 
-          if (!isNextHeatToScore && !isCompletedHeat) {
+          // CRITICAL FIX: If the round has NO results yet, assign observers to ALL heats
+          // This ensures observers are ready when resuming after completing a previous round
+          const roundHasNoResults = !currentRoundData.results || currentRoundData.results.length === 0;
+          const shouldAssignForFreshRound = roundHasNoResults && !currentRoundData.completed;
+
+          if (shouldAssignForFreshRound) {
+            console.log(`  🆕 Fresh round with no results - assigning observers to this heat`);
+          }
+
+          if (!isNextHeatToScore && !isCompletedHeat && !shouldAssignForFreshRound) {
             console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet`);
             continue;
           }
@@ -257,6 +266,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           if (isNextHeatToScore) {
             console.log(`  ✅ This is the next heat to score - assigning observers`);
+          }
+
+          if (shouldAssignForFreshRound) {
+            console.log(`  ✅ Fresh round - will assign observers to this heat`);
           }
 
           // For completed heats, load existing observers to show who observed
@@ -276,7 +289,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             if (existingObservers && existingObservers.length > 0) {
               newObserversByHeat.set(heatNumber, existingObservers);
             }
-          } else if (isNextHeatToScore) {
+          } else if (isNextHeatToScore || shouldAssignForFreshRound) {
             // For the next heat to score, check if we can reuse existing observers
             // This applies to BOTH completed and uncompleted rounds
             existingObservers = await getObserverAssignments(
