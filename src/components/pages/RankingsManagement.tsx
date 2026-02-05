@@ -15,11 +15,11 @@ interface RankingsManagementProps {
 // Default URLs for different yacht classes
 const DEFAULT_RANKING_URLS: RankingURLConfig[] = [
   { yachtClassName: 'IOM', url: 'https://radiosailing.org.au/index.php?arcade=iom-ranking' },
-  { yachtClassName: 'DF95', url: 'https://radiosailing.org.au/index.php?arcade=df95-ranking' },
-  { yachtClassName: 'DF65', url: 'https://radiosailing.org.au/index.php?arcade=df65-ranking' },
+  { yachtClassName: '10R', url: 'https://radiosailing.org.au/index.php?arcade=10r-ranking' },
   { yachtClassName: 'Marblehead', url: 'https://radiosailing.org.au/index.php?arcade=marblehead-ranking' },
-  { yachtClassName: '10 Rater', url: 'https://radiosailing.org.au/index.php?arcade=10r-ranking' },
-  { yachtClassName: 'A Class', url: 'https://radiosailing.org.au/index.php?arcade=a-class-ranking' },
+  { yachtClassName: 'A Class', url: 'https://radiosailing.org.au/index.php?arcade=aclass-ranking' },
+  { yachtClassName: 'DF65', url: 'https://radiosailing.org.au/index.php?arcade=df65-ranking' },
+  { yachtClassName: 'DF95', url: 'https://radiosailing.org.au/index.php?arcade=df95-ranking' },
 ];
 
 export const RankingsManagement: React.FC<RankingsManagementProps> = ({
