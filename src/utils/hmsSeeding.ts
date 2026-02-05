@@ -59,8 +59,8 @@ export function assignSkippersUsingHMSSeeding(
     const heatIndex = getSnakePatternHeatIndex(index, numberOfHeats);
     heats[heatIndex].skippers.push({
       id: skipper.id,
-      name: `${skipper.firstName} ${skipper.lastName}`,
-      sailNumber: skipper.sailNumber,
+      name: skipper.name,
+      sailNumber: skipper.sailNumber || skipper.sailNo,
       rank: skipper.rank,
       ranking: skipper.ranking
     });
@@ -71,8 +71,8 @@ export function assignSkippersUsingHMSSeeding(
     const heatIndex = index % numberOfHeats;
     heats[heatIndex].skippers.push({
       id: skipper.id,
-      name: `${skipper.firstName} ${skipper.lastName}`,
-      sailNumber: skipper.sailNumber
+      name: skipper.name,
+      sailNumber: skipper.sailNumber || skipper.sailNo
     });
   });
 

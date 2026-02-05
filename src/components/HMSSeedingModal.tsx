@@ -48,7 +48,15 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
   }, [isOpen, skippers, nationalAssociationId, yachtClassName]);
 
   async function loadRankings() {
+    console.log('HMS Seeding: Loading rankings', {
+      nationalAssociationId,
+      yachtClassName,
+      skipperCount: skippers.length,
+      firstSkipperSample: skippers[0]
+    });
+
     if (!nationalAssociationId || !yachtClassName) {
+      console.warn('HMS Seeding: Missing nationalAssociationId or yachtClassName');
       // No rankings available - just use skippers without rankings
       const skippersData: SkipperWithRanking[] = skippers.map(s => ({
         ...s,
@@ -90,7 +98,7 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
         for (const skipper of skippers) {
           if (!skipper.memberId) continue;
 
-          const skipperFullName = `${skipper.firstName} ${skipper.lastName}`.toLowerCase().trim();
+          const skipperFullName = skipper.name.toLowerCase().trim();
 
           // Find matching ranking by name
           const matchedRanking = allRankings.find(ranking => {
@@ -120,9 +128,18 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
         }
 
         if (rankingsMap.size > 0) {
-          console.log(`Auto-matched ${rankingsMap.size} skippers to rankings`);
+          console.log(`Auto-matched ${rankingsMap.size} skippers to rankings:`, Array.from(rankingsMap.entries()));
+        } else {
+          console.warn('No fuzzy matches found. Sample data:', {
+            firstSkipperName: skippers[0]?.name,
+            firstRankingName: allRankings[0]?.skipper_name,
+            totalSkippers: skippers.length,
+            totalRankings: allRankings.length
+          });
         }
       }
+
+      console.log('Final rankings map size:', rankingsMap.size);
 
       // Merge rankings with skippers
       const skippersData: SkipperWithRanking[] = skippers.map(skipper => {
