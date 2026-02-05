@@ -156,22 +156,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       try {
         const { currentRound, rounds, roundJustCompleted } = heatManagement;
 
-        // Determine which round to load observers for
-        // Priority:
-        // 1. If currentRound > roundJustCompleted, we've advanced to a new round - use currentRound
-        // 2. If a round was just completed and we haven't advanced yet, use that completed round
-        // 3. Otherwise, use the next uncompleted round or current round
+        // CRITICAL: Use the SAME logic as the modal display to determine which round to load observers for
+        // This ensures observers match the round being displayed
         let roundToLoadObserversFor;
-        if (roundJustCompleted && currentRound > roundJustCompleted) {
-          // We've advanced to a new round after completing a previous round
-          roundToLoadObserversFor = rounds.find(r => r.round === currentRound);
-          console.log('📈 Advanced to new round', currentRound);
-        } else if (roundJustCompleted) {
-          // Still showing the completed round
+        if (roundJustCompleted) {
+          // Show the round that was just completed (with results)
+          // This matches the modal display logic at line 383-385
           roundToLoadObserversFor = rounds.find(r => r.round === roundJustCompleted);
           console.log('🏁 Showing completed round', roundJustCompleted);
         } else {
-          // Normal case: show next uncompleted or current round
+          // Show the next uncompleted round, or current round
+          // This matches the modal display logic at line 388
           roundToLoadObserversFor = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
           console.log('➡️ Showing current/next round', roundToLoadObserversFor?.round);
         }
