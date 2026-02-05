@@ -81,8 +81,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     const heatCount = roundData.heatAssignments.length;
     const resultCount = roundData.results?.length || 0;
     const completionStatus = roundData.completed ? 'complete' : 'incomplete';
+    // CRITICAL: Include roundJustCompleted in the key so when it clears (when advancing to new round),
+    // the key changes and forces useEffect to re-run and select fresh observers
+    const justCompletedFlag = roundJustCompleted ? `jc${roundJustCompleted}` : 'active';
 
-    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}`;
+    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}`;
   }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds]);
 
   // Load and select observers when modal opens
