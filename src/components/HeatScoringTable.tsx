@@ -286,13 +286,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     const currentHeatComplete = progress.scored === progress.total && progress.total > 0;
 
     if (currentHeatComplete) {
+      console.log(`🎯 Heat ${selectedHeat} is complete (${progress.scored}/${progress.total})`);
+
       // Prevent advancing FROM the same heat multiple times
       if (lastAutoAdvancedHeat.current === selectedHeat) {
+        console.log(`⏭️ Already advanced from Heat ${selectedHeat}, skipping`);
         return;
       }
 
       const currentHeatIndex = availableHeats.indexOf(selectedHeat);
       if (currentHeatIndex === -1) return;
+
+      console.log(`📍 Current heat index: ${currentHeatIndex}/${availableHeats.length - 1} (Heat ${selectedHeat})`);
 
       // Move to the next heat (moving UP from lower heats to higher heats)
       // availableHeats is ['D', 'C', 'B', 'A'], so we INCREMENT index
@@ -322,8 +327,24 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           }, 500); // Small delay for visual feedback
         }
       } else {
-        // All heats complete, stay on current heat
-        console.log('✅ All heats complete!');
+        // All heats complete - trigger completion and show heat assignments modal
+        console.log('✅ All heats complete! Triggering round completion...');
+        lastAutoAdvancedHeat.current = selectedHeat; // Prevent re-triggering
+
+        // Ensure the last heat completion is registered
+        if (!lastCompletedHeats.current.has(`${heatManagement.currentRound}-${selectedHeat}`)) {
+          console.log(`🏁 Triggering final heat (${selectedHeat}) completion for round progression`);
+          lastCompletedHeats.current.add(`${heatManagement.currentRound}-${selectedHeat}`);
+          onCompleteHeat(selectedHeat);
+        }
+
+        // Show heat assignments modal which will handle round completion/progression
+        if (touchMode) {
+          console.log('📋 Opening heat assignments modal for round progression');
+          setShowHeatAssignments(true);
+          // Reset touch mode confirmation for next round
+          setTouchModeResultsConfirmed(false);
+        }
       }
     }
   }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed]);
