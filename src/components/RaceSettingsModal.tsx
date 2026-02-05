@@ -78,10 +78,45 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   );
   const [currentHeatManagement, setCurrentHeatManagement] = useState<HeatManagement | null>(initialHeatManagement);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
+  const [nationalAssociationId, setNationalAssociationId] = useState<string | undefined>(undefined);
 
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
+
+  // Load national association ID from club's state association
+  useEffect(() => {
+    const loadNationalAssociationId = async () => {
+      if (!isOpen || !currentEvent?.clubId) return;
+
+      try {
+        // Get club's state association
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', currentEvent.clubId)
+          .single();
+
+        if (clubData?.state_association_id) {
+          // Get state association's national association
+          const { data: stateData } = await supabase
+            .from('state_associations')
+            .select('national_association_id')
+            .eq('id', clubData.state_association_id)
+            .single();
+
+          if (stateData?.national_association_id) {
+            setNationalAssociationId(stateData.national_association_id);
+            console.log('Loaded national association ID:', stateData.national_association_id);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading national association ID:', err);
+      }
+    };
+
+    loadNationalAssociationId();
+  }, [isOpen, currentEvent?.clubId]);
 
   // Load user's scoring mode preference
   useEffect(() => {
@@ -1642,8 +1677,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         numHeats={numHeats}
         darkMode={darkMode}
         currentEvent={currentEvent}
-        nationalAssociationId={currentEvent?.national_association_id}
-        yachtClassName={currentEvent?.race_class}
+        nationalAssociationId={nationalAssociationId}
+        yachtClassName={currentEvent?.raceClass}
       />
 
       {/* Clear All Results Confirmation Modal */}
