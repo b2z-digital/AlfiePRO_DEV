@@ -194,10 +194,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         // Heats complete from bottom to top (B -> A for 2 heats, C -> B -> A for 3 heats)
         const heatCompletionStatus = sortedHeats.map((heat, idx) => {
           const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
-          const isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
-            const result = heatResults.find(r => r.skipperIndex === skipperIdx);
-            return result && (result.position !== null || result.letterScore || result.markedAsUP);
-          });
+
+          // For completed rounds, check if this heat has ANY results with positions
+          // (don't rely on original skipperIndices as skippers may have moved between heats)
+          let isCompleted;
+          if (currentRoundData.completed) {
+            // If round is complete, a heat is complete if it has any results with scored positions
+            isCompleted = heatResults.some(r => r.position !== null || r.letterScore || r.markedAsUP);
+          } else {
+            // For active rounds, check if all skippers in the original assignment have results
+            isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
+              const result = heatResults.find(r => r.skipperIndex === skipperIdx);
+              return result && (result.position !== null || result.letterScore || result.markedAsUP);
+            });
+          }
+
           return { heatDesignation: heat.heatDesignation, heatNumber: idx + 1, isCompleted };
         });
 
