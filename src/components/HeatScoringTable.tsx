@@ -1207,6 +1207,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         skippers={skippers}
         heatManagement={heatManagement}
         darkMode={darkMode}
+        currentEvent={currentEvent}
       />
 
       {/* Overall Results Modal */}
