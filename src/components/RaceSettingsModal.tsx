@@ -364,15 +364,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         });
       }
 
-      // For manual assignment, open modal instead of auto-seeding
-      if (initialAssignment === 'manual') {
-        setShowManualAssignmentModal(true);
-        return;
-      }
-
-      // DON'T seed heats immediately when toggling on
-      // Wait until user clicks "Save Settings" to seed with final configuration
-      // Just enable the UI for now
+      // DON'T open assignment modals or seed heats immediately when toggling on
+      // Wait until user configures settings and clicks "Save Settings"
+      // This prevents modals from opening before the race officer has set the number of heats
       return;
     } else if (!enabled) {
       // Disabling heat racing
@@ -1691,6 +1685,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         skippers={skippers}
         numHeats={numHeats}
         darkMode={darkMode}
+        onRankingAssignment={() => {
+          setShowManualAssignmentModal(false);
+          setShowHMSSeedingModal(true);
+        }}
       />
 
       {/* National Rankings Modal */}
