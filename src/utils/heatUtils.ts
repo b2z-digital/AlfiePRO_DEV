@@ -313,18 +313,34 @@ export const completeHeat = (
   // Check if all heats are complete
   // Note: After mid-round movements, a skipper might be in a different heat than where they scored
   // So we check if each skipper has a result from ANY heat in this round
+  console.log(`\n🔍 Checking if all heats complete for Round ${currentRound}:`);
+  console.log(`  Available heats:`, availableHeats);
+  console.log(`  Total results in round:`, updatedRounds[roundIndex].results.length);
+  console.log(`  Results:`, updatedRounds[roundIndex].results.map(r => `Skipper ${r.skipperIndex} in Heat ${r.heatDesignation}: position ${r.position}`));
+
   const allHeatsComplete = availableHeats.every(h => {
     const heatSkippers = updatedRounds[roundIndex].heatAssignments.find(a => a.heatDesignation === h)?.skipperIndices || [];
-    return heatSkippers.every(skipperIndex => {
+    console.log(`  Heat ${h}: ${heatSkippers.length} skippers assigned`);
+
+    const complete = heatSkippers.every(skipperIndex => {
       // Check if this skipper has a result in ANY heat for this round
       const result = updatedRounds[roundIndex].results.find(
         r => r.skipperIndex === skipperIndex &&
              r.round === currentRound &&
              (r.position !== null || r.letterScore)
       );
-      return !!result;
+      const hasResult = !!result;
+      if (!hasResult) {
+        console.log(`    ❌ Skipper ${skipperIndex} has NO result yet`);
+      }
+      return hasResult;
     });
+
+    console.log(`  Heat ${h}: ${complete ? '✅ COMPLETE' : '❌ INCOMPLETE'}`);
+    return complete;
   });
+
+  console.log(`  Overall: ${allHeatsComplete ? '✅ ALL HEATS COMPLETE' : '❌ NOT ALL HEATS COMPLETE'}`);
 
   // Mark round as complete if all heats are done
   updatedRounds[roundIndex] = {
