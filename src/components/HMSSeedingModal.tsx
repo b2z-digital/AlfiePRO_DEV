@@ -84,76 +84,83 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
         yachtClassName
       );
 
-      // If no rankings found, try to auto-match based on names
-      if (rankingsMap.size === 0) {
-        console.log('No verified mappings found, attempting fuzzy matching...');
+      console.log(`Found ${rankingsMap.size} rankings via memberId lookup`);
 
-        // Import required functions dynamically
-        const { getRankingsByClass } = await import('../utils/rankingsStorage');
+      // Always try fuzzy matching for skippers that don't have rankings yet
+      console.log('Attempting fuzzy matching for unmatched skippers...');
 
-        // Get all rankings for this class
-        const allRankings = await getRankingsByClass(nationalAssociationId, yachtClassName);
+      // Import required functions dynamically
+      const { getRankingsByClass } = await import('../utils/rankingsStorage');
 
-        console.log('Fuzzy matching data:', {
-          skipperNames: skippers.map(s => s.name),
-          rankingNames: allRankings.map(r => r.skipper_name),
+      // Get all rankings for this class
+      const allRankings = await getRankingsByClass(nationalAssociationId, yachtClassName);
+
+      console.log('Fuzzy matching data:', {
+        skipperNames: skippers.map(s => s.name),
+        rankingNames: allRankings.map(r => r.skipper_name),
+        totalSkippers: skippers.length,
+        totalRankings: allRankings.length
+      });
+
+      // Try to match skippers to rankings by name
+      for (const skipper of skippers) {
+        const key = skipper.memberId || skipper.name;
+
+        // Skip if already matched via memberId
+        if (rankingsMap.has(key)) {
+          console.log(`⊙ Skipper "${skipper.name}" already matched via memberId`);
+          continue;
+        }
+
+        const skipperFullName = skipper.name.toLowerCase().trim();
+
+        // Find matching ranking by name
+        const matchedRanking = allRankings.find(ranking => {
+          const rankingName = ranking.skipper_name.toLowerCase().trim();
+
+          // Try exact match first
+          if (rankingName === skipperFullName) return true;
+
+          // Try partial match (handles "Steve" vs "Stephen", etc.)
+          const rankingParts = rankingName.split(' ');
+          const skipperParts = skipperFullName.split(' ');
+
+          // Check if both first and last names are similar
+          if (rankingParts.length >= 2 && skipperParts.length >= 2) {
+            const firstMatch = rankingParts[0].includes(skipperParts[0]) || skipperParts[0].includes(rankingParts[0]);
+            const lastMatch = rankingParts[rankingParts.length - 1] === skipperParts[skipperParts.length - 1];
+
+            if (firstMatch && lastMatch) return true;
+          }
+
+          return false;
+        });
+
+        if (matchedRanking) {
+          console.log(`✓ Matched "${skipper.name}" to "${matchedRanking.skipper_name}" (rank #${matchedRanking.rank})`);
+          rankingsMap.set(key, matchedRanking);
+        } else {
+          console.log(`✗ No match for "${skipper.name}"`);
+        }
+      }
+
+      if (rankingsMap.size > 0) {
+        console.log(`Total matched ${rankingsMap.size} skippers to rankings`);
+      } else {
+        console.warn('No fuzzy matches found. Sample data:', {
+          firstSkipperName: skippers[0]?.name,
+          firstRankingName: allRankings[0]?.skipper_name,
           totalSkippers: skippers.length,
           totalRankings: allRankings.length
         });
-
-        // Try to match skippers to rankings by name
-        for (const skipper of skippers) {
-          if (!skipper.memberId) continue;
-
-          const skipperFullName = skipper.name.toLowerCase().trim();
-
-          // Find matching ranking by name
-          const matchedRanking = allRankings.find(ranking => {
-            const rankingName = ranking.skipper_name.toLowerCase().trim();
-
-            // Try exact match first
-            if (rankingName === skipperFullName) return true;
-
-            // Try partial match (handles "Steve" vs "Stephen", etc.)
-            const rankingParts = rankingName.split(' ');
-            const skipperParts = skipperFullName.split(' ');
-
-            // Check if both first and last names are similar
-            if (rankingParts.length >= 2 && skipperParts.length >= 2) {
-              const firstMatch = rankingParts[0].includes(skipperParts[0]) || skipperParts[0].includes(rankingParts[0]);
-              const lastMatch = rankingParts[rankingParts.length - 1] === skipperParts[skipperParts.length - 1];
-
-              if (firstMatch && lastMatch) return true;
-            }
-
-            return false;
-          });
-
-          if (matchedRanking) {
-            console.log(`✓ Matched "${skipper.name}" to "${matchedRanking.skipper_name}" (rank #${matchedRanking.rank})`);
-            rankingsMap.set(skipper.memberId, matchedRanking);
-          } else {
-            console.log(`✗ No match for "${skipper.name}"`);
-          }
-        }
-
-        if (rankingsMap.size > 0) {
-          console.log(`Auto-matched ${rankingsMap.size} skippers to rankings:`, Array.from(rankingsMap.entries()));
-        } else {
-          console.warn('No fuzzy matches found. Sample data:', {
-            firstSkipperName: skippers[0]?.name,
-            firstRankingName: allRankings[0]?.skipper_name,
-            totalSkippers: skippers.length,
-            totalRankings: allRankings.length
-          });
-        }
       }
 
       console.log('Final rankings map size:', rankingsMap.size);
 
       // Merge rankings with skippers
       const skippersData: SkipperWithRanking[] = skippers.map(skipper => {
-        const ranking = skipper.memberId ? rankingsMap.get(skipper.memberId) : undefined;
+        const key = skipper.memberId || skipper.name;
+        const ranking = rankingsMap.get(key);
         return {
           ...skipper,
           rank: ranking?.rank,
