@@ -98,6 +98,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [showOverallResults, setShowOverallResults] = useState(false);
   const [showRaceResults, setShowRaceResults] = useState(false);
   const [showHeatAssignments, setShowHeatAssignments] = useState(false);
+  const [observerReloadTrigger, setObserverReloadTrigger] = useState(0);
   const [showManualAssignModal, setShowManualAssignModal] = useState(false);
   const [shouldAutoShuffle, setShouldAutoShuffle] = useState(false);
   const [editingSkipperIndex, setEditingSkipperIndex] = useState<number | null>(null);
@@ -769,7 +770,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     };
 
     loadObservers();
-  }, [currentEvent?.id, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers, currentRound]);
+  }, [currentEvent?.id, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers, currentRound, observerReloadTrigger]);
 
   // Don't render until a heat is selected
   if (!selectedHeat) {
@@ -1121,6 +1122,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       <HeatAssignmentModal
         isOpen={showHeatAssignments}
         onClose={() => {
+          console.log('🔄 Heat Assignment Modal closing - triggering observer reload');
           setShowHeatAssignments(false);
           if (heatManagement.roundJustCompleted) {
             delete heatManagement.roundJustCompleted;
@@ -1130,6 +1132,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
+          // Trigger observer reload to ensure scoring screen gets the latest observers
+          setObserverReloadTrigger(prev => prev + 1);
         }}
         heatManagement={heatManagement}
         skippers={skippers}
