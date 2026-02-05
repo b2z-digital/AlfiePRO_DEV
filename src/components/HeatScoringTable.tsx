@@ -348,7 +348,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         }
       }
     }
-  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed, areAllHeatsComplete, isRoundComplete, onAdvanceToNextRound]);
+  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed, onAdvanceToNextRound, currentRound]);
 
   // Handle manual heat selection
   const handleHeatSelection = (heat: HeatDesignation) => {
