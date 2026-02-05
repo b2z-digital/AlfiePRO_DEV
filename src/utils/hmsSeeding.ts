@@ -22,6 +22,7 @@ import type { NationalRanking, HMSSeeding } from '../types/rankings';
 export interface SkipperWithRanking extends Skipper {
   rank?: number;
   ranking?: NationalRanking;
+  originalIndex?: number;  // The original index in the skippers array
 }
 
 /**
@@ -62,7 +63,8 @@ export function assignSkippersUsingHMSSeeding(
       name: skipper.name,
       sailNumber: skipper.sailNumber || skipper.sailNo,
       rank: skipper.rank,
-      ranking: skipper.ranking
+      ranking: skipper.ranking,
+      originalIndex: skipper.originalIndex  // Preserve the original index
     });
   });
 
@@ -72,7 +74,8 @@ export function assignSkippersUsingHMSSeeding(
     heats[heatIndex].skippers.push({
       id: skipper.id,
       name: skipper.name,
-      sailNumber: skipper.sailNumber || skipper.sailNo
+      sailNumber: skipper.sailNumber || skipper.sailNo,
+      originalIndex: skipper.originalIndex  // Preserve the original index
     });
   });
 

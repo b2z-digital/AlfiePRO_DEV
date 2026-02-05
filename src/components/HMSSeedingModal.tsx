@@ -58,10 +58,11 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
     if (!nationalAssociationId || !yachtClassName) {
       console.warn('HMS Seeding: Missing nationalAssociationId or yachtClassName');
       // No rankings available - just use skippers without rankings
-      const skippersData: SkipperWithRanking[] = skippers.map(s => ({
+      const skippersData: SkipperWithRanking[] = skippers.map((s, index) => ({
         ...s,
         rank: undefined,
-        ranking: undefined
+        ranking: undefined,
+        originalIndex: index  // Store the original index for later lookup
       }));
       setSkippersWithRankings(skippersData);
       generatePreview(skippersData);
@@ -157,14 +158,15 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
 
       console.log('Final rankings map size:', rankingsMap.size);
 
-      // Merge rankings with skippers
-      const skippersData: SkipperWithRanking[] = skippers.map(skipper => {
+      // Merge rankings with skippers AND add the original index
+      const skippersData: SkipperWithRanking[] = skippers.map((skipper, index) => {
         const key = skipper.memberId || skipper.name;
         const ranking = rankingsMap.get(key);
         return {
           ...skipper,
           rank: ranking?.rank,
-          ranking
+          ranking,
+          originalIndex: index  // Store the original index for later lookup
         };
       });
 
@@ -197,13 +199,30 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
   function handleConfirm() {
     if (!preview) return;
 
+    console.log('🟢 HMS Seeding - Starting conversion to heat assignments');
+    console.log('Preview heats:', preview.heats.length);
+    console.log('Total skippers in props:', skippers.length);
+
     // Convert HMS seeding format to HeatAssignment format
     const assignments: HeatAssignment[] = preview.heats.map((heat, heatIndex) => {
       const heatDesignation = String.fromCharCode(65 + heatIndex) as HeatDesignation; // A, B, C, etc.
 
+      console.log(`\n🟢 Processing Heat ${heatDesignation}:`);
+      console.log('  Skippers in heat:', heat.skippers.length);
+
       const skipperIndices = heat.skippers.map(heatSkipper => {
-        return skippers.findIndex(s => s.id === heatSkipper.id);
-      }).filter(index => index !== -1);
+        // Use originalIndex if available, otherwise fall back to ID matching
+        if (heatSkipper.originalIndex !== undefined) {
+          console.log(`  - Using originalIndex for ${heatSkipper.name}: ${heatSkipper.originalIndex}`);
+          return heatSkipper.originalIndex;
+        }
+
+        const foundIndex = skippers.findIndex(s => s.id === heatSkipper.id);
+        console.log(`  - Searching for ${heatSkipper.name} (ID: ${heatSkipper.id}): found at index ${foundIndex}`);
+        return foundIndex;
+      }).filter(index => index !== -1 && index !== undefined);
+
+      console.log(`  Final indices for Heat ${heatDesignation}:`, skipperIndices);
 
       return {
         heatDesignation,
@@ -211,6 +230,7 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
       };
     });
 
+    console.log('\n🟢 Final assignments:', JSON.stringify(assignments, null, 2));
     onConfirm(assignments);
     onClose();
   }
