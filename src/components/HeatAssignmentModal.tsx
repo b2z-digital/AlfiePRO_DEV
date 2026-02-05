@@ -46,9 +46,6 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [loadingObservers, setLoadingObservers] = useState(false);
   const [showObserverSelector, setShowObserverSelector] = useState(false);
   const [selectedHeatForObserver, setSelectedHeatForObserver] = useState<number>(1);
-  const [showCustomObserverInput, setShowCustomObserverInput] = useState(false);
-  const [customObserverName, setCustomObserverName] = useState('');
-  const [customObserverSailNumber, setCustomObserverSailNumber] = useState('');
 
   // Reset edit state when modal opens/closes
   useEffect(() => {
@@ -265,11 +262,6 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           // Also check if ALL observers are still available (not promoted/relegated)
           const observersStillInHeat = existingObservers?.filter(obs => {
-            // Custom observers (skipper_index = -1) always exist
-            if (obs.skipper_index === -1) {
-              return true;
-            }
-
             // The skipper_index is the array position, so just check if that index is valid
             const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
             if (!skipperStillExists) {
@@ -957,30 +949,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     const heatNumber = heatIndex + 1;
                     const heatObservers = observersByHeat.get(heatNumber) || [];
 
-                    // Check if this is a completed heat showing previous observers
-                    const isPreviousHeatObservers = heatCompleted;
-
-                    console.log(`🔍 Heat ${heatDesignation} observer check:`, {
-                      heatNumber,
-                      observersCount: heatObservers.length,
-                      isPreviousHeat: isPreviousHeatObservers,
-                      heatCompleted: heatCompleted,
-                      loadingObservers,
-                      observersByHeatSize: observersByHeat.size,
-                      observers: heatObservers.map(o => ({ index: o.skipper_index, name: o.skipper_name }))
-                    });
-
-                    // Always show the observer section for active (uncompleted) heats
-                    // Also show for completed heats if they have observers (previous observers)
-                    const shouldShowObserversSection = !isPreviousHeatObservers || heatObservers.length > 0 || loadingObservers;
-
-                    if (!shouldShowObserversSection) {
-                      console.log(`⏭️ Skipping observer section for Heat ${heatDesignation}`);
+                    // Only render if there are observers for this heat
+                    if (heatObservers.length === 0) {
                       return null;
                     }
 
-                    console.log(`✅ Showing observer section for Heat ${heatDesignation}`);
-
+                    // Check if this is a completed heat showing previous observers
+                    const isPreviousHeatObservers = heatCompleted;
 
                     return (
                       <div className={`mt-auto border-t ${
@@ -1019,41 +994,26 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {loadingObservers && heatObservers.length === 0 ? (
-                              <div className="col-span-2 flex items-center justify-center py-4">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-                                <span className={`ml-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  Loading observers...
-                                </span>
-                              </div>
-                            ) : heatObservers.map((observer, idx) => {
-                              // Handle custom observers (skipper_index = -1)
-                              const isCustomObserver = observer.skipper_index === -1;
-                              const observerSkipper = isCustomObserver ? null : skippers[observer.skipper_index];
-
-                              // Skip if not custom and skipper doesn't exist
-                              if (!isCustomObserver && !observerSkipper) return null;
-
-                              // Get display name and sail number
-                              const displayName = isCustomObserver ? observer.skipper_name : observerSkipper!.name;
-                              const displaySailNo = isCustomObserver ? observer.skipper_sail_number : observerSkipper!.sailNo;
+                            {heatObservers.map((observer, idx) => {
+                              const observerSkipper = skippers[observer.skipper_index];
+                              if (!observerSkipper) return null;
 
                               // Style previous observers like regular skipper cards, active observers with purple
                               if (isPreviousHeatObservers) {
                                 // Previous observers - styled like regular skipper cards (no purple, not clickable)
                                 return (
                                   <div
-                                    key={observer.id || `${observer.skipper_index}-${idx}`}
+                                    key={observer.skipper_index}
                                     className={`flex items-center gap-2 p-2 rounded border-2 ${
                                       darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                                     }`}
                                   >
                                     <Eye size={14} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
-                                    {!isCustomObserver && observerSkipper?.avatarUrl ? (
+                                    {observerSkipper.avatarUrl ? (
                                       <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
                                         <img
                                           src={observerSkipper.avatarUrl}
-                                          alt={displayName}
+                                          alt={observerSkipper.name}
                                           className="w-full h-full object-cover"
                                         />
                                       </div>
@@ -1061,14 +1021,14 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                       <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
                                         darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
                                       }`}>
-                                        {displayName.split(' ').map(n => n[0]).join('')}
+                                        {observerSkipper.name.split(' ').map(n => n[0]).join('')}
                                       </div>
                                     )}
                                     <span className={`font-medium truncate flex-1 text-xs ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                                      {displayName}
+                                      {observerSkipper.name}
                                     </span>
                                     <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                      #{displaySailNo}
+                                      #{observerSkipper.sailNo}
                                     </span>
                                   </div>
                                 );
@@ -1077,7 +1037,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               // Active observers - purple styling, clickable to remove
                               return (
                                 <button
-                                  key={observer.id || `${observer.skipper_index}-${idx}`}
+                                  key={observer.skipper_index}
                                   onClick={async () => {
                                     if (!currentEvent?.id) return;
 
@@ -1087,8 +1047,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                       heatNumber,
                                       heatManagement.currentRound,
                                       observer.skipper_index,
-                                      displayName,
-                                      displaySailNo,
+                                      observerSkipper.name,
+                                      observerSkipper.sailNo,
                                       observer.times_served
                                     );
 
@@ -1117,10 +1077,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 >
                                   <Eye size={14} className="text-purple-400 flex-shrink-0" />
                                   <span className="font-medium truncate flex-1 text-left">
-                                    {displayName}
+                                    {observerSkipper.name}
                                   </span>
                                   <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    #{displaySailNo}
+                                    #{observerSkipper.sailNo}
                                   </span>
                                 </button>
                               );
@@ -1363,124 +1323,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Select a skipper to add as an observer. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowCustomObserverInput(!showCustomObserverInput);
-                      setCustomObserverName('');
-                      setCustomObserverSailNumber('');
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      showCustomObserverInput
-                        ? darkMode
-                          ? 'bg-slate-700 text-slate-300 border-2 border-purple-500'
-                          : 'bg-slate-100 text-slate-700 border-2 border-purple-500'
-                        : darkMode
-                        ? 'bg-purple-600 text-white hover:bg-purple-700'
-                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                    }`}
-                  >
-                    {showCustomObserverInput ? 'Cancel' : 'Custom Observer'}
-                  </button>
-                </div>
-
-                {/* Custom Observer Input Form */}
-                {showCustomObserverInput && (
-                  <div className={`mb-4 p-4 rounded-lg border-2 ${
-                    darkMode ? 'bg-slate-700 border-purple-500' : 'bg-purple-50 border-purple-500'
-                  }`}>
-                    <h4 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-purple-300' : 'text-purple-900'}`}>
-                      Add Custom Observer
-                    </h4>
-                    <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Add a non-racing observer (e.g., club member, friend, or other volunteer).
-                    </p>
-                    <div className="space-y-3">
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                          Full Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={customObserverName}
-                          onChange={(e) => setCustomObserverName(e.target.value)}
-                          placeholder="Enter observer name"
-                          className={`w-full px-3 py-2 rounded-lg text-sm ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                              : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-                          } border focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                          Sail Number (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={customObserverSailNumber}
-                          onChange={(e) => setCustomObserverSailNumber(e.target.value)}
-                          placeholder="Enter sail number (optional)"
-                          className={`w-full px-3 py-2 rounded-lg text-sm ${
-                            darkMode
-                              ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                              : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-                          } border focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                        />
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (!currentEvent?.id || !customObserverName.trim()) return;
-
-                          // Add custom observer with skipper_index = -1 to indicate it's custom
-                          const success = await toggleObserver(
-                            currentEvent.id,
-                            selectedHeatForObserver,
-                            heatManagement.currentRound,
-                            -1, // Custom observer marker
-                            customObserverName.trim(),
-                            customObserverSailNumber.trim() || undefined,
-                            0 // No previous service for custom observers
-                          );
-
-                          if (success) {
-                            // Reload observers
-                            const updatedObservers = await getObserverAssignments(
-                              currentEvent.id,
-                              selectedHeatForObserver,
-                              heatManagement.currentRound
-                            );
-
-                            // Update state
-                            setObserversByHeat(prev => {
-                              const newMap = new Map(prev);
-                              newMap.set(selectedHeatForObserver, updatedObservers || []);
-                              return newMap;
-                            });
-
-                            // Reset form and close
-                            setCustomObserverName('');
-                            setCustomObserverSailNumber('');
-                            setShowCustomObserverInput(false);
-                            setShowObserverSelector(false);
-                          }
-                        }}
-                        disabled={!customObserverName.trim()}
-                        className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          customObserverName.trim()
-                            ? 'bg-purple-600 text-white hover:bg-purple-700'
-                            : 'bg-slate-400 text-slate-200 cursor-not-allowed'
-                        }`}
-                      >
-                        Add Custom Observer
-                      </button>
-                    </div>
-                  </div>
-                )}
-
+                <p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Select a skipper to add as an observer. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {availableSkippers.map(({ skipper, index }) => (
                     <button

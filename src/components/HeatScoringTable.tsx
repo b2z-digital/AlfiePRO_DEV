@@ -264,20 +264,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Show modal when a round completes and next round assignments are generated
   const lastCompletedRoundShown = React.useRef<number | null>(null);
   React.useEffect(() => {
-    console.log('🔍 roundJustCompleted useEffect check:', {
-      roundJustCompleted: heatManagement.roundJustCompleted,
-      lastShown: lastCompletedRoundShown.current,
-      willShow: heatManagement.roundJustCompleted && lastCompletedRoundShown.current !== heatManagement.roundJustCompleted
-    });
-
     if (heatManagement.roundJustCompleted &&
         lastCompletedRoundShown.current !== heatManagement.roundJustCompleted) {
       console.log(`🏁 Round ${heatManagement.roundJustCompleted} completed! Showing Round ${heatManagement.roundJustCompleted + 1} assignments`);
       setShowHeatAssignments(true);
       lastCompletedRoundShown.current = heatManagement.roundJustCompleted;
-
-      // Reset manual selection to allow auto-advance in next round
-      setManualSelection(false);
     }
   }, [heatManagement.roundJustCompleted]);
 
@@ -295,18 +286,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     const currentHeatComplete = progress.scored === progress.total && progress.total > 0;
 
     if (currentHeatComplete) {
-      console.log(`🎯 Heat ${selectedHeat} is complete (${progress.scored}/${progress.total})`);
-
       // Prevent advancing FROM the same heat multiple times
       if (lastAutoAdvancedHeat.current === selectedHeat) {
-        console.log(`⏭️ Already advanced from Heat ${selectedHeat}, skipping`);
         return;
       }
 
       const currentHeatIndex = availableHeats.indexOf(selectedHeat);
       if (currentHeatIndex === -1) return;
-
-      console.log(`📍 Current heat index: ${currentHeatIndex}/${availableHeats.length - 1} (Heat ${selectedHeat})`);
 
       // Move to the next heat (moving UP from lower heats to higher heats)
       // availableHeats is ['D', 'C', 'B', 'A'], so we INCREMENT index
@@ -336,22 +322,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           }, 500); // Small delay for visual feedback
         }
       } else {
-        // All heats complete - trigger completion but DON'T show modal yet
-        // Let the parent component handle the round advancement and modal display
-        console.log('✅ All heats complete! Triggering round completion...');
-        lastAutoAdvancedHeat.current = selectedHeat; // Prevent re-triggering
-
-        // Ensure the last heat completion is registered
-        if (!lastCompletedHeats.current.has(`${heatManagement.currentRound}-${selectedHeat}`)) {
-          console.log(`🏁 Triggering final heat (${selectedHeat}) completion for round progression`);
-          lastCompletedHeats.current.add(`${heatManagement.currentRound}-${selectedHeat}`);
-          onCompleteHeat(selectedHeat);
-          // Reset touch mode confirmation for next round
-          setTouchModeResultsConfirmed(false);
-        }
-
-        // Don't show modal here - the roundJustCompleted flag will trigger it via another useEffect
-        console.log('⏳ Waiting for parent to update round state before showing modal...');
+        // All heats complete, stay on current heat
+        console.log('✅ All heats complete!');
       }
     }
   }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed]);
@@ -1112,22 +1084,6 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
-
-          // Reload observers after modal closes to ensure they're up to date
-          const reloadObservers = async () => {
-            if (currentEvent?.id && selectedHeat && currentEvent.enable_observers) {
-              const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
-              console.log(`🔄 Reloading observers after modal close for Heat ${selectedHeat} (heat_number=${heatNumber})`);
-              const observers = await getObserverAssignments(
-                currentEvent.id,
-                heatNumber,
-                heatManagement.currentRound
-              );
-              console.log(`✅ Reloaded ${observers?.length || 0} observers:`, observers);
-              setCurrentHeatObservers(observers || []);
-            }
-          };
-          reloadObservers();
         }}
         heatManagement={heatManagement}
         skippers={skippers}
