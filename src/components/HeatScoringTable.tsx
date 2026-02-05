@@ -264,11 +264,20 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Show modal when a round completes and next round assignments are generated
   const lastCompletedRoundShown = React.useRef<number | null>(null);
   React.useEffect(() => {
+    console.log('🔍 roundJustCompleted useEffect check:', {
+      roundJustCompleted: heatManagement.roundJustCompleted,
+      lastShown: lastCompletedRoundShown.current,
+      willShow: heatManagement.roundJustCompleted && lastCompletedRoundShown.current !== heatManagement.roundJustCompleted
+    });
+
     if (heatManagement.roundJustCompleted &&
         lastCompletedRoundShown.current !== heatManagement.roundJustCompleted) {
       console.log(`🏁 Round ${heatManagement.roundJustCompleted} completed! Showing Round ${heatManagement.roundJustCompleted + 1} assignments`);
       setShowHeatAssignments(true);
       lastCompletedRoundShown.current = heatManagement.roundJustCompleted;
+
+      // Reset manual selection to allow auto-advance in next round
+      setManualSelection(false);
     }
   }, [heatManagement.roundJustCompleted]);
 
@@ -327,7 +336,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           }, 500); // Small delay for visual feedback
         }
       } else {
-        // All heats complete - trigger completion and show heat assignments modal
+        // All heats complete - trigger completion but DON'T show modal yet
+        // Let the parent component handle the round advancement and modal display
         console.log('✅ All heats complete! Triggering round completion...');
         lastAutoAdvancedHeat.current = selectedHeat; // Prevent re-triggering
 
@@ -336,15 +346,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           console.log(`🏁 Triggering final heat (${selectedHeat}) completion for round progression`);
           lastCompletedHeats.current.add(`${heatManagement.currentRound}-${selectedHeat}`);
           onCompleteHeat(selectedHeat);
-        }
-
-        // Show heat assignments modal which will handle round completion/progression
-        if (touchMode) {
-          console.log('📋 Opening heat assignments modal for round progression');
-          setShowHeatAssignments(true);
           // Reset touch mode confirmation for next round
           setTouchModeResultsConfirmed(false);
         }
+
+        // Don't show modal here - the roundJustCompleted flag will trigger it via another useEffect
+        console.log('⏳ Waiting for parent to update round state before showing modal...');
       }
     }
   }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed]);
