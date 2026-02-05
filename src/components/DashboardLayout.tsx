@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -29,6 +29,8 @@ import ArticleDetailPage from '../pages/ArticleDetailPage';
 import ArticleEditorPage from '../pages/ArticleEditorPage';
 import { FinancesPage } from '../pages/FinancesPage';
 import { MeetingsPage } from './pages/MeetingsPage';
+import { RankingsManagement } from './pages/RankingsManagement';
+import { NameMappingManager } from './pages/NameMappingManager';
 import { TasksPage } from './tasks/TasksPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
@@ -791,7 +793,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: DollarSign,
           description: 'Manage association finances',
           path: '/finances'
-        }
+        },
+        ...(currentOrganization?.type === 'national' ? [{
+          id: 'rankings',
+          label: 'National Rankings',
+          icon: Award,
+          description: 'Manage national skipper rankings',
+          path: '/rankings'
+        }, {
+          id: 'name-mapping',
+          label: 'Name Mapping',
+          icon: Link,
+          description: 'Map rankings to member records',
+          path: '/name-mapping'
+        }] : [])
       ]
     }] : []),
     ...(!currentOrganization ? [{
@@ -1494,6 +1509,29 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       <StateRemittanceDashboard
                         darkMode={darkMode}
                         stateAssociationId={currentOrganization.id}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              } />
+              <Route path="/rankings" element={
+                <div className="h-full overflow-y-auto">
+                  <div className="p-4 sm:p-6 lg:p-16">
+                    {currentOrganization?.type === 'national' ? (
+                      <RankingsManagement
+                        nationalAssociationId={currentOrganization.id}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              } />
+              <Route path="/name-mapping" element={
+                <div className="h-full overflow-y-auto">
+                  <div className="p-4 sm:p-6 lg:p-16">
+                    {currentOrganization?.type === 'national' && currentClub ? (
+                      <NameMappingManager
+                        nationalAssociationId={currentOrganization.id}
+                        clubId={currentClub.clubId}
                       />
                     ) : null}
                   </div>
