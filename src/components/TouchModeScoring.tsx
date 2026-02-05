@@ -24,6 +24,7 @@ interface TouchModeScoringProps {
   dropRules?: number[] | string;
   currentEvent?: RaceEvent | null;
   isHeatScoring?: boolean;
+  isScoringLastHeat?: boolean; // True when all other heats are complete and this is the last one
   onConfirmResults?: () => void; // Called when user confirms the finish order
   updateSkipper?: (skipperIndex: number, updates: Partial<Skipper>) => void;
   heatObservers?: ObserverAssignment[]; // Observers for the current heat
@@ -49,6 +50,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   dropRules = [],
   currentEvent,
   isHeatScoring = false,
+  isScoringLastHeat = false,
   onConfirmResults,
   updateSkipper,
   heatObservers = []
@@ -974,10 +976,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                   console.log('🎯 Confirm button clicked - Race:', currentRace);
                   handleConfirmResults();
                 }}
-                className={`w-full py-3 px-4 rounded-lg font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98`}
+                className={`w-full py-3 px-4 rounded-lg font-semibold text-white ${
+                  isScoringLastHeat
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                } transition-colors flex items-center justify-center gap-2 shadow-lg active:scale-98`}
               >
                 <Check size={20} />
-                Confirm & Apply Results
+                {isScoringLastHeat ? 'Confirm Results & Complete Round' : 'Confirm & Apply Results'}
               </button>
             </div>
           )}

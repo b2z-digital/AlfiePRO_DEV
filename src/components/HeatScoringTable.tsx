@@ -674,6 +674,26 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return allComplete;
   };
 
+  // Check if we're scoring the last heat (all other heats complete)
+  const isScoringLastHeat = () => {
+    if (!currentRound || !selectedHeat) {
+      return false;
+    }
+
+    // Check if all heats EXCEPT the selected one are complete
+    const otherHeats = availableHeats.filter(heat => heat !== selectedHeat);
+    const allOthersComplete = otherHeats.every(heat => {
+      const progress = getHeatProgress(heat);
+      return progress.scored === progress.total && progress.total > 0;
+    });
+
+    // Check if the selected heat is not yet complete
+    const currentHeatProgress = getHeatProgress(selectedHeat);
+    const currentHeatNotComplete = currentHeatProgress.scored < currentHeatProgress.total;
+
+    return allOthersComplete && currentHeatNotComplete;
+  };
+
   // Check if round is complete (already advanced to next round)
   const isRoundComplete = currentRound?.completed || false;
 
@@ -764,8 +784,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   return (
     <div className="space-y-6 p-8 no-select">
-      {/* All Heats Complete - Show Actions */}
-      {areAllHeatsComplete() && !isRoundComplete && (
+      {/* All Heats Complete - Show Actions (hidden in touch mode as it's shown in the button instead) */}
+      {areAllHeatsComplete() && !isRoundComplete && !touchMode && (
           <div className={`mt-4 p-4 rounded-lg ${
             darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
           }`}>
@@ -1007,6 +1027,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             currentRace={heatManagement.currentRound}
             numRaces={12}
             isHeatScoring={true}
+            isScoringLastHeat={isScoringLastHeat()}
             raceResults={mappedRaceResults}
             heatObservers={currentHeatObservers}
             updateRaceResults={(updatedResults) => {

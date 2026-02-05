@@ -44,17 +44,26 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
     const fetchObservers = async () => {
       if (!isOpen || !currentEvent?.id) return;
 
+      console.log('[HeatRaceResultsModal] Starting observer fetch');
       const observersMap = new Map<string, ObserverAssignment[]>();
 
       // Get all completed rounds
       const completedRounds = heatManagement.rounds.filter(r => r.completed);
+      console.log('[HeatRaceResultsModal] Completed rounds:', completedRounds.map(r => ({
+        round: r.round,
+        heatAssignments: r.heatAssignments.map(a => a.heatDesignation)
+      })));
 
       // For each completed round, fetch observers for each heat
       for (const round of completedRounds) {
+        console.log(`[HeatRaceResultsModal] Processing Round ${round.round} with ${round.heatAssignments.length} heat assignments`);
+
         for (const assignment of round.heatAssignments) {
           const heat = assignment.heatDesignation;
           // Heat numbers: A=1, B=2, C=3, etc.
           const heatNumber = heat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+
+          console.log(`[HeatRaceResultsModal] Fetching observers for Heat ${heat} (${heatNumber}), Round ${round.round}`);
 
           try {
             const observers = await getObserverAssignments(
@@ -63,16 +72,22 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
               round.round
             );
 
+            console.log(`[HeatRaceResultsModal] Heat ${heat} Round ${round.round} observers:`, observers);
+
             if (observers && observers.length > 0) {
               const key = `${heat}-${round.round}`;
               observersMap.set(key, observers);
+              console.log(`[HeatRaceResultsModal] Stored ${observers.length} observers for key: ${key}`);
+            } else {
+              console.log(`[HeatRaceResultsModal] No observers found for Heat ${heat} Round ${round.round}`);
             }
           } catch (error) {
-            console.error(`Error fetching observers for heat ${heat}, round ${round.round}:`, error);
+            console.error(`[HeatRaceResultsModal] Error fetching observers for heat ${heat}, round ${round.round}:`, error);
           }
         }
       }
 
+      console.log('[HeatRaceResultsModal] Final observers map:', Array.from(observersMap.entries()));
       setObserversByHeatRound(observersMap);
     };
 
