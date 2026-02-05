@@ -3,11 +3,12 @@ import { Skipper } from '../types';
 
 export interface ObserverAssignment {
   id?: string;
-  skipper_index: number;
+  skipper_index?: number; // Optional - null for custom observers
   skipper_name: string;
   skipper_sail_number?: string;
   times_served: number;
   is_manual_assignment?: boolean;
+  is_custom_observer?: boolean; // True for non-competing observers (volunteers, etc.)
 }
 
 /**
@@ -139,11 +140,12 @@ export async function saveObserverAssignments(
           event_id: eventId,
           heat_number: heatNumber,
           race_number: raceNumber,
-          skipper_index: observer.skipper_index,
+          skipper_index: observer.skipper_index || null,
           skipper_name: observer.skipper_name,
           skipper_sail_number: observer.skipper_sail_number,
           is_manual_assignment: observer.is_manual_assignment || false,
-          times_served: observer.times_served + 1 // Increment times served
+          is_custom_observer: observer.is_custom_observer || false,
+          times_served: observer.is_custom_observer ? 0 : (observer.times_served + 1) // Don't track times served for custom observers
         }))
       );
 

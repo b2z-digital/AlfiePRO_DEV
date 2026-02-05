@@ -46,6 +46,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [loadingObservers, setLoadingObservers] = useState(false);
   const [showObserverSelector, setShowObserverSelector] = useState(false);
   const [selectedHeatForObserver, setSelectedHeatForObserver] = useState<number>(1);
+  const [showCustomObserverInput, setShowCustomObserverInput] = useState(false);
+  const [customObserverName, setCustomObserverName] = useState('');
 
   // Reset edit state when modal opens/closes
   useEffect(() => {
@@ -905,12 +907,45 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 {result.position}
                               </span>
                             )}
+
+                            {/* Sail Number - Prominent Display */}
+                            <div className={`flex-shrink-0 px-2 py-1 rounded font-bold text-sm ${
+                              darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'
+                            }`}>
+                              {currentEvent?.show_country && skipper.country_code && (
+                                <span className="mr-1">
+                                  {getIOCCode(skipper.country_code)}
+                                </span>
+                              )}
+                              {skipper.sailNo}
+                            </div>
+
                             {/* Flag (if event shows flag) */}
                             {currentEvent?.show_flag && skipper.country_code && (
-                              <div className="flex-shrink-0 text-2xl">
+                              <div className="flex-shrink-0 text-xl leading-none">
                                 {getCountryFlag(skipper.country_code)}
                               </div>
                             )}
+
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium truncate text-sm ${
+                                darkMode ? 'text-white' : 'text-slate-900'
+                              }`}>
+                                {skipper.name}
+                              </p>
+                              {isPromoted && (
+                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
+                                  {wasPromotedFromBelow ? `↑ From Heat ${lowerHeatLetter}` : '↑ Promoted'}
+                                </p>
+                              )}
+                              {isRelegated && (
+                                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
+                                  ↓ Relegate
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Avatar moved to the right */}
                             {skipper.avatarUrl ? (
                               <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
                                 <img
@@ -926,34 +961,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 {skipper.name.split(' ').map(n => n[0]).join('')}
                               </div>
                             )}
-                            <div className="flex-1 min-w-0">
-                              <p className={`font-medium truncate text-sm ${
-                                darkMode ? 'text-white' : 'text-slate-900'
-                              }`}>
-                                {skipper.name}
-                              </p>
-                              <p className={`text-xs truncate ${
-                                darkMode ? 'text-slate-400' : 'text-slate-600'
-                              }`}>
-                                {skipper.boatModel} - #
-                                {currentEvent?.show_country && skipper.country_code && (
-                                  <span className="font-bold mr-1">
-                                    {getIOCCode(skipper.country_code)}
-                                  </span>
-                                )}
-                                {skipper.sailNo}
-                              </p>
-                              {isPromoted && (
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
-                                  {wasPromotedFromBelow ? `↑ From Heat ${lowerHeatLetter}` : '↑ Promoted'}
-                                </p>
-                              )}
-                              {isRelegated && (
-                                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
-                                  ↓ Relegate
-                                </p>
-                              )}
-                            </div>
+
                             {result && result.letterScore && (
                               <span className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded bg-red-500 text-white">
                                 {result.letterScore}
@@ -1395,10 +1403,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               </div>
 
               <div className="flex-1 overflow-y-auto p-4">
-                <p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Select a skipper to add as an observer. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
+                {!showCustomObserverInput ? (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Select a skipper to add as an observer. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
+                      </p>
+                      <button
+                        onClick={() => setShowCustomObserverInput(true)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                          darkMode
+                            ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                            : 'bg-purple-500 hover:bg-purple-600 text-white'
+                        }`}
+                      >
+                        <UserPlus size={14} />
+                        Custom Observer
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
                   {availableSkippers.map(({ skipper, index }) => (
                     <button
                       key={index}
@@ -1480,11 +1503,115 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       </div>
                     </button>
                   ))}
-                </div>
-                {availableSkippers.length === 0 && (
-                  <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                    No skippers available to add as observers.
-                  </p>
+                    </div>
+                    {availableSkippers.length === 0 && (
+                      <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        No skippers available to add as observers.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <button
+                        onClick={() => {
+                          setShowCustomObserverInput(false);
+                          setCustomObserverName('');
+                        }}
+                        className={`p-1 rounded-lg transition-colors ${
+                          darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
+                        }`}
+                      >
+                        <X size={16} />
+                      </button>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Add a custom observer (volunteer, non-competing individual, etc.)
+                      </p>
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        darkMode ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        Observer Name
+                      </label>
+                      <input
+                        type="text"
+                        value={customObserverName}
+                        onChange={(e) => setCustomObserverName(e.target.value)}
+                        placeholder="Enter observer's name"
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+                            : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                        }`}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setShowCustomObserverInput(false);
+                          setCustomObserverName('');
+                        }}
+                        className={`px-4 py-2 rounded-lg transition-colors ${
+                          darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!currentEvent?.id || !customObserverName.trim()) return;
+
+                          const customObserver: ObserverAssignment = {
+                            skipper_index: undefined,
+                            skipper_name: customObserverName.trim(),
+                            times_served: 0,
+                            is_manual_assignment: true,
+                            is_custom_observer: true
+                          };
+
+                          // Add the custom observer
+                          const currentObservers = observersByHeat.get(selectedHeatForObserver) || [];
+                          const updatedObservers = [...currentObservers, customObserver];
+
+                          // Save to database
+                          const success = await saveObserverAssignments(
+                            currentEvent.id,
+                            selectedHeatForObserver,
+                            round,
+                            updatedObservers
+                          );
+
+                          if (success) {
+                            // Update state
+                            setObserversByHeat(prev => {
+                              const newMap = new Map(prev);
+                              newMap.set(selectedHeatForObserver, updatedObservers);
+                              return newMap;
+                            });
+
+                            // Reset and close
+                            setCustomObserverName('');
+                            setShowCustomObserverInput(false);
+                            setShowObserverSelector(false);
+                          }
+                        }}
+                        disabled={!customObserverName.trim()}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          !customObserverName.trim()
+                            ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
+                            : darkMode
+                            ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                            : 'bg-purple-500 hover:bg-purple-600 text-white'
+                        }`}
+                      >
+                        Add Observer
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
