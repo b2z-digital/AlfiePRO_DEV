@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments } from '../types/heat';
@@ -49,6 +49,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [showCustomObserverInput, setShowCustomObserverInput] = useState(false);
   const [customObserverName, setCustomObserverName] = useState('');
 
+  // Track modal open/close to force reloads
+  const prevIsOpenRef = useRef(isOpen);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  // Detect when modal opens (isOpen changes from false to true)
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      console.log('🚪 Modal opened - triggering fresh observer load');
+      setReloadTrigger(prev => prev + 1);
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
+
   // Reset edit state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
@@ -62,40 +75,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   }, [isOpen]);
 
   // Create a stable key that represents the state of rounds that should trigger observer reload
-  const roundDataKey = useMemo(() => {
-    const { currentRound, roundJustCompleted, rounds } = heatManagement;
-
-    // Determine which round we're displaying
-    let targetRound;
-    if (roundJustCompleted && currentRound > roundJustCompleted) {
-      targetRound = currentRound;
-    } else if (roundJustCompleted) {
-      targetRound = roundJustCompleted;
-    } else {
-      const nextUncompleted = rounds.find(r => !r.completed);
-      targetRound = nextUncompleted?.round || currentRound;
-    }
-
-    const roundData = rounds.find(r => r.round === targetRound);
-    if (!roundData) return `${currentRound}-no-data`;
-
-    // Create a hash of the round state that matters for observers
-    const heatCount = roundData.heatAssignments.length;
-    const resultCount = roundData.results?.length || 0;
-    const completionStatus = roundData.completed ? 'complete' : 'incomplete';
-    // CRITICAL: Include roundJustCompleted in the key so when it clears (when advancing to new round),
-    // the key changes and forces useEffect to re-run and select fresh observers
-    const justCompletedFlag = roundJustCompleted ? `jc${roundJustCompleted}` : 'active';
-
-    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}`;
-  }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds]);
-
   // Load and select observers when modal opens
   useEffect(() => {
     console.log('🔵 HeatAssignmentModal useEffect TRIGGERED:', {
       isOpen,
       hasEventId: !!currentEvent?.id,
-      roundDataKey,
+      currentRound: heatManagement.currentRound,
+      roundJustCompleted: heatManagement.roundJustCompleted,
       dependencies: {
         isOpen,
         eventId: currentEvent?.id,
@@ -111,7 +97,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         hasEventId: !!currentEvent?.id,
         enable_observers: currentEvent?.enable_observers,
         observers_per_heat: currentEvent?.observers_per_heat,
-        roundDataKey,
+        currentRound: heatManagement.currentRound,
+        roundJustCompleted: heatManagement.roundJustCompleted,
         currentEvent
       });
 
@@ -396,7 +383,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     };
 
     loadObservers();
-  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
+  }, [
+    isOpen,
+    reloadTrigger,
+    currentEvent?.id,
+    currentEvent?.enable_observers,
+    currentEvent?.observers_per_heat,
+    heatManagement.currentRound,
+    heatManagement.roundJustCompleted,
+    JSON.stringify(heatManagement.rounds.map(r => ({ round: r.round, completed: r.completed, resultsCount: r.results?.length || 0 }))),
+    skippers?.length
+  ]);
 
   if (!isOpen) return null;
 
