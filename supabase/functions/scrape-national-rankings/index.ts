@@ -30,18 +30,31 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get auth token from request
+    // Get auth token from request (optional for cron jobs)
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header");
-    }
+    let userId: string | null = null;
+    let isCronJob = false;
 
-    // Verify user is authenticated
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authHeader) {
+      // Verify user is authenticated
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-    if (authError || !user) {
-      throw new Error("Unauthorized");
+      if (authError || !user) {
+        throw new Error("Unauthorized");
+      }
+      userId = user.id;
+    } else {
+      // Check if this is a cron job call (has special header or comes from internal)
+      const cronSecret = req.headers.get("X-Cron-Secret");
+      const expectedSecret = Deno.env.get("CRON_SECRET") || "internal-cron-job";
+
+      if (cronSecret === expectedSecret) {
+        isCronJob = true;
+        userId = null; // System-initiated
+      } else {
+        throw new Error("No authorization header");
+      }
     }
 
     const { url, yachtClassName, nationalAssociationId } = await req.json();
@@ -66,7 +79,7 @@ Deno.serve(async (req: Request) => {
         status: "failed",
         rankings_imported: 0,
         error_message: "No rankings found in HTML",
-        initiated_by: user.id,
+        initiated_by: userId,
       });
 
       return new Response(
@@ -118,7 +131,7 @@ Deno.serve(async (req: Request) => {
         status: "failed",
         rankings_imported: 0,
         error_message: insertError.message,
-        initiated_by: user.id,
+        initiated_by: userId,
       });
 
       throw insertError;
@@ -131,7 +144,7 @@ Deno.serve(async (req: Request) => {
       source_url: url,
       status: "success",
       rankings_imported: rankings.length,
-      initiated_by: user.id,
+      initiated_by: userId,
     });
 
     return new Response(
