@@ -225,16 +225,20 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
           const isCompletedHeat = heatCompletionStatus[i].isCompleted;
 
+          console.log(`  isNextHeatToScore: ${isNextHeatToScore}, isCompletedHeat: ${isCompletedHeat}`);
+
           if (!isNextHeatToScore && !isCompletedHeat) {
             console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet`);
             continue;
           }
 
           if (isCompletedHeat) {
-            console.log(`  ✅ This is a completed heat - loading previous observers`);
+            console.log(`  ✅ This is a completed heat - loading observers for completed heat`);
           }
 
-          console.log(`  ✅ This is the next heat to score - assigning observers`);
+          if (isNextHeatToScore) {
+            console.log(`  ✅ This is the next heat to score - assigning observers`);
+          }
 
           // Check if we already have observers for this heat
           const existingObservers = await getObserverAssignments(
@@ -321,9 +325,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }
 
         console.log('\n📊 Loaded observers for', newObserversByHeat.size, 'heats');
-        console.log('   Observer details:', Array.from(newObserversByHeat.entries()).map(([heat, obs]) =>
-          `Heat ${heat}: ${obs.map(o => `${o.skipper_name} (${o.skipper_index})`).join(', ')}`
-        ).join('\n   '));
+        console.log('   Observer details by heat:');
+        for (let i = 1; i <= sortedHeats.length; i++) {
+          const observers = newObserversByHeat.get(i);
+          console.log(`   Heat ${['A', 'B', 'C', 'D', 'E', 'F'][i-1]}: ${observers ? observers.map(o => `${o.skipper_name} (${o.skipper_index})`).join(', ') : 'NONE'}`);
+        }
         setObserversByHeat(newObserversByHeat);
 
         if (newObserversByHeat.size === 0) {
@@ -972,7 +978,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                   ? (darkMode ? 'text-slate-300' : 'text-slate-700')
                                   : (darkMode ? 'text-purple-300' : 'text-purple-700')
                               }`}>
-                                {isPreviousHeatObservers ? 'Previous Observers' : 'Observers'} ({heatObservers.length})
+                                Observers ({heatObservers.length})
                               </h5>
                             </div>
                             {!isPreviousHeatObservers && (
