@@ -87,28 +87,53 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   // Load national association ID from club's state association
   useEffect(() => {
     const loadNationalAssociationId = async () => {
-      if (!isOpen || !currentEvent?.clubId) return;
+      console.log('RaceSettingsModal: Attempting to load national association ID', {
+        isOpen,
+        currentEvent,
+        clubId: currentEvent?.clubId,
+        hasCurrentEvent: !!currentEvent
+      });
+
+      if (!isOpen) {
+        console.log('Modal not open, skipping');
+        return;
+      }
+
+      if (!currentEvent?.clubId) {
+        console.warn('No clubId on currentEvent, cannot load national association ID');
+        return;
+      }
 
       try {
+        console.log('Fetching club data for clubId:', currentEvent.clubId);
         // Get club's state association
-        const { data: clubData } = await supabase
+        const { data: clubData, error: clubError } = await supabase
           .from('clubs')
           .select('state_association_id')
           .eq('id', currentEvent.clubId)
           .single();
 
+        console.log('Club data result:', { clubData, clubError });
+
         if (clubData?.state_association_id) {
+          console.log('Fetching state association data for:', clubData.state_association_id);
           // Get state association's national association
-          const { data: stateData } = await supabase
+          const { data: stateData, error: stateError } = await supabase
             .from('state_associations')
             .select('national_association_id')
             .eq('id', clubData.state_association_id)
             .single();
 
+          console.log('State association data result:', { stateData, stateError });
+
           if (stateData?.national_association_id) {
             setNationalAssociationId(stateData.national_association_id);
-            console.log('Loaded national association ID:', stateData.national_association_id);
+            console.log('✓ Successfully loaded national association ID:', stateData.national_association_id);
+          } else {
+            console.warn('State association has no national_association_id');
           }
+        } else {
+          console.warn('Club has no state_association_id');
         }
       } catch (err) {
         console.error('Error loading national association ID:', err);
@@ -1669,6 +1694,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       />
 
       {/* HMS Seeding Modal */}
+      {showHMSSeedingModal && console.log('Rendering HMSSeedingModal with props:', {
+        nationalAssociationId,
+        yachtClassName: currentEvent?.raceClass,
+        currentEventKeys: currentEvent ? Object.keys(currentEvent) : [],
+        currentEventRaceClass: currentEvent?.raceClass
+      })}
       <HMSSeedingModal
         isOpen={showHMSSeedingModal}
         onClose={() => setShowHMSSeedingModal(false)}
