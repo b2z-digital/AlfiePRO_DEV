@@ -260,63 +260,81 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             console.log(`  ✅ This is the next heat to score - assigning observers`);
           }
 
-          // Check if we already have observers for this heat
-          const existingObservers = await getObserverAssignments(
-            currentEvent.id,
-            heatNumber,
-            roundNumberToLoad
-          );
+          // For completed heats, load existing observers to show who observed
+          // For the next heat to score in an active round, we may need to re-select if heat composition changed
+          let shouldSelectNewObservers = false;
+          let existingObservers: ObserverAssignment[] | null = null;
 
-          // Validate existing observers:
-          // 1. Count must match expected
-          // 2. None of the observers can be racing in THIS heat
-          console.log(`  📋 Checking existing observers:`, existingObservers?.length || 0);
-          if (existingObservers && existingObservers.length > 0) {
-            console.log(`     Existing observer indices:`, existingObservers.map(o => o.skipper_index));
-            console.log(`     Racing skipper indices:`, heat.skipperIndices);
+          if (isCompletedHeat) {
+            // Heat is complete - load observers who actually observed this heat
+            existingObservers = await getObserverAssignments(
+              currentEvent.id,
+              heatNumber,
+              roundNumberToLoad
+            );
+            console.log(`  📖 Loading ${existingObservers?.length || 0} observers for completed heat`);
+
+            if (existingObservers && existingObservers.length > 0) {
+              newObserversByHeat.set(heatNumber, existingObservers);
+            }
+          } else if (isNextHeatToScore) {
+            // This is the next heat to score - check if we can reuse existing observers
+            existingObservers = await getObserverAssignments(
+              currentEvent.id,
+              heatNumber,
+              roundNumberToLoad
+            );
+
+            console.log(`  📋 Checking existing observers:`, existingObservers?.length || 0);
+            if (existingObservers && existingObservers.length > 0) {
+              console.log(`     Existing observer indices:`, existingObservers.map(o => o.skipper_index));
+              console.log(`     Racing skipper indices:`, heat.skipperIndices);
+            }
+
+            // Validate existing observers:
+            // 1. Count must match expected
+            // 2. None of the observers can be racing in THIS heat
+            const observersRacingInHeat = existingObservers?.filter(obs => {
+              const isRacing = heat.skipperIndices.includes(obs.skipper_index);
+              if (isRacing) {
+                console.log(`     ❌ Observer ${obs.skipper_name} (index ${obs.skipper_index}) is RACING in this heat!`);
+              }
+              return isRacing;
+            }) || [];
+
+            // Also check if ALL observers are still available
+            const observersStillInHeat = existingObservers?.filter(obs => {
+              const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
+              if (!skipperStillExists) {
+                console.log(`     ⚠️ Observer ${obs.skipper_name} (index ${obs.skipper_index}) no longer exists in skipper list`);
+              }
+              return skipperStillExists;
+            }) || [];
+
+            const hasValidExistingObservers = existingObservers &&
+              existingObservers.length > 0 &&
+              existingObservers.length === observersPerHeat &&
+              observersRacingInHeat.length === 0 && // No observers can be racing in this heat
+              observersStillInHeat.length === existingObservers.length; // All observers still exist
+
+            if (hasValidExistingObservers) {
+              console.log(`  ✅ Using existing ${existingObservers.length} valid observers:`, existingObservers.map(o => `${o.skipper_name} (${o.skipper_index})`));
+              newObserversByHeat.set(heatNumber, existingObservers);
+            } else {
+              if (existingObservers && existingObservers.length > 0) {
+                console.warn(`  ⚠️ Existing observers invalid - will re-select`);
+              } else {
+                console.log(`  ℹ️ No existing observers found - will select new`);
+              }
+              shouldSelectNewObservers = true;
+            }
+          } else {
+            console.log(`  ⏭️ Not next heat to score and not completed - skipping observer assignment`);
           }
 
-          const observersRacingInHeat = existingObservers?.filter(obs => {
-            const isRacing = heat.skipperIndices.includes(obs.skipper_index);
-            if (isRacing) {
-              console.log(`     ❌ Observer ${obs.skipper_name} (index ${obs.skipper_index}) is RACING in this heat!`);
-            }
-            return isRacing;
-          }) || [];
-
-          // Also check if ALL observers are still available (not promoted/relegated)
-          const observersStillInHeat = existingObservers?.filter(obs => {
-            // The skipper_index is the array position, so just check if that index is valid
-            const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
-            if (!skipperStillExists) {
-              console.log(`     ⚠️ Observer ${obs.skipper_name} (index ${obs.skipper_index}) no longer exists in skipper list`);
-            }
-            return skipperStillExists;
-          }) || [];
-
-          const hasValidExistingObservers = existingObservers &&
-            existingObservers.length > 0 &&
-            existingObservers.length === observersPerHeat &&
-            observersRacingInHeat.length === 0 && // No observers can be racing in this heat
-            observersStillInHeat.length === existingObservers.length; // All observers still exist
-
-          if (hasValidExistingObservers) {
-            console.log(`  ✅ Using existing ${existingObservers.length} observers:`, existingObservers.map(o => `${o.skipper_name} (${o.skipper_index})`));
-            newObserversByHeat.set(heatNumber, existingObservers);
-          } else {
-            if (existingObservers && existingObservers.length > 0) {
-              if (existingObservers.length !== observersPerHeat) {
-                console.warn(`  ⚠️ Found ${existingObservers.length} existing observers but expected ${observersPerHeat}, will re-select`);
-              }
-              if (observersRacingInHeat.length > 0) {
-                console.warn(`  ⚠️ Found ${observersRacingInHeat.length} observers racing in this heat, will re-select:`,
-                  observersRacingInHeat.map(o => `${o.skipper_name} (index ${o.skipper_index})`));
-              }
-              if (observersStillInHeat.length !== existingObservers.length) {
-                console.warn(`  ⚠️ ${existingObservers.length - observersStillInHeat.length} observer(s) no longer exist, will re-select`);
-              }
-            }
-            console.log(`  🔄 Re-selecting observers for this heat`);
+          // Select new observers if needed
+          if (shouldSelectNewObservers) {
+            console.log(`  🔄 Selecting new observers for this heat`);
             console.log('  🏁 Skippers racing in this heat:', heat.skipperIndices);
 
             // Select observers from skippers NOT racing in THIS specific heat
