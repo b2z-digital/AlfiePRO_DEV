@@ -112,11 +112,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   // Reset touch mode confirmation when heat or round changes
   React.useEffect(() => {
+    console.log('🔄 Resetting touch mode confirmation for Round', heatManagement.currentRound, 'Heat', selectedHeat);
     setTouchModeResultsConfirmed(false);
   }, [selectedHeat, heatManagement.currentRound]);
 
   // Track which heat was last auto-advanced to prevent loops
   const lastAutoAdvancedHeat = React.useRef<HeatDesignation | null>(null);
+
+  // Track which round was last auto-advanced to prevent loops
+  const lastAutoAdvancedRound = React.useRef<number | null>(null);
 
   // Track if we've shown the initial modal
   const hasShownInitialModal = React.useRef<boolean>(false);
@@ -192,6 +196,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         setSelectedHeat(heatToSelect);
         setManualSelection(false); // Reset manual selection on round change
         lastAutoAdvancedHeat.current = null; // Reset auto-advance tracking for new round
+        lastAutoAdvancedRound.current = null; // Reset round auto-advance tracking
       }
 
       // Auto-show heat assignments modal when round changes (but not on initial load)
@@ -322,11 +327,28 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           }, 500); // Small delay for visual feedback
         }
       } else {
-        // All heats complete, stay on current heat
-        console.log('✅ All heats complete!');
+        // All heats complete - check if we should auto-advance to next round
+        if (areAllHeatsComplete() && !isRoundComplete && onAdvanceToNextRound) {
+          // Prevent advancing from the same round multiple times
+          if (lastAutoAdvancedRound.current === heatManagement.currentRound) {
+            console.log('⚠️ Already auto-advanced from Round', heatManagement.currentRound);
+            return;
+          }
+
+          console.log('✅ All heats complete! Auto-advancing to next round...');
+          lastAutoAdvancedRound.current = heatManagement.currentRound;
+
+          // Use a small delay to allow UI to update
+          setTimeout(() => {
+            const lastHeat = availableHeats[availableHeats.length - 1];
+            onAdvanceToNextRound(lastHeat);
+          }, 1000);
+        } else {
+          console.log('✅ All heats complete!');
+        }
       }
     }
-  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed]);
+  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed, areAllHeatsComplete, isRoundComplete, onAdvanceToNextRound]);
 
   // Handle manual heat selection
   const handleHeatSelection = (heat: HeatDesignation) => {
@@ -697,6 +719,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   React.useEffect(() => {
     const loadObservers = async () => {
       if (!currentEvent?.id || !selectedHeat || !currentEvent.enable_observers) {
+        console.log(`🚫 Not loading observers: eventId=${currentEvent?.id}, heat=${selectedHeat}, enable_observers=${currentEvent?.enable_observers}`);
         setCurrentHeatObservers([]);
         return;
       }
@@ -710,11 +733,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           heatNumber,                    // Heat number goes SECOND
           heatManagement.currentRound     // Round number goes THIRD
         );
-        console.log(`✅ Loaded ${observers?.length || 0} observers:`, observers);
+        console.log(`✅ Loaded ${observers?.length || 0} observers for Round ${heatManagement.currentRound}, Heat ${selectedHeat}:`, observers);
         console.log(`📋 Observer details:`, observers?.map(o => ({
           skipper_index: o.skipper_index,
           skipper_name: o.skipper_name,
-          sail_number: o.skipper_sail_number
+          sail_number: o.skipper_sail_number,
+          round: o.round,
+          heat_number: o.heat_number
         })));
         setCurrentHeatObservers(observers || []);
       } catch (error) {
@@ -724,7 +749,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     };
 
     loadObservers();
-  }, [currentEvent?.id, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers]);
+  }, [currentEvent?.id, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers, currentRound]);
 
   // Don't render until a heat is selected
   if (!selectedHeat) {
