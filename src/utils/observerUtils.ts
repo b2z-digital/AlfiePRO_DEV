@@ -131,11 +131,11 @@ export async function saveObserverAssignments(
     }
     console.log(`  ✅ Deleted stale observers`);
 
-    // Insert new assignments
-    console.log(`  💾 Inserting ${observers.length} new observers`);
-    const { error: insertError } = await supabase
+    // Upsert new assignments (handles race conditions in dev mode)
+    console.log(`  💾 Upserting ${observers.length} new observers`);
+    const { error: upsertError } = await supabase
       .from('heat_observers')
-      .insert(
+      .upsert(
         observers.map(observer => ({
           event_id: eventId,
           heat_number: heatNumber,
@@ -146,11 +146,15 @@ export async function saveObserverAssignments(
           is_manual_assignment: observer.is_manual_assignment || false,
           is_custom_observer: observer.is_custom_observer || false,
           times_served: observer.is_custom_observer ? 0 : (observer.times_served + 1) // Don't track times served for custom observers
-        }))
+        })),
+        {
+          onConflict: 'event_id,heat_number,race_number,skipper_index',
+          ignoreDuplicates: false  // Update if exists
+        }
       );
 
-    if (insertError) {
-      console.error('Error inserting observers:', insertError);
+    if (upsertError) {
+      console.error('Error upserting observers:', upsertError);
       return false;
     }
 

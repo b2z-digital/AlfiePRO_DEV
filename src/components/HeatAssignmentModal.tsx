@@ -517,8 +517,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
         {/* Heat Grid */}
         <div className="p-6 overflow-y-auto flex-1">
-          <div className="grid gap-4" style={{
-            gridTemplateColumns: `repeat(${Math.min(heatAssignments.length, 6)}, minmax(200px, 1fr))`
+          <div className="flex gap-4 overflow-x-auto pb-2" style={{
+            scrollBehavior: 'smooth'
           }}>
             {/* Find the last completed heat (for edit mode) */}
             {/* Heats complete from bottom to top (C → B → A), so the "last" completed is the HIGHEST one */}
@@ -683,9 +683,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               return (
                 <div
                   key={heatDesignation}
-                  className={`rounded-lg border-2 overflow-hidden flex flex-col ${
+                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-shrink-0 ${
                     darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
+                  style={{
+                    minWidth: '380px',  // Ensure enough space for 2 columns of skipper cards
+                    width: heatAssignments.length <= 2 ? 'calc((100% - 1rem) / 2)' : '380px'  // Full width for 1-2 heats, fixed for 3+
+                  }}
                 >
                   {/* Heat Header */}
                   <div className={`p-3 ${getHeatGradient(heatDesignation)} border-b-2`}>
@@ -928,9 +932,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             )}
 
                             <div className="flex-1 min-w-0">
-                              <p className={`font-medium truncate text-sm ${
-                                darkMode ? 'text-white' : 'text-slate-900'
-                              }`}>
+                              <p
+                                className={`font-medium truncate text-sm ${
+                                  darkMode ? 'text-white' : 'text-slate-900'
+                                }`}
+                                title={skipper.name}  // Show full name on hover
+                              >
                                 {skipper.name}
                               </p>
                               {isPromoted && (
