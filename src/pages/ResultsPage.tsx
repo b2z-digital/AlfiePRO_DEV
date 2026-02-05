@@ -1827,6 +1827,7 @@ export const ResultsPage: React.FC = () => {
           darkMode={true}
           heatManagement={selectedEvent.heatManagement}
           skippers={selectedEvent.skippers}
+          currentEvent={selectedEvent}
         />
       )}
 
