@@ -1010,7 +1010,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             <div className={`grid ${gridCols} gap-6 sm:gap-8`}>
               {skippers.map((skipper, index) => {
                 const isFinished = usedSkipperIndices.has(index);
-                const isObserver = heatObservers.some(obs => obs.skipper_index === index);
+                const skipperSailNo = skipper.sailNumber || skipper.sailNo;
+                const isObserver = heatObservers.some(obs => obs.skipper_sail_number === skipperSailNo);
 
                 // Don't show observers in the racing grid
                 if (isObserver) return null;
