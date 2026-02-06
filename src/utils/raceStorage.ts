@@ -120,7 +120,9 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             show_flag: race.show_flag ?? true,
             show_country: race.show_country ?? true,
             show_club_state: race.show_club_state ?? false,
-            show_category: race.show_category ?? false
+            show_category: race.show_category ?? false,
+            enable_observers: race.enable_observers || false,
+            observers_per_heat: race.observers_per_heat || undefined
           } as any;
 
           console.log(`🔍 [raceStorage] Loading event "${race.event_name}":`, {
@@ -253,7 +255,10 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           show_flag: (event as any).show_flag ?? true,
           show_country: (event as any).show_country ?? true,
           show_club_state: (event as any).show_club_state ?? false,
-          show_category: (event as any).show_category ?? false
+          show_category: (event as any).show_category ?? false,
+          // Observer settings
+          enable_observers: (event as any).enable_observers || false,
+          observers_per_heat: (event as any).observers_per_heat || undefined
         });
 
       if (error) {
