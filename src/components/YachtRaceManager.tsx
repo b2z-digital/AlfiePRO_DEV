@@ -78,8 +78,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
-  const [showClearResultsModal, setShowClearResultsModal] = useState(false);
-  const [pendingClearScope, setPendingClearScope] = useState<'day' | 'all' | null>(null);
   const [heatManagement, setHeatManagement] = useState<HeatManagement | null>(null);
   const [selectedVenueName, setSelectedVenueName] = useState<string | null>(null);
   const [currentNumRaces, setCurrentNumRaces] = useState(12);
@@ -1761,102 +1759,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     console.log('🔴 Navigation call completed');
   };
 
-  const handleClearResults = async (scope: 'day' | 'all') => {
-    console.log(`🗑️ Clearing ${scope === 'day' ? 'current day' : 'all'} results...`);
-    setShowClearResultsModal(false);
-
-    const currentEvent = getCurrentEvent();
-    if (!currentEvent) return;
-
-    if (scope === 'day') {
-      // Clear current day only
-      setRaceResults([]);
-      setLastCompletedRace(0);
-
-      // Restore original handicaps and clear withdrawal flags
-      const newSkippers = skippers.map((skipper, idx) => ({
-        ...skipper,
-        startHcap: originalHandicaps[idx] !== undefined ? originalHandicaps[idx] : skipper.startHcap,
-        withdrawnFromRace: undefined
-      }));
-      setSkippers(newSkippers);
-
-      // Reset handicap determination flags
-      setHasDeterminedInitialHcaps(false);
-      setIsManualHandicaps(false);
-
-      // Save cleared day results
-      try {
-        await updateEventResults(
-          currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
-          [],
-          skippers,
-          0,
-          false,
-          false,
-          false,
-          currentDay,
-          heatManagement,
-          currentNumRaces,
-          currentDropRules as number[]
-        );
-        console.log(`✅ Cleared Day ${currentDay} results`);
-        if (addNotification) {
-          addNotification('success', `Day ${currentDay} results cleared`);
-        }
-      } catch (error) {
-        console.error('❌ Error clearing day results:', error);
-        if (addNotification) {
-          addNotification('error', 'Failed to clear day results');
-        }
-      }
-    } else {
-      // Clear all days - this is more complex and needs to reset the entire event
-      setRaceResults([]);
-      setLastCompletedRace(0);
-
-      const newSkippers = skippers.map((skipper, idx) => ({
-        ...skipper,
-        startHcap: originalHandicaps[idx] !== undefined ? originalHandicaps[idx] : skipper.startHcap,
-        withdrawnFromRace: undefined
-      }));
-      setSkippers(newSkippers);
-
-      setHasDeterminedInitialHcaps(false);
-      setIsManualHandicaps(false);
-
-      try {
-        // For multi-day events, we need to clear all days
-        if (currentEvent.multiDay && currentEvent.numDays) {
-          for (let day = 1; day <= currentEvent.numDays; day++) {
-            await updateEventResults(
-              currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
-              [],
-              skippers,
-              0,
-              false,
-              false,
-              false,
-              day,
-              heatManagement,
-              currentNumRaces,
-              currentDropRules as number[]
-            );
-          }
-        }
-        console.log('✅ Cleared all event results');
-        if (addNotification) {
-          addNotification('success', 'All event results cleared');
-        }
-      } catch (error) {
-        console.error('❌ Error clearing all results:', error);
-        if (addNotification) {
-          addNotification('error', 'Failed to clear all results');
-        }
-      }
-    }
-  };
-
   const handleCompleteScoring = async () => {
     console.log('🏁 handleCompleteScoring called');
 
@@ -3085,15 +2987,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           addNotification={addNotification}
           hasRaceResults={raceResults.length > 0}
           onClearAllRaceResults={async () => {
-            const currentEvent = getCurrentEvent();
-
-            // For multi-day events, show modal to choose scope
-            if (currentEvent?.multiDay) {
-              setShowClearResultsModal(true);
-              return;
-            }
-
-            // For single-day events, clear immediately
             console.log('🗑️ Clearing all race results...');
             setRaceResults([]);
             setLastCompletedRace(0);
@@ -3112,6 +3005,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setIsManualHandicaps(false);
 
             // CRITICAL: Explicitly save cleared state to database
+            const currentEvent = getCurrentEvent();
             if (currentEvent) {
               console.log('💾 Saving cleared race results to database...');
               try {
@@ -3215,70 +3109,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           cancelText="Cancel"
           darkMode={darkMode}
         />
-
-        {/* Multi-Day Clear Results Modal */}
-        {showClearResultsModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className={`
-              w-full max-w-lg rounded-xl shadow-xl border
-              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-            `}>
-              <div className={`p-6 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Clear Results - Multi-Day Event
-                </h3>
-                <p className={`mt-2 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                  This is a multi-day event. Choose which results to clear:
-                </p>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className={`p-4 rounded-lg border-2 ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-                  <h4 className={`font-semibold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Clear Day {currentDay} Only
-                  </h4>
-                  <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                    This will clear all results for Day {currentDay} only. Other days will remain unchanged.
-                  </p>
-                  <button
-                    onClick={() => handleClearResults('day')}
-                    className="mt-3 w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition-colors"
-                  >
-                    Clear Day {currentDay}
-                  </button>
-                </div>
-
-                <div className={`p-4 rounded-lg border-2 ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-                  <h4 className={`font-semibold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Clear All Days
-                  </h4>
-                  <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                    This will clear all results for the entire {currentEvent?.numDays || currentEvent?.numberOfDays}-day event. This action cannot be undone.
-                  </p>
-                  <button
-                    onClick={() => handleClearResults('all')}
-                    className="mt-3 w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
-                  >
-                    Clear All Days
-                  </button>
-                </div>
-              </div>
-
-              <div className={`p-4 border-t flex justify-end ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                <button
-                  onClick={() => setShowClearResultsModal(false)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    darkMode
-                      ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                      : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
-                  }`}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
