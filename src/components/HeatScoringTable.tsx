@@ -255,15 +255,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     }
   }, [heatManagement, currentRound?.results]);
 
-  // Show modal on initial load for Round 1 if no scores yet
+  // Show modal on initial load when continuing scoring
+  // This ensures the user sees heat assignments when clicking "Continue Scoring"
   React.useEffect(() => {
-    if (!hasShownInitialModal.current && currentRound && currentRound.round === 1) {
-      const hasScores = currentRound.results && currentRound.results.length > 0;
-      if (!hasScores && availableHeats.length > 0) {
-        console.log('🎯 Initial heat allocation - showing assignments modal');
-        setShowHeatAssignments(true);
-        hasShownInitialModal.current = true;
-      }
+    if (!hasShownInitialModal.current && currentRound && availableHeats.length > 0) {
+      console.log('🎯 Initial load - showing heat assignments modal for Round', currentRound.round);
+      setShowHeatAssignments(true);
+      hasShownInitialModal.current = true;
     }
   }, [currentRound, availableHeats]);
 
