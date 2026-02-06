@@ -123,8 +123,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Track which round was last auto-advanced to prevent loops
   const lastAutoAdvancedRound = React.useRef<number | null>(null);
 
-  // Track if we've shown the initial modal
-  const hasShownInitialModal = React.useRef<boolean>(false);
+  // Track if we've shown the initial modal (reset on each render cycle)
+  const [hasShownInitialModal, setHasShownInitialModal] = React.useState<boolean>(false);
 
   // Track last promotion to avoid showing modal multiple times
   const lastPromotionShown = React.useRef<string | null>(null);
@@ -258,12 +258,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Show modal on initial load when continuing scoring
   // This ensures the user sees heat assignments when clicking "Continue Scoring"
   React.useEffect(() => {
-    if (!hasShownInitialModal.current && currentRound && availableHeats.length > 0) {
+    if (!hasShownInitialModal && currentRound && availableHeats.length > 0) {
       console.log('🎯 Initial load - showing heat assignments modal for Round', currentRound.round);
       setShowHeatAssignments(true);
-      hasShownInitialModal.current = true;
+      setHasShownInitialModal(true);
     }
-  }, [currentRound, availableHeats]);
+  }, [currentRound, availableHeats, hasShownInitialModal]);
 
   // Show modal when a round completes and next round assignments are generated
   const lastCompletedRoundShown = React.useRef<number | null>(null);
