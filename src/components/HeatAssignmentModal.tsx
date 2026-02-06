@@ -1381,9 +1381,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     Cancel
                   </button>
                   <button
-                    onClick={() => {
-                      // Apply modifications to next round's heat assignments
-                      if (onUpdateAssignments && roundToDisplay && nextRound) {
+                    onClick={async () => {
+                      // Apply modifications to current round's heat assignments (mid-round edits)
+                      // OR next round's assignments (between-round edits)
+                      if (onUpdateAssignments && roundToDisplay) {
                         const updatedAssignments = applyManualOverrides(
                           roundToDisplay,
                           modifiedPromotions,
@@ -1392,7 +1393,43 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           heatAssignments,
                           configuration.numberOfHeats
                         );
+
+                        // If we're editing mid-round (no nextRound), update CURRENT round
+                        // If between rounds (nextRound exists), update NEXT round
+                        const targetRoundNumber = nextRound ? nextRound.round : roundToDisplay.round;
+
+                        console.log('💾 Applying assignment changes to Round', targetRoundNumber);
+                        console.log('   Updated assignments:', updatedAssignments);
+
+                        // Update in parent state
                         onUpdateAssignments(updatedAssignments);
+
+                        // Save to database if currentEvent exists
+                        if (currentEvent?.id) {
+                          try {
+                            const { error } = await supabase
+                              .from('quick_races')
+                              .update({
+                                heat_management: {
+                                  ...heatManagement,
+                                  rounds: heatManagement.rounds.map(r =>
+                                    r.round === targetRoundNumber
+                                      ? { ...r, heatAssignments: updatedAssignments }
+                                      : r
+                                  )
+                                }
+                              })
+                              .eq('id', currentEvent.id);
+
+                            if (error) {
+                              console.error('❌ Error saving assignment changes:', error);
+                            } else {
+                              console.log('✅ Assignment changes saved to database');
+                            }
+                          } catch (error) {
+                            console.error('❌ Error updating assignments:', error);
+                          }
+                        }
                       }
 
                       // Save the applied changes to show them visually
@@ -1734,18 +1771,56 @@ function applyManualOverrides(
   originalHeatAssignments: HeatAssignment[],
   numberOfHeats: number
 ): HeatAssignment[] {
-  // Start with the original assignments for the NEXT round
+  console.log('🔧 applyManualOverrides called with:', {
+    roundNumber: round.round,
+    roundCompleted: round.completed,
+    modifiedPromotions: Array.from(modifiedPromotions),
+    resultsCount: round.results?.length || 0
+  });
+
   const heats = (['A', 'B', 'C', 'D', 'E', 'F'] as HeatDesignation[]).slice(0, numberOfHeats);
 
-  // Build the next round assignments based on current round results
-  const nextRoundAssignments: HeatAssignment[] = heats.map(heat => ({
-    heatDesignation: heat,
-    skipperIndices: []
-  }));
+  // Check if we're doing mid-round edits (some heats complete, others not)
+  const completedHeats = new Set<string>();
+  const heatResults = new Map<HeatDesignation, any[]>();
+
+  round.results?.forEach((r: any) => {
+    if (!heatResults.has(r.heatDesignation)) {
+      heatResults.set(r.heatDesignation, []);
+    }
+    heatResults.get(r.heatDesignation)!.push(r);
+
+    // A heat is complete if all results have positions
+    const results = heatResults.get(r.heatDesignation)!;
+    if (results.every((res: any) => res.position !== null || res.letterScore)) {
+      completedHeats.add(r.heatDesignation);
+    }
+  });
+
+  const isMidRound = !round.completed && completedHeats.size > 0;
+
+  console.log('   Mid-round edit:', isMidRound);
+  console.log('   Completed heats:', Array.from(completedHeats));
+
+  // If mid-round, update CURRENT round's assignments for uncompleted heats
+  // If between rounds, build NEXT round's assignments
+  const updatedAssignments: HeatAssignment[] = heats.map(heat => {
+    // For mid-round: keep existing assignments for uncompleted heats, update completed ones
+    if (isMidRound && !completedHeats.has(heat)) {
+      const existing = originalHeatAssignments.find(a => a.heatDesignation === heat);
+      return existing || { heatDesignation: heat, skipperIndices: [] };
+    }
+
+    // For completed heats or between-round: build from results
+    return {
+      heatDesignation: heat,
+      skipperIndices: []
+    };
+  });
 
   // Build a map of current results
   const skipperResults = new Map<number, { heat: HeatDesignation; position: number }>();
-  round.results.forEach((r: any) => {
+  (round.results || []).forEach((r: any) => {
     if (r.position !== null) {
       skipperResults.set(r.skipperIndex, {
         heat: r.heatDesignation,
@@ -1800,28 +1875,62 @@ function applyManualOverrides(
       shouldRelegate = !shouldRelegate;
     }
 
-    // Determine target heat for next round
+    // Determine target heat
     let targetHeatIdx = currentHeatIdx;
 
-    if (shouldPromote && !isTopHeat) {
-      targetHeatIdx = round.round === 1 ? 0 : currentHeatIdx - 1; // R1: all promote to Heat A, R2+: to next higher
-    } else if (shouldRelegate && !isBottomHeat) {
-      targetHeatIdx = currentHeatIdx + 1;
+    // For mid-round: only move skippers between heats in the CURRENT round
+    // For between-rounds: move to next round's heats
+    if (isMidRound) {
+      // Mid-round: Promote to higher heat in THIS round
+      if (shouldPromote && !isTopHeat) {
+        targetHeatIdx = currentHeatIdx - 1;
+        console.log(`   🔼 Mid-round: Promoting skipper ${skipperIndex} from Heat ${heats[currentHeatIdx]} to ${heats[targetHeatIdx]}`);
+      }
+      // Don't handle relegations mid-round (they apply to next round)
+    } else {
+      // Between rounds: Apply normal promotion/relegation logic for next round
+      if (shouldPromote && !isTopHeat) {
+        targetHeatIdx = round.round === 1 ? 0 : currentHeatIdx - 1; // R1: all promote to Heat A, R2+: to next higher
+      } else if (shouldRelegate && !isBottomHeat) {
+        targetHeatIdx = currentHeatIdx + 1;
+      }
     }
 
     // Add to target heat
-    nextRoundAssignments[targetHeatIdx].skipperIndices.push(skipperIndex);
+    updatedAssignments[targetHeatIdx].skipperIndices.push(skipperIndex);
   });
 
-  console.log('Manual overrides applied:', {
+  // For mid-round edits: Also add skippers who haven't raced yet (from original assignments of incomplete heats)
+  if (isMidRound) {
+    heats.forEach((heat, idx) => {
+      if (!completedHeats.has(heat)) {
+        const originalAssignment = originalHeatAssignments.find(a => a.heatDesignation === heat);
+        if (originalAssignment) {
+          // Add skippers who were originally in this heat and haven't been moved via promotion edits
+          originalAssignment.skipperIndices.forEach(skipperIdx => {
+            // Don't add if already in results (sailed in a completed heat)
+            if (!skipperResults.has(skipperIdx)) {
+              // Don't add duplicates
+              if (!updatedAssignments[idx].skipperIndices.includes(skipperIdx)) {
+                updatedAssignments[idx].skipperIndices.push(skipperIdx);
+              }
+            }
+          });
+        }
+      }
+    });
+  }
+
+  console.log('✅ Manual overrides applied:', {
+    isMidRound,
     promotions: Array.from(modifiedPromotions),
     relegations: Array.from(modifiedRelegations),
-    nextRoundAssignments: nextRoundAssignments.map(ha => ({
+    updatedAssignments: updatedAssignments.map(ha => ({
       heat: ha.heatDesignation,
       count: ha.skipperIndices.length,
       skippers: ha.skipperIndices
     }))
   });
 
-  return nextRoundAssignments;
+  return updatedAssignments;
 }
