@@ -43,7 +43,7 @@ interface HeatScoringTableProps {
   onGoToRound?: (roundNumber: number) => void;
   onAdvanceToNextRound?: (currentHeat: HeatDesignation) => void;
   onClearHeatRaceResults?: (heatDesignation: HeatDesignation, round: number, race: number, skipperIndices: number[]) => void;
-  onUpdateHeatAssignments?: (assignments: any) => void;
+  onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
 }
 

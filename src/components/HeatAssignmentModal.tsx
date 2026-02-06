@@ -17,7 +17,7 @@ interface HeatAssignmentModalProps {
   onReshuffle?: () => void;
   onManualAssign?: () => void;
   onStartRound?: (roundNumber: number) => void;
-  onUpdateAssignments?: (assignments: HeatAssignment[]) => void;
+  onUpdateAssignments?: (assignments: HeatAssignment[], targetRound?: number) => void;
   onAdvanceToNextRound?: (nextRoundNumber: number) => void;
 }
 
@@ -1401,8 +1401,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         console.log('💾 Applying assignment changes to Round', targetRoundNumber);
                         console.log('   Updated assignments:', updatedAssignments);
 
-                        // Update in parent state
-                        onUpdateAssignments(updatedAssignments);
+                        // Update in parent state - pass targetRoundNumber so parent knows which round to update
+                        onUpdateAssignments(updatedAssignments, targetRoundNumber);
 
                         // Save to database if currentEvent exists
                         if (currentEvent?.id) {
