@@ -40,6 +40,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [appliedPromotions, setAppliedPromotions] = useState<Set<number>>(new Set());
   const [appliedRelegations, setAppliedRelegations] = useState<Set<number>>(new Set());
   const [hasAppliedChanges, setHasAppliedChanges] = useState(false);
+  const [limitWarning, setLimitWarning] = useState<string | null>(null);
 
   // Observer state - store per heat
   const [observersByHeat, setObserversByHeat] = useState<Map<number, ObserverAssignment[]>>(new Map());
@@ -403,6 +404,57 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const { currentRound, rounds, configuration } = heatManagement;
   const promotionCount = configuration.promotionCount;
 
+  // Helper function to count how many skippers are currently promoted from a specific heat
+  const countCurrentPromotions = (heatDesignation: HeatDesignation): number => {
+    // Find results for this heat
+    const heatResults = results?.filter(r => r.heatDesignation === heatDesignation) || [];
+
+    // Count how many are promoted (considering both natural promotion and modifications)
+    let count = 0;
+    heatResults.forEach(result => {
+      if (!result.position) return;
+
+      // Determine if naturally promoted
+      const naturallyPromoted = result.position <= promotionCount;
+
+      // Check if manually toggled
+      const manuallyToggled = modifiedPromotions.has(result.skipperIndex);
+
+      // Final status: naturally promoted XOR manually toggled
+      const isPromoted = naturallyPromoted ? !manuallyToggled : manuallyToggled;
+
+      if (isPromoted) count++;
+    });
+
+    return count;
+  };
+
+  // Helper function to count how many skippers are currently relegated from a specific heat
+  const countCurrentRelegations = (heatDesignation: HeatDesignation): number => {
+    // Find results for this heat
+    const heatResults = results?.filter(r => r.heatDesignation === heatDesignation) || [];
+    const totalInHeat = heatResults.length;
+
+    // Count how many are relegated (considering both natural relegation and modifications)
+    let count = 0;
+    heatResults.forEach(result => {
+      if (!result.position) return;
+
+      // Determine if naturally relegated (bottom finishers)
+      const naturallyRelegated = result.position > (totalInHeat - promotionCount);
+
+      // Check if manually toggled
+      const manuallyToggled = modifiedRelegations.has(result.skipperIndex);
+
+      // Final status: naturally relegated XOR manually toggled
+      const isRelegated = naturallyRelegated ? !manuallyToggled : manuallyToggled;
+
+      if (isRelegated) count++;
+    });
+
+    return count;
+  };
+
   // If a round was just completed, show that completed round with its results
   // Otherwise, find the next uncompleted round to score
   const roundJustCompleted = heatManagement.roundJustCompleted;
@@ -514,6 +566,22 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             <X size={24} />
           </button>
         </div>
+
+        {/* Warning notification for promotion limit */}
+        {limitWarning && (
+          <div className={`mx-6 mt-4 p-3 rounded-lg border ${
+            darkMode
+              ? 'bg-amber-900/20 border-amber-700/50 text-amber-300'
+              : 'bg-amber-50 border-amber-300 text-amber-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <p className="text-sm font-medium">{limitWarning}</p>
+            </div>
+          </div>
+        )}
 
         {/* Heat Grid */}
         <div className="p-6 overflow-y-auto flex-1">
@@ -844,22 +912,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             // 4. If not top heat, toggle promotion (default for heats that can promote)
 
                             if (isRelegated && !isBottomHeat) {
-                              // Currently relegated - allow toggling off
+                              // Currently relegated - allow toggling off (always allowed)
                               setModifiedRelegations(prev => {
                                 const newSet = new Set(prev);
                                 if (newSet.has(skipperIndex)) {
                                   newSet.delete(skipperIndex);
+                                  setLimitWarning(null);
                                 } else {
                                   newSet.add(skipperIndex);
                                 }
                                 return newSet;
                               });
                             } else if (isPromoted && !isTopHeat) {
-                              // Currently promoted - allow toggling off
+                              // Currently promoted - allow toggling off (always allowed)
                               setModifiedPromotions(prev => {
                                 const newSet = new Set(prev);
                                 if (newSet.has(skipperIndex)) {
                                   newSet.delete(skipperIndex);
+                                  // Clear any warning when deselecting
+                                  setLimitWarning(null);
                                 } else {
                                   newSet.add(skipperIndex);
                                 }
@@ -867,22 +938,47 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               });
                             } else if (isInNaturalRelegationZone && !isBottomHeat) {
                               // In relegation zone - toggle relegation
+                              // Check relegation limit before allowing new selection
+                              const currentRelegationCount = countCurrentRelegations(heatDesignation);
+
                               setModifiedRelegations(prev => {
                                 const newSet = new Set(prev);
                                 if (newSet.has(skipperIndex)) {
+                                  // Always allow deselecting
                                   newSet.delete(skipperIndex);
+                                  setLimitWarning(null);
                                 } else {
+                                  // Check if we're at the limit before allowing new selection
+                                  if (currentRelegationCount >= promotionCount) {
+                                    // Show warning and prevent selection
+                                    setLimitWarning(`Cannot relegate more than ${promotionCount} skippers from Heat ${heatDesignation}`);
+                                    setTimeout(() => setLimitWarning(null), 3000);
+                                    return prev; // Return unchanged set
+                                  }
                                   newSet.add(skipperIndex);
                                 }
                                 return newSet;
                               });
                             } else if (!isTopHeat) {
                               // Default: toggle promotion for heats that can promote
+                              // Check promotion limit before allowing new selection
+                              const currentPromotionCount = countCurrentPromotions(heatDesignation);
+
                               setModifiedPromotions(prev => {
                                 const newSet = new Set(prev);
                                 if (newSet.has(skipperIndex)) {
+                                  // Always allow deselecting
                                   newSet.delete(skipperIndex);
+                                  // Clear any warning when deselecting
+                                  setLimitWarning(null);
                                 } else {
+                                  // Check if we're at the limit before allowing new selection
+                                  if (currentPromotionCount >= promotionCount) {
+                                    // Show warning and prevent selection
+                                    setLimitWarning(`Cannot promote more than ${promotionCount} skippers from Heat ${heatDesignation}`);
+                                    setTimeout(() => setLimitWarning(null), 3000);
+                                    return prev; // Return unchanged set
+                                  }
                                   newSet.add(skipperIndex);
                                 }
                                 return newSet;
