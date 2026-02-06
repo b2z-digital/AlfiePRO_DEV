@@ -40,6 +40,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [appliedPromotions, setAppliedPromotions] = useState<Set<number>>(new Set());
   const [appliedRelegations, setAppliedRelegations] = useState<Set<number>>(new Set());
   const [hasAppliedChanges, setHasAppliedChanges] = useState(false);
+  const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
 
   // Observer state - store per heat
@@ -59,6 +60,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setAppliedPromotions(new Set());
       setAppliedRelegations(new Set());
       setHasAppliedChanges(false);
+      setIsApplyingChanges(false);
     }
   }, [isOpen]);
 
@@ -1382,70 +1384,83 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   </button>
                   <button
                     onClick={async () => {
-                      // Apply modifications to current round's heat assignments (mid-round edits)
-                      // OR next round's assignments (between-round edits)
-                      if (onUpdateAssignments && roundToDisplay) {
-                        const updatedAssignments = applyManualOverrides(
-                          roundToDisplay,
-                          modifiedPromotions,
-                          modifiedRelegations,
-                          promotionCount,
-                          heatAssignments,
-                          configuration.numberOfHeats
-                        );
+                      // Prevent multiple rapid clicks
+                      if (isApplyingChanges) return;
+                      setIsApplyingChanges(true);
 
-                        // If we're editing mid-round (no nextRound), update CURRENT round
-                        // If between rounds (nextRound exists), update NEXT round
-                        const targetRoundNumber = nextRound ? nextRound.round : roundToDisplay.round;
+                      try {
+                        // Apply modifications to current round's heat assignments (mid-round edits)
+                        // OR next round's assignments (between-round edits)
+                        if (onUpdateAssignments && roundToDisplay) {
+                          const updatedAssignments = applyManualOverrides(
+                            roundToDisplay,
+                            modifiedPromotions,
+                            modifiedRelegations,
+                            promotionCount,
+                            heatAssignments,
+                            configuration.numberOfHeats
+                          );
 
-                        console.log('💾 Applying assignment changes to Round', targetRoundNumber);
-                        console.log('   Updated assignments:', updatedAssignments);
+                          // If we're editing mid-round (no nextRound), update CURRENT round
+                          // If between rounds (nextRound exists), update NEXT round
+                          const targetRoundNumber = nextRound ? nextRound.round : roundToDisplay.round;
 
-                        // Update in parent state - pass targetRoundNumber so parent knows which round to update
-                        onUpdateAssignments(updatedAssignments, targetRoundNumber);
+                          console.log('💾 Applying assignment changes to Round', targetRoundNumber);
+                          console.log('   Updated assignments:', updatedAssignments);
 
-                        // Save to database if currentEvent exists
-                        if (currentEvent?.id) {
-                          try {
-                            const { error } = await supabase
-                              .from('quick_races')
-                              .update({
-                                heat_management: {
-                                  ...heatManagement,
-                                  rounds: heatManagement.rounds.map(r =>
-                                    r.round === targetRoundNumber
-                                      ? { ...r, heatAssignments: updatedAssignments }
-                                      : r
-                                  )
-                                }
-                              })
-                              .eq('id', currentEvent.id);
+                          // Update in parent state - pass targetRoundNumber so parent knows which round to update
+                          onUpdateAssignments(updatedAssignments, targetRoundNumber);
 
-                            if (error) {
-                              console.error('❌ Error saving assignment changes:', error);
-                            } else {
-                              console.log('✅ Assignment changes saved to database');
+                          // Save to database if currentEvent exists
+                          if (currentEvent?.id) {
+                            try {
+                              const { error } = await supabase
+                                .from('quick_races')
+                                .update({
+                                  heat_management: {
+                                    ...heatManagement,
+                                    rounds: heatManagement.rounds.map(r =>
+                                      r.round === targetRoundNumber
+                                        ? { ...r, heatAssignments: updatedAssignments }
+                                        : r
+                                    )
+                                  }
+                                })
+                                .eq('id', currentEvent.id);
+
+                              if (error) {
+                                console.error('❌ Error saving assignment changes:', error);
+                              } else {
+                                console.log('✅ Assignment changes saved to database');
+                              }
+                            } catch (error) {
+                              console.error('❌ Error updating assignments:', error);
                             }
-                          } catch (error) {
-                            console.error('❌ Error updating assignments:', error);
                           }
                         }
+
+                        // Save the applied changes to show them visually
+                        setAppliedPromotions(new Set(modifiedPromotions));
+                        setAppliedRelegations(new Set(modifiedRelegations));
+                        setHasAppliedChanges(true);
+
+                        // Exit edit mode but keep the modifications visible
+                        setEditMode(false);
+                        setModifiedPromotions(new Set());
+                        setModifiedRelegations(new Set());
+                      } finally {
+                        setIsApplyingChanges(false);
                       }
-
-                      // Save the applied changes to show them visually
-                      setAppliedPromotions(new Set(modifiedPromotions));
-                      setAppliedRelegations(new Set(modifiedRelegations));
-                      setHasAppliedChanges(true);
-
-                      // Exit edit mode but keep the modifications visible
-                      setEditMode(false);
-                      setModifiedPromotions(new Set());
-                      setModifiedRelegations(new Set());
                     }}
-                    className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    disabled={isApplyingChanges}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                      isApplyingChanges
+                        ? 'bg-green-400 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700'
+                    } text-white`}
                   >
                     <Check size={18} />
-                    Apply Changes
+                    {isApplyingChanges ? 'Applying...' : 'Apply Changes'}
                   </button>
                 </>
               )}
@@ -1802,21 +1817,12 @@ function applyManualOverrides(
   console.log('   Mid-round edit:', isMidRound);
   console.log('   Completed heats:', Array.from(completedHeats));
 
-  // If mid-round, update CURRENT round's assignments for uncompleted heats
-  // If between rounds, build NEXT round's assignments
-  const updatedAssignments: HeatAssignment[] = heats.map(heat => {
-    // For mid-round: keep existing assignments for uncompleted heats, update completed ones
-    if (isMidRound && !completedHeats.has(heat)) {
-      const existing = originalHeatAssignments.find(a => a.heatDesignation === heat);
-      return existing || { heatDesignation: heat, skipperIndices: [] };
-    }
-
-    // For completed heats or between-round: build from results
-    return {
-      heatDesignation: heat,
-      skipperIndices: []
-    };
-  });
+  // ALWAYS start with fresh empty assignments - we'll build them from scratch
+  // This prevents duplicates when applying changes multiple times
+  const updatedAssignments: HeatAssignment[] = heats.map(heat => ({
+    heatDesignation: heat,
+    skipperIndices: []
+  }));
 
   // Build a map of current results
   const skipperResults = new Map<number, { heat: HeatDesignation; position: number }>();
@@ -1896,8 +1902,12 @@ function applyManualOverrides(
       }
     }
 
-    // Add to target heat
-    updatedAssignments[targetHeatIdx].skipperIndices.push(skipperIndex);
+    // Add to target heat (with duplicate check)
+    if (!updatedAssignments[targetHeatIdx].skipperIndices.includes(skipperIndex)) {
+      updatedAssignments[targetHeatIdx].skipperIndices.push(skipperIndex);
+    } else {
+      console.warn(`⚠️ Skipper ${skipperIndex} already in target heat ${heats[targetHeatIdx]}, skipping duplicate`);
+    }
   });
 
   // For mid-round edits: Also add skippers who haven't raced yet (from original assignments of incomplete heats)
