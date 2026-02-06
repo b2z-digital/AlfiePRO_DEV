@@ -103,16 +103,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         currentEvent
       });
 
+      // Set loading state at the start
+      setLoadingObservers(true);
+
       if (!isOpen || !currentEvent?.id) {
         console.log('⏭️ Skipping observer load - no event or modal closed');
         setObserversByHeat(new Map());
+        setLoadingObservers(false);
         return;
       }
 
       // CRITICAL: Don't load observers until skippers are actually loaded
       if (!skippers || skippers.length === 0) {
         console.log('⏳ Waiting for skippers to load before assigning observers...');
-        setObserversByHeat(new Map());
+        // Keep loading state active - the useEffect will re-trigger when skippers load
+        // Don't clear the map or set loading to false
         return;
       }
 
@@ -129,6 +134,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         if (error) {
           console.error('❌ Error fetching observer settings:', error);
           setObserversByHeat(new Map());
+          setLoadingObservers(false);
           return;
         }
 
@@ -144,15 +150,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         if (!eventData?.enable_observers) {
           console.log('⏭️ Observers disabled for this event');
           setObserversByHeat(new Map());
+          setLoadingObservers(false);
           return;
         }
       } else if (!enableObservers) {
         console.log('⏭️ Observers disabled for this event');
         setObserversByHeat(new Map());
+        setLoadingObservers(false);
         return;
       }
 
-      setLoadingObservers(true);
       try {
         const { currentRound, rounds, roundJustCompleted } = heatManagement;
 
