@@ -736,12 +736,26 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     setShowManualAssignModal(true);
   };
 
+  // Force reload observers when Heat Assignments Modal opens
+  // This ensures fresh observer data when continuing scoring after exiting
+  React.useEffect(() => {
+    if (showHeatAssignments) {
+      console.log('📋 Heat Assignments Modal opened - triggering observer refresh');
+      setObserverReloadTrigger(prev => prev + 1);
+    }
+  }, [showHeatAssignments]);
+
   // Load observers for the current heat
   React.useEffect(() => {
     const loadObservers = async () => {
       if (!currentEvent?.id || !selectedHeat || !currentEvent.enable_observers) {
         console.log(`🚫 Not loading observers: eventId=${currentEvent?.id}, heat=${selectedHeat}, enable_observers=${currentEvent?.enable_observers}`);
-        setCurrentHeatObservers([]);
+        // Clear observers if we can't load them
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (currentHeatObservers.length > 0) {
+          console.log('🧹 Clearing stale observers');
+          setCurrentHeatObservers([]);
+        }
         return;
       }
 
@@ -762,9 +776,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           round: o.round,
           heat_number: o.heat_number
         })));
+
+        // Always update state, even if empty, to trigger re-render
+        console.log(`🔄 Setting currentHeatObservers to ${observers?.length || 0} observers`);
         setCurrentHeatObservers(observers || []);
       } catch (error) {
-        console.error('Error loading observers for current heat:', error);
+        console.error('❌ Error loading observers for current heat:', error);
         setCurrentHeatObservers([]);
       }
     };
@@ -1132,7 +1149,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
-          // Trigger observer reload to ensure scoring screen gets the latest observers
+          // CRITICAL: Force observer reload when modal closes to ensure fresh observers for scoring
+          // This ensures observers are reloaded from the database, not stale modal state
           setObserverReloadTrigger(prev => prev + 1);
         }}
         heatManagement={heatManagement}
