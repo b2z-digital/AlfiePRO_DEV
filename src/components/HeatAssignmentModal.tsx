@@ -600,7 +600,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               for (let i = 0; i < heatAssignments.length; i++) {
                 const assignment = heatAssignments[i];
                 const heatResults = results.filter(r => r.heatDesignation === assignment.heatDesignation);
-                const isComplete = heatResults.length > 0 && heatResults.every(r =>
+                const isComplete = heatResults.length > 0 && heatResults.length >= assignment.skipperIndices.length && heatResults.every(r =>
                   r.position !== null || r.letterScore || r.markedAsUP
                 );
                 if (isComplete) {
@@ -631,8 +631,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 ? heatResults.map(r => r.skipperIndex)
                 : [];
 
-              // Check if this heat is completed (has results)
-              const heatCompleted = heatResults.length > 0 && heatResults.every(r =>
+              // Check if this heat is completed (all assigned skippers have results)
+              const heatCompleted = heatResults.length > 0 && heatResults.length >= skipperIndices.length && heatResults.every(r =>
                 r.position !== null || r.letterScore || r.markedAsUP
               );
 
