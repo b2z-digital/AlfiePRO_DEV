@@ -131,9 +131,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         }
       );
 
+      const pollMs = (streamStatus === 'testing' || streamStatus === 'live') ? 5000 : 15000;
       const pollInterval = setInterval(() => {
         loadCameras(activeSession.id);
-      }, 5000);
+      }, pollMs);
 
       return () => {
         sessionSubscription.unsubscribe();
@@ -388,18 +389,17 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }, 500);
   };
 
-  useEffect(() => {
-    console.log('[ControlPanel] Mobile camera useEffect triggered. activeSession:', !!activeSession, 'streamStatus:', streamStatus, 'cameras:', cameras.length);
+  const cameraFingerprint = cameras.map(c => `${c.id}:${c.status}:${c.last_connected_at || ''}`).join(',');
 
-    if (!activeSession) {
-      console.log('[ControlPanel] Early return - no active session');
-      return;
-    }
+  useEffect(() => {
+    if (!activeSession) return;
 
     const mobileCameras = cameras.filter(c =>
       c.camera_type === 'mobile' &&
       (c.status === 'connected' || c.status === 'streaming')
     );
+
+    if (mobileCameras.length === 0) return;
 
     console.log('[ControlPanel] Mobile cameras found:', mobileCameras.length);
     mobileCameras.forEach(c => console.log(`  - ${c.camera_name}: ${c.status}, hasPc: ${!!peerConnectionsRef.current[c.id]}`));
@@ -420,7 +420,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         setupMobileCameraConnection(camera);
       }
     });
-  }, [activeSession?.id, cameras, streamStatus]);
+  }, [activeSession?.id, cameraFingerprint]);
 
   useEffect(() => {
     return () => {
