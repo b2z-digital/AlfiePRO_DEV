@@ -77,11 +77,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     entriesClose: '',
     lateEntryUntil: '',
     // Results display settings
-    showClubState: false,
+    showClubState: true,
     showDesign: false,
     showCategory: false,
     showCountry: false,
-    showFlag: false,
+    showFlag: true,
     noticeOfRaceFile: null as File | null,
     noticeOfRaceUrl: '',
     sailingInstructionsFile: null as File | null,
@@ -2469,44 +2469,81 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                 </div>
 
                 <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, isPaid: !prev.isPaid }))}
-                    className={`
-                      w-full p-4 rounded-lg border-2 transition-all text-left
-                      ${formData.isPaid
-                        ? 'bg-emerald-600/20 border-emerald-500 ring-2 ring-emerald-500/20'
-                        : darkMode
-                          ? 'bg-slate-700/50 border-slate-600 hover:bg-slate-700'
-                          : 'bg-white border-slate-200 hover:border-slate-300'}
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${formData.isPaid ? 'bg-emerald-500/20' : darkMode ? 'bg-slate-600' : 'bg-slate-100'}`}>
-                          <DollarSign size={20} className={formData.isPaid ? 'text-emerald-600' : darkMode ? 'text-slate-400' : 'text-slate-600'} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, isPaid: false }))}
+                      className={`
+                        group relative p-5 rounded-xl border-2 transition-all duration-300 text-left transform hover:scale-[1.02]
+                        ${!formData.isPaid
+                          ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/20'
+                          : darkMode
+                            ? 'bg-slate-700/30 border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'}
+                      `}
+                    >
+                      {!formData.isPaid && (
+                        <div className="absolute inset-0 rounded-xl bg-blue-500/5 blur-xl"></div>
+                      )}
+                      <div className="flex items-center gap-3 mb-2 relative z-10">
+                        <div className={`
+                          p-2.5 rounded-xl transition-all duration-300 transform group-hover:scale-110
+                          ${!formData.isPaid
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                            : darkMode
+                              ? 'bg-slate-600 text-slate-300 group-hover:bg-slate-500'
+                              : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'}
+                        `}>
+                          <Users size={20} />
                         </div>
                         <div>
-                          <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Paid Event
-                          </div>
-                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Collect entry fees from participants
-                          </p>
+                          <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            Free Event
+                          </h3>
                         </div>
                       </div>
-                      <div className={`
-                        w-5 h-5 rounded-full border-2 flex items-center justify-center
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
+                        No entry fees required
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, isPaid: true }))}
+                      className={`
+                        group relative p-5 rounded-xl border-2 transition-all duration-300 text-left transform hover:scale-[1.02]
                         ${formData.isPaid
-                          ? 'border-emerald-500 bg-emerald-500'
-                          : darkMode ? 'border-slate-400' : 'border-slate-300'}
-                      `}>
-                        {formData.isPaid && (
-                          <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-                        )}
+                          ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-emerald-500 shadow-lg shadow-emerald-500/20'
+                          : darkMode
+                            ? 'bg-slate-700/30 border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'}
+                      `}
+                    >
+                      {formData.isPaid && (
+                        <div className="absolute inset-0 rounded-xl bg-emerald-500/5 blur-xl"></div>
+                      )}
+                      <div className="flex items-center gap-3 mb-2 relative z-10">
+                        <div className={`
+                          p-2.5 rounded-xl transition-all duration-300 transform group-hover:scale-110
+                          ${formData.isPaid
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                            : darkMode
+                              ? 'bg-slate-600 text-slate-300 group-hover:bg-slate-500'
+                              : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'}
+                        `}>
+                          <DollarSign size={20} />
+                        </div>
+                        <div>
+                          <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            Paid Event
+                          </h3>
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
+                        Collect entry fees from participants
+                      </p>
+                    </button>
+                  </div>
 
                   {formData.isPaid && (
                     <div className="mt-4 space-y-6">
@@ -2693,9 +2730,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                 <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Club/State Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showClubState
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2704,8 +2741,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showClubState: !prev.showClubState }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showClubState ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showClubState ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2720,9 +2757,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Design Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showDesign
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2731,8 +2768,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showDesign: !prev.showDesign }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showDesign ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showDesign ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2747,9 +2784,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Category Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showCategory
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2758,8 +2795,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showCategory: !prev.showCategory }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showCategory ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showCategory ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2774,9 +2811,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Country Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showCountry
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2785,8 +2822,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showCountry: !prev.showCountry }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showCountry ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showCountry ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2801,9 +2838,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Show Flag Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showFlag
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2812,8 +2849,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showFlag: !prev.showFlag }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showFlag ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showFlag ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
