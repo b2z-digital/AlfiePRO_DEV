@@ -91,7 +91,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
           assignee:members!assignee_id (
             first_name,
             last_name,
-            avatar_url
+            avatar_url,
+            user_id
           ),
           clubs!club_id (
             name

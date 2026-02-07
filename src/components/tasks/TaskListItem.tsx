@@ -194,8 +194,8 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
                         size="xs"
                       />
                       {(() => {
-                        const assigneeUserId = (task as any).assignee?.id || task.assignee_id;
-                        const filteredFollowers = followerProfiles.filter(f => f.id !== assigneeUserId);
+                        const assigneeUserId = (task as any).assignee?.user_id;
+                        const filteredFollowers = assigneeUserId ? followerProfiles.filter(f => f.id !== assigneeUserId) : followerProfiles;
                         if (filteredFollowers.length === 0) return null;
                         return (
                           <div className="flex -space-x-2">
@@ -228,7 +228,7 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
                 </div>
 
                 {/* Attachment Indicator */}
-                {task.attachment_count && task.attachment_count > 0 && (
+                {(task.attachment_count ?? 0) > 0 && (
                   <div className={`
                     flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium shadow-sm
                     ${darkMode ? 'bg-slate-700/50 text-slate-300 ring-1 ring-slate-600/50' : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/50'}
@@ -254,7 +254,7 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
                 </div>
 
                 {/* Comment Indicator */}
-                {task.comment_count && task.comment_count > 0 && (
+                {(task.comment_count ?? 0) > 0 && (
                   <div className={`
                     flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium shadow-sm
                     ${darkMode ? 'bg-green-500/20 text-green-300 ring-1 ring-green-400/30' : 'bg-green-50 text-green-600 ring-1 ring-green-200/50'}

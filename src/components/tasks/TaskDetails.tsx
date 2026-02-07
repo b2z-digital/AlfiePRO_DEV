@@ -478,8 +478,8 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
               )}
 
               {(() => {
-                const assigneeMemberId = (task as any).assignee?.id || task.assignee_id;
-                const filteredFollowers = followers.filter(f => f.id !== assigneeMemberId);
+                const assigneeUserId = (task as any).assignee?.user_id;
+                const filteredFollowers = assigneeUserId ? followers.filter(f => f.id !== assigneeUserId) : followers;
                 if (filteredFollowers.length === 0) return null;
                 return (
                   <div>
