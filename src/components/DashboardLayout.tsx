@@ -345,8 +345,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         setup: (ch: any) => ch.on('postgres_changes', {
           event: '*',
           schema: 'public',
-          table: 'club_tasks',
-          filter: `assignee_id=eq.${userId}`
+          table: 'club_tasks'
         }, () => fetchUnreadTasksCount()).subscribe()
       },
       {
@@ -472,18 +471,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const fetchUnreadTasksCount = async () => {
     if (!user || !currentClub?.clubId) return;
 
-    // Skip if offline - not critical for offline functionality
-    if (!navigator.onLine) {
-      console.log('Offline - skipping tasks count fetch');
-      return;
-    }
+    if (!navigator.onLine) return;
 
     try {
-      // Count all active tasks assigned to user (pending or in_progress)
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('id')
+        .eq('club_id', currentClub.clubId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!memberData) {
+        setUnreadTasksCount(0);
+        return;
+      }
+
       const { count, error } = await supabase
         .from('club_tasks')
         .select('*', { count: 'exact', head: true })
-        .eq('assignee_id', user.id)
+        .eq('assignee_id', memberData.id)
         .eq('club_id', currentClub.clubId)
         .in('status', ['pending', 'in_progress']);
 
