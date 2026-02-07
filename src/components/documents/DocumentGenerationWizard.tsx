@@ -1381,8 +1381,8 @@ function resolveFieldDisplayValue(key: string, rawValue: string, formFields: For
     return `${d}/${m}/${y.slice(2)}`;
   }
 
-  if (typeof rawValue === 'string' && rawValue.includes('_') && !/^\d{4}[-_]\d{2}[-_]\d{2}/.test(rawValue) && !rawValue.includes('://')) {
-    return rawValue.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  if (typeof rawValue === 'string' && rawValue.includes('_') && !/^\d{4}[-_]\d{2}[-_]\d{2}/.test(rawValue) && !rawValue.includes('://') && !rawValue.includes('@')) {
+    return rawValue.replace(/_/g, ' ');
   }
 
   return rawValue;
@@ -1418,6 +1418,8 @@ async function generatePDFFromHTML(
   processedHTML = processedHTML.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_match, y, m, d) => {
     return `${d}/${m}/${y.slice(2)}`;
   });
+
+  processedHTML = processedHTML.replace(/{{[^}]+}}/g, '');
 
   let logoDataUrl = '';
   if (template.logo_url) {
@@ -1612,48 +1614,73 @@ async function generatePDFFromHTML(
     const contentDiv = measurePage.querySelector('.pdf-content');
     const allBlockElements: HTMLElement[] = [];
     if (contentDiv) {
-      const collectBlocks = (parent: Element) => {
+      const BLOCK_TAGS = /^(P|H[1-6]|DIV|BLOCKQUOTE|TABLE|HR|PRE|SECTION|ARTICLE|HEADER|FOOTER|NAV|ASIDE|FIGURE)$/;
+      const collectLeafBlocks = (parent: Element) => {
         Array.from(parent.children).forEach(child => {
           const el = child as HTMLElement;
+          if (!el.tagName) return;
           const tag = el.tagName.toUpperCase();
+          const display = getComputedStyle(el).display;
+
+          if (display === 'none') return;
+          if (display === 'inline' || display === 'inline-block') return;
+
           if (tag === 'UL' || tag === 'OL') {
             Array.from(el.children).forEach(li => {
-              if ((li as HTMLElement).tagName.toUpperCase() === 'LI') {
-                allBlockElements.push(li as HTMLElement);
+              const liEl = li as HTMLElement;
+              if (liEl.tagName?.toUpperCase() === 'LI') {
+                allBlockElements.push(liEl);
               }
             });
-          } else {
-            const display = getComputedStyle(el).display;
-            if (display === 'block' || display === 'list-item' || tag.match(/^(P|H[1-6]|DIV|BLOCKQUOTE|TABLE|HR|PRE)$/)) {
-              allBlockElements.push(el);
+            return;
+          }
+
+          let hasBlockChildren = false;
+          for (const ch of Array.from(el.children)) {
+            const chEl = ch as HTMLElement;
+            if (!chEl.tagName) continue;
+            const chTag = chEl.tagName.toUpperCase();
+            const chDisplay = getComputedStyle(chEl).display;
+            if (chDisplay === 'block' || chDisplay === 'list-item' || chDisplay === 'flex' || chDisplay === 'grid' ||
+                BLOCK_TAGS.test(chTag) || chTag === 'UL' || chTag === 'OL' || chTag === 'LI') {
+              hasBlockChildren = true;
+              break;
             }
+          }
+
+          if (hasBlockChildren) {
+            collectLeafBlocks(el);
+          } else if (display === 'block' || display === 'list-item' || BLOCK_TAGS.test(tag)) {
+            allBlockElements.push(el);
           }
         });
       };
-      collectBlocks(contentDiv);
+      collectLeafBlocks(contentDiv);
     }
 
     const measureRect = measurePage.getBoundingClientRect();
     const breakOffsets: number[] = [0];
     let nextBoundary = contentAreaHeightPx;
+    const SAFETY_MARGIN = 4;
 
     for (const el of allBlockElements) {
       const rect = el.getBoundingClientRect();
       const elTop = rect.top - measureRect.top;
       const elBottom = rect.bottom - measureRect.top;
 
-      if (elBottom > nextBoundary && elTop > breakOffsets[breakOffsets.length - 1]) {
+      if (elBottom > nextBoundary - SAFETY_MARGIN && elTop > breakOffsets[breakOffsets.length - 1] + SAFETY_MARGIN) {
         breakOffsets.push(elTop);
         nextBoundary = elTop + contentAreaHeightPx;
+      }
 
-        if (el.offsetHeight > contentAreaHeightPx) {
-          let extra = elTop + contentAreaHeightPx;
-          while (extra < elBottom) {
-            breakOffsets.push(extra);
-            extra += contentAreaHeightPx;
-          }
-          nextBoundary = extra;
+      if (el.offsetHeight > contentAreaHeightPx && elTop >= breakOffsets[breakOffsets.length - 1]) {
+        const baseOffset = breakOffsets[breakOffsets.length - 1];
+        let extra = baseOffset + contentAreaHeightPx;
+        while (extra < elBottom) {
+          breakOffsets.push(extra);
+          extra += contentAreaHeightPx;
         }
+        nextBoundary = extra;
       }
     }
 
