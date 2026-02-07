@@ -1907,22 +1907,21 @@ function applyManualOverrides(
     }
   });
 
-  // For mid-round edits: Also add skippers who haven't raced yet (from original assignments of incomplete heats)
   if (isMidRound) {
     heats.forEach((heat, idx) => {
       if (!completedHeats.has(heat)) {
         const originalAssignment = originalHeatAssignments.find(a => a.heatDesignation === heat);
         if (originalAssignment) {
-          // Add skippers who were originally in this heat and haven't been moved via promotion edits
+          const promotedSkippers = updatedAssignments[idx].skipperIndices.slice();
+          const originalSkippers: number[] = [];
           originalAssignment.skipperIndices.forEach(skipperIdx => {
-            // Don't add if already in results (sailed in a completed heat)
             if (!skipperResults.has(skipperIdx)) {
-              // Don't add duplicates
-              if (!updatedAssignments[idx].skipperIndices.includes(skipperIdx)) {
-                updatedAssignments[idx].skipperIndices.push(skipperIdx);
+              if (!promotedSkippers.includes(skipperIdx)) {
+                originalSkippers.push(skipperIdx);
               }
             }
           });
+          updatedAssignments[idx].skipperIndices = [...originalSkippers, ...promotedSkippers];
         }
       }
     });
