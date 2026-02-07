@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown, Radio } from 'lucide-react';
+import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown, Radio, Globe, Link, Lock, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -658,7 +658,7 @@ export function LivestreamSetupWizard({
       {/* Loading Modal Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60]">
-          <div className="bg-gray-900 rounded-lg p-8 max-w-md w-full mx-4 border border-blue-500/30 shadow-2xl">
+          <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl p-8 max-w-md w-full mx-4 border border-cyan-500/30 shadow-2xl">
             <div className="flex flex-col items-center">
               {/* Animated Spinner */}
               <div className="relative w-20 h-20 mb-6">
@@ -668,7 +668,7 @@ export function LivestreamSetupWizard({
 
               {/* Loading Message */}
               <h3 className="text-xl font-semibold text-white mb-2">Setting Up Your Stream</h3>
-              <p className="text-gray-400 text-center">{loadingMessage}</p>
+              <p className="text-slate-400 text-center">{loadingMessage}</p>
 
               {/* Progress Dots */}
               <div className="flex space-x-2 mt-6">
@@ -682,7 +682,7 @@ export function LivestreamSetupWizard({
       )}
 
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-700/50">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-700/50">
         {/* Header */}
         <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
@@ -771,17 +771,17 @@ export function LivestreamSetupWizard({
           {currentStep === 'event' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-white font-semibold text-lg mb-2">Select Event</h3>
-                <p className="text-gray-400 text-sm mb-4">Choose which race or event this livestream will cover</p>
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-2">Select Event</h3>
+                <p className="text-slate-400 text-sm mb-4">Choose which race or event this livestream will cover</p>
 
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Link to Race/Event <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <select
                     value={wizardData.eventId || ''}
                     onChange={(e) => handleEventSelection(e.target.value)}
-                    className="w-full px-3 py-2 pr-10 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 appearance-none"
+                    className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
                   >
                     <option value="">No event selected</option>
                     {events.map(event => (
@@ -790,7 +790,7 @@ export function LivestreamSetupWizard({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                 </div>
                 {events.length === 0 && (
                   <p className="mt-2 text-sm text-yellow-400">
@@ -811,7 +811,7 @@ export function LivestreamSetupWizard({
 
                 return isMultiDay && wizardData.eventId && wizardData.timing === 'later' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Event Day
                     </label>
                     <div className="relative">
@@ -843,15 +843,15 @@ export function LivestreamSetupWizard({
                             updateWizardData({ eventDay: dayNumber });
                           }
                         }}
-                        className="w-full px-3 py-2 pr-10 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 appearance-none"
+                        className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
                       >
                         {Array.from({ length: selectedEvent.number_of_days || 5 }, (_, i) => i + 1).map(day => (
                           <option key={day} value={day}>Day {day}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                     </div>
-                    <p className="mt-2 text-sm text-gray-400">
+                    <p className="mt-2 text-sm text-slate-400">
                       This is a {selectedEvent.number_of_days || 'multi'}-day event - select which day this stream covers
                     </p>
                   </div>
@@ -864,20 +864,20 @@ export function LivestreamSetupWizard({
             <div className="space-y-6">
               {wizardData.timing === 'later' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
                     Scheduled Start Time
                   </label>
                   <input
                     type="datetime-local"
                     value={wizardData.scheduledTime || ''}
                     onChange={(e) => updateWizardData({ scheduledTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 [color-scheme:dark]"
+                    className="w-full px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors [color-scheme:dark]"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Title <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -885,12 +885,12 @@ export function LivestreamSetupWizard({
                   value={wizardData.title}
                   onChange={(e) => updateWizardData({ title: e.target.value })}
                   placeholder="Add a title that describes your stream"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Description
                 </label>
                 <textarea
@@ -898,19 +898,19 @@ export function LivestreamSetupWizard({
                   onChange={(e) => updateWizardData({ description: e.target.value })}
                   placeholder="Tell viewers more about your stream"
                   rows={4}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Category
                 </label>
                 <div className="relative">
                   <select
                     value={wizardData.category}
                     onChange={(e) => updateWizardData({ category: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 appearance-none"
+                    className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
                   >
                     <option value="Sports">Sports</option>
                     <option value="Entertainment">Entertainment</option>
@@ -918,7 +918,7 @@ export function LivestreamSetupWizard({
                     <option value="Gaming">Gaming</option>
                     <option value="People & Blogs">People & Blogs</option>
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                 </div>
               </div>
             </div>
@@ -926,102 +926,96 @@ export function LivestreamSetupWizard({
 
           {currentStep === 'customization' && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-white font-semibold mb-4">Live Chat</h3>
-                <div className="space-y-3">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={wizardData.enableChat}
-                      onChange={(e) => updateWizardData({ enableChat: e.target.checked })}
-                      className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                    />
-                    <span className="text-gray-300">Enable live chat</span>
-                  </label>
-
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={wizardData.enableLeaderboard}
-                      onChange={(e) => updateWizardData({ enableLeaderboard: e.target.checked })}
-                      className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                    />
-                    <span className="text-gray-300">Show live leaderboard overlay</span>
-                  </label>
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5 space-y-4">
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Features</h3>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ enableChat: !wizardData.enableChat })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <span className="text-slate-200">Live chat</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableChat ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableChat ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-700/30" />
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ enableLeaderboard: !wizardData.enableLeaderboard })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <span className="text-slate-200">Live leaderboard overlay</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableLeaderboard ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableLeaderboard ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-700/30" />
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ enableReactions: !wizardData.enableReactions })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <span className="text-slate-200">Live reactions</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableReactions ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableReactions ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-700/30" />
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ slowMode: !wizardData.slowMode })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <div>
+                      <span className="text-slate-200">Slow mode</span>
+                      {wizardData.slowMode && (
+                        <span className="text-slate-400 text-sm ml-2">({wizardData.slowModeSeconds}s delay)</span>
+                      )}
+                    </div>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.slowMode ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.slowMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <h3 className="text-white font-semibold mb-4">Participant Modes</h3>
-                <p className="text-gray-400 text-sm mb-3">Who can send messages</p>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.chatMode === 'anyone'}
-                      onChange={() => updateWizardData({ chatMode: 'anyone' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Anyone</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.chatMode === 'subscribers'}
-                      onChange={() => updateWizardData({ chatMode: 'subscribers' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Subscribers only</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.chatMode === 'members'}
-                      onChange={() => updateWizardData({ chatMode: 'members' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Club members only</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-white font-semibold mb-4">Reactions</h3>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={wizardData.enableReactions}
-                    onChange={(e) => updateWizardData({ enableReactions: e.target.checked })}
-                    className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                  />
-                  <span className="text-gray-300">Enable live reactions</span>
-                </label>
-              </div>
-
-              <div>
-                <h3 className="text-white font-semibold mb-4">Message Delay</h3>
-                <label className="flex items-center space-x-3 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={wizardData.slowMode}
-                    onChange={(e) => updateWizardData({ slowMode: e.target.checked })}
-                    className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                  />
-                  <span className="text-gray-300">Enable slow mode</span>
-                </label>
                 {wizardData.slowMode && (
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">Seconds between messages</label>
+                  <div className="pt-2 pl-1">
+                    <label className="block text-sm text-slate-400 mb-2">Seconds between messages</label>
                     <input
                       type="number"
                       min="1"
                       max="300"
                       value={wizardData.slowModeSeconds}
                       onChange={(e) => updateWizardData({ slowModeSeconds: parseInt(e.target.value) || 60 })}
-                      className="w-32 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500"
+                      className="w-32 px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5">
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-2">Chat Permissions</h3>
+                <p className="text-slate-400 text-sm mb-4">Who can send messages</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'anyone', label: 'Anyone' },
+                    { value: 'subscribers', label: 'Subscribers' },
+                    { value: 'members', label: 'Members' },
+                  ] as const).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateWizardData({ chatMode: option.value })}
+                      className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
+                        wizardData.chatMode === option.value
+                          ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                          : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                      } border`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1029,69 +1023,77 @@ export function LivestreamSetupWizard({
           {currentStep === 'visibility' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-white font-semibold mb-4">Who can watch this stream?</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3 p-3 bg-gray-800 rounded">
-                    <input
-                      type="radio"
-                      checked={wizardData.visibility === 'public'}
-                      onChange={() => updateWizardData({ visibility: 'public' })}
-                      className="w-4 h-4"
-                    />
-                    <div>
-                      <div className="text-white font-medium">Public</div>
-                      <div className="text-gray-400 text-sm">Anyone can watch your stream</div>
-                    </div>
-                  </label>
-                  <label className="flex items-center space-x-3 p-3 bg-gray-800 rounded">
-                    <input
-                      type="radio"
-                      checked={wizardData.visibility === 'unlisted'}
-                      onChange={() => updateWizardData({ visibility: 'unlisted' })}
-                      className="w-4 h-4"
-                    />
-                    <div>
-                      <div className="text-white font-medium">Unlisted</div>
-                      <div className="text-gray-400 text-sm">Only people with the link can watch</div>
-                    </div>
-                  </label>
-                  <label className="flex items-center space-x-3 p-3 bg-gray-800 rounded">
-                    <input
-                      type="radio"
-                      checked={wizardData.visibility === 'private'}
-                      onChange={() => updateWizardData({ visibility: 'private' })}
-                      className="w-4 h-4"
-                    />
-                    <div>
-                      <div className="text-white font-medium">Private</div>
-                      <div className="text-gray-400 text-sm">Only club members can watch</div>
-                    </div>
-                  </label>
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-4">Who can watch this stream?</h3>
+                <div className="space-y-3">
+                  {([
+                    { value: 'public' as const, label: 'Public', desc: 'Anyone can watch your stream', icon: Globe },
+                    { value: 'unlisted' as const, label: 'Unlisted', desc: 'Only people with the link can watch', icon: Link },
+                    { value: 'private' as const, label: 'Private', desc: 'Only club members can watch', icon: Lock },
+                  ]).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateWizardData({ visibility: option.value })}
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-200 text-left ${
+                        wizardData.visibility === option.value
+                          ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/20'
+                          : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600/50'
+                      } backdrop-blur-sm`}
+                    >
+                      <div className={`p-2.5 rounded-xl ${
+                        wizardData.visibility === option.value
+                          ? 'bg-cyan-500/20 text-cyan-400'
+                          : 'bg-slate-700/50 text-slate-400'
+                      }`}>
+                        <option.icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-white font-medium">{option.label}</div>
+                        <div className="text-slate-400 text-sm">{option.desc}</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        wizardData.visibility === option.value
+                          ? 'border-cyan-500 bg-cyan-500'
+                          : 'border-slate-500'
+                      }`}>
+                        {wizardData.visibility === option.value && (
+                          <Check className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="bg-gray-800 p-4 rounded">
-                <h3 className="text-white font-semibold mb-2">Audience</h3>
-                <p className="text-gray-400 text-sm mb-4">Is this stream made for kids?</p>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.madeForKids === true}
-                      onChange={() => updateWizardData({ madeForKids: true })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Yes, it's made for kids</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.madeForKids === false}
-                      onChange={() => updateWizardData({ madeForKids: false })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">No, it's not made for kids</span>
-                  </label>
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Audience</h3>
+                </div>
+                <p className="text-slate-400 text-sm mb-4">Is this stream made for kids?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ madeForKids: true })}
+                    className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 border ${
+                      wizardData.madeForKids === true
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    Yes, for kids
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ madeForKids: false })}
+                    className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 border ${
+                      wizardData.madeForKids === false
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    No, not for kids
+                  </button>
                 </div>
               </div>
             </div>
@@ -1099,63 +1101,63 @@ export function LivestreamSetupWizard({
 
           {currentStep === 'review' && (
             <div className="space-y-6">
-              <div className="bg-gray-800 p-6 rounded-lg space-y-4">
-                <h3 className="text-white font-semibold text-lg">Review Your Stream Settings</h3>
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-6 space-y-4">
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Stream Summary</h3>
 
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Timing:</span>
+                <div className="space-y-0 text-sm">
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Timing</span>
                     <span className="text-white font-medium">
                       {wizardData.timing === 'now' ? 'Go Live Now' : 'Scheduled'}
                     </span>
                   </div>
 
                   {wizardData.timing === 'later' && wizardData.scheduledTime && (
-                    <div className="flex justify-between border-b border-gray-700 pb-2">
-                      <span className="text-gray-400">Start Time:</span>
+                    <div className="flex justify-between py-3 border-b border-slate-700/30">
+                      <span className="text-slate-400">Start Time</span>
                       <span className="text-white font-medium">
                         {new Date(wizardData.scheduledTime).toLocaleString()}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Title:</span>
-                    <span className="text-white font-medium">{wizardData.title || 'Not set'}</span>
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Title</span>
+                    <span className="text-white font-medium max-w-[60%] text-right">{wizardData.title || 'Not set'}</span>
                   </div>
 
                   {wizardData.eventId && (
-                    <div className="flex justify-between border-b border-gray-700 pb-2">
-                      <span className="text-gray-400">Linked Event:</span>
+                    <div className="flex justify-between py-3 border-b border-slate-700/30">
+                      <span className="text-slate-400">Linked Event</span>
                       <span className="text-white font-medium">
                         {events.find(e => e.id === wizardData.eventId)?.name || 'Selected'}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Visibility:</span>
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Visibility</span>
                     <span className="text-white font-medium capitalize">{wizardData.visibility}</span>
                   </div>
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Chat:</span>
-                    <span className="text-white font-medium">
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Chat</span>
+                    <span className={`font-medium ${wizardData.enableChat ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {wizardData.enableChat ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Leaderboard:</span>
-                    <span className="text-white font-medium">
+                  <div className="flex justify-between py-3">
+                    <span className="text-slate-400">Leaderboard</span>
+                    <span className={`font-medium ${wizardData.enableLeaderboard ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {wizardData.enableLeaderboard ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-blue-900 bg-opacity-30 border border-blue-700 p-4 rounded">
-                <p className="text-blue-200 text-sm">
+              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-2xl p-4">
+                <p className="text-cyan-200 text-sm">
                   {wizardData.timing === 'now'
                     ? 'Click "Go Live" to create your stream session. You can then configure cameras and overlays before starting the broadcast.'
                     : 'Your stream will be scheduled and you can configure additional settings later.'}
@@ -1166,7 +1168,7 @@ export function LivestreamSetupWizard({
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-800/80 px-6 py-4 flex justify-between items-center border-t border-slate-700/50">
+        <div className="bg-slate-800/30 backdrop-blur-sm px-6 py-4 flex justify-between items-center border-t border-slate-700/50">
           <button
             onClick={currentStepIndex === 0 ? onClose : handleBack}
             className="flex items-center space-x-2 px-4 py-2.5 text-slate-300 hover:text-white transition-colors rounded-xl hover:bg-slate-700/50"
