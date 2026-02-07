@@ -11,7 +11,7 @@ interface ScheduleDocumentModalProps {
   documentType: 'nor' | 'si';
   eventDate: string;
   eventName: string;
-  onSchedule: (contacts: string[], contactEmails: string[], dueDate: string) => void;
+  onSchedule: (contacts: string[], contactEmails: string[], dueDate: string, memberIds: string[]) => void;
   isLinked?: boolean;
 }
 
@@ -134,7 +134,7 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
       .map(e => e.trim())
       .filter(e => e.includes('@'));
 
-    onSchedule([...selectedContacts, ...emails], emails, dueDate);
+    onSchedule([...selectedContacts, ...emails], emails, dueDate, [...selectedMembers]);
     onClose();
   };
 

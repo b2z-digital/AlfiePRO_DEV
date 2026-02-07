@@ -3,6 +3,7 @@ import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, Calend
 import { RaceType, BoatType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { storeRaceEvent, storeRaceSeries } from '../../utils/raceStorage';
+import { createTask } from '../../utils/taskStorage';
 import { addPublicEvent, updatePublicEvent } from '../../utils/publicEventStorage';
 import { getStoredClubs } from '../../utils/clubStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
@@ -136,8 +137,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const [showScheduleDocumentModal, setShowScheduleDocumentModal] = useState(false);
   const [scheduleDocumentType, setScheduleDocumentType] = useState<'nor' | 'si'>('nor');
   const [scheduledDocuments, setScheduledDocuments] = useState<{
-    nor?: { scheduled: boolean; contacts: string[]; dueDate?: string };
-    si?: { scheduled: boolean; contacts: string[]; dueDate?: string };
+    nor?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[] };
+    si?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[] };
   }>({});
   const [linkDocumentSchedules, setLinkDocumentSchedules] = useState(true);
 
@@ -506,7 +507,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const handleScheduleDocument = (type: 'nor' | 'si') => {
     // Validate that event date is set
     if (!formData.raceDate) {
-      addNotification('Please set an event date first', 'error');
+      addNotification('error', 'Please set an event date first');
       return;
     }
 
@@ -514,7 +515,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     setShowScheduleDocumentModal(true);
   };
 
-  const handleDocumentScheduled = (documentType: 'nor' | 'si', contacts: string[], contactEmails: string[], dueDate?: string) => {
+  const handleDocumentScheduled = (documentType: 'nor' | 'si', contacts: string[], contactEmails: string[], dueDate?: string, memberIds?: string[]) => {
     if (linkDocumentSchedules) {
       setScheduledDocuments(prev => ({
         ...prev,
@@ -522,19 +523,21 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           scheduled: true,
           contacts: contacts,
           contactEmails: contactEmails,
-          dueDate: dueDate
+          dueDate: dueDate,
+          memberIds: memberIds
         },
         si: {
           scheduled: true,
           contacts: contacts,
           contactEmails: contactEmails,
-          dueDate: dueDate
+          dueDate: dueDate,
+          memberIds: memberIds
         }
       }));
 
       addNotification(
-        'Notice of Race and Sailing Instructions creation scheduled successfully (linked)',
-        'success'
+        'success',
+        'NOR & SI document reminders successfully scheduled'
       );
     } else {
       setScheduledDocuments(prev => ({
@@ -543,13 +546,14 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           scheduled: true,
           contacts: contacts,
           contactEmails: contactEmails,
-          dueDate: dueDate
+          dueDate: dueDate,
+          memberIds: memberIds
         }
       }));
 
       addNotification(
-        `${documentType === 'nor' ? 'Notice of Race' : 'Sailing Instructions'} creation scheduled successfully`,
-        'success'
+        'success',
+        `${documentType === 'nor' ? 'NOR' : 'SI'} document reminder successfully scheduled`
       );
     }
   };
@@ -912,6 +916,36 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           'Event Submitted for Approval',
           message
         );
+      }
+
+      if (currentClub?.clubId && user?.id) {
+        const eventDateFormatted = new Date(formData.raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const docsToCreate: { type: 'nor' | 'si'; label: string }[] = [];
+        if (scheduledDocuments.nor?.scheduled) docsToCreate.push({ type: 'nor', label: 'Notice of Race (NOR)' });
+        if (scheduledDocuments.si?.scheduled) docsToCreate.push({ type: 'si', label: 'Sailing Instructions (SI)' });
+
+        for (const docInfo of docsToCreate) {
+          const doc = scheduledDocuments[docInfo.type];
+          if (!doc?.memberIds?.length) continue;
+
+          for (const memberId of doc.memberIds) {
+            try {
+              await createTask(currentClub.clubId, user.id, {
+                title: `Prepare ${docInfo.label} - ${formData.eventName}`,
+                description: `Prepare and finalise the ${docInfo.label} for the event "${formData.eventName}" scheduled on ${eventDateFormatted}.`,
+                due_date: doc.dueDate || null,
+                priority: 'high',
+                assignee_id: memberId,
+                send_reminder: true,
+                reminder_type: 'both',
+                reminder_date: doc.dueDate || null,
+                followers: [user.id]
+              });
+            } catch (taskErr) {
+              console.error(`Error creating ${docInfo.type} task for member ${memberId}:`, taskErr);
+            }
+          }
+        }
       }
 
       onSuccess();
@@ -2012,7 +2046,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                     const norTemplate = availableTemplates.find(t => t.document_type === 'nor' && t.linked_form_id);
                                     console.log('NOR Template:', norTemplate);
                                     if (!norTemplate) {
-                                      addNotification('No NOR template found.', 'error');
+                                      addNotification('error', 'No NOR template found.');
                                       return;
                                     }
 
@@ -2041,7 +2075,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                     setShowDocumentWizard(true);
                                   } catch (err) {
                                     console.error('Error in Edit NOR handler:', err);
-                                    addNotification('Failed to load document for editing', 'error');
+                                    addNotification('error', 'Failed to load document for editing');
                                   }
                                 }}
                                 className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
@@ -2154,13 +2188,13 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                               console.log('Generate NOR clicked');
                               console.log('Available templates:', availableTemplates);
                               if (availableTemplates.length === 0) {
-                                addNotification('No document templates found. Create a template in Settings > Race Documents first.', 'error');
+                                addNotification('error', 'No document templates found. Create a template in Settings > Race Documents first.');
                                 return;
                               }
                               const norTemplate = availableTemplates.find(t => t.document_type === 'nor' && t.linked_form_id);
                               console.log('Found NOR template:', norTemplate);
                               if (!norTemplate) {
-                                addNotification('No NOR template found. Link a form to your NOR template in Settings > Race Documents.', 'error');
+                                addNotification('error', 'No NOR template found. Link a form to your NOR template in Settings > Race Documents.');
                                 return;
                               }
                               setSelectedTemplate(norTemplate.id);
@@ -2285,12 +2319,12 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                           type="button"
                           onClick={() => {
                             if (availableTemplates.length === 0) {
-                              addNotification('No document templates found. Create a template in Settings > Race Documents first.', 'error');
+                              addNotification('error', 'No document templates found. Create a template in Settings > Race Documents first.');
                               return;
                             }
                             const siTemplate = availableTemplates.find(t => t.document_type === 'si' && t.linked_form_id);
                             if (!siTemplate) {
-                              addNotification('No SI template found. Link a form to your SI template in Settings > Race Documents.', 'error');
+                              addNotification('error', 'No SI template found. Link a form to your SI template in Settings > Race Documents.');
                               return;
                             }
                             setSelectedTemplate(siTemplate.id);
@@ -3047,8 +3081,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
 
                         if (!hasNorDocument && !hasSiDocument) {
                           addNotification(
-                            `${formData.eventLevel === 'state' ? 'State' : 'National'} events require race documents. Please upload, generate, or schedule at least one document (NOR or SI).`,
-                            'error'
+                            'error',
+                            `${formData.eventLevel === 'state' ? 'State' : 'National'} events require race documents. Please upload, generate, or schedule at least one document (NOR or SI).`
                           );
                           return;
                         }
@@ -3225,8 +3259,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         eventDate={formData.raceDate}
         eventName={formData.eventName}
         isLinked={linkDocumentSchedules}
-        onSchedule={(contacts, contactEmails, dueDate) => {
-          handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails, dueDate);
+        onSchedule={(contacts, contactEmails, dueDate, memberIds) => {
+          handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails, dueDate, memberIds);
           setShowScheduleDocumentModal(false);
         }}
       />
