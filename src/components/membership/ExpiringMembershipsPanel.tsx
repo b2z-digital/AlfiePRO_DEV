@@ -38,7 +38,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   const [expiringMembers, setExpiringMembers] = useState<ExpiringMember[]>([]);
   const [overdueMembers, setOverdueMembers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterDays, setFilterDays] = useState(30);
+  const [filterDays, setFilterDays] = useState(90);
   const [activeTab, setActiveTab] = useState<'expiring' | 'overdue'>('expiring');
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
 

@@ -39,16 +39,35 @@
   }
 }
 
-/* Disable text selection on interactive elements for native app feel */
-button,
-[role="button"],
-[draggable="true"],
-.no-select {
+/* Disable text selection app-wide for native app feel */
+*,
+*::before,
+*::after {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Re-enable text selection where users need to type or copy */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable="true"] *,
+.ProseMirror,
+.ProseMirror *,
+.ql-editor,
+.ql-editor *,
+pre,
+code,
+.select-text,
+.select-text * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 /* Image Protection - Prevent drag and copy on public pages */
