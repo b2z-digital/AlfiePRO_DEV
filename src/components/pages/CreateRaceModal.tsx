@@ -37,14 +37,21 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const { addNotification } = useNotifications();
   const isEditing = !!(editingEvent || editingSeries);
   const raceClassOptions = [
-    { value: 'DF65', label: 'Dragon Force 65' },
-    { value: 'DF95', label: 'Dragon Force 95' },
-    { value: '10R', label: '10 Rater' },
-    { value: 'IOM', label: 'IOM' },
-    { value: 'Marblehead', label: 'Marblehead' },
-    { value: 'A Class', label: 'A Class' },
-    { value: 'RC Laser', label: 'RC Laser' },
+    { value: 'DF65', label: 'Dragon Force 65', keywords: ['dragon force 65', 'df65', 'dragonflite'] },
+    { value: 'DF95', label: 'Dragon Force 95', keywords: ['dragon force 95', 'df95', 'dragonflite 95'] },
+    { value: '10R', label: '10 Rater', keywords: ['10 rater', 'ten rater', '10r'] },
+    { value: 'IOM', label: 'IOM', keywords: ['iom', 'international one metre'] },
+    { value: 'Marblehead', label: 'Marblehead', keywords: ['marblehead'] },
+    { value: 'A Class', label: 'A Class', keywords: ['a class'] },
+    { value: 'RC Laser', label: 'RC Laser', keywords: ['rc laser'] },
   ];
+
+  const findBoatClassForOption = (opt: typeof raceClassOptions[number]): BoatClass | undefined => {
+    return boatClasses.find(bc => {
+      const dbName = bc.name.toLowerCase();
+      return opt.keywords.some(kw => dbName.includes(kw));
+    });
+  };
   const [formData, setFormData] = useState({
     eventName: '',
     clubName: '',
@@ -1206,18 +1213,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Event between two or more clubs
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.isInterclub
-                        ? 'border-emerald-500 bg-emerald-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.isInterclub && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
 
                 <button
@@ -1259,18 +1254,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Event spanning multiple days
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.isMultiDay
-                        ? 'border-emerald-500 bg-emerald-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.isMultiDay && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
 
                 <button
@@ -1308,18 +1291,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Enable fleet board & skipper tracking
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.enableLiveTracking
-                        ? 'border-emerald-500 bg-emerald-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.enableLiveTracking && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
 
                 <button
@@ -1357,18 +1328,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Broadcast race to YouTube live
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.enableLiveStream
-                        ? 'border-red-500 bg-red-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.enableLiveStream && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
               </div>
 
@@ -1867,9 +1826,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                         ? (raceClassOptions.find(o => o.value === formData.raceClass)?.label || formData.raceClass)
                         : 'Select race class'}
                     </button>
-                    {formData.raceClass && (() => {
-                      const opt = raceClassOptions.find(o => o.value === formData.raceClass);
-                      const bc = opt ? boatClasses.find(bc => bc.name.toLowerCase() === opt.label.toLowerCase()) : null;
+                    {(() => {
+                      const opt = formData.raceClass ? raceClassOptions.find(o => o.value === formData.raceClass) : null;
+                      const bc = opt ? findBoatClassForOption(opt) : null;
                       return bc?.class_image ? (
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border-2 border-slate-600">
                           <img src={bc.class_image} alt="" className="w-full h-full object-cover" />
@@ -1878,18 +1837,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                         <Sailboat size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                       );
                     })()}
-                    {!formData.raceClass && (
-                      <Sailboat size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                    )}
                     <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
 
                     {showClassDropdown && (
                       <div className={`
-                        absolute top-full left-0 right-0 mt-1 max-h-60 overflow-auto rounded-lg shadow-xl z-50 border
+                        absolute bottom-full left-0 right-0 mb-1 max-h-60 overflow-auto rounded-lg shadow-xl z-50 border
                         ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}
                       `}>
                         {raceClassOptions.map(opt => {
-                          const bc = boatClasses.find(bc => bc.name.toLowerCase() === opt.label.toLowerCase());
+                          const bc = findBoatClassForOption(opt);
                           return (
                             <button
                               key={opt.value}
