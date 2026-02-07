@@ -57,11 +57,14 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
 
   const eventDateObj = useMemo(() => eventDate ? new Date(eventDate + 'T00:00:00') : null, [eventDate]);
 
+  const initialMembersKey = initialSelectedMembers?.join(',') || '';
+
   useEffect(() => {
     if (isOpen && eventDate) {
       if (initialDueDate) {
-        setDueDate(initialDueDate);
-        const initDate = new Date(initialDueDate + 'T00:00:00');
+        const normalizedDate = initialDueDate.substring(0, 10);
+        setDueDate(normalizedDate);
+        const initDate = new Date(normalizedDate + 'T00:00:00');
         setCalendarMonth(initDate.getMonth());
         setCalendarYear(initDate.getFullYear());
       } else {
@@ -82,12 +85,14 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
       }
 
       if (initialSelectedMembers && initialSelectedMembers.length > 0) {
-        setSelectedMembers(initialSelectedMembers);
+        setSelectedMembers([...initialSelectedMembers]);
+      } else {
+        setSelectedMembers([]);
       }
 
       fetchMembers();
     }
-  }, [isOpen, eventDate, currentClub]);
+  }, [isOpen, eventDate, currentClub, initialDueDate, initialMembersKey]);
 
   const fetchMembers = async () => {
     if (!currentClub?.clubId) return;

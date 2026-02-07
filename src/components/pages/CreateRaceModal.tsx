@@ -140,6 +140,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     nor?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[]; existingTaskIds?: string[] };
     si?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[]; existingTaskIds?: string[] };
   }>({});
+  const [loadingScheduledDocs, setLoadingScheduledDocs] = useState(false);
   const [linkDocumentSchedules, setLinkDocumentSchedules] = useState(true);
 
   useEffect(() => {
@@ -326,13 +327,21 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
       });
 
       const loadScheduledDocuments = async () => {
+        setLoadingScheduledDocs(true);
         try {
           const eventName = editingEvent.eventName || '';
-          const { data, error } = await supabase
+          const clubId = editingEvent.clubId || currentClub?.clubId;
+          let query = supabase
             .from('club_tasks')
             .select('id, title, due_date, assignee_id, status')
             .or(`title.ilike.%Notice of Race (NOR) - ${eventName}%,title.ilike.%Sailing Instructions (SI) - ${eventName}%`)
             .neq('status', 'completed');
+
+          if (clubId) {
+            query = query.eq('club_id', clubId);
+          }
+
+          const { data, error } = await query;
 
           if (error) throw error;
 
@@ -345,7 +354,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               schedules.nor = {
                 scheduled: true,
                 contacts: norTasks.map(t => t.assignee_id).filter(Boolean),
-                dueDate: norTasks[0].due_date,
+                dueDate: norTasks[0].due_date?.substring(0, 10),
                 memberIds: norTasks.map(t => t.assignee_id).filter(Boolean),
                 existingTaskIds: norTasks.map(t => t.id)
               };
@@ -354,7 +363,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               schedules.si = {
                 scheduled: true,
                 contacts: siTasks.map(t => t.assignee_id).filter(Boolean),
-                dueDate: siTasks[0].due_date,
+                dueDate: siTasks[0].due_date?.substring(0, 10),
                 memberIds: siTasks.map(t => t.assignee_id).filter(Boolean),
                 existingTaskIds: siTasks.map(t => t.id)
               };
@@ -365,6 +374,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           }
         } catch (err) {
           console.error('Error loading scheduled documents:', err);
+        } finally {
+          setLoadingScheduledDocs(false);
         }
       };
 
@@ -2215,6 +2226,13 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                           </div>
                         </div>
                       </div>
+                    ) : loadingScheduledDocs && editingEvent ? (
+                      <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-700/30 border-slate-600' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
+                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Loading scheduled documents...</p>
+                        </div>
+                      </div>
                     ) : (
                       /* Show upload/generate/schedule options when no document exists */
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2360,6 +2378,13 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                               <Trash2 size={16} />
                             </button>
                           </div>
+                        </div>
+                      </div>
+                    ) : loadingScheduledDocs && editingEvent ? (
+                      <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-700/30 border-slate-600' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
+                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Loading scheduled documents...</p>
                         </div>
                       </div>
                     ) : (
