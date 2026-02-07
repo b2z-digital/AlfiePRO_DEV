@@ -316,8 +316,6 @@ export async function getLiveTrackingEventByToken(
   token: string
 ): Promise<LiveTrackingEvent | null> {
   try {
-    console.log('🔎 getLiveTrackingEventByToken called with token:', token);
-
     const { data, error } = await supabase
       .from('live_tracking_events')
       .select('*')
@@ -325,16 +323,20 @@ export async function getLiveTrackingEventByToken(
       .eq('enabled', true)
       .maybeSingle();
 
-    console.log('📊 Query result - data:', data, 'error:', error);
+    if (error) throw error;
+    if (data) return data as LiveTrackingEvent;
 
-    if (error) {
-      console.error('❌ Supabase error:', error);
-      throw error;
-    }
+    const { data: shortData, error: shortError } = await supabase
+      .from('live_tracking_events')
+      .select('*')
+      .eq('short_code', token.toUpperCase())
+      .eq('enabled', true)
+      .maybeSingle();
 
-    return data as LiveTrackingEvent | null;
+    if (shortError) throw shortError;
+    return shortData as LiveTrackingEvent | null;
   } catch (error) {
-    console.error('❌ Error getting live tracking event by token:', error);
+    console.error('Error getting live tracking event by token:', error);
     return null;
   }
 }

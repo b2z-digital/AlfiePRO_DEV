@@ -98,6 +98,7 @@ export interface LiveTrackingEvent {
   state_association_id?: string | null;
   national_association_id?: string | null;
   access_token: string;
+  short_code: string | null;
   enabled: boolean;
   qr_code_url: string | null;
   public_url: string | null;

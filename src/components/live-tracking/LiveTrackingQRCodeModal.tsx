@@ -90,13 +90,13 @@ export default function LiveTrackingQRCodeModal({
       console.log('Live tracking event created:', event);
       setTrackingEvent(event);
 
-      // Try to get event website domain, fallback to current origin
+      const shortCode = event.short_code;
       const eventDomain = await getEventWebsiteDomain();
-      const trackingUrl = eventDomain
-        ? `${eventDomain}/live/${event.access_token}`
-        : `${window.location.origin}/live/${event.access_token}`;
+      const baseUrl = eventDomain || window.location.origin;
+      const trackingUrl = shortCode
+        ? `${baseUrl}/t/${shortCode}`
+        : `${baseUrl}/live/${event.access_token}`;
 
-      console.log('Generating QR code for URL:', trackingUrl);
       setPublicUrl(trackingUrl);
 
       await generateQRCode(trackingUrl);

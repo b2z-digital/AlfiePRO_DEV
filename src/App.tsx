@@ -204,6 +204,7 @@ function App() {
         <Route path="/nor/:slug" element={<PublicNorGenerator />} />
 
         {/* Live Tracking Routes (Public) */}
+        <Route path="/t/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token/dashboard" element={<LiveDashboardPage />} />
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
