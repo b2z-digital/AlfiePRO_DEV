@@ -333,12 +333,12 @@ export default function LiveTrackingQRCodeModal({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl p-8 max-w-2xl w-full">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl p-8 max-w-2xl w-full border border-slate-700/50">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
           </div>
-          <p className="text-center mt-4 text-gray-600">Generating QR Code...</p>
+          <p className="text-center mt-4 text-slate-400">Generating QR Code...</p>
         </div>
       </div>
     );
@@ -346,14 +346,14 @@ export default function LiveTrackingQRCodeModal({
 
   if (error || !trackingEvent) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl p-8 max-w-2xl w-full">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl p-8 max-w-2xl w-full border border-slate-700/50">
           <div className="text-center">
-            <div className="text-red-500 text-5xl mb-4">⚠️</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">
+            <div className="text-red-400 text-5xl mb-4">!</div>
+            <h3 className="text-xl font-bold text-white mb-2">
               Failed to Initialize Live Tracking
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-slate-400 mb-6">
               {error || 'Unable to create tracking event. Please check browser console for details.'}
             </p>
             <div className="flex gap-3 justify-center">
@@ -363,18 +363,18 @@ export default function LiveTrackingQRCodeModal({
                   setLoading(true);
                   initializeLiveTracking();
                 }}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-medium transition-all"
               >
                 Try Again
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors"
+                className="px-6 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 rounded-xl font-medium transition-colors border border-slate-600/50"
               >
                 Close
               </button>
             </div>
-            <div className="mt-4 text-sm text-gray-500">
+            <div className="mt-4 text-sm text-slate-500">
               <p>Check browser console (F12) for detailed error information</p>
             </div>
           </div>
@@ -385,7 +385,7 @@ export default function LiveTrackingQRCodeModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 border border-slate-200 overflow-hidden animate-slideUp">
+      <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl shadow-2xl max-w-4xl w-full my-8 border border-slate-700/50 overflow-hidden animate-slideUp">
         <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
@@ -407,34 +407,34 @@ export default function LiveTrackingQRCodeModal({
 
         <div className="p-6 space-y-6">
           {/* Engagement Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <Users size={18} />
-                <span className="text-sm font-medium">Active Now</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-4">
+              <div className="flex items-center gap-2 text-cyan-400 mb-1">
+                <Users size={16} />
+                <span className="text-xs font-medium uppercase tracking-wider">Active Now</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{stats.active_sessions}</p>
+              <p className="text-2xl font-bold text-white">{stats.active_sessions}</p>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-green-600 mb-1">
-                <Users size={18} />
-                <span className="text-sm font-medium">Total Sessions</span>
+            <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-4">
+              <div className="flex items-center gap-2 text-emerald-400 mb-1">
+                <Users size={16} />
+                <span className="text-xs font-medium uppercase tracking-wider">Total Sessions</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{stats.total_sessions}</p>
+              <p className="text-2xl font-bold text-white">{stats.total_sessions}</p>
             </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-purple-600 mb-1">
-                <Bell size={18} />
-                <span className="text-sm font-medium">Notifications</span>
+            <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-4">
+              <div className="flex items-center gap-2 text-amber-400 mb-1">
+                <Bell size={16} />
+                <span className="text-xs font-medium uppercase tracking-wider">Notifications</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{stats.notifications_sent}</p>
+              <p className="text-2xl font-bold text-white">{stats.notifications_sent}</p>
             </div>
-            <div className="bg-orange-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-orange-600 mb-1">
-                <Bell size={18} />
-                <span className="text-sm font-medium">Open Rate</span>
+            <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-4">
+              <div className="flex items-center gap-2 text-rose-400 mb-1">
+                <Bell size={16} />
+                <span className="text-xs font-medium uppercase tracking-wider">Open Rate</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-white">
                 {stats.notification_open_rate.toFixed(1)}%
               </p>
             </div>
@@ -443,53 +443,53 @@ export default function LiveTrackingQRCodeModal({
           <div className="grid md:grid-cols-2 gap-6">
             {/* QR Code Display */}
             <div className="space-y-4">
-              <div className="bg-gray-50 rounded-xl p-6 flex flex-col items-center min-h-[350px] justify-center">
+              <div className="bg-white rounded-2xl p-6 flex flex-col items-center min-h-[350px] justify-center">
                 {qrCodeDataUrl ? (
                   <img
                     src={qrCodeDataUrl}
                     alt="QR Code"
-                    className="w-full max-w-[300px] rounded-lg shadow-md"
+                    className="w-full max-w-[280px] rounded-xl"
                   />
                 ) : (
                   <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Generating QR Code...</p>
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-cyan-500 mx-auto mb-4"></div>
+                    <p className="text-slate-400">Generating QR Code...</p>
                   </div>
                 )}
-                <p className="text-sm text-gray-600 text-center mt-4">
+                <p className="text-sm text-slate-400 text-center mt-4">
                   Skippers scan this code to start tracking
                 </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={handleDownloadQR}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
                 >
-                  <Download size={18} />
+                  <Download size={16} />
                   QR Code
                 </button>
                 <button
                   onClick={handleDownloadPoster}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-emerald-500/20"
                 >
-                  <Download size={18} />
+                  <Download size={16} />
                   Poster
                 </button>
                 <button
                   onClick={handleCopyLink}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-slate-200 rounded-xl transition-colors text-sm font-medium border border-slate-600/50"
                 >
-                  <Copy size={18} />
+                  <Copy size={16} />
                   {copied ? 'Copied!' : 'Copy Link'}
                 </button>
                 <button
                   onClick={handleShare}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
                   title="Select members to notify about live tracking"
                 >
-                  <Share2 size={18} />
+                  <Share2 size={16} />
                   Notify Members
                 </button>
               </div>
@@ -498,80 +498,52 @@ export default function LiveTrackingQRCodeModal({
             {/* Instructions */}
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">
                   How It Works
                 </h3>
                 <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
-                      1
+                  {[
+                    { num: 1, title: 'Display QR Code', desc: 'Print poster or show on screen at event venue' },
+                    { num: 2, title: 'Skippers Scan', desc: 'They select their name/sail number - no app required' },
+                    { num: 3, title: 'Follow Their Race', desc: 'View live updates, results, and standings on their device' },
+                    { num: 4, title: 'Stay Updated', desc: 'Automatic page updates as you score each race' },
+                  ].map((step) => (
+                    <div key={step.num} className="flex gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center font-semibold text-sm">
+                        {step.num}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">{step.title}</p>
+                        <p className="text-sm text-slate-400">{step.desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Display QR Code</p>
-                      <p className="text-sm text-gray-600">
-                        Print poster or show on screen at event venue
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
-                      2
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Skippers Scan</p>
-                      <p className="text-sm text-gray-600">
-                        They select their name/sail number - no app required
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
-                      3
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Follow Their Race</p>
-                      <p className="text-sm text-gray-600">
-                        View live updates, results, and standings on their device
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-semibold">
-                      4
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Stay Updated</p>
-                      <p className="text-sm text-gray-600">
-                        Automatic page updates as you score each race
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h4 className="font-semibold text-amber-900 mb-2">
+              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-2xl p-4">
+                <h4 className="font-semibold text-cyan-300 text-sm mb-2">
                   Real-Time Information
                 </h4>
-                <ul className="text-sm text-amber-800 space-y-1">
-                  <li>• Live race results as they're scored</li>
-                  <li>• Current standings and rankings</li>
-                  <li>• Heat assignments (for HMS racing)</li>
-                  <li>• Promotion/relegation status</li>
-                  <li>• Individual handicap updates</li>
-                  <li>• Overall event leaderboard</li>
+                <ul className="text-sm text-slate-300 space-y-1">
+                  <li>Live race results as they're scored</li>
+                  <li>Current standings and rankings</li>
+                  <li>Heat assignments (for HMS racing)</li>
+                  <li>Promotion/relegation status</li>
+                  <li>Individual handicap updates</li>
+                  <li>Overall event leaderboard</li>
                 </ul>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-semibold text-green-900 mb-2">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
+                <h4 className="font-semibold text-emerald-300 text-sm mb-2">
                   Works for All Race Formats
                 </h4>
-                <ul className="text-sm text-green-800 space-y-1">
-                  <li>• Heat Racing (HMS)</li>
-                  <li>• One-Fleet Scratch Racing</li>
-                  <li>• Handicap Racing</li>
-                  <li>• Series & Championships</li>
+                <ul className="text-sm text-slate-300 space-y-1">
+                  <li>Heat Racing (HMS)</li>
+                  <li>One-Fleet Scratch Racing</li>
+                  <li>Handicap Racing</li>
+                  <li>Series & Championships</li>
                 </ul>
               </div>
             </div>
@@ -579,8 +551,8 @@ export default function LiveTrackingQRCodeModal({
 
           {/* Public URL */}
           {trackingEvent && publicUrl && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-4">
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
                 Public Tracking URL
               </label>
               <div className="flex gap-2">
@@ -588,11 +560,11 @@ export default function LiveTrackingQRCodeModal({
                   type="text"
                   value={publicUrl}
                   readOnly
-                  className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-mono"
+                  className="flex-1 px-4 py-2.5 bg-slate-900/50 border border-slate-600/50 rounded-xl text-sm font-mono text-slate-300"
                 />
                 <button
                   onClick={handleCopyLink}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium"
                 >
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
