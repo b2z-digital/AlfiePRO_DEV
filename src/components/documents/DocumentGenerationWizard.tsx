@@ -1338,8 +1338,8 @@ async function generatePDFFromHTML(
   }
 
   let logoDataUrl = '';
-  if (template.header_logo_url) {
-    const logoUrl: string = template.header_logo_url;
+  if (template.logo_url) {
+    const logoUrl: string = template.logo_url;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 
     if (supabaseUrl && logoUrl.includes(supabaseUrl)) {
@@ -1503,8 +1503,8 @@ async function generatePDFFromHTML(
   measurePage.style.padding = `${paddingPx}px`;
 
   let logoHTML = '';
-  if (logoDataUrl || template.header_logo_url) {
-    const logoSrc = logoDataUrl || template.header_logo_url;
+  if (logoDataUrl || template.logo_url) {
+    const logoSrc = logoDataUrl || template.logo_url;
     logoHTML = `<img class="pdf-logo" src="${logoSrc}" />`;
   }
 
