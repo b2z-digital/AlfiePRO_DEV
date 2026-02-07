@@ -161,8 +161,7 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
     if (daysUntilDue < 0) return `${Math.abs(daysUntilDue)}d overdue`;
     if (daysUntilDue === 0) return 'Due today';
     if (daysUntilDue === 1) return 'Tomorrow';
-    if (daysUntilDue <= 7) return `${daysUntilDue}d left`;
-    return null;
+    return `${daysUntilDue}d left`;
   };
 
   const dateParts = task.due_date ? getDateParts(task.due_date) : null;

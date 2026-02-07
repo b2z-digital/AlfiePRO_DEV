@@ -1141,7 +1141,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
@@ -1437,7 +1437,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
