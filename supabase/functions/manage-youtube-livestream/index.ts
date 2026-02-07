@@ -84,7 +84,20 @@ async function getYouTubeCredentials(
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Default YouTube token refresh failed:', errorText);
-    throw new Error('Failed to authenticate with default AlfiePRO YouTube account.');
+    let hint = 'Failed to authenticate with default AlfiePRO YouTube account.';
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.error === 'invalid_grant') {
+        hint = 'YouTube refresh token has expired. Please re-connect YouTube in Settings > Integrations to get a new token.';
+      } else if (parsed.error === 'unauthorized_client') {
+        hint = 'Google OAuth client credentials are invalid. Please check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.';
+      } else {
+        hint += ` Google error: ${parsed.error_description || parsed.error || errorText}`;
+      }
+    } catch {
+      hint += ` Details: ${errorText}`;
+    }
+    throw new Error(hint);
   }
 
   const tokenData = await response.json();
