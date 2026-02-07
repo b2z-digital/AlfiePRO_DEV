@@ -6,6 +6,8 @@ import { ModalProvider } from './contexts/ModalContext';
 import { RaceEvent } from './types/race';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
+import { ForgotPassword } from './components/auth/ForgotPassword';
+import { ResetPassword } from './components/auth/ResetPassword';
 import { useAuth } from './contexts/AuthContext';
 import { SubscriptionSelection } from './pages/SubscriptionSelection';
 import { SubscriptionSuccess } from './pages/SubscriptionSuccess';
@@ -239,6 +241,8 @@ function App() {
 
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
         <Route path="/register" element={isAuthenticated ? <Navigate to="/" /> : <Register />} />
+        <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/" /> : <ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/invite/:token" element={<InvitationSignup />} />
         {/* OAuth callback - allow even when not authenticated, component handles auth internally */}
         <Route path="/stripe-oauth-callback" element={<StripeOAuthCallback />} />
