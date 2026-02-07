@@ -29,26 +29,43 @@ interface YouTubeCredentials {
 async function getYouTubeCredentials(
   supabase: any,
   clubId: string
-): Promise<{ credentials: YouTubeCredentials; isDefault: boolean }> {
+): Promise<{ credentials: YouTubeCredentials; isDefault: boolean; integrationId?: string }> {
   const { data: integration } = await supabase
     .from('integrations')
-    .select('credentials')
+    .select('id, credentials')
     .eq('club_id', clubId)
     .eq('platform', 'youtube')
     .eq('is_active', true)
     .maybeSingle();
 
   if (integration?.credentials?.refresh_token) {
-    return { credentials: integration.credentials as YouTubeCredentials, isDefault: false };
+    return {
+      credentials: integration.credentials as YouTubeCredentials,
+      isDefault: false,
+      integrationId: integration.id,
+    };
   }
 
-  const refreshToken = Deno.env.get('YOUTUBE_DEFAULT_REFRESH_TOKEN');
+  const { data: defaultIntegration } = await supabase
+    .from('integrations')
+    .select('id, credentials')
+    .eq('platform', 'youtube')
+    .eq('is_active', true)
+    .eq('is_default', true)
+    .maybeSingle();
+
+  if (!defaultIntegration?.credentials?.refresh_token) {
+    throw new Error('No YouTube integration found. The default AlfiePRO account is not configured.');
+  }
+
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
-  if (!refreshToken || !clientId || !clientSecret) {
-    throw new Error('No YouTube integration found. Please connect YouTube in Settings > Integrations.');
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing Google OAuth credentials');
   }
+
+  const creds = defaultIntegration.credentials as YouTubeCredentials;
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -56,7 +73,7 @@ async function getYouTubeCredentials(
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
-      refresh_token: refreshToken,
+      refresh_token: creds.refresh_token,
       grant_type: 'refresh_token',
     }),
   });
@@ -65,24 +82,48 @@ async function getYouTubeCredentials(
     throw new Error('Failed to authenticate with default AlfiePRO YouTube account.');
   }
 
-  const data = await response.json();
+  const tokenData = await response.json();
+  creds.access_token = tokenData.access_token;
+
+  if (!creds.channel_id) {
+    try {
+      const channelResponse = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+        { headers: { 'Authorization': `Bearer ${creds.access_token}` } }
+      );
+      if (channelResponse.ok) {
+        const channelData = await channelResponse.json();
+        if (channelData.items?.length > 0) {
+          creds.channel_id = channelData.items[0].id;
+          creds.channel_name = channelData.items[0].snippet.title;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch channel info:', e);
+    }
+  }
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
+  await supabase
+    .from('integrations')
+    .update({
+      credentials: { ...creds, expires_at: expiresAt },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', defaultIntegration.id);
 
   return {
-    credentials: {
-      access_token: data.access_token,
-      refresh_token: refreshToken,
-      channel_id: Deno.env.get('YOUTUBE_DEFAULT_CHANNEL_ID') || '',
-      channel_name: Deno.env.get('YOUTUBE_DEFAULT_CHANNEL_NAME') || 'AlfiePRO',
-    },
+    credentials: creds,
     isDefault: true,
+    integrationId: defaultIntegration.id,
   };
 }
 
 async function refreshYouTubeToken(
   credentials: YouTubeCredentials,
-  clubId: string,
   supabase: any,
-  isDefault: boolean
+  isDefault: boolean,
+  integrationId?: string
 ): Promise<string> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
@@ -108,21 +149,15 @@ async function refreshYouTubeToken(
 
   const data = await response.json();
   const newAccessToken = data.access_token;
-  const expiresIn = data.expires_in;
+  const expiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
 
-  if (!isDefault) {
-    const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString();
+  if (integrationId) {
     await supabase
       .from('integrations')
       .update({
-        credentials: {
-          ...credentials,
-          access_token: newAccessToken,
-          expires_at: expiresAt,
-        },
+        credentials: { ...credentials, access_token: newAccessToken, expires_at: expiresAt },
       })
-      .eq('club_id', clubId)
-      .eq('platform', 'youtube');
+      .eq('id', integrationId);
   }
 
   return newAccessToken;
@@ -162,14 +197,14 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { credentials, isDefault } = await getYouTubeCredentials(supabase, clubId);
+    const { credentials, isDefault, integrationId } = await getYouTubeCredentials(supabase, clubId);
 
     let accessToken = credentials.access_token;
 
-    if (!isDefault && credentials.expires_at) {
+    if (credentials.expires_at) {
       const expiryTime = new Date(credentials.expires_at).getTime();
       if (Date.now() >= expiryTime - 300000) {
-        accessToken = await refreshYouTubeToken(credentials, clubId, supabase, isDefault);
+        accessToken = await refreshYouTubeToken(credentials, supabase, isDefault, integrationId);
       }
     }
 

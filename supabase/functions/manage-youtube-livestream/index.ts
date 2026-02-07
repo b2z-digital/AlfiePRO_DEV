@@ -15,33 +15,60 @@ interface YouTubeCredentials {
 
 interface Context {
   supabaseClient: any;
+  serviceClient: any;
   clubId: string;
   isDefault: boolean;
+  integrationId?: string;
+}
+
+function getServiceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
 }
 
 async function getYouTubeCredentials(
   supabaseClient: any,
+  serviceClient: any,
   clubId: string
-): Promise<{ credentials: YouTubeCredentials; isDefault: boolean }> {
+): Promise<{ credentials: YouTubeCredentials; isDefault: boolean; integrationId?: string }> {
   const { data: integration } = await supabaseClient
     .from('integrations')
-    .select('credentials')
+    .select('id, credentials')
     .eq('club_id', clubId)
     .eq('platform', 'youtube')
     .eq('is_active', true)
     .maybeSingle();
 
   if (integration?.credentials?.refresh_token) {
-    return { credentials: integration.credentials as YouTubeCredentials, isDefault: false };
+    return {
+      credentials: integration.credentials as YouTubeCredentials,
+      isDefault: false,
+      integrationId: integration.id,
+    };
   }
 
-  const refreshToken = Deno.env.get('YOUTUBE_DEFAULT_REFRESH_TOKEN');
+  const { data: defaultIntegration } = await serviceClient
+    .from('integrations')
+    .select('id, credentials')
+    .eq('platform', 'youtube')
+    .eq('is_active', true)
+    .eq('is_default', true)
+    .maybeSingle();
+
+  if (!defaultIntegration?.credentials?.refresh_token) {
+    throw new Error('No YouTube integration found. The default AlfiePRO account is not configured.');
+  }
+
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
-  if (!refreshToken || !clientId || !clientSecret) {
-    throw new Error('No YouTube integration found for this club and default AlfiePRO account is not configured.');
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing Google OAuth credentials in environment');
   }
+
+  const creds = defaultIntegration.credentials as YouTubeCredentials;
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -49,7 +76,7 @@ async function getYouTubeCredentials(
     body: new URLSearchParams({
       client_id: clientId,
       client_secret: clientSecret,
-      refresh_token: refreshToken,
+      refresh_token: creds.refresh_token!,
       grant_type: 'refresh_token',
     }),
   });
@@ -60,16 +87,40 @@ async function getYouTubeCredentials(
     throw new Error('Failed to authenticate with default AlfiePRO YouTube account.');
   }
 
-  const data = await response.json();
+  const tokenData = await response.json();
+  creds.access_token = tokenData.access_token;
+
+  if (!creds.channel_id) {
+    try {
+      const channelResponse = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+        { headers: { 'Authorization': `Bearer ${creds.access_token}` } }
+      );
+      if (channelResponse.ok) {
+        const channelData = await channelResponse.json();
+        if (channelData.items?.length > 0) {
+          creds.channel_id = channelData.items[0].id;
+          creds.channel_name = channelData.items[0].snippet.title;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch channel info:', e);
+    }
+  }
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
+  await serviceClient
+    .from('integrations')
+    .update({
+      credentials: { ...creds, expires_at: expiresAt },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', defaultIntegration.id);
 
   return {
-    credentials: {
-      access_token: data.access_token,
-      refresh_token: refreshToken,
-      channel_id: Deno.env.get('YOUTUBE_DEFAULT_CHANNEL_ID') || '',
-      channel_name: Deno.env.get('YOUTUBE_DEFAULT_CHANNEL_NAME') || 'AlfiePRO',
-    },
+    credentials: creds,
     isDefault: true,
+    integrationId: defaultIntegration.id,
   };
 }
 
@@ -107,19 +158,18 @@ async function refreshAccessToken(
 
   const data = await response.json();
   const newAccessToken = data.access_token;
+  const expiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
 
-  if (!context.isDefault) {
-    await context.supabaseClient
-      .from('integrations')
-      .update({
-        credentials: {
-          ...credentials,
-          access_token: newAccessToken,
-        },
-      })
-      .eq('club_id', context.clubId)
-      .eq('platform', 'youtube');
-  }
+  const client = context.isDefault ? context.serviceClient : context.supabaseClient;
+  const updateQuery = context.integrationId
+    ? client.from('integrations').update({
+        credentials: { ...credentials, access_token: newAccessToken, expires_at: expiresAt },
+      }).eq('id', context.integrationId)
+    : client.from('integrations').update({
+        credentials: { ...credentials, access_token: newAccessToken, expires_at: expiresAt },
+      }).eq('club_id', context.clubId).eq('platform', 'youtube');
+
+  await updateQuery;
 
   return newAccessToken;
 }
@@ -159,8 +209,9 @@ Deno.serve(async (req: Request) => {
 
     const { action, clubId, sessionData, broadcastId } = await req.json();
 
-    const { credentials, isDefault } = await getYouTubeCredentials(supabaseClient, clubId);
-    const context: Context = { supabaseClient, clubId, isDefault };
+    const serviceClient = getServiceClient();
+    const { credentials, isDefault, integrationId } = await getYouTubeCredentials(supabaseClient, serviceClient, clubId);
+    const context: Context = { supabaseClient, serviceClient, clubId, isDefault, integrationId };
 
     switch (action) {
       case 'createBroadcast':
@@ -202,6 +253,28 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+async function makeAuthenticatedRequest(
+  url: string,
+  options: RequestInit,
+  credentials: YouTubeCredentials,
+  context: Context
+): Promise<{ response: Response; data: any }> {
+  let accessToken = credentials.access_token;
+
+  const headers = { ...options.headers as Record<string, string>, 'Authorization': `Bearer ${accessToken}` };
+  let response = await fetch(url, { ...options, headers });
+  let data = await response.json();
+
+  if (response.status === 401) {
+    accessToken = await refreshAccessToken(credentials, context);
+    const retryHeaders = { ...options.headers as Record<string, string>, 'Authorization': `Bearer ${accessToken}` };
+    response = await fetch(url, { ...options, headers: retryHeaders });
+    data = await response.json();
+  }
+
+  return { response, data };
+}
+
 async function createBroadcast(
   credentials: YouTubeCredentials,
   sessionData: any,
@@ -230,72 +303,38 @@ async function createBroadcast(
     },
   };
 
-  let accessToken = credentials.access_token;
-  let retryCount = 0;
+  const { response, data } = await makeAuthenticatedRequest(
+    'https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(broadcastData),
+    },
+    credentials,
+    context
+  );
 
-  while (retryCount < 2) {
-    const response = await fetch(
-      'https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(broadcastData),
-      }
-    );
-
-    const data = await response.json();
-
-    if (response.status === 401 && retryCount === 0) {
-      try {
-        accessToken = await refreshAccessToken(credentials, context);
-        retryCount++;
-        continue;
-      } catch (refreshError) {
-        return new Response(
-          JSON.stringify({
-            error: refreshError.message,
-            hint: context.isDefault
-              ? 'The default AlfiePRO YouTube account needs to be re-authenticated.'
-              : 'Please reconnect your YouTube account in Settings > Integrations'
-          }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-    }
-
-    if (!response.ok) {
-      const errorDetail = data.error?.message || JSON.stringify(data);
-      return new Response(
-        JSON.stringify({
-          error: `YouTube API error (${response.status}): ${errorDetail}`,
-          details: data
-        }),
-        {
-          status: response.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
+  if (!response.ok) {
+    const errorDetail = data.error?.message || JSON.stringify(data);
     return new Response(
-      JSON.stringify({ broadcast: data }),
+      JSON.stringify({
+        error: `YouTube API error (${response.status}): ${errorDetail}`,
+        details: data,
+        hint: context.isDefault
+          ? 'The default AlfiePRO YouTube account may need to be re-authenticated.'
+          : 'Please reconnect your YouTube account in Settings > Integrations',
+      }),
       {
-        status: 200,
+        status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
 
   return new Response(
-    JSON.stringify({ error: 'Failed after token refresh retry' }),
+    JSON.stringify({ broadcast: data }),
     {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     }
   );
@@ -319,43 +358,16 @@ async function createStream(
     },
   };
 
-  let accessToken = credentials.access_token;
-  const response = await fetch(
+  const { response, data } = await makeAuthenticatedRequest(
     'https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn,status',
     {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(streamData),
-    }
+    },
+    credentials,
+    context
   );
-
-  const data = await response.json();
-
-  if (response.status === 401) {
-    accessToken = await refreshAccessToken(credentials, context);
-    const retryResponse = await fetch(
-      'https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn,status',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(streamData),
-      }
-    );
-    const retryData = await retryResponse.json();
-    if (!retryResponse.ok) {
-      throw new Error(`YouTube API error: ${JSON.stringify(retryData)}`);
-    }
-    return new Response(
-      JSON.stringify({ stream: retryData }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
 
   if (!response.ok) {
     throw new Error(`YouTube API error: ${JSON.stringify(data)}`);
@@ -368,28 +380,6 @@ async function createStream(
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     }
   );
-}
-
-async function makeAuthenticatedRequest(
-  url: string,
-  options: RequestInit,
-  credentials: YouTubeCredentials,
-  context: Context
-): Promise<{ response: Response; data: any }> {
-  let accessToken = credentials.access_token;
-
-  const headers = { ...options.headers as Record<string, string>, 'Authorization': `Bearer ${accessToken}` };
-  let response = await fetch(url, { ...options, headers });
-  let data = await response.json();
-
-  if (response.status === 401) {
-    accessToken = await refreshAccessToken(credentials, context);
-    const retryHeaders = { ...options.headers as Record<string, string>, 'Authorization': `Bearer ${accessToken}` };
-    response = await fetch(url, { ...options, headers: retryHeaders });
-    data = await response.json();
-  }
-
-  return { response, data };
 }
 
 async function bindBroadcastToStream(
