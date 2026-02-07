@@ -1698,9 +1698,12 @@ async function generatePDFFromHTML(
       contentWrapper.style.width = '100%';
       contentWrapper.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
 
+      const nextOffset = pageNum < totalPages - 1 ? breakOffsets[pageNum + 1] : pageOffset + contentAreaHeightPx;
+      const clipHeight = Math.min(nextOffset - pageOffset, contentAreaHeightPx);
+
       const clipper = document.createElement('div');
       clipper.style.overflow = 'hidden';
-      clipper.style.height = `${contentAreaHeightPx}px`;
+      clipper.style.height = `${clipHeight}px`;
       clipper.appendChild(contentWrapper);
       pageDiv.appendChild(clipper);
 
