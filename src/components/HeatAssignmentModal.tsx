@@ -1293,7 +1293,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`flex ${isInitialAllocation || (round >= 2 && !completed) ? 'justify-between' : editMode ? 'justify-between' : 'justify-end'} gap-3 p-6 border-t flex-shrink-0 ${
+        <div className={`flex ${isInitialAllocation || editMode || (round >= 2 && !completed && results && results.length > 0) ? 'justify-between' : 'justify-end'} gap-3 p-6 border-t flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           {/* Show reshuffle/manual assign buttons only for initial Round 1 allocation */}
