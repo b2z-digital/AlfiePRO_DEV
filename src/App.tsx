@@ -71,7 +71,7 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, onboardingCompleted, hasPendingApplication, userClubs } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, userClubs } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
   useDataPreloader();
@@ -128,11 +128,14 @@ function App() {
   });
 
   // Show loading state while checking authentication (but not for public routes)
-  if (loading && !isPublicRoute) {
+  if ((loading && !isPublicRoute) || isLoggingOut) {
     console.log('⏳ Showing loading screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="text-white text-xl">{isLoggingOut ? 'Signing out...' : 'Loading...'}</div>
+        </div>
       </div>
     );
   }
@@ -289,7 +292,7 @@ function App() {
               <Navigate to="/login" />
             ) : hasPendingApplication ? (
               <Navigate to="/application-pending" />
-            ) : userClubs.length === 0 && !onboardingCompleted ? (
+            ) : clubsLoaded && userClubs.length === 0 && !onboardingCompleted ? (
               <Navigate to="/onboarding" />
             ) : (
               <DashboardLayout
