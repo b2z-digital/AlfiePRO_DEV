@@ -193,27 +193,32 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
                         imageUrl={task.assignee.avatar_url}
                         size="xs"
                       />
-                      {followerProfiles.length > 0 && (
-                        <div className="flex -space-x-2">
-                          {followerProfiles.slice(0, 3).map((follower) => (
-                            <Avatar
-                              key={follower.id}
-                              firstName={follower.first_name}
-                              lastName={follower.last_name}
-                              imageUrl={follower.avatar_url}
-                              size="xs"
-                            />
-                          ))}
-                          {followerProfiles.length > 3 && (
-                            <div className={`
-                              w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
-                              ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'}
-                            `}>
-                              +{followerProfiles.length - 3}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {(() => {
+                        const assigneeUserId = (task as any).assignee?.id || task.assignee_id;
+                        const filteredFollowers = followerProfiles.filter(f => f.id !== assigneeUserId);
+                        if (filteredFollowers.length === 0) return null;
+                        return (
+                          <div className="flex -space-x-2">
+                            {filteredFollowers.slice(0, 3).map((follower) => (
+                              <Avatar
+                                key={follower.id}
+                                firstName={follower.first_name}
+                                lastName={follower.last_name}
+                                imageUrl={follower.avatar_url}
+                                size="xs"
+                              />
+                            ))}
+                            {filteredFollowers.length > 3 && (
+                              <div className={`
+                                w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
+                                ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-700'}
+                              `}>
+                                +{filteredFollowers.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </>
                   ) : (
                     <>
