@@ -449,9 +449,9 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
           <select
             value={formData[field.field_name] || ''}
             onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-            className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 appearance-none cursor-pointer ${
+            className={`w-full px-4 py-3 rounded-xl border transition-all duration-200 appearance-none cursor-pointer ${
               darkMode
-                ? 'bg-slate-700/50 border-slate-600 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
+                ? 'bg-slate-900/50 border-slate-600/50 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
                 : 'bg-white border-slate-300 text-slate-900 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
             } ${errors[field.field_name] ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''} focus:outline-none pr-12`}
             required={field.is_required}
@@ -471,15 +471,15 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
       );
     }
 
-    const baseInputClass = `w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${
+    const baseInputClass = `w-full px-4 py-3 rounded-xl border transition-all duration-200 ${
       darkMode
-        ? 'bg-slate-700/50 border-slate-600 text-slate-100 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 [color-scheme:dark]'
+        ? 'bg-slate-900/50 border-slate-600/50 text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 [color-scheme:dark]'
         : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
     } ${errors[field.field_name] ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''} focus:outline-none`;
 
-    const selectClass = `w-full px-4 py-2.5 rounded-lg border transition-all duration-200 appearance-none cursor-pointer ${
+    const selectClass = `w-full px-4 py-3 rounded-xl border transition-all duration-200 appearance-none cursor-pointer ${
       darkMode
-        ? 'bg-slate-700/50 border-slate-600 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
+        ? 'bg-slate-900/50 border-slate-600/50 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
         : 'bg-white border-slate-300 text-slate-900 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
     } ${errors[field.field_name] ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''} focus:outline-none pr-12`;
 
@@ -589,24 +589,49 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
 
       case 'radio':
         return (
-          <div className="space-y-4">
-            {field.options?.map((option, i) => (
-              <label key={i} className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative flex items-center">
+          <div className="space-y-2">
+            {field.options?.map((option, i) => {
+              const isSelected = formData[field.field_name] === option.value;
+              return (
+                <label
+                  key={i}
+                  className={`flex items-center gap-3 cursor-pointer group px-4 py-3 rounded-xl border transition-all duration-200 ${
+                    isSelected
+                      ? darkMode
+                        ? 'border-cyan-500/50 bg-cyan-500/10'
+                        : 'border-cyan-500 bg-cyan-50'
+                      : darkMode
+                        ? 'border-slate-700/50 bg-slate-900/30 hover:border-slate-600'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                    isSelected
+                      ? 'border-cyan-500 bg-cyan-500'
+                      : darkMode
+                        ? 'border-slate-500'
+                        : 'border-slate-400'
+                  }`}>
+                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
                   <input
                     type="radio"
                     name={field.field_name}
                     value={option.value}
-                    checked={formData[field.field_name] === option.value}
+                    checked={isSelected}
                     onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-                    className="w-5 h-5 text-cyan-500 border-slate-400 focus:ring-0 focus:ring-offset-0 cursor-pointer rounded-sm"
+                    className="sr-only"
                   />
-                </div>
-                <span className={`${darkMode ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-slate-900'} transition-colors`}>
-                  {option.label}
-                </span>
-              </label>
-            ))}
+                  <span className={`text-sm ${
+                    isSelected
+                      ? darkMode ? 'text-white font-medium' : 'text-slate-900 font-medium'
+                      : darkMode ? 'text-slate-300' : 'text-slate-700'
+                  } transition-colors`}>
+                    {option.label}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         );
 
@@ -662,8 +687,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
       <div className={`w-full max-w-5xl my-8 rounded-2xl shadow-2xl overflow-hidden border ${
         darkMode ? 'bg-slate-800/80 backdrop-blur-2xl border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl border-slate-200'
       }`}>
-        {/* Header with Blue Gradient */}
-        <div className="relative px-8 py-6 border-b bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 border-blue-700/20">
+        <div className="relative px-8 py-6 border-b bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-600 border-blue-700/20">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl shadow-lg bg-white/20 backdrop-blur-sm">
@@ -707,9 +731,9 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
                 <Sparkles className="text-white" size={16} />
               </div>
             </div>
-            <div className="relative w-full h-2.5 rounded-full overflow-hidden bg-white/20">
+            <div className="relative w-full h-2 rounded-full overflow-hidden bg-white/20">
               <div
-                className="h-full transition-all duration-700 ease-out rounded-full bg-white shadow-lg shadow-white/30"
+                className="h-full transition-all duration-700 ease-out rounded-full bg-gradient-to-r from-white via-cyan-200 to-white shadow-lg shadow-white/30"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -865,11 +889,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
             {!isReviewPage ? (
               <button
                 onClick={handleNext}
-                className={`flex items-center gap-2 px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg ${
-                  darkMode
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-500/20'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-green-500/30'
-                }`}
+                className="flex items-center gap-2 px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-500/20"
               >
                 Next Step
                 <ChevronRight size={20} />
@@ -878,14 +898,8 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all duration-200 shadow-lg ${
-                  generating
-                    ? 'opacity-60 cursor-not-allowed'
-                    : ''
-                } ${
-                  darkMode
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-500/20'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-green-500/30'
+                className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all duration-200 shadow-lg bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white shadow-emerald-500/20 ${
+                  generating ? 'opacity-60 cursor-not-allowed' : ''
                 }`}
               >
                 {generating ? (
@@ -1292,196 +1306,235 @@ async function generatePDFFromHTML(
   template: any,
   club: any
 ): Promise<jsPDF> {
-  console.log('=== GENERATE PDF FROM HTML (html2canvas method) ===');
-
-  // Replace merge fields in HTML content
   let processedHTML = template.html_content;
 
-  // Replace form data merge fields
   Object.keys(formData).forEach((key) => {
     const placeholder = `{{${key}}}`;
     const value = formData[key] || "";
     processedHTML = processedHTML.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "g"), value);
   });
 
-  // Replace club merge fields
   if (club) {
     processedHTML = processedHTML.replace(/{{club_name}}/g, club.name || "");
     processedHTML = processedHTML.replace(/{{club_email}}/g, club.email || "");
     processedHTML = processedHTML.replace(/{{club_website}}/g, club.website || "");
   }
 
-  // Create a temporary container for rendering with full styling
-  const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '210mm'; // A4 width
-  container.style.padding = '20mm';
-  container.style.backgroundColor = 'white';
-  container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-  container.style.fontSize = '14px';
-  container.style.lineHeight = '1.8';
-  container.style.color = '#000000';
+  const A4_WIDTH_PX = 794;
+  const A4_HEIGHT_PX = 1123;
+  const SCALE = 2;
+  const MARGIN_MM = 20;
+  const FOOTER_HEIGHT_MM = 12;
+  const CONTENT_HEIGHT_MM = 297 - MARGIN_MM - MARGIN_MM - FOOTER_HEIGHT_MM;
 
-  // Add logo if available
+  const documentStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { background: white; }
+    .pdf-page {
+      width: ${A4_WIDTH_PX}px;
+      background: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1a1a1a;
+    }
+    .pdf-content {
+      white-space: pre-wrap;
+      tab-size: 4;
+    }
+    .pdf-content h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      line-height: 1.3;
+    }
+    .pdf-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      line-height: 1.3;
+    }
+    .pdf-content h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 0.75em;
+      margin-bottom: 0.5em;
+      line-height: 1.3;
+    }
+    .pdf-content p {
+      margin-bottom: 1.25em;
+      white-space: pre-wrap;
+    }
+    .pdf-content ol, .pdf-content ul {
+      margin-left: 1.5em;
+      margin-bottom: 1.25em;
+    }
+    .pdf-content li {
+      margin-bottom: 0.25em;
+      line-height: 1.6;
+    }
+    .pdf-content strong { font-weight: 700; }
+    .pdf-content em { font-style: italic; }
+    .pdf-content u { text-decoration: underline; }
+    .pdf-content s { text-decoration: line-through; }
+    .pdf-content .ql-align-center { text-align: center; }
+    .pdf-content .ql-align-right { text-align: right; }
+    .pdf-content .ql-align-justify { text-align: justify; }
+    .pdf-content .ql-indent-1 { padding-left: 3em; }
+    .pdf-content .ql-indent-2 { padding-left: 6em; }
+    .pdf-content .ql-indent-3 { padding-left: 9em; }
+    .pdf-content .hanging-indent { padding-left: 3em; text-indent: -3em; }
+    .pdf-content a { color: #1a1a1a; text-decoration: underline; }
+    .pdf-content img { max-width: 100%; height: auto; }
+    .pdf-content br { display: inline; content: ''; }
+    .pdf-logo { display: block; margin: 0 auto 24px; max-width: 120px; max-height: 120px; object-fit: contain; }
+    .pdf-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 10px;
+      color: #888;
+      border-top: 1px solid #ddd;
+      padding-top: 6px;
+    }
+  `;
+
+  const paddingPx = Math.round((MARGIN_MM / 210) * A4_WIDTH_PX);
+
+  const measuringContainer = document.createElement('div');
+  measuringContainer.style.position = 'absolute';
+  measuringContainer.style.left = '-9999px';
+  measuringContainer.style.top = '0';
+
+  const styleEl = document.createElement('style');
+  styleEl.textContent = documentStyles;
+  measuringContainer.appendChild(styleEl);
+
+  const measurePage = document.createElement('div');
+  measurePage.className = 'pdf-page';
+  measurePage.style.padding = `${paddingPx}px`;
+
+  let logoHTML = '';
   if (template.header_logo_url) {
-    const logoImg = document.createElement('img');
-    logoImg.src = template.header_logo_url;
-    logoImg.style.display = 'block';
-    logoImg.style.margin = '0 auto 20px';
-    logoImg.style.maxWidth = '100px';
-    logoImg.style.maxHeight = '100px';
-    container.appendChild(logoImg);
+    logoHTML = `<img class="pdf-logo" src="${template.header_logo_url}" crossorigin="anonymous" />`;
   }
 
-  // Add content with proper styling
-  const contentDiv = document.createElement('div');
-  contentDiv.innerHTML = processedHTML;
-
-  // Apply comprehensive text formatting styles
-  contentDiv.style.fontSize = '14px';
-  contentDiv.style.lineHeight = '1.8';
-
-  // Style all headings
-  const h1s = contentDiv.getElementsByTagName('h1');
-  Array.from(h1s).forEach(h1 => {
-    (h1 as HTMLElement).style.fontSize = '28px';
-    (h1 as HTMLElement).style.fontWeight = 'bold';
-    (h1 as HTMLElement).style.marginTop = '20px';
-    (h1 as HTMLElement).style.marginBottom = '15px';
-    (h1 as HTMLElement).style.lineHeight = '1.3';
-  });
-
-  const h2s = contentDiv.getElementsByTagName('h2');
-  Array.from(h2s).forEach(h2 => {
-    (h2 as HTMLElement).style.fontSize = '22px';
-    (h2 as HTMLElement).style.fontWeight = 'bold';
-    (h2 as HTMLElement).style.marginTop = '18px';
-    (h2 as HTMLElement).style.marginBottom = '12px';
-    (h2 as HTMLElement).style.lineHeight = '1.4';
-  });
-
-  const h3s = contentDiv.getElementsByTagName('h3');
-  Array.from(h3s).forEach(h3 => {
-    (h3 as HTMLElement).style.fontSize = '18px';
-    (h3 as HTMLElement).style.fontWeight = 'bold';
-    (h3 as HTMLElement).style.marginTop = '16px';
-    (h3 as HTMLElement).style.marginBottom = '10px';
-    (h3 as HTMLElement).style.lineHeight = '1.4';
-  });
-
-  // Style paragraphs
-  const ps = contentDiv.getElementsByTagName('p');
-  Array.from(ps).forEach(p => {
-    (p as HTMLElement).style.marginTop = '8px';
-    (p as HTMLElement).style.marginBottom = '8px';
-    (p as HTMLElement).style.lineHeight = '1.8';
-  });
-
-  // Style lists
-  const uls = contentDiv.getElementsByTagName('ul');
-  Array.from(uls).forEach(ul => {
-    (ul as HTMLElement).style.marginTop = '8px';
-    (ul as HTMLElement).style.marginBottom = '8px';
-    (ul as HTMLElement).style.paddingLeft = '25px';
-    (ul as HTMLElement).style.listStyleType = 'disc';
-  });
-
-  const ols = contentDiv.getElementsByTagName('ol');
-  Array.from(ols).forEach(ol => {
-    (ol as HTMLElement).style.marginTop = '8px';
-    (ol as HTMLElement).style.marginBottom = '8px';
-    (ol as HTMLElement).style.paddingLeft = '25px';
-    (ol as HTMLElement).style.listStyleType = 'decimal';
-  });
-
-  const lis = contentDiv.getElementsByTagName('li');
-  Array.from(lis).forEach(li => {
-    (li as HTMLElement).style.marginTop = '4px';
-    (li as HTMLElement).style.marginBottom = '4px';
-    (li as HTMLElement).style.lineHeight = '1.6';
-  });
-
-  // Style strong/bold text
-  const strongs = contentDiv.getElementsByTagName('strong');
-  Array.from(strongs).forEach(strong => {
-    (strong as HTMLElement).style.fontWeight = 'bold';
-  });
-
-  // Style emphasized text
-  const ems = contentDiv.getElementsByTagName('em');
-  Array.from(ems).forEach(em => {
-    (em as HTMLElement).style.fontStyle = 'italic';
-  });
-
-  container.appendChild(contentDiv);
-
-  document.body.appendChild(container);
+  measurePage.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
+  measuringContainer.appendChild(measurePage);
+  document.body.appendChild(measuringContainer);
 
   try {
-    // Wait for images to load
-    const images = container.getElementsByTagName('img');
+    const images = measuringContainer.getElementsByTagName('img');
     await Promise.all(
       Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = resolve; // Continue even if image fails
-          setTimeout(resolve, 3000); // Timeout after 3 seconds
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          setTimeout(resolve, 5000);
         });
       })
     );
 
-    // Capture the container as canvas with optimized settings
-    const canvas = await html2canvas(container, {
-      scale: 1.5, // Reduced from 2 for smaller file size
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      windowWidth: 794, // A4 width in pixels at 96 DPI
-      windowHeight: 1123 // A4 height in pixels at 96 DPI
-    });
+    const fullHeight = measurePage.scrollHeight;
+    const contentAreaHeightPx = Math.round((CONTENT_HEIGHT_MM / 297) * A4_HEIGHT_PX);
+    const totalPages = Math.max(1, Math.ceil(fullHeight / contentAreaHeightPx));
 
-    // Create PDF
+    document.body.removeChild(measuringContainer);
+
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
-      compress: true // Enable compression
+      compress: true
     });
 
-    const imgWidth = 210; // A4 width in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const pageHeight = 297; // A4 height in mm
-    let heightLeft = imgHeight;
-    let position = 0;
+    const footerText = template.footer_text || '';
 
-    // Convert to JPEG with compression for smaller file size
-    const imgData = canvas.toDataURL('image/jpeg', 0.85); // 85% quality JPEG
+    for (let pageNum = 0; pageNum < totalPages; pageNum++) {
+      if (pageNum > 0) pdf.addPage();
 
-    // Add first page
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
+      const pageContainer = document.createElement('div');
+      pageContainer.style.position = 'absolute';
+      pageContainer.style.left = '-9999px';
+      pageContainer.style.top = '0';
 
-    // Add additional pages if content is longer than one page
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
+      const pageStyle = document.createElement('style');
+      pageStyle.textContent = documentStyles;
+      pageContainer.appendChild(pageStyle);
+
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'pdf-page';
+      pageDiv.style.width = `${A4_WIDTH_PX}px`;
+      pageDiv.style.height = `${A4_HEIGHT_PX}px`;
+      pageDiv.style.padding = `${paddingPx}px`;
+      pageDiv.style.position = 'relative';
+      pageDiv.style.overflow = 'hidden';
+
+      const contentWrapper = document.createElement('div');
+      contentWrapper.style.position = 'relative';
+      contentWrapper.style.top = `-${pageNum * contentAreaHeightPx}px`;
+      contentWrapper.style.width = '100%';
+      contentWrapper.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
+
+      const clipper = document.createElement('div');
+      clipper.style.overflow = 'hidden';
+      clipper.style.height = `${contentAreaHeightPx}px`;
+      clipper.appendChild(contentWrapper);
+      pageDiv.appendChild(clipper);
+
+      if (footerText) {
+        const footer = document.createElement('div');
+        footer.className = 'pdf-footer';
+        footer.style.position = 'absolute';
+        footer.style.bottom = `${paddingPx}px`;
+        footer.style.left = `${paddingPx}px`;
+        footer.style.right = `${paddingPx}px`;
+        footer.textContent = footerText
+          .replace(/\{page\}/g, String(pageNum + 1))
+          .replace(/\{pages\}/g, String(totalPages));
+        pageDiv.appendChild(footer);
+      }
+
+      pageContainer.appendChild(pageDiv);
+      document.body.appendChild(pageContainer);
+
+      const pageImages = pageContainer.getElementsByTagName('img');
+      await Promise.all(
+        Array.from(pageImages).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            setTimeout(resolve, 5000);
+          });
+        })
+      );
+
+      const canvas = await html2canvas(pageDiv, {
+        scale: SCALE,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: A4_WIDTH_PX,
+        height: A4_HEIGHT_PX
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, `page-${pageNum}`, 'FAST');
+
+      document.body.removeChild(pageContainer);
     }
-
-    // Cleanup
-    document.body.removeChild(container);
 
     return pdf;
   } catch (error) {
     console.error('Error generating PDF from HTML:', error);
-    // Cleanup on error
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
+    const leftover = document.querySelector('[style*="-9999px"]');
+    if (leftover) leftover.remove();
     throw error;
   }
 }
