@@ -6,8 +6,10 @@ import { storeRaceEvent, storeRaceSeries } from '../../utils/raceStorage';
 import { addPublicEvent, updatePublicEvent } from '../../utils/publicEventStorage';
 import { getStoredClubs } from '../../utils/clubStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
+import { getClubBoatClasses } from '../../utils/boatClassStorage';
 import { Club } from '../../types/club';
 import { Venue } from '../../types/venue';
+import { BoatClass } from '../../types/boatClass';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -34,6 +36,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const { currentClub, currentOrganization, user } = useAuth();
   const { addNotification } = useNotifications();
   const isEditing = !!(editingEvent || editingSeries);
+  const raceClassOptions = [
+    { value: 'DF65', label: 'Dragon Force 65' },
+    { value: 'DF95', label: 'Dragon Force 95' },
+    { value: '10R', label: '10 Rater' },
+    { value: 'IOM', label: 'IOM' },
+    { value: 'Marblehead', label: 'Marblehead' },
+    { value: 'A Class', label: 'A Class' },
+    { value: 'RC Laser', label: 'RC Laser' },
+  ];
   const [formData, setFormData] = useState({
     eventName: '',
     clubName: '',
@@ -108,8 +119,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const roundRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [showClubDropdown, setShowClubDropdown] = useState(false);
   const [showVenueDropdown, setShowVenueDropdown] = useState(false);
+  const [showClassDropdown, setShowClassDropdown] = useState(false);
+  const [boatClasses, setBoatClasses] = useState<BoatClass[]>([]);
   const clubDropdownRef = useRef<HTMLDivElement>(null);
   const venueDropdownRef = useRef<HTMLDivElement>(null);
+  const classDropdownRef = useRef<HTMLDivElement>(null);
 
   // Document scheduling state
   const [showScheduleDocumentModal, setShowScheduleDocumentModal] = useState(false);
@@ -153,6 +167,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           console.error('Error fetching state associations:', stateAssocError);
         } else {
           setStateAssociations(stateAssocData || []);
+        }
+
+        if (currentClub?.clubId) {
+          try {
+            const clubClasses = await getClubBoatClasses(currentClub.clubId);
+            setBoatClasses(clubClasses);
+          } catch (e) {
+            console.error('Error fetching boat classes:', e);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -229,6 +252,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
       }
       if (venueDropdownRef.current && !venueDropdownRef.current.contains(event.target as Node)) {
         setShowVenueDropdown(false);
+      }
+      if (classDropdownRef.current && !classDropdownRef.current.contains(event.target as Node)) {
+        setShowClassDropdown(false);
       }
     };
 
@@ -1090,14 +1116,14 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
             {currentStep === 'details' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {type === 'quick' ? (
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <div className="lg:col-span-2">
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     Event Name *
                   </label>
                   <div className="relative">
-                    <FileText 
-                      size={18} 
-                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                    <FileText
+                      size={20}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}
                     />
                     <input
                       type="text"
@@ -1105,24 +1131,25 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       value={formData.eventName}
                       onChange={(e) => setFormData(prev => ({ ...prev, eventName: e.target.value }))}
                       className={`
-                        w-full pl-10 pr-4 py-2 rounded-lg transition-colors
-                        ${darkMode 
-                          ? 'bg-slate-700 text-slate-200' 
-                          : 'bg-white text-slate-900 border border-slate-200'}
+                        w-full pl-12 pr-4 py-3.5 rounded-xl transition-all text-lg font-medium
+                        focus:ring-2 focus:ring-emerald-500/50 focus:outline-none
+                        ${darkMode
+                          ? 'bg-slate-700/80 text-white border border-slate-600 focus:border-emerald-500'
+                          : 'bg-white text-slate-900 border-2 border-slate-200 focus:border-emerald-500'}
                       `}
                       placeholder="Enter event name"
                     />
                   </div>
                 </div>
               ) : (
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <div className="lg:col-span-2">
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     Series Name *
                   </label>
                   <div className="relative">
-                    <FileText 
-                      size={18} 
-                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                    <FileText
+                      size={20}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}
                     />
                     <input
                       type="text"
@@ -1130,10 +1157,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       value={formData.seriesName}
                       onChange={(e) => setFormData(prev => ({ ...prev, seriesName: e.target.value }))}
                       className={`
-                        w-full pl-10 pr-4 py-2 rounded-lg transition-colors
-                        ${darkMode 
-                          ? 'bg-slate-700 text-slate-200' 
-                          : 'bg-white text-slate-900 border border-slate-200'}
+                        w-full pl-12 pr-4 py-3.5 rounded-xl transition-all text-lg font-medium
+                        focus:ring-2 focus:ring-emerald-500/50 focus:outline-none
+                        ${darkMode
+                          ? 'bg-slate-700/80 text-white border border-slate-600 focus:border-emerald-500'
+                          : 'bg-white text-slate-900 border-2 border-slate-200 focus:border-emerald-500'}
                       `}
                       placeholder="Enter series name"
                     />
@@ -1142,7 +1170,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               )}
 
               {/* Event Type Options - spans both columns */}
-              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 animate-slideIn">
+              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-3 animate-slideIn">
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, isInterclub: !prev.isInterclub }))}
@@ -1820,44 +1848,80 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
 
               {/* Race Class and Race Format Row */}
               <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div ref={classDropdownRef}>
                   <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Race Class *
                   </label>
                   <div className="relative">
-                    <Sailboat
-                      size={18}
-                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                    />
-                    <select
-                      required
-                      value={formData.raceClass}
-                      onChange={(e) => {
-                        const value = e.target.value as BoatType;
-                        const selectedOption = e.target.options[e.target.selectedIndex];
-                        const className = selectedOption.text;
-                        setFormData(prev => ({
-                          ...prev,
-                          raceClass: value,
-                          boatClassName: className
-                        }));
-                      }}
+                    <button
+                      type="button"
+                      onClick={() => setShowClassDropdown(!showClassDropdown)}
                       className={`
-                        w-full pl-10 pr-4 py-2 rounded-lg transition-colors appearance-none
+                        w-full pl-14 pr-10 py-2.5 rounded-lg transition-colors text-left hover:border-blue-400
                         ${darkMode
                           ? 'bg-slate-700 text-slate-200'
                           : 'bg-white text-slate-900 border border-slate-200'}
                       `}
                     >
-                      <option value="">Select race class</option>
-                      <option value="DF65">Dragon Force 65</option>
-                      <option value="DF95">Dragon Force 95</option>
-                      <option value="10R">10 Rater</option>
-                      <option value="IOM">IOM</option>
-                      <option value="Marblehead">Marblehead</option>
-                      <option value="A Class">A Class</option>
-                      <option value="RC Laser">RC Laser</option>
-                    </select>
+                      {formData.raceClass
+                        ? (raceClassOptions.find(o => o.value === formData.raceClass)?.label || formData.raceClass)
+                        : 'Select race class'}
+                    </button>
+                    {formData.raceClass && (() => {
+                      const opt = raceClassOptions.find(o => o.value === formData.raceClass);
+                      const bc = opt ? boatClasses.find(bc => bc.name.toLowerCase() === opt.label.toLowerCase()) : null;
+                      return bc?.class_image ? (
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border-2 border-slate-600">
+                          <img src={bc.class_image} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <Sailboat size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                      );
+                    })()}
+                    {!formData.raceClass && (
+                      <Sailboat size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                    )}
+                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+
+                    {showClassDropdown && (
+                      <div className={`
+                        absolute top-full left-0 right-0 mt-1 max-h-60 overflow-auto rounded-lg shadow-xl z-50 border
+                        ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}
+                      `}>
+                        {raceClassOptions.map(opt => {
+                          const bc = boatClasses.find(bc => bc.name.toLowerCase() === opt.label.toLowerCase());
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  raceClass: opt.value as BoatType,
+                                  boatClassName: opt.label
+                                }));
+                                setShowClassDropdown(false);
+                              }}
+                              className={`
+                                w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-500/10 transition-colors
+                                ${formData.raceClass === opt.value ? 'bg-blue-500/20' : ''}
+                              `}
+                            >
+                              {bc?.class_image ? (
+                                <img src={bc.class_image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border-2 border-slate-600" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center flex-shrink-0">
+                                  <Sailboat size={20} className="text-slate-300" />
+                                </div>
+                              )}
+                              <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {opt.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
