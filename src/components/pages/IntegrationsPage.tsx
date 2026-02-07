@@ -183,6 +183,26 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       return;
     }
 
+    if (urlParams.get('youtube_connected') === 'true') {
+      const channelName = urlParams.get('channel_name') || 'YouTube';
+      setSuccess(`YouTube connected successfully: ${channelName}`);
+      addNotification('success', `Connected to YouTube channel: ${channelName}`);
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => {
+        fetchIntegrationStatus();
+        setSuccess(null);
+      }, 3000);
+      return;
+    }
+
+    if (urlParams.get('youtube_error')) {
+      const ytError = urlParams.get('youtube_error');
+      setError(`YouTube connection failed: ${ytError}`);
+      addNotification('error', `YouTube connection failed: ${ytError}`);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
     if (code && state) {
       try {
         const stateData = JSON.parse(decodeURIComponent(state));
@@ -441,8 +461,15 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   const handleConnectYoutube = async () => {
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '230273275079-723coi1ukfg2vngapur5djnug1cer6hd.apps.googleusercontent.com';
-      const redirectUri = `${window.location.origin}/settings`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const redirectUri = `${supabaseUrl}/functions/v1/youtube-oauth-callback`;
       const scope = 'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload';
+
+      const stateData = {
+        clubId: currentClub?.clubId,
+        integration: 'youtube',
+        origin: window.location.origin,
+      };
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(clientId)}&` +
@@ -451,7 +478,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         `response_type=code&` +
         `access_type=offline&` +
         `prompt=consent&` +
-        `state=${encodeURIComponent(JSON.stringify({ clubId: currentClub?.clubId, integration: 'youtube' }))}`;
+        `state=${encodeURIComponent(JSON.stringify(stateData))}`;
 
       window.location.href = authUrl;
     } catch (err) {
