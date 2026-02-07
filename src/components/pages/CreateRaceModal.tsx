@@ -302,11 +302,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         entriesOpen: (editingEvent as any).entriesOpen || '',
         entriesClose: (editingEvent as any).entriesClose || '',
         lateEntryUntil: (editingEvent as any).lateEntryUntil || '',
-        showClubState: (editingEvent as any).showClubState || false,
-        showDesign: (editingEvent as any).showDesign || false,
-        showCategory: (editingEvent as any).showCategory || false,
-        showCountry: (editingEvent as any).showCountry || false,
-        showFlag: (editingEvent as any).showFlag || false,
+        showClubState: editingEvent.showClubState ?? false,
+        showDesign: editingEvent.showDesign ?? false,
+        showCategory: editingEvent.showCategory ?? false,
+        showCountry: editingEvent.showCountry ?? true,
+        showFlag: editingEvent.showFlag ?? true,
         noticeOfRaceFile: null,
         noticeOfRaceUrl: editingEvent.noticeOfRaceUrl || '',
         sailingInstructionsFile: null,
@@ -324,6 +324,35 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         seriesName: '',
         rounds: []
       });
+
+      // Load scheduled documents for this event
+      const loadScheduledDocuments = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('race_document_schedule')
+            .select('document_type, due_date, assignee_ids, assignee_names')
+            .eq('event_id', editingEvent.id);
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            const schedules: any = {};
+            data.forEach(schedule => {
+              schedules[schedule.document_type] = {
+                scheduled: true,
+                contacts: schedule.assignee_names || [],
+                dueDate: schedule.due_date,
+                memberIds: schedule.assignee_ids || []
+              };
+            });
+            setScheduledDocuments(schedules);
+          }
+        } catch (err) {
+          console.error('Error loading scheduled documents:', err);
+        }
+      };
+
+      loadScheduledDocuments();
     }
   }, [editingEvent, clubs, venues]);
 
@@ -359,11 +388,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         entriesOpen: (editingSeries as any).entriesOpen || '',
         entriesClose: (editingSeries as any).entriesClose || '',
         lateEntryUntil: (editingSeries as any).lateEntryUntil || '',
-        showClubState: (editingSeries as any).showClubState || false,
-        showDesign: (editingSeries as any).showDesign || false,
-        showCategory: (editingSeries as any).showCategory || false,
-        showCountry: (editingSeries as any).showCountry || false,
-        showFlag: (editingSeries as any).showFlag || false,
+        showClubState: (editingSeries as any).showClubState ?? false,
+        showDesign: (editingSeries as any).showDesign ?? false,
+        showCategory: (editingSeries as any).showCategory ?? false,
+        showCountry: (editingSeries as any).showCountry ?? true,
+        showFlag: (editingSeries as any).showFlag ?? true,
         noticeOfRaceFile: null,
         noticeOfRaceUrl: editingSeries.noticeOfRaceUrl || '',
         sailingInstructionsFile: null,
