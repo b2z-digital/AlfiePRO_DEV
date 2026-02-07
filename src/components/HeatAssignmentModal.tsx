@@ -498,6 +498,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   // Check if this is Round 1 with no scores (initial allocation)
   const isInitialAllocation = round === 1 && (!results || results.length === 0);
 
+  // Check if any heat has scoring in progress (partial results)
+  const anyScoringInProgress = !completed && heatAssignments.some(assignment => {
+    const heatResults = (results || []).filter(r => r.heatDesignation === assignment.heatDesignation);
+    const hasResults = heatResults.length > 0;
+    const allScored = heatResults.length >= assignment.skipperIndices.length && heatResults.every(r =>
+      r.position !== null || r.letterScore || r.markedAsUP
+    );
+    return hasResults && !allScored;
+  });
+
   // Sort heat assignments alphabetically (A, B, C, etc.) for consistent display
   heatAssignments = [...heatAssignments].sort((a, b) =>
     a.heatDesignation.localeCompare(b.heatDesignation)
@@ -742,9 +752,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <h3 className="text-lg font-bold text-white">
                         Heat {heatDesignation}
                       </h3>
-                      {heatCompleted && (
+                      {heatCompleted ? (
                         <span className="text-xs font-semibold px-2 py-1 rounded bg-green-500 text-white">
                           Complete
+                        </span>
+                      ) : heatResults.length > 0 && !completed && (
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-500 text-white">
+                          Scoring
                         </span>
                       )}
                     </div>
@@ -1337,7 +1351,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           {/* Edit mode controls for mid-round only (when at least one heat complete but round not finished) */}
           {/* Allow manual override of promotions/relegations */}
-          {!isInitialAllocation && !completed && round >= 2 && results && results.length > 0 && (
+          {!isInitialAllocation && !completed && round >= 2 && results && results.length > 0 && !anyScoringInProgress && (
             <div className="flex gap-3">
               {!editMode ? (
                 <button
