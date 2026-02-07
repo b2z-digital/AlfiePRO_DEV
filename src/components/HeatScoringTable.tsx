@@ -174,7 +174,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
       for (const heat of availableHeats) {
         const progress = getHeatProgress(heat);
-        const isComplete = progress.scored === progress.total && progress.total > 0;
+        const isComplete = progress.scored >= progress.total && progress.total > 0;
 
         if (isInitialLoad || isRoundChange) {
           console.log(`Heat ${heat}: ${progress.scored}/${progress.total} - ${isComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
@@ -287,7 +287,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
     // Check if current heat is complete
     const progress = getHeatProgress(selectedHeat);
-    const currentHeatComplete = progress.scored === progress.total && progress.total > 0;
+    const currentHeatComplete = progress.scored >= progress.total && progress.total > 0;
 
     if (currentHeatComplete) {
       // Prevent advancing FROM the same heat multiple times
@@ -306,7 +306,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       if (nextHeatIndex < availableHeats.length) {
         const nextHeat = availableHeats[nextHeatIndex];
         const nextProgress = getHeatProgress(nextHeat);
-        const nextHeatComplete = nextProgress.scored === nextProgress.total && nextProgress.total > 0;
+        const nextHeatComplete = nextProgress.scored >= nextProgress.total && nextProgress.total > 0;
 
         // Only auto-advance if next heat is NOT complete
         if (!nextHeatComplete) {
@@ -651,7 +651,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const isHeatComplete = (heat: HeatDesignation) => {
     const progress = getHeatProgress(heat);
-    return progress.scored === progress.total && progress.total > 0;
+    return progress.scored >= progress.total && progress.total > 0;
   };
 
   // Check if all heats are complete for current race
@@ -663,7 +663,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     // Use the getHeatProgress function which already works correctly
     const allComplete = availableHeats.every(heat => {
       const progress = getHeatProgress(heat);
-      return progress.scored === progress.total && progress.total > 0;
+      return progress.scored >= progress.total && progress.total > 0;
     });
 
     if (allComplete) {
@@ -683,7 +683,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     const otherHeats = availableHeats.filter(heat => heat !== selectedHeat);
     const allOthersComplete = otherHeats.every(heat => {
       const progress = getHeatProgress(heat);
-      return progress.scored === progress.total && progress.total > 0;
+      return progress.scored >= progress.total && progress.total > 0;
     });
 
     // Check if the selected heat is not yet complete

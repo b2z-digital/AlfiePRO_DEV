@@ -2545,7 +2545,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   // Handler to update heat assignments for next round with manual overrides
-  const handleUpdateHeatAssignments = (updatedAssignments: any[], targetRound?: number) => {
+  const handleUpdateHeatAssignments = async (updatedAssignments: any[], targetRound?: number) => {
     if (!heatManagement) return;
 
     console.log('🔧 handleUpdateHeatAssignments called with:', {
@@ -2617,9 +2617,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     console.log('✅ Heat assignments updated for round', roundNumberToUpdate);
     setHeatManagement(updatedHeatManagement);
 
-    // Also save to database
-    if (currentEvent?.id) {
-      autoSaveHeatManagement(updatedHeatManagement);
+    const event = getCurrentEvent();
+    if (event?.id) {
+      try {
+        await supabase
+          .from('quick_races')
+          .update({ heat_management: updatedHeatManagement })
+          .eq('id', event.isSeriesEvent ? event.seriesId : event.id);
+      } catch (err) {
+        console.error('Error saving heat assignments:', err);
+      }
     }
   };
 
