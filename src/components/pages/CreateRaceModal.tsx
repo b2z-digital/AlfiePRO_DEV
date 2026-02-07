@@ -137,8 +137,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const [showScheduleDocumentModal, setShowScheduleDocumentModal] = useState(false);
   const [scheduleDocumentType, setScheduleDocumentType] = useState<'nor' | 'si'>('nor');
   const [scheduledDocuments, setScheduledDocuments] = useState<{
-    nor?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[] };
-    si?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[] };
+    nor?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[]; existingTaskIds?: string[] };
+    si?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[]; existingTaskIds?: string[] };
   }>({});
   const [linkDocumentSchedules, setLinkDocumentSchedules] = useState(true);
 
@@ -325,27 +325,43 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         rounds: []
       });
 
-      // Load scheduled documents for this event
       const loadScheduledDocuments = async () => {
         try {
+          const eventName = editingEvent.eventName || '';
           const { data, error } = await supabase
-            .from('race_document_schedule')
-            .select('document_type, due_date, assignee_ids, assignee_names')
-            .eq('event_id', editingEvent.id);
+            .from('club_tasks')
+            .select('id, title, due_date, assignee_id, status')
+            .or(`title.ilike.%Notice of Race (NOR) - ${eventName}%,title.ilike.%Sailing Instructions (SI) - ${eventName}%`)
+            .neq('status', 'completed');
 
           if (error) throw error;
 
           if (data && data.length > 0) {
+            const norTasks = data.filter(t => t.title.includes('Notice of Race (NOR)'));
+            const siTasks = data.filter(t => t.title.includes('Sailing Instructions (SI)'));
             const schedules: any = {};
-            data.forEach(schedule => {
-              schedules[schedule.document_type] = {
+
+            if (norTasks.length > 0) {
+              schedules.nor = {
                 scheduled: true,
-                contacts: schedule.assignee_names || [],
-                dueDate: schedule.due_date,
-                memberIds: schedule.assignee_ids || []
+                contacts: norTasks.map(t => t.assignee_id).filter(Boolean),
+                dueDate: norTasks[0].due_date,
+                memberIds: norTasks.map(t => t.assignee_id).filter(Boolean),
+                existingTaskIds: norTasks.map(t => t.id)
               };
-            });
-            setScheduledDocuments(schedules);
+            }
+            if (siTasks.length > 0) {
+              schedules.si = {
+                scheduled: true,
+                contacts: siTasks.map(t => t.assignee_id).filter(Boolean),
+                dueDate: siTasks[0].due_date,
+                memberIds: siTasks.map(t => t.assignee_id).filter(Boolean),
+                existingTaskIds: siTasks.map(t => t.id)
+              };
+            }
+            if (Object.keys(schedules).length > 0) {
+              setScheduledDocuments(schedules);
+            }
           }
         } catch (err) {
           console.error('Error loading scheduled documents:', err);
@@ -553,14 +569,16 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           contacts: contacts,
           contactEmails: contactEmails,
           dueDate: dueDate,
-          memberIds: memberIds
+          memberIds: memberIds,
+          existingTaskIds: prev.nor?.existingTaskIds
         },
         si: {
           scheduled: true,
           contacts: contacts,
           contactEmails: contactEmails,
           dueDate: dueDate,
-          memberIds: memberIds
+          memberIds: memberIds,
+          existingTaskIds: prev.si?.existingTaskIds
         }
       }));
 
@@ -576,7 +594,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           contacts: contacts,
           contactEmails: contactEmails,
           dueDate: dueDate,
-          memberIds: memberIds
+          memberIds: memberIds,
+          existingTaskIds: prev[documentType]?.existingTaskIds
         }
       }));
 
@@ -957,21 +976,35 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           const doc = scheduledDocuments[docInfo.type];
           if (!doc?.memberIds?.length) continue;
 
-          for (const memberId of doc.memberIds) {
+          if (doc.existingTaskIds && doc.existingTaskIds.length > 0) {
             try {
-              await createTask(currentClub.clubId, user.id, {
-                title: `Prepare ${docInfo.label} - ${formData.eventName}`,
-                description: `Prepare and finalise the ${docInfo.label} for the event "${formData.eventName}" scheduled on ${eventDateFormatted}.`,
-                due_date: doc.dueDate || null,
-                priority: 'high',
-                assignee_id: memberId,
-                send_reminder: true,
-                reminder_type: 'both',
-                reminder_date: doc.dueDate || null,
-                followers: [user.id]
-              });
+              await supabase
+                .from('club_tasks')
+                .update({
+                  due_date: doc.dueDate || null,
+                  reminder_date: doc.dueDate || null
+                })
+                .in('id', doc.existingTaskIds);
             } catch (taskErr) {
-              console.error(`Error creating ${docInfo.type} task for member ${memberId}:`, taskErr);
+              console.error(`Error updating ${docInfo.type} tasks:`, taskErr);
+            }
+          } else {
+            for (const memberId of doc.memberIds) {
+              try {
+                await createTask(currentClub.clubId, user.id, {
+                  title: `Prepare ${docInfo.label} - ${formData.eventName}`,
+                  description: `Prepare and finalise the ${docInfo.label} for the event "${formData.eventName}" scheduled on ${eventDateFormatted}.`,
+                  due_date: doc.dueDate || null,
+                  priority: 'high',
+                  assignee_id: memberId,
+                  send_reminder: true,
+                  reminder_type: 'both',
+                  reminder_date: doc.dueDate || null,
+                  followers: [user.id]
+                });
+              } catch (taskErr) {
+                console.error(`Error creating ${docInfo.type} task for member ${memberId}:`, taskErr);
+              }
             }
           }
         }
@@ -2149,24 +2182,37 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                 Document Creation Scheduled
                               </p>
                               <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Task will be created for {scheduledDocuments.nor?.contacts?.length || 0} contact(s)
+                                {scheduledDocuments.nor?.existingTaskIds ? 'Task assigned' : 'Task will be created'} for {scheduledDocuments.nor?.memberIds?.length || scheduledDocuments.nor?.contacts?.length || 0} member(s)
+                                {scheduledDocuments.nor?.dueDate && (
+                                  <> - Due: {new Date(scheduledDocuments.nor.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                )}
                               </p>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setScheduledDocuments(prev => {
-                                const newState = { ...prev };
-                                delete newState.nor;
-                                return newState;
-                              });
-                            }}
-                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-                            title="Remove Schedule"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleScheduleDocument('nor')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                              title="Edit Schedule"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScheduledDocuments(prev => {
+                                  const newState = { ...prev };
+                                  delete newState.nor;
+                                  return newState;
+                                });
+                              }}
+                              className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                              title="Remove Schedule"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -2283,24 +2329,37 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                 Document Creation Scheduled
                               </p>
                               <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Task will be created for {scheduledDocuments.si?.contacts?.length || 0} contact(s)
+                                {scheduledDocuments.si?.existingTaskIds ? 'Task assigned' : 'Task will be created'} for {scheduledDocuments.si?.memberIds?.length || scheduledDocuments.si?.contacts?.length || 0} member(s)
+                                {scheduledDocuments.si?.dueDate && (
+                                  <> - Due: {new Date(scheduledDocuments.si.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                )}
                               </p>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setScheduledDocuments(prev => {
-                                const newState = { ...prev };
-                                delete newState.si;
-                                return newState;
-                              });
-                            }}
-                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-                            title="Remove Schedule"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleScheduleDocument('si')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                              title="Edit Schedule"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScheduledDocuments(prev => {
+                                  const newState = { ...prev };
+                                  delete newState.si;
+                                  return newState;
+                                });
+                              }}
+                              className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                              title="Remove Schedule"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -3325,6 +3384,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         eventDate={formData.raceDate}
         eventName={formData.eventName}
         isLinked={linkDocumentSchedules}
+        initialDueDate={scheduledDocuments[scheduleDocumentType]?.dueDate}
+        initialSelectedMembers={scheduledDocuments[scheduleDocumentType]?.memberIds}
         onSchedule={(contacts, contactEmails, dueDate, memberIds) => {
           handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails, dueDate, memberIds);
           setShowScheduleDocumentModal(false);

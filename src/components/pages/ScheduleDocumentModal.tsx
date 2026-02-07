@@ -13,6 +13,8 @@ interface ScheduleDocumentModalProps {
   eventName: string;
   onSchedule: (contacts: string[], contactEmails: string[], dueDate: string, memberIds: string[]) => void;
   isLinked?: boolean;
+  initialDueDate?: string;
+  initialSelectedMembers?: string[];
 }
 
 interface ClubMember {
@@ -39,7 +41,9 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
   eventDate,
   eventName,
   onSchedule,
-  isLinked = false
+  isLinked = false,
+  initialDueDate,
+  initialSelectedMembers
 }) => {
   const { currentClub } = useAuth();
   const [members, setMembers] = useState<ClubMember[]>([]);
@@ -55,20 +59,31 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
 
   useEffect(() => {
     if (isOpen && eventDate) {
-      const evDate = new Date(eventDate + 'T00:00:00');
-      const suggested = new Date(evDate);
-      suggested.setDate(suggested.getDate() - 60);
+      if (initialDueDate) {
+        setDueDate(initialDueDate);
+        const initDate = new Date(initialDueDate + 'T00:00:00');
+        setCalendarMonth(initDate.getMonth());
+        setCalendarYear(initDate.getFullYear());
+      } else {
+        const evDate = new Date(eventDate + 'T00:00:00');
+        const suggested = new Date(evDate);
+        suggested.setDate(suggested.getDate() - 60);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (suggested < today) {
-        suggested.setTime(today.getTime());
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (suggested < today) {
+          suggested.setTime(today.getTime());
+        }
+
+        const dateStr = `${suggested.getFullYear()}-${String(suggested.getMonth() + 1).padStart(2, '0')}-${String(suggested.getDate()).padStart(2, '0')}`;
+        setDueDate(dateStr);
+        setCalendarMonth(suggested.getMonth());
+        setCalendarYear(suggested.getFullYear());
       }
 
-      const dateStr = `${suggested.getFullYear()}-${String(suggested.getMonth() + 1).padStart(2, '0')}-${String(suggested.getDate()).padStart(2, '0')}`;
-      setDueDate(dateStr);
-      setCalendarMonth(suggested.getMonth());
-      setCalendarYear(suggested.getFullYear());
+      if (initialSelectedMembers && initialSelectedMembers.length > 0) {
+        setSelectedMembers(initialSelectedMembers);
+      }
 
       fetchMembers();
     }
