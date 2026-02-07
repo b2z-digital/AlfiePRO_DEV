@@ -1385,7 +1385,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
         {/* Event Content */}
         <div className="p-4">
           {/* Action Buttons */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
             <div className="flex gap-2">
               <button
                 onClick={(e) => {
@@ -1663,7 +1663,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
         {/* Series Content */}
         <div className="p-4" onClick={() => toggleSeriesExpansion(s.id)}>
           {/* Action Buttons */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
             <div className="flex gap-2">
               <button
                 onClick={(e) => {

@@ -197,6 +197,13 @@ input[type="color"]::-moz-color-swatch {
   font-weight: 600;
 }
 
+/* Touch device support - always show hover-only elements on devices without hover */
+@media (hover: none) {
+  .touch-show {
+    opacity: 1 !important;
+  }
+}
+
 /* Slide-in animation for reconciliation panel */
 @keyframes slide-in {
   from {
