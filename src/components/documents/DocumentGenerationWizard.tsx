@@ -1339,16 +1339,68 @@ async function generatePDFFromHTML(
 
   let logoDataUrl = '';
   if (template.header_logo_url) {
-    try {
-      const response = await fetch(template.header_logo_url);
-      const blob = await response.blob();
-      logoDataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) {
-      console.warn('Failed to load logo as base64, will try direct URL');
+    const logoUrl: string = template.header_logo_url;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+
+    if (supabaseUrl && logoUrl.includes(supabaseUrl)) {
+      try {
+        const pathMatch = logoUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/([^?]+)/);
+        if (pathMatch) {
+          const fullPath = decodeURIComponent(pathMatch[1]);
+          const slashIdx = fullPath.indexOf('/');
+          const bucket = fullPath.substring(0, slashIdx);
+          const filePath = fullPath.substring(slashIdx + 1);
+          const { data } = await supabase.storage.from(bucket).download(filePath);
+          if (data) {
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(data);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase storage download failed:', e);
+      }
+    }
+
+    if (!logoDataUrl) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve) => {
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                logoDataUrl = canvas.toDataURL('image/png');
+              }
+            } catch (_) {}
+            resolve();
+          };
+          img.onerror = () => resolve();
+          setTimeout(resolve, 5000);
+          img.src = logoUrl;
+        });
+      } catch (_) {}
+    }
+
+    if (!logoDataUrl) {
+      try {
+        const resp = await fetch(logoUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch (_) {}
     }
   }
 
