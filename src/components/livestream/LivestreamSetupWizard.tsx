@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown } from 'lucide-react';
+import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown, Radio } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -681,31 +681,38 @@ export function LivestreamSetupWizard({
         </div>
       )}
 
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-700/50">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 relative">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-white hover:text-gray-200"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">{getStepTitle()}</h2>
-            {currentStep === 'timing' && (
-              <p className="text-blue-100">When do you want to go live?</p>
-            )}
+        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
+                <Radio className="text-white drop-shadow-lg w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white drop-shadow-lg">{getStepTitle()}</h2>
+                {currentStep === 'timing' && (
+                  <p className="text-cyan-100 text-sm mt-0.5">When do you want to go live?</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Progress Indicator */}
-          <div className="mt-6 flex justify-center space-x-2">
+          <div className="mt-5 flex justify-center space-x-2 relative z-10">
             {steps.map((step, index) => (
               <div
                 key={step}
-                className={`h-1 w-16 rounded-full transition-colors ${
-                  index <= currentStepIndex ? 'bg-white' : 'bg-blue-400 bg-opacity-30'
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  index <= currentStepIndex ? 'bg-white w-20' : 'bg-white/20 w-16'
                 }`}
               />
             ))}
@@ -721,18 +728,18 @@ export function LivestreamSetupWizard({
                   updateWizardData({ timing: 'now' });
                   handleNext();
                 }}
-                className="w-full bg-gray-800 hover:bg-gray-700 p-6 rounded-lg flex items-center justify-between group transition-colors"
+                className="w-full bg-slate-800/80 hover:bg-slate-700/80 p-6 rounded-xl flex items-center justify-between group transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/5"
               >
                 <div className="flex items-center space-x-4">
-                  <div className="bg-gray-700 p-3 rounded-full group-hover:bg-gray-600">
+                  <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-3 rounded-xl group-hover:scale-105 transition-transform shadow-lg">
                     <Video className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
                     <h3 className="text-white font-semibold text-lg">Go Live Now</h3>
-                    <p className="text-gray-400">Set up your stream and start broadcasting immediately</p>
+                    <p className="text-slate-400 text-sm">Set up your stream and start broadcasting immediately</p>
                   </div>
                 </div>
-                <div className="bg-white text-gray-900 px-4 py-2 rounded-lg font-semibold">
+                <div className="bg-white text-slate-900 px-5 py-2 rounded-xl font-semibold text-sm shadow-md group-hover:shadow-lg transition-shadow">
                   Now
                 </div>
               </button>
@@ -742,18 +749,18 @@ export function LivestreamSetupWizard({
                   updateWizardData({ timing: 'later' });
                   handleNext();
                 }}
-                className="w-full bg-gray-800 hover:bg-gray-700 p-6 rounded-lg flex items-center justify-between group transition-colors"
+                className="w-full bg-slate-800/80 hover:bg-slate-700/80 p-6 rounded-xl flex items-center justify-between group transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/5"
               >
                 <div className="flex items-center space-x-4">
-                  <div className="bg-gray-700 p-3 rounded-full group-hover:bg-gray-600">
+                  <div className="bg-gradient-to-br from-slate-600 to-slate-700 p-3 rounded-xl group-hover:scale-105 transition-transform shadow-lg">
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
                     <h3 className="text-white font-semibold text-lg">Schedule Stream</h3>
-                    <p className="text-gray-400">Set up a stream for a later time or future event</p>
+                    <p className="text-slate-400 text-sm">Set up a stream for a later time or future event</p>
                   </div>
                 </div>
-                <div className="bg-white text-gray-900 px-4 py-2 rounded-lg font-semibold">
+                <div className="bg-white text-slate-900 px-5 py-2 rounded-xl font-semibold text-sm shadow-md group-hover:shadow-lg transition-shadow">
                   Later
                 </div>
               </button>
@@ -1159,10 +1166,10 @@ export function LivestreamSetupWizard({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-800 px-6 py-4 flex justify-between items-center border-t border-gray-700">
+        <div className="bg-slate-800/80 px-6 py-4 flex justify-between items-center border-t border-slate-700/50">
           <button
             onClick={currentStepIndex === 0 ? onClose : handleBack}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"
+            className="flex items-center space-x-2 px-4 py-2.5 text-slate-300 hover:text-white transition-colors rounded-xl hover:bg-slate-700/50"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{currentStepIndex === 0 ? 'Cancel' : 'Back'}</span>
@@ -1172,7 +1179,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleNext}
               disabled={currentStep === 'details' && (!wizardData.title || !wizardData.eventId)}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
             >
               <span>Next</span>
               <ArrowRight className="w-4 h-4" />
@@ -1181,7 +1188,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleComplete}
               disabled={loading || !wizardData.title || !wizardData.eventId}
-              className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-500 hover:to-green-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
             >
               <Check className="w-4 h-4" />
               <span>{loading ? 'Creating...' : wizardData.timing === 'now' ? 'Go Live' : 'Schedule Stream'}</span>
