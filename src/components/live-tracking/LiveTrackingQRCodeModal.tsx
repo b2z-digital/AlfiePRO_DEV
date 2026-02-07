@@ -35,6 +35,7 @@ export default function LiveTrackingQRCodeModal({
     notification_open_rate: 0,
   });
   const [publicUrl, setPublicUrl] = useState<string>('');
+  const [displayUrl, setDisplayUrl] = useState<string>('');
 
   useEffect(() => {
     initializeLiveTracking();
@@ -92,14 +93,21 @@ export default function LiveTrackingQRCodeModal({
 
       const shortCode = event.short_code;
       const eventDomain = await getEventWebsiteDomain();
-      const baseUrl = eventDomain || window.location.origin;
-      const trackingUrl = shortCode
-        ? `${baseUrl}/t/${shortCode}`
-        : `${baseUrl}/live/${event.access_token}`;
+      const localBaseUrl = eventDomain || window.location.origin;
 
-      setPublicUrl(trackingUrl);
+      const qrUrl = shortCode
+        ? `${localBaseUrl}/t/${shortCode}`
+        : `${localBaseUrl}/live/${event.access_token}`;
 
-      await generateQRCode(trackingUrl);
+      const brandedBase = eventDomain || 'https://alfiepro.com.au';
+      const brandedUrl = shortCode
+        ? `${brandedBase}/t/${shortCode}`
+        : qrUrl;
+
+      setPublicUrl(qrUrl);
+      setDisplayUrl(brandedUrl);
+
+      await generateQRCode(qrUrl);
       console.log('QR code generated successfully');
 
       await loadStats();
@@ -182,8 +190,8 @@ export default function LiveTrackingQRCodeModal({
   };
 
   const handleCopyLink = () => {
-    if (!trackingEvent || !publicUrl) return;
-    navigator.clipboard.writeText(publicUrl);
+    if (!trackingEvent || !displayUrl) return;
+    navigator.clipboard.writeText(displayUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -273,14 +281,13 @@ export default function LiveTrackingQRCodeModal({
   };
 
   const handleShare = () => {
-    if (!trackingEvent || !publicUrl) return;
+    if (!trackingEvent || !displayUrl) return;
 
-    // Try native share first on mobile
     if (navigator.share && /Mobile|Android|iPhone/i.test(navigator.userAgent)) {
       navigator.share({
         title: `${eventName} - Live Tracking`,
         text: 'Track race progress in real-time!',
-        url: publicUrl,
+        url: displayUrl,
       }).catch(() => {
         // If cancelled or failed, show member selection
         setShowMemberSelection(true);
@@ -292,18 +299,16 @@ export default function LiveTrackingQRCodeModal({
   };
 
   const handleSendNotifications = async (selectedMembers: any[]) => {
-    if (!trackingEvent || !publicUrl) return;
+    if (!trackingEvent || !displayUrl) return;
 
     try {
       const { supabase } = await import('../../utils/supabase');
 
-      // Determine the organization ID to use for notifications
       const orgId = clubId || stateAssociationId || nationalAssociationId;
       if (!orgId) {
         throw new Error('No organization ID available for notifications');
       }
 
-      // Send notification to each selected member
       const notifications = selectedMembers.map(member => ({
         user_id: member.user_id,
         club_id: clubId || null,
@@ -312,7 +317,7 @@ export default function LiveTrackingQRCodeModal({
         type: 'info' as const,
         title: `${eventName} - Live Tracking Available`,
         message: `Live skipper tracking is now active! Scan the QR code or visit the link to follow the race in real-time.`,
-        link: publicUrl,
+        link: displayUrl,
         read: false
       }));
 
@@ -550,21 +555,18 @@ export default function LiveTrackingQRCodeModal({
           </div>
 
           {/* Public URL */}
-          {trackingEvent && publicUrl && (
+          {trackingEvent && displayUrl && (
             <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-4">
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
-                Public Tracking URL
+                Share Link
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={publicUrl}
-                  readOnly
-                  className="flex-1 px-4 py-2.5 bg-slate-900/50 border border-slate-600/50 rounded-xl text-sm font-mono text-slate-300"
-                />
+              <div className="flex gap-2 items-center">
+                <div className="flex-1 px-4 py-2.5 bg-slate-900/50 border border-slate-600/50 rounded-xl text-sm font-mono text-cyan-300 truncate select-all">
+                  {displayUrl}
+                </div>
                 <button
                   onClick={handleCopyLink}
-                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium"
+                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium shrink-0"
                 >
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
@@ -587,13 +589,13 @@ export default function LiveTrackingQRCodeModal({
       </div>
 
       {/* Member Selection Modal */}
-      {showMemberSelection && trackingEvent && publicUrl && (
+      {showMemberSelection && trackingEvent && displayUrl && (
         <MemberSelectionModal
           clubId={clubId || undefined}
           stateAssociationId={stateAssociationId || undefined}
           nationalAssociationId={nationalAssociationId || undefined}
           eventName={eventName}
-          trackingUrl={publicUrl}
+          trackingUrl={displayUrl}
           onClose={() => setShowMemberSelection(false)}
           onSend={handleSendNotifications}
         />
