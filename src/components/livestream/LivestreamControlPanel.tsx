@@ -2057,7 +2057,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
       {showAnalytics && activeSession && (
         <StreamAnalyticsModal
-          session={activeSession}
+          sessionId={activeSession.id}
+          clubId={clubId}
           onClose={() => setShowAnalytics(false)}
         />
       )}
