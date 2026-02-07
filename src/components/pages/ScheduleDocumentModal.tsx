@@ -65,7 +65,7 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
         suggested.setTime(today.getTime());
       }
 
-      const dateStr = suggested.toISOString().split('T')[0];
+      const dateStr = `${suggested.getFullYear()}-${String(suggested.getMonth() + 1).padStart(2, '0')}-${String(suggested.getDate()).padStart(2, '0')}`;
       setDueDate(dateStr);
       setCalendarMonth(suggested.getMonth());
       setCalendarYear(suggested.getFullYear());
@@ -149,9 +149,14 @@ export const ScheduleDocumentModal: React.FC<ScheduleDocumentModalProps> = ({
   const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
 
+  const formatLocalDate = (year: number, month: number, day: number) => {
+    const m = String(month + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    return `${year}-${m}-${d}`;
+  };
+
   const handleSelectDate = (day: number) => {
-    const selected = new Date(calendarYear, calendarMonth, day);
-    setDueDate(selected.toISOString().split('T')[0]);
+    setDueDate(formatLocalDate(calendarYear, calendarMonth, day));
     setShowCalendar(false);
   };
 
