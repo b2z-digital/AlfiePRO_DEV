@@ -485,23 +485,24 @@ export async function getEventEngagementStats(eventId: string): Promise<{
     const trackingEvent = await getLiveTrackingEvent(eventId);
     const sessions = await getActiveSessionsForEvent(eventId);
 
-    const notifications = await supabase
-      .from('skipper_notifications_sent')
-      .select('opened_at')
-      .in(
-        'session_id',
-        sessions.map((s) => s.id)
-      );
+    let openRate = 0;
+    if (trackingEvent) {
+      const { data: notifData } = await supabase
+        .from('notifications')
+        .select('read')
+        .like('subject', `[LiveTracking:${trackingEvent.id}]%`);
 
-    const notificationData = notifications.data || [];
-    const opened = notificationData.filter((n) => n.opened_at).length;
-    const total = notificationData.length;
+      if (notifData && notifData.length > 0) {
+        const readCount = notifData.filter((n) => n.read).length;
+        openRate = (readCount / notifData.length) * 100;
+      }
+    }
 
     return {
       active_sessions: sessions.length,
       total_sessions: trackingEvent?.total_sessions_created || 0,
       notifications_sent: trackingEvent?.total_notifications_sent || 0,
-      notification_open_rate: total > 0 ? (opened / total) * 100 : 0,
+      notification_open_rate: openRate,
     };
   } catch (error) {
     console.error('Error getting engagement stats:', error);

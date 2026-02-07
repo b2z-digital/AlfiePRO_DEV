@@ -309,15 +309,14 @@ export default function LiveTrackingQRCodeModal({
         throw new Error('No organization ID available for notifications');
       }
 
+      const liveTrackingSubject = `[LiveTracking:${trackingEvent.id}] ${eventName} - Live Tracking Available`;
+
       const notifications = selectedMembers.map(member => ({
         user_id: member.user_id,
         club_id: clubId || null,
-        state_association_id: stateAssociationId || null,
-        national_association_id: nationalAssociationId || null,
         type: 'info' as const,
-        title: `${eventName} - Live Tracking Available`,
-        message: `Live skipper tracking is now active! Scan the QR code or visit the link to follow the race in real-time.`,
-        link: displayUrl,
+        subject: liveTrackingSubject,
+        body: `Live skipper tracking is now active for ${eventName}! Follow the race in real-time: ${displayUrl}`,
         read: false
       }));
 
@@ -326,6 +325,20 @@ export default function LiveTrackingQRCodeModal({
         .insert(notifications);
 
       if (notifError) throw notifError;
+
+      await supabase
+        .from('live_tracking_events')
+        .update({
+          total_notifications_sent: (trackingEvent.total_notifications_sent || 0) + selectedMembers.length
+        })
+        .eq('id', trackingEvent.id);
+
+      setTrackingEvent(prev => prev ? {
+        ...prev,
+        total_notifications_sent: (prev.total_notifications_sent || 0) + selectedMembers.length
+      } : prev);
+
+      await loadStats();
 
       setSuccessMessage(`Successfully notified ${selectedMembers.length} member${selectedMembers.length !== 1 ? 's' : ''}!`);
       setTimeout(() => setSuccessMessage(null), 3000);
