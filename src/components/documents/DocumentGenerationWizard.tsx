@@ -380,7 +380,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
       if (submissionError) throw submissionError;
 
       // Generate PDF client-side using jsPDF
-      const pdf = await generatePDFDocument(formData, template, currentClub, { clubs, venues, stateAssociations });
+      const pdf = await generatePDFDocument(formData, template, currentClub, { clubs, venues, stateAssociations }, form?.fields || []);
 
       // Convert PDF to blob
       const pdfBlob = pdf.output('blob');
@@ -927,19 +927,11 @@ async function generatePDFDocument(
   formData: any,
   template: any,
   club: any,
-  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] }
+  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] },
+  formFields: FormField[] = []
 ): Promise<jsPDF> {
-  // Debug logging
-  console.log('=== PDF GENERATION DEBUG ===');
-  console.log('Template type:', template.template_type);
-  console.log('Has html_content:', !!template.html_content);
-  console.log('Template ID:', template.id);
-  console.log('Template name:', template.name);
-
-  // Check if this is an HTML template from WYSIWYG builder
   if (template.template_type === 'html' && template.html_content) {
-    console.log('✅ Using HTML template generation');
-    return await generatePDFFromHTML(formData, template, club, lookupData);
+    return await generatePDFFromHTML(formData, template, club, lookupData, formFields);
   }
 
   // Legacy structured template processing
@@ -1301,28 +1293,48 @@ function generateDaySchedule(formData: any): string {
 }
 
 // Helper function to generate PDF from HTML template using html2canvas
+function resolveFieldDisplayValue(key: string, rawValue: string, formFields: FormField[], lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] }): string {
+  if (!rawValue) return rawValue;
+
+  if (key === 'state_association' || key === 'state_association_id') {
+    const assoc = lookupData.stateAssociations.find(a => a.id === rawValue);
+    if (assoc) return assoc.name + (assoc.state ? ` (${assoc.state})` : '');
+  }
+  if (key === 'clubs' || key === 'club' || key === 'club_id') {
+    const c = lookupData.clubs.find(c => c.id === rawValue);
+    if (c) return c.name;
+  }
+  if (key === 'venue' || key === 'venue_id') {
+    const v = lookupData.venues.find(v => v.id === rawValue);
+    if (v) return v.name;
+  }
+
+  const field = formFields.find(f => f.field_name === key);
+  if (field && field.options && field.options.length > 0) {
+    const option = field.options.find(o => o.value === rawValue);
+    if (option) return option.label;
+  }
+
+  if (typeof rawValue === 'string' && rawValue.includes('_') && !/^\d{4}[-_]\d{2}[-_]\d{2}/.test(rawValue) && !rawValue.includes('://')) {
+    return rawValue.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  return rawValue;
+}
+
 async function generatePDFFromHTML(
   formData: any,
   template: any,
   club: any,
-  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] }
+  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] },
+  formFields: FormField[] = []
 ): Promise<jsPDF> {
   let processedHTML = template.html_content;
 
   const resolvedFormData: Record<string, string> = {};
   Object.keys(formData).forEach((key) => {
-    let value = formData[key] || "";
-    if (key === 'state_association' || key === 'state_association_id') {
-      const assoc = lookupData.stateAssociations.find(a => a.id === value);
-      if (assoc) value = assoc.name + (assoc.state ? ` (${assoc.state})` : '');
-    } else if (key === 'clubs' || key === 'club' || key === 'club_id') {
-      const c = lookupData.clubs.find(c => c.id === value);
-      if (c) value = c.name;
-    } else if (key === 'venue' || key === 'venue_id') {
-      const v = lookupData.venues.find(v => v.id === value);
-      if (v) value = v.name;
-    }
-    resolvedFormData[key] = value;
+    const value = formData[key] || "";
+    resolvedFormData[key] = resolveFieldDisplayValue(key, value, formFields, lookupData);
   });
 
   Object.keys(resolvedFormData).forEach((key) => {
@@ -1525,9 +1537,48 @@ async function generatePDFFromHTML(
       })
     );
 
-    const fullHeight = measurePage.scrollHeight;
     const contentAreaHeightPx = Math.round((CONTENT_HEIGHT_MM / 297) * A4_HEIGHT_PX);
-    const totalPages = Math.max(1, Math.ceil(fullHeight / contentAreaHeightPx));
+
+    const contentDiv = measurePage.querySelector('.pdf-content');
+    const allBlockElements: HTMLElement[] = [];
+    if (contentDiv) {
+      const collectBlocks = (parent: Element) => {
+        Array.from(parent.children).forEach(child => {
+          const el = child as HTMLElement;
+          const display = getComputedStyle(el).display;
+          if (display === 'block' || display === 'list-item' || el.tagName.match(/^(P|H[1-6]|UL|OL|DIV|BLOCKQUOTE|TABLE|HR|PRE)$/i)) {
+            allBlockElements.push(el);
+          }
+        });
+      };
+      collectBlocks(contentDiv);
+    }
+
+    const measureRect = measurePage.getBoundingClientRect();
+    const breakOffsets: number[] = [0];
+    let nextBoundary = contentAreaHeightPx;
+
+    for (const el of allBlockElements) {
+      const rect = el.getBoundingClientRect();
+      const elTop = rect.top - measureRect.top;
+      const elBottom = rect.bottom - measureRect.top;
+
+      if (elBottom > nextBoundary && elTop > breakOffsets[breakOffsets.length - 1]) {
+        breakOffsets.push(elTop);
+        nextBoundary = elTop + contentAreaHeightPx;
+
+        if (el.offsetHeight > contentAreaHeightPx) {
+          let extra = elTop + contentAreaHeightPx;
+          while (extra < elBottom) {
+            breakOffsets.push(extra);
+            extra += contentAreaHeightPx;
+          }
+          nextBoundary = extra;
+        }
+      }
+    }
+
+    const totalPages = breakOffsets.length;
 
     document.body.removeChild(measuringContainer);
 
@@ -1542,6 +1593,8 @@ async function generatePDFFromHTML(
 
     for (let pageNum = 0; pageNum < totalPages; pageNum++) {
       if (pageNum > 0) pdf.addPage();
+
+      const pageOffset = breakOffsets[pageNum];
 
       const pageContainer = document.createElement('div');
       pageContainer.style.position = 'absolute';
@@ -1562,7 +1615,7 @@ async function generatePDFFromHTML(
 
       const contentWrapper = document.createElement('div');
       contentWrapper.style.position = 'relative';
-      contentWrapper.style.top = `-${pageNum * contentAreaHeightPx}px`;
+      contentWrapper.style.top = `-${pageOffset}px`;
       contentWrapper.style.width = '100%';
       contentWrapper.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
 
