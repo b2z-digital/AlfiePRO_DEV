@@ -136,8 +136,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const [showScheduleDocumentModal, setShowScheduleDocumentModal] = useState(false);
   const [scheduleDocumentType, setScheduleDocumentType] = useState<'nor' | 'si'>('nor');
   const [scheduledDocuments, setScheduledDocuments] = useState<{
-    nor?: { scheduled: boolean; contacts: string[] };
-    si?: { scheduled: boolean; contacts: string[] };
+    nor?: { scheduled: boolean; contacts: string[]; dueDate?: string };
+    si?: { scheduled: boolean; contacts: string[]; dueDate?: string };
   }>({});
   const [linkDocumentSchedules, setLinkDocumentSchedules] = useState(true);
 
@@ -514,20 +514,21 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     setShowScheduleDocumentModal(true);
   };
 
-  const handleDocumentScheduled = (documentType: 'nor' | 'si', contacts: string[], contactEmails: string[]) => {
+  const handleDocumentScheduled = (documentType: 'nor' | 'si', contacts: string[], contactEmails: string[], dueDate?: string) => {
     if (linkDocumentSchedules) {
-      // When linked, schedule both NOR and SI with the same settings
       setScheduledDocuments(prev => ({
         ...prev,
         nor: {
           scheduled: true,
           contacts: contacts,
-          contactEmails: contactEmails
+          contactEmails: contactEmails,
+          dueDate: dueDate
         },
         si: {
           scheduled: true,
           contacts: contacts,
-          contactEmails: contactEmails
+          contactEmails: contactEmails,
+          dueDate: dueDate
         }
       }));
 
@@ -536,13 +537,13 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         'success'
       );
     } else {
-      // When unlinked, only schedule the selected document
       setScheduledDocuments(prev => ({
         ...prev,
         [documentType]: {
           scheduled: true,
           contacts: contacts,
-          contactEmails: contactEmails
+          contactEmails: contactEmails,
+          dueDate: dueDate
         }
       }));
 
@@ -3224,8 +3225,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         eventDate={formData.raceDate}
         eventName={formData.eventName}
         isLinked={linkDocumentSchedules}
-        onSchedule={(contacts, contactEmails) => {
-          handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails);
+        onSchedule={(contacts, contactEmails, dueDate) => {
+          handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails, dueDate);
           setShowScheduleDocumentModal(false);
         }}
       />
