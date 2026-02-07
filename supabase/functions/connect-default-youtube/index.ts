@@ -24,40 +24,79 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const youtubeAccessToken = Deno.env.get('YOUTUBE_DEFAULT_ACCESS_TOKEN');
     const youtubeRefreshToken = Deno.env.get('YOUTUBE_DEFAULT_REFRESH_TOKEN');
     const youtubeChannelId = Deno.env.get('YOUTUBE_DEFAULT_CHANNEL_ID');
     const youtubeChannelName = Deno.env.get('YOUTUBE_DEFAULT_CHANNEL_NAME');
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing Supabase configuration');
     }
 
-    if (!youtubeAccessToken || !youtubeRefreshToken || !youtubeChannelId || !youtubeChannelName) {
+    if (!youtubeRefreshToken || !youtubeChannelId || !clientId || !clientSecret) {
       throw new Error('Default YouTube account not configured. Please set up YouTube credentials.');
     }
 
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: youtubeRefreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to refresh default YouTube access token');
+    }
+
+    const tokenData = await tokenResponse.json();
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Store the default YouTube connection for this club
-    const { error: dbError } = await supabase
-      .from('club_integrations')
-      .upsert({
-        club_id: club_id,
-        provider: 'youtube',
-        youtube_channel_id: youtubeChannelId,
-        youtube_channel_name: youtubeChannelName,
-        youtube_access_token: youtubeAccessToken,
-        youtube_refresh_token: youtubeRefreshToken,
-        youtube_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
-        access_token: youtubeAccessToken,
-        refresh_token: youtubeRefreshToken,
-        token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now
-        is_enabled: true,
-        connected_at: new Date().toISOString()
-      }, {
-        onConflict: 'club_id,provider'
-      });
+    const { data: existing } = await supabase
+      .from('integrations')
+      .select('id')
+      .eq('club_id', club_id)
+      .eq('platform', 'youtube')
+      .maybeSingle();
+
+    const credentials = {
+      access_token: tokenData.access_token,
+      refresh_token: youtubeRefreshToken,
+      channel_id: youtubeChannelId,
+      channel_name: youtubeChannelName || 'AlfiePRO',
+      expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+    };
+
+    let dbError = null;
+
+    if (existing) {
+      const { error } = await supabase
+        .from('integrations')
+        .update({
+          credentials,
+          is_active: true,
+          connected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+      dbError = error;
+    } else {
+      const { error } = await supabase
+        .from('integrations')
+        .insert({
+          club_id: club_id,
+          platform: 'youtube',
+          credentials,
+          is_active: true,
+          connected_at: new Date().toISOString(),
+        });
+      dbError = error;
+    }
 
     if (dbError) {
       throw new Error(`Database error: ${dbError.message}`);
@@ -67,7 +106,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         channelId: youtubeChannelId,
-        channelName: youtubeChannelName,
+        channelName: youtubeChannelName || 'AlfiePRO',
         message: 'YouTube integration connected to default AlfiePRO channel successfully'
       }),
       {

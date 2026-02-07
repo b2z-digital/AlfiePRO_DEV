@@ -108,8 +108,6 @@ export function LivestreamSetupWizard({
 
   const checkYouTubeIntegration = async () => {
     try {
-      console.log('🔍 Checking YouTube integration for club:', clubId);
-
       const { data: integration, error } = await supabase
         .from('integrations')
         .select('platform, is_active, credentials')
@@ -119,37 +117,21 @@ export function LivestreamSetupWizard({
         .maybeSingle();
 
       if (error) {
-        console.error('❌ Error checking YouTube integration:', error);
-        addNotification('error', 'Failed to check YouTube integration');
+        console.error('Error checking YouTube integration:', error);
         return;
       }
 
       if (!integration) {
-        console.warn('⚠️ No active YouTube integration found for this club');
-        console.log('💡 To schedule streams to YouTube, you need to:');
-        console.log('   1. Go to Settings → Integrations');
-        console.log('   2. Connect your YouTube account');
-        console.log('   3. Grant the necessary permissions');
-        addNotification('warning', 'YouTube not connected. Streams will only use Cloudflare.', 5000);
+        addNotification('info', 'Streaming via AlfiePRO default YouTube account.', 4000);
         return;
       }
 
       const credentials = integration.credentials as any;
-      console.log('✅ YouTube integration found:', {
-        platform: integration.platform,
-        isActive: integration.is_active,
-        hasCredentials: !!credentials,
-        hasAccessToken: !!credentials?.access_token,
-        accessTokenLength: credentials?.access_token?.length || 0
-      });
-
-      if (!credentials?.access_token) {
-        console.error('❌ YouTube integration has no access token');
-        addNotification('error', 'YouTube integration is invalid. Please reconnect in Settings.');
+      if (credentials?.channel_name) {
+        addNotification('success', `YouTube connected: ${credentials.channel_name}`, 3000);
       }
     } catch (error) {
-      console.error('❌ Error checking YouTube integration:', error);
-      addNotification('error', 'Failed to check YouTube integration');
+      console.error('Error checking YouTube integration:', error);
     }
   };
 
