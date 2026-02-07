@@ -1659,14 +1659,15 @@ async function generatePDFFromHTML(
     }
 
     const measureRect = measurePage.getBoundingClientRect();
+    const contentOrigin = measureRect.top + paddingPx;
     const breakOffsets: number[] = [0];
     let nextBoundary = contentAreaHeightPx;
     const SAFETY_MARGIN = 4;
 
     for (const el of allBlockElements) {
       const rect = el.getBoundingClientRect();
-      const elTop = rect.top - measureRect.top;
-      const elBottom = rect.bottom - measureRect.top;
+      const elTop = rect.top - contentOrigin;
+      const elBottom = rect.bottom - contentOrigin;
 
       if (elBottom > nextBoundary - SAFETY_MARGIN && elTop > breakOffsets[breakOffsets.length - 1] + SAFETY_MARGIN) {
         breakOffsets.push(elTop);
