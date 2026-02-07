@@ -836,6 +836,23 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             r.position <= promotionCount &&
                             !r.letterScore
                           );
+                        } else if (completed && !editMode) {
+                          const currentHeatAssignment = heatAssignments[heatIndex];
+                          const lowerHeatSkipperSet = new Set(lowerHeatResults.map(r => r.skipperIndex));
+                          const hasMidRoundOverrides = currentHeatAssignment?.skipperIndices.some(
+                            (idx: number) => lowerHeatSkipperSet.has(idx)
+                          );
+
+                          if (hasMidRoundOverrides) {
+                            wasPromotedFromBelow = lowerHeatSkipperSet.has(skipperIndex);
+                          } else {
+                            wasPromotedFromBelow = lowerHeatResults.some(r =>
+                              r.skipperIndex === skipperIndex &&
+                              r.position !== null &&
+                              r.position <= promotionCount &&
+                              !r.letterScore
+                            );
+                          }
                         }
 
                         if (wasPromotedFromBelow) {
@@ -846,23 +863,27 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       // Skip promotion/relegation logic for SHRS
                       if (!isSHRS) {
                       if (completed && result?.position) {
-                        // For completed rounds (showing results), only show promotions, not relegations
-                        // ROUND 1 (Initial Seeding) - NO promotion/relegation badges
                         if (round === 1) {
                           isPromoted = false;
                           isRelegated = false;
                         }
-                        // ROUND 2+ - Only show promotions (not relegations)
                         else {
-                          if (isBottomHeat) {
-                            // Bottom heat: Only top skippers are promoted (go up)
-                            isPromoted = result.position <= promotionCount;
-                          } else if (!isTopHeat) {
-                            // Middle heats: Only show top promoted (go up), no relegations
-                            isPromoted = result.position <= promotionCount;
+                          if (!isTopHeat) {
+                            const upperHeatIdx = heatIndex - 1;
+                            const upperHeatAssignment = upperHeatIdx >= 0 ? heatAssignments[upperHeatIdx] : null;
+                            const thisHeatSkipperSet = new Set(
+                              results.filter(r => r.heatDesignation === heatDesignation).map(r => r.skipperIndex)
+                            );
+                            const hasMidRoundOverrides = upperHeatAssignment?.skipperIndices.some(
+                              (idx: number) => thisHeatSkipperSet.has(idx)
+                            );
+
+                            if (hasMidRoundOverrides && upperHeatAssignment) {
+                              isPromoted = upperHeatAssignment.skipperIndices.includes(skipperIndex);
+                            } else {
+                              isPromoted = result.position <= promotionCount;
+                            }
                           }
-                          // Top heat: No promotion indicators (they're already at the top)
-                          // And no relegation indicators for completed rounds
                         }
                       }
                       } // End of !isSHRS check
@@ -1451,16 +1472,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           }
                         }
 
-                        // Save the applied changes to show them visually
                         setAppliedPromotions(new Set(modifiedPromotions));
                         setAppliedRelegations(new Set(modifiedRelegations));
                         setHasAppliedChanges(true);
-
-                        // Exit edit mode but keep the modifications visible
-                        setEditMode(false);
                         setModifiedPromotions(new Set());
                         setModifiedRelegations(new Set());
+                      } catch (error) {
+                        console.error('Error applying changes:', error);
                       } finally {
+                        setEditMode(false);
                         setIsApplyingChanges(false);
                       }
                     }}
