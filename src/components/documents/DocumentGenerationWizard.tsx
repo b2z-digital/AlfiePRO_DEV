@@ -192,9 +192,39 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
                 break;
               }
 
-              case 'boat_class_name':
-                prePopulatedData[field.field_name] = eventData.raceClass || eventData.boatClassName || eventData.race_class || '';
+              case 'boat_class_name': {
+                const classValue = eventData.raceClass || eventData.boatClassName || eventData.race_class || '';
+                if (classValue && field.options && field.options.length > 0) {
+                  const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const norm = normalise(classValue);
+                  const classAliases: Record<string, string[]> = {
+                    '10r': ['internationaltengater', 'internationaltengater', 'international10rater', '10rater', 'tenrater', '10r'],
+                    'df65': ['dragonforce65', 'df65', 'dragonflite65'],
+                    'df95': ['dragonforce95', 'df95', 'dragonflite95'],
+                    'iom': ['internationalonemétre', 'internationalonemetre', 'iom', 'iomusdollars'],
+                    'marblehead': ['marblehead', 'm'],
+                    'rg65': ['rg65'],
+                  };
+                  let matched = field.options.find(o => normalise(o.value) === norm || normalise(o.label) === norm);
+                  if (!matched) {
+                    const aliases = Object.entries(classAliases).find(([, vals]) => vals.includes(norm));
+                    if (aliases) {
+                      matched = field.options.find(o => {
+                        const ov = normalise(o.value);
+                        const ol = normalise(o.label);
+                        return aliases[1].some(a => ov.includes(a) || ol.includes(a)) || ov.includes(aliases[0]) || ol.includes(aliases[0]);
+                      });
+                    }
+                  }
+                  if (!matched) {
+                    matched = field.options.find(o => normalise(o.label).includes(norm) || normalise(o.value).includes(norm) || norm.includes(normalise(o.label)) || norm.includes(normalise(o.value)));
+                  }
+                  prePopulatedData[field.field_name] = matched ? matched.value : classValue;
+                } else {
+                  prePopulatedData[field.field_name] = classValue;
+                }
                 break;
+              }
 
               case 'club_id':
                 prePopulatedData[field.field_name] = eventData.clubId || eventData.club_id || '';
@@ -684,6 +714,29 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+      {generating && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[60]">
+          <div className="bg-gradient-to-br from-cyan-600 to-blue-700 rounded-2xl p-8 shadow-2xl max-w-md mx-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <Sparkles className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white" size={32} />
+              </div>
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-white mb-2">Generating Document...</h3>
+                <p className="text-cyan-100 text-sm">
+                  Building your professional document with formatting and layout
+                </p>
+              </div>
+              <div className="flex gap-1 mt-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`w-full max-w-5xl my-8 rounded-2xl shadow-2xl overflow-hidden border ${
         darkMode ? 'bg-slate-800/80 backdrop-blur-2xl border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl border-slate-200'
       }`}>
@@ -839,8 +892,16 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
                           const stateAssoc = stateAssociations.find(s => s.id === value);
                           displayValue = stateAssoc ? `${stateAssoc.name} (${stateAssoc.state})` : value;
                         }
-                        // Handle underscores in values - replace with spaces
-                        else if (typeof displayValue === 'string') {
+                        else if (field.options && field.options.length > 0) {
+                          const opt = field.options.find(o => o.value === value);
+                          if (opt) displayValue = opt.label;
+                          else if (typeof displayValue === 'string') displayValue = displayValue.replace(/_/g, ' ');
+                        }
+                        else if (typeof displayValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(displayValue)) {
+                          const [y, m, d] = displayValue.split('-');
+                          displayValue = `${d}/${m}/${y.slice(2)}`;
+                        }
+                        else if (typeof displayValue === 'string' && displayValue.includes('_')) {
                           displayValue = displayValue.replace(/_/g, ' ');
                         }
 
@@ -1315,6 +1376,11 @@ function resolveFieldDisplayValue(key: string, rawValue: string, formFields: For
     if (option) return option.label;
   }
 
+  if (typeof rawValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    const [y, m, d] = rawValue.split('-');
+    return `${d}/${m}/${y.slice(2)}`;
+  }
+
   if (typeof rawValue === 'string' && rawValue.includes('_') && !/^\d{4}[-_]\d{2}[-_]\d{2}/.test(rawValue) && !rawValue.includes('://')) {
     return rawValue.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
@@ -1348,6 +1414,10 @@ async function generatePDFFromHTML(
     processedHTML = processedHTML.replace(/{{club_email}}/g, club.email || "");
     processedHTML = processedHTML.replace(/{{club_website}}/g, club.website || "");
   }
+
+  processedHTML = processedHTML.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_match, y, m, d) => {
+    return `${d}/${m}/${y.slice(2)}`;
+  });
 
   let logoDataUrl = '';
   if (template.logo_url) {
@@ -1545,9 +1615,18 @@ async function generatePDFFromHTML(
       const collectBlocks = (parent: Element) => {
         Array.from(parent.children).forEach(child => {
           const el = child as HTMLElement;
-          const display = getComputedStyle(el).display;
-          if (display === 'block' || display === 'list-item' || el.tagName.match(/^(P|H[1-6]|UL|OL|DIV|BLOCKQUOTE|TABLE|HR|PRE)$/i)) {
-            allBlockElements.push(el);
+          const tag = el.tagName.toUpperCase();
+          if (tag === 'UL' || tag === 'OL') {
+            Array.from(el.children).forEach(li => {
+              if ((li as HTMLElement).tagName.toUpperCase() === 'LI') {
+                allBlockElements.push(li as HTMLElement);
+              }
+            });
+          } else {
+            const display = getComputedStyle(el).display;
+            if (display === 'block' || display === 'list-item' || tag.match(/^(P|H[1-6]|DIV|BLOCKQUOTE|TABLE|HR|PRE)$/)) {
+              allBlockElements.push(el);
+            }
           }
         });
       };
