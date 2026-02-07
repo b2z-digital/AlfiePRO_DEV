@@ -331,46 +331,49 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         try {
           const eventName = editingEvent.eventName || '';
           const clubId = editingEvent.clubId || currentClub?.clubId;
-          let query = supabase
-            .from('club_tasks')
-            .select('id, title, due_date, assignee_id, status')
-            .or(`title.ilike.%Notice of Race (NOR) - ${eventName}%,title.ilike.%Sailing Instructions (SI) - ${eventName}%`)
-            .neq('status', 'completed');
 
-          if (clubId) {
-            query = query.eq('club_id', clubId);
+          const baseQuery = () => {
+            let q = supabase
+              .from('club_tasks')
+              .select('id, title, due_date, assignee_id, status')
+              .neq('status', 'completed');
+            if (clubId) {
+              q = q.eq('club_id', clubId);
+            }
+            return q;
+          };
+
+          const [norResult, siResult] = await Promise.all([
+            baseQuery().ilike('title', `%Notice of Race%${eventName}%`),
+            baseQuery().ilike('title', `%Sailing Instructions%${eventName}%`)
+          ]);
+
+          const schedules: any = {};
+
+          if (!norResult.error && norResult.data && norResult.data.length > 0) {
+            const norTasks = norResult.data;
+            schedules.nor = {
+              scheduled: true,
+              contacts: norTasks.map(t => t.assignee_id).filter(Boolean),
+              dueDate: norTasks[0].due_date?.substring(0, 10),
+              memberIds: norTasks.map(t => t.assignee_id).filter(Boolean),
+              existingTaskIds: norTasks.map(t => t.id)
+            };
           }
 
-          const { data, error } = await query;
+          if (!siResult.error && siResult.data && siResult.data.length > 0) {
+            const siTasks = siResult.data;
+            schedules.si = {
+              scheduled: true,
+              contacts: siTasks.map(t => t.assignee_id).filter(Boolean),
+              dueDate: siTasks[0].due_date?.substring(0, 10),
+              memberIds: siTasks.map(t => t.assignee_id).filter(Boolean),
+              existingTaskIds: siTasks.map(t => t.id)
+            };
+          }
 
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            const norTasks = data.filter(t => t.title.includes('Notice of Race (NOR)'));
-            const siTasks = data.filter(t => t.title.includes('Sailing Instructions (SI)'));
-            const schedules: any = {};
-
-            if (norTasks.length > 0) {
-              schedules.nor = {
-                scheduled: true,
-                contacts: norTasks.map(t => t.assignee_id).filter(Boolean),
-                dueDate: norTasks[0].due_date?.substring(0, 10),
-                memberIds: norTasks.map(t => t.assignee_id).filter(Boolean),
-                existingTaskIds: norTasks.map(t => t.id)
-              };
-            }
-            if (siTasks.length > 0) {
-              schedules.si = {
-                scheduled: true,
-                contacts: siTasks.map(t => t.assignee_id).filter(Boolean),
-                dueDate: siTasks[0].due_date?.substring(0, 10),
-                memberIds: siTasks.map(t => t.assignee_id).filter(Boolean),
-                existingTaskIds: siTasks.map(t => t.id)
-              };
-            }
-            if (Object.keys(schedules).length > 0) {
-              setScheduledDocuments(schedules);
-            }
+          if (Object.keys(schedules).length > 0) {
+            setScheduledDocuments(schedules);
           }
         } catch (err) {
           console.error('Error loading scheduled documents:', err);
