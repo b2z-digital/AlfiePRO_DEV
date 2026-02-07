@@ -649,19 +649,30 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   // For OTHER completed heats in edit mode, show who sailed here
                   skippersToDisplay = skippersWhoSailed;
                 } else {
-                  // For not-yet-completed heats in edit mode, FILTER OUT promoted skippers from below
                   const heatIndex = ['A', 'B', 'C', 'D', 'E', 'F'].indexOf(heatDesignation);
                   const lowerHeatLetter = ['A', 'B', 'C', 'D', 'E', 'F'][heatIndex + 1] as HeatDesignation;
 
                   if (lowerHeatLetter && lastCompletedHeatLetter === lowerHeatLetter) {
-                    // This heat receives promotions from the last completed heat
-                    // Filter out those promoted skippers
                     const lowerHeatResults = results.filter(r => r.heatDesignation === lowerHeatLetter);
-                    const promotedSkipperIndices = lowerHeatResults
-                      .filter(r => r.position !== null && r.position <= promotionCount && !r.letterScore)
-                      .map(r => r.skipperIndex);
+                    const allLowerHeatSkippers = lowerHeatResults.map(r => r.skipperIndex);
 
-                    skippersToDisplay = skipperIndices.filter(idx => !promotedSkipperIndices.includes(idx));
+                    const effectivelyPromoted: number[] = [];
+                    lowerHeatResults.forEach(result => {
+                      if (!result.position) return;
+                      const naturallyPromoted = result.position <= promotionCount && !result.letterScore;
+                      const manuallyToggled = modifiedPromotions.has(result.skipperIndex);
+                      const shouldBePromoted = naturallyPromoted ? !manuallyToggled : manuallyToggled;
+                      if (shouldBePromoted) {
+                        effectivelyPromoted.push(result.skipperIndex);
+                      }
+                    });
+
+                    skippersToDisplay = skipperIndices.filter(idx => !allLowerHeatSkippers.includes(idx));
+                    effectivelyPromoted.forEach(idx => {
+                      if (!skippersToDisplay.includes(idx)) {
+                        skippersToDisplay.push(idx);
+                      }
+                    });
                   } else {
                     skippersToDisplay = skipperIndices;
                   }
@@ -713,18 +724,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 }
               }
 
-              // Sort skippers by their result position if available
               const sortedSkippers = [...skippersToDisplay].sort((a, b) => {
                 const resultA = heatResults.find(r => r.skipperIndex === a);
                 const resultB = heatResults.find(r => r.skipperIndex === b);
 
-                if (!resultA || !resultB) return 0;
+                const aHasResult = resultA && resultA.position !== null;
+                const bHasResult = resultB && resultB.position !== null;
 
-                // Position-based sorting
-                const posA = resultA.position !== null ? resultA.position : 9999;
-                const posB = resultB.position !== null ? resultB.position : 9999;
-
-                return posA - posB;
+                if (aHasResult && bHasResult) {
+                  return resultA.position! - resultB.position!;
+                }
+                if (aHasResult && !bHasResult) return -1;
+                if (!aHasResult && bHasResult) return 1;
+                return 0;
               });
 
               // Calculate heat position info for header and P slots
@@ -800,22 +812,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       let isRelegated = false;
                       let wasPromotedFromBelow = false;
 
-                      // Check if this skipper was promoted FROM the heat below
-                      // - For active rounds: check if naturally promoted from below
-                      // - After applying changes: check if manually promoted from below (only for heat directly above last completed)
-                      if (!editMode && round >= 2 && !isBottomHeat && lowerHeatLetter) {
+                      if (round >= 2 && !isBottomHeat && lowerHeatLetter) {
                         const lowerHeatResults = results.filter(r => r.heatDesignation === lowerHeatLetter);
 
-                        if (hasAppliedChanges && lowerHeatLetter === lastCompletedHeatLetter) {
-                          // After applying changes: ONLY show promotions from the last completed heat
+                        if (editMode && lowerHeatLetter === lastCompletedHeatLetter) {
+                          const lowerHeatResult = lowerHeatResults.find(r => r.skipperIndex === skipperIndex);
+                          if (lowerHeatResult && lowerHeatResult.position) {
+                            const naturallyPromoted = lowerHeatResult.position <= promotionCount;
+                            const manuallyToggled = modifiedPromotions.has(skipperIndex);
+                            wasPromotedFromBelow = naturallyPromoted ? !manuallyToggled : manuallyToggled;
+                          }
+                        } else if (!editMode && hasAppliedChanges && lowerHeatLetter === lastCompletedHeatLetter) {
                           const lowerHeatResult = lowerHeatResults.find(r => r.skipperIndex === skipperIndex);
                           if (lowerHeatResult && lowerHeatResult.position) {
                             const naturallyPromoted = lowerHeatResult.position <= promotionCount;
                             const manuallyToggled = appliedPromotions.has(skipperIndex);
                             wasPromotedFromBelow = naturallyPromoted ? !manuallyToggled : manuallyToggled;
                           }
-                        } else if (!completed && !hasAppliedChanges && lowerHeatCompleted) {
-                          // Active rounds (before any manual changes): check natural promotions
+                        } else if (!editMode && !completed && !hasAppliedChanges && lowerHeatCompleted) {
                           wasPromotedFromBelow = lowerHeatResults.some(r =>
                             r.skipperIndex === skipperIndex &&
                             r.position !== null &&
@@ -825,7 +839,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         }
 
                         if (wasPromotedFromBelow) {
-                          isPromoted = true; // Mark as promoted so the green border shows
+                          isPromoted = true;
                         }
                       }
 
@@ -867,9 +881,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         }
                       }
 
-                      // Apply manual overrides ONLY in edit mode (HMS only)
-                      // After applying changes, promotions are shown in the destination heat via wasPromotedFromBelow
-                      if (!isSHRS && editMode) {
+                      if (!isSHRS && editMode && isLastCompletedHeat) {
                         if (modifiedPromotions.has(skipperIndex)) {
                           isPromoted = !isPromoted;
                         }
