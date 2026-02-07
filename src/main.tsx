@@ -22,9 +22,10 @@ if (lastReload) {
   console.log('[Main] Time since last reload:', Math.round(timeSinceReload / 1000), 'seconds');
 }
 
-if ('serviceWorker' in navigator) {
-  registerServiceWorker();
-}
+// Register service worker only in supported environments
+registerServiceWorker().catch(() => {
+  // Silently handle any registration errors
+});
 
 function Root() {
   const isMobileStreamRoute = window.location.pathname.startsWith('/mobile-stream/');
