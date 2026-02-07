@@ -939,7 +939,7 @@ async function generatePDFDocument(
   // Check if this is an HTML template from WYSIWYG builder
   if (template.template_type === 'html' && template.html_content) {
     console.log('✅ Using HTML template generation');
-    return await generatePDFFromHTML(formData, template, club);
+    return await generatePDFFromHTML(formData, template, club, lookupData);
   }
 
   // Legacy structured template processing
@@ -1304,13 +1304,30 @@ function generateDaySchedule(formData: any): string {
 async function generatePDFFromHTML(
   formData: any,
   template: any,
-  club: any
+  club: any,
+  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] }
 ): Promise<jsPDF> {
   let processedHTML = template.html_content;
 
+  const resolvedFormData: Record<string, string> = {};
   Object.keys(formData).forEach((key) => {
+    let value = formData[key] || "";
+    if (key === 'state_association' || key === 'state_association_id') {
+      const assoc = lookupData.stateAssociations.find(a => a.id === value);
+      if (assoc) value = assoc.name + (assoc.state ? ` (${assoc.state})` : '');
+    } else if (key === 'clubs' || key === 'club' || key === 'club_id') {
+      const c = lookupData.clubs.find(c => c.id === value);
+      if (c) value = c.name;
+    } else if (key === 'venue' || key === 'venue_id') {
+      const v = lookupData.venues.find(v => v.id === value);
+      if (v) value = v.name;
+    }
+    resolvedFormData[key] = value;
+  });
+
+  Object.keys(resolvedFormData).forEach((key) => {
     const placeholder = `{{${key}}}`;
-    const value = formData[key] || "";
+    const value = resolvedFormData[key];
     processedHTML = processedHTML.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "g"), value);
   });
 
@@ -1318,6 +1335,21 @@ async function generatePDFFromHTML(
     processedHTML = processedHTML.replace(/{{club_name}}/g, club.name || "");
     processedHTML = processedHTML.replace(/{{club_email}}/g, club.email || "");
     processedHTML = processedHTML.replace(/{{club_website}}/g, club.website || "");
+  }
+
+  let logoDataUrl = '';
+  if (template.header_logo_url) {
+    try {
+      const response = await fetch(template.header_logo_url);
+      const blob = await response.blob();
+      logoDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('Failed to load logo as base64, will try direct URL');
+    }
   }
 
   const A4_WIDTH_PX = 794;
@@ -1419,8 +1451,9 @@ async function generatePDFFromHTML(
   measurePage.style.padding = `${paddingPx}px`;
 
   let logoHTML = '';
-  if (template.header_logo_url) {
-    logoHTML = `<img class="pdf-logo" src="${template.header_logo_url}" crossorigin="anonymous" />`;
+  if (logoDataUrl || template.header_logo_url) {
+    const logoSrc = logoDataUrl || template.header_logo_url;
+    logoHTML = `<img class="pdf-logo" src="${logoSrc}" />`;
   }
 
   measurePage.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
