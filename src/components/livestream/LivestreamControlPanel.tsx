@@ -849,33 +849,75 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         }
 
         if (activeSession.cloudflare_output_id && activeSession.cloudflare_live_input_id) {
-          console.log('[GoLive] Restarting Cloudflare output to trigger fresh RTMP connection to YouTube...');
-          addNotification('info', 'Establishing connection to YouTube...', 5000);
-          try {
-            const restartResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                action: 'restartOutput',
-                clubId: clubId,
-                sessionData: {
-                  liveInputId: activeSession.cloudflare_live_input_id,
-                  outputId: activeSession.cloudflare_output_id
-                }
-              })
-            });
-            const restartData = await restartResponse.json();
-            console.log('[GoLive] Output restart result:', restartData);
-            if (restartData.success) {
-              console.log('[GoLive] Output restarted successfully. Waiting for RTMP connection to establish...');
-            } else {
-              console.warn('[GoLive] Output restart returned error:', restartData);
+          const currentUrl = activeSession.youtube_stream_url || '';
+          const needsRtmpsUpgrade = currentUrl.startsWith('rtmp://') && !currentUrl.startsWith('rtmps://');
+
+          if (needsRtmpsUpgrade) {
+            const rtmpsUrl = currentUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
+            console.log('[GoLive] Current output uses RTMP. Recreating with RTMPS:', rtmpsUrl);
+            addNotification('info', 'Connecting securely to YouTube (RTMPS)...', 5000);
+            try {
+              const recreateResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'recreateOutput',
+                  clubId: clubId,
+                  sessionData: {
+                    liveInputId: activeSession.cloudflare_live_input_id,
+                    outputId: activeSession.cloudflare_output_id,
+                    streamUrl: rtmpsUrl,
+                    streamKey: activeSession.youtube_stream_key
+                  }
+                })
+              });
+              const recreateData = await recreateResp.json();
+              if (recreateData.success && recreateData.newOutputId) {
+                console.log('[GoLive] Output recreated with RTMPS. New output ID:', recreateData.newOutputId);
+                await livestreamStorage.updateSession(activeSession.id, {
+                  cloudflare_output_id: recreateData.newOutputId,
+                  youtube_stream_url: rtmpsUrl
+                });
+                activeSession.cloudflare_output_id = recreateData.newOutputId;
+                activeSession.youtube_stream_url = rtmpsUrl;
+              } else {
+                console.warn('[GoLive] RTMPS recreate failed, falling back to restart:', recreateData);
+              }
+            } catch (recreateErr) {
+              console.error('[GoLive] Error recreating output with RTMPS:', recreateErr);
             }
-          } catch (restartError) {
-            console.error('[GoLive] Error restarting output:', restartError);
+          } else {
+            console.log('[GoLive] Restarting Cloudflare output to trigger fresh connection to YouTube...');
+            addNotification('info', 'Establishing connection to YouTube...', 5000);
+            try {
+              const restartResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'restartOutput',
+                  clubId: clubId,
+                  sessionData: {
+                    liveInputId: activeSession.cloudflare_live_input_id,
+                    outputId: activeSession.cloudflare_output_id
+                  }
+                })
+              });
+              const restartData = await restartResponse.json();
+              console.log('[GoLive] Output restart result:', restartData);
+              if (restartData.success) {
+                console.log('[GoLive] Output restarted successfully.');
+              } else {
+                console.warn('[GoLive] Output restart returned error:', restartData);
+              }
+            } catch (restartError) {
+              console.error('[GoLive] Error restarting output:', restartError);
+            }
           }
         }
 
@@ -1013,11 +1055,52 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     console.log('[GoLive] Stream key exists:', !!stream?.cdn?.ingestionInfo?.streamName);
 
                     if (healthStatus === 'noData') {
-                      // noData is NORMAL for the first 30-60 seconds after creating an output
-                      // Cloudflare needs time to establish the RTMP connection to YouTube
-                      console.log('[GoLive] YouTube stream health: noData (Cloudflare output is initializing - this is normal and can take 30-60 seconds)');
+                      console.log('[GoLive] YouTube stream health: noData (Cloudflare output is initializing)');
                       if (attemptNumber === 1) {
                         addNotification('info', 'Waiting for Cloudflare to connect to YouTube... This typically takes 30-60 seconds.', 8000);
+                      }
+
+                      if (attemptNumber === 3 && activeSession.cloudflare_output_id && activeSession.cloudflare_live_input_id) {
+                        const currentUrl = activeSession.youtube_stream_url || '';
+                        if (currentUrl.startsWith('rtmp://') && !currentUrl.startsWith('rtmps://')) {
+                          const rtmpsUrl = currentUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
+                          console.log('[GoLive] RTMP output not forwarding after 3 attempts. Recreating with RTMPS:', rtmpsUrl);
+                          addNotification('info', 'Switching to secure RTMPS connection...', 5000);
+                          try {
+                            const recreateResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${session.access_token}`,
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                action: 'recreateOutput',
+                                clubId: clubId,
+                                sessionData: {
+                                  liveInputId: activeSession.cloudflare_live_input_id,
+                                  outputId: activeSession.cloudflare_output_id,
+                                  streamUrl: rtmpsUrl,
+                                  streamKey: activeSession.youtube_stream_key
+                                }
+                              })
+                            });
+                            const recreateData = await recreateResp.json();
+                            if (recreateData.success && recreateData.newOutputId) {
+                              console.log('[GoLive] Output recreated with RTMPS. New output ID:', recreateData.newOutputId);
+                              await livestreamStorage.updateSession(activeSession.id, {
+                                cloudflare_output_id: recreateData.newOutputId,
+                                youtube_stream_url: rtmpsUrl
+                              });
+                              activeSession.cloudflare_output_id = recreateData.newOutputId;
+                              activeSession.youtube_stream_url = rtmpsUrl;
+                              addNotification('success', 'Switched to RTMPS. Waiting for YouTube to detect stream...', 5000);
+                            } else {
+                              console.warn('[GoLive] Failed to recreate output with RTMPS:', recreateData);
+                            }
+                          } catch (recreateErr) {
+                            console.error('[GoLive] Error recreating output with RTMPS:', recreateErr);
+                          }
+                        }
                       }
                     } else if (healthStatus === 'good' || healthStatus === 'ok') {
                       console.log('[GoLive] YouTube is receiving video data!');
@@ -1059,7 +1142,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   console.log('[GoLive] No Cloudflare output found. Creating one now...');
                   addNotification('info', 'Setting up YouTube output in Cloudflare...', 5000);
 
-                  const rtmpUrl = activeSession.youtube_stream_url;
+                  let rtmpUrl = activeSession.youtube_stream_url || '';
+                  if (rtmpUrl.startsWith('rtmp://') && !rtmpUrl.startsWith('rtmps://')) {
+                    rtmpUrl = rtmpUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
+                    console.log('[GoLive] Converted to RTMPS URL:', rtmpUrl);
+                  }
 
                   const streamKey = activeSession.youtube_stream_key;
 

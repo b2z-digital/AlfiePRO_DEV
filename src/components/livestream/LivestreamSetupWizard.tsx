@@ -490,12 +490,20 @@ export function LivestreamSetupWizard({
               const streamData = await streamResponse.json();
 
               if (streamResponse.ok && streamData.stream) {
+                const rtmpsUrl = streamData.stream.cdn?.ingestionInfo?.rtmpsIngestionAddress;
                 const rtmpUrl = streamData.stream.cdn?.ingestionInfo?.ingestionAddress;
                 const streamKey = streamData.stream.cdn?.ingestionInfo?.streamName;
+                const preferredUrl = rtmpsUrl || rtmpUrl;
+
+                console.log('[LivestreamWizard] YouTube ingestion URLs:', {
+                  rtmps: rtmpsUrl,
+                  rtmp: rtmpUrl,
+                  using: preferredUrl
+                });
 
                 sessionData.youtube_stream_key = streamKey;
-                sessionData.youtube_stream_url = rtmpUrl;
-                sessionData.youtube_rtmp_url = rtmpUrl ? `${rtmpUrl}/${streamKey}` : undefined;
+                sessionData.youtube_stream_url = preferredUrl;
+                sessionData.youtube_rtmp_url = preferredUrl ? `${preferredUrl}/${streamKey}` : undefined;
 
                 // Bind broadcast to stream
                 setLoadingMessage('Connecting broadcast to stream...');
@@ -523,10 +531,10 @@ export function LivestreamSetupWizard({
 
                   // Step 4: Add YouTube as output destination in Cloudflare
                   // Add the output immediately - YouTube will detect video when cameras connect
-                  if (rtmpUrl && streamKey) {
+                  if (preferredUrl && streamKey) {
                     setLoadingMessage('Connecting Cloudflare to YouTube...');
                     console.log('[LivestreamWizard] Adding YouTube output to Cloudflare...');
-                    console.log('[LivestreamWizard] YouTube RTMP URL:', rtmpUrl);
+                    console.log('[LivestreamWizard] YouTube Stream URL:', preferredUrl);
                     console.log('[LivestreamWizard] YouTube Stream Key:', streamKey?.substring(0, 10) + '...');
 
                     const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
@@ -537,7 +545,7 @@ export function LivestreamSetupWizard({
                         clubId,
                         sessionData: {
                           liveInputId: cfData.liveInput.uid,
-                          streamUrl: rtmpUrl,
+                          streamUrl: preferredUrl,
                           streamKey: streamKey
                         }
                       })
