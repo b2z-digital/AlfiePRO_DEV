@@ -127,6 +127,34 @@ async function exchangeAndStore(
     throw new Error(`Database error: ${dbError.message}`);
   }
 
+  if (refresh_token) {
+    const { data: defaultIntegration } = await supabase
+      .from('integrations')
+      .select('id, credentials')
+      .eq('platform', 'youtube')
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (defaultIntegration) {
+      const defaultChannelId = defaultIntegration.credentials?.channel_id;
+      if (defaultChannelId === channelId && defaultIntegration.id !== existing?.id) {
+        console.log('Reconnected channel matches system default - updating default credentials');
+        await supabase
+          .from('integrations')
+          .update({
+            credentials: {
+              ...defaultIntegration.credentials,
+              access_token,
+              refresh_token,
+              expires_at: expiresAt,
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', defaultIntegration.id);
+      }
+    }
+  }
+
   console.log('YouTube integration stored successfully');
   return { channelId, channelName };
 }

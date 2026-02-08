@@ -27,14 +27,29 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: integration } = await supabase
+    const { data: defaultIntegration } = await supabase
       .from('integrations')
       .select('id, credentials, club_id')
       .eq('platform', 'youtube')
       .eq('is_active', true)
-      .order('connected_at', { ascending: false })
-      .limit(1)
+      .eq('is_default', true)
       .maybeSingle();
+
+    let integration = defaultIntegration;
+
+    if (!integration?.credentials?.refresh_token) {
+      const { data: fallback } = await supabase
+        .from('integrations')
+        .select('id, credentials, club_id')
+        .eq('platform', 'youtube')
+        .eq('is_active', true)
+        .not('credentials->refresh_token', 'is', null)
+        .order('connected_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      integration = fallback;
+    }
 
     if (!integration?.credentials?.refresh_token) {
       throw new Error('No YouTube integration with refresh_token found in database');
@@ -55,7 +70,14 @@ Deno.serve(async (req: Request) => {
 
     if (!tokenResponse.ok) {
       const errText = await tokenResponse.text();
-      throw new Error(`Token refresh failed: ${errText}`);
+      let hint = `Token refresh failed: ${errText}`;
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed.error === 'invalid_grant') {
+          hint = 'The YouTube refresh token has expired. Please re-connect the YouTube account via Settings > Integrations.';
+        }
+      } catch { /* ignore */ }
+      throw new Error(hint);
     }
 
     const tokenData = await tokenResponse.json();
@@ -101,10 +123,9 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        refresh_token: refreshToken,
         channel_id: channelId,
         channel_name: channelName,
-        message: 'Set these as your Supabase Edge Function secrets: YOUTUBE_DEFAULT_REFRESH_TOKEN, YOUTUBE_DEFAULT_CHANNEL_ID, YOUTUBE_DEFAULT_CHANNEL_NAME',
+        is_default: integration.id === defaultIntegration?.id,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
