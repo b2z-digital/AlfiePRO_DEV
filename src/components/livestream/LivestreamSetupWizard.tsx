@@ -430,6 +430,9 @@ export function LivestreamSetupWizard({
           sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
           sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
           sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
+          sessionData.cloudflare_rtmps_url = cfData.liveInput.rtmps?.url;
+          sessionData.cloudflare_rtmps_stream_key = cfData.liveInput.rtmps?.streamKey;
+          console.log('[LivestreamWizard] Cloudflare RTMPS ingest URL:', cfData.liveInput.rtmps?.url);
 
           // Step 2: Create YouTube broadcast (always if integration exists)
           try {
@@ -522,14 +525,37 @@ export function LivestreamSetupWizard({
 
                 const bindData = await bindResponse.json();
                 if (bindResponse.ok) {
-                  console.log('✅ Broadcast bound to stream');
+                  console.log('[LivestreamWizard] Broadcast bound to stream');
 
-                  // YouTube will automatically transition from 'ready' to 'testing' when video is detected
-                  // Do NOT manually transition - it will cause 403 error
-                  console.log('[LivestreamWizard] YouTube broadcast is ready. Will auto-detect video when stream starts.');
+                  setLoadingMessage('Creating Cloudflare → YouTube relay output...');
+                  try {
+                    const fullRtmpUrl = `${rtmpUrl || rtmpsUrl}/${streamKey}`;
+                    console.log('[LivestreamWizard] Creating Cloudflare output to YouTube RTMP:', fullRtmpUrl);
+                    const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        action: 'addOutput',
+                        clubId,
+                        sessionData: {
+                          liveInputId: cfData.liveInput.uid,
+                          url: fullRtmpUrl,
+                          enabled: true
+                        }
+                      })
+                    });
+                    const outputData = await outputResponse.json();
+                    if (outputResponse.ok && outputData.output) {
+                      sessionData.cloudflare_output_id = outputData.output.uid;
+                      console.log('[LivestreamWizard] Cloudflare output created:', outputData.output.uid);
+                    } else {
+                      console.warn('[LivestreamWizard] Failed to create Cloudflare output:', outputData);
+                    }
+                  } catch (outputError) {
+                    console.warn('[LivestreamWizard] Cloudflare output creation error:', outputError);
+                  }
+
                   addNotification('success', 'YouTube broadcast created successfully', 3000);
-
-                  console.log('[LivestreamWizard] YouTube output will be created at GoLive time (after video is flowing)');
                   setLoadingMessage('Finalizing YouTube configuration...');
                 } else {
                   console.error('❌ Failed to bind broadcast to stream:', bindData);
