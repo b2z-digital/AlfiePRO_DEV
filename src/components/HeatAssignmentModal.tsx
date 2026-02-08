@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus } from 'lucide-react';
+import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -1168,10 +1168,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     ? 'bg-purple-700 text-purple-200 hover:bg-purple-600'
                                     : 'bg-purple-600 text-white hover:bg-purple-700'
                                 }`}
-                                title="Add observer"
+                                title="Manage observers"
                               >
-                                <UserPlus size={12} />
-                                <span>Add</span>
+                                <Edit3 size={12} />
+                                <span>Manage</span>
                               </button>
                             )}
                           </div>
@@ -1523,29 +1523,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         </div>
       </div>
 
-      {/* Observer Selector Modal */}
+      {/* Observer Selector Modal - Toggle-based with limit enforcement */}
       {showObserverSelector && currentEvent && (() => {
-        // Get current round data - use the round being displayed, not currentRound
         const currentRoundData = heatManagement.rounds.find(r => r.round === round);
         if (!currentRoundData) return null;
 
-        // Get the heat assignment for the selected heat
         const sortedHeats = [...currentRoundData.heatAssignments].sort((a, b) =>
           a.heatDesignation.localeCompare(b.heatDesignation)
         );
         const selectedHeat = sortedHeats[selectedHeatForObserver - 1];
         if (!selectedHeat) return null;
 
-        // Get current observers for this heat
         const currentObservers = observersByHeat.get(selectedHeatForObserver) || [];
         const currentObserverIndices = currentObservers.map(o => o.skipper_index);
+        const maxObservers = currentEvent.observers_per_heat ?? 2;
+        const isAtLimit = currentObservers.length >= maxObservers;
 
-        // Get available skippers (not racing in this heat and not already observers)
-        const availableSkippers = skippers
+        const allAvailableSkippers = skippers
           .map((s, idx) => ({ skipper: s, index: idx }))
-          .filter(({ index }) =>
-            !selectedHeat.skipperIndices.includes(index) && !currentObserverIndices.includes(index)
-          );
+          .filter(({ index }) => !selectedHeat.skipperIndices.includes(index));
 
         return (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black bg-opacity-70">
@@ -1557,9 +1553,18 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               <div className={`flex items-center justify-between p-4 border-b ${
                 darkMode ? 'border-slate-700' : 'border-slate-200'
               }`}>
-                <h3 className="text-lg font-bold">Add Observer to Heat {selectedHeat.heatDesignation}</h3>
+                <div>
+                  <h3 className="text-lg font-bold">Manage Observers - Heat {selectedHeat.heatDesignation}</h3>
+                  <p className={`text-sm mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {currentObservers.length} of {maxObservers} observer{maxObservers !== 1 ? 's' : ''} assigned
+                  </p>
+                </div>
                 <button
-                  onClick={() => setShowObserverSelector(false)}
+                  onClick={() => {
+                    setShowObserverSelector(false);
+                    setShowCustomObserverInput(false);
+                    setCustomObserverName('');
+                  }}
                   className={`p-1 rounded-lg transition-colors ${
                     darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
                   }`}
@@ -1571,108 +1576,153 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               <div className="flex-1 overflow-y-auto p-4">
                 {!showCustomObserverInput ? (
                   <>
-                    <div className="flex items-center justify-between mb-4">
+                    {isAtLimit && (
+                      <div className={`flex items-center gap-2 p-3 rounded-lg mb-4 ${
+                        darkMode ? 'bg-amber-900/30 border border-amber-700/50' : 'bg-amber-50 border border-amber-200'
+                      }`}>
+                        <AlertCircle size={16} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                        <p className={`text-sm ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
+                          Maximum of {maxObservers} observer{maxObservers !== 1 ? 's' : ''} reached. Deselect an observer before adding another.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mb-3">
                       <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Select a skipper to add as an observer. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
+                        Tap to select or deselect observers. Only skippers not racing in Heat {selectedHeat.heatDesignation} are shown.
                       </p>
                       <button
-                        onClick={() => setShowCustomObserverInput(true)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                        onClick={() => {
+                          if (isAtLimit) {
+                            setLimitWarning(`Maximum of ${maxObservers} observer${maxObservers !== 1 ? 's' : ''} reached. Remove one first.`);
+                            setTimeout(() => setLimitWarning(null), 3000);
+                            return;
+                          }
+                          setShowCustomObserverInput(true);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 flex-shrink-0 ${
                           darkMode
                             ? 'bg-purple-600 hover:bg-purple-700 text-white'
                             : 'bg-purple-500 hover:bg-purple-600 text-white'
                         }`}
                       >
                         <UserPlus size={14} />
-                        Custom Observer
+                        Custom
                       </button>
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
-                  {availableSkippers.map(({ skipper, index }) => (
-                    <button
-                      key={index}
-                      onClick={async () => {
-                        if (!currentEvent?.id) return;
+                      {allAvailableSkippers.map(({ skipper, index }) => {
+                        const isSelected = currentObserverIndices.includes(index);
+                        return (
+                          <button
+                            key={index}
+                            onClick={async () => {
+                              if (!currentEvent?.id) return;
 
-                        // Get times served for this skipper
-                        const { data: existingObserver } = await supabase
-                          .from('heat_observers')
-                          .select('times_served')
-                          .eq('event_id', currentEvent.id)
-                          .eq('skipper_index', index)
-                          .order('times_served', { ascending: false })
-                          .limit(1)
-                          .maybeSingle();
+                              if (!isSelected && isAtLimit) {
+                                setLimitWarning(`Maximum of ${maxObservers} observer${maxObservers !== 1 ? 's' : ''} reached. Remove one first.`);
+                                setTimeout(() => setLimitWarning(null), 3000);
+                                return;
+                              }
 
-                        const timesServed = existingObserver?.times_served || 0;
+                              const { data: existingObserver } = await supabase
+                                .from('heat_observers')
+                                .select('times_served')
+                                .eq('event_id', currentEvent.id)
+                                .eq('skipper_index', index)
+                                .order('times_served', { ascending: false })
+                                .limit(1)
+                                .maybeSingle();
 
-                        // Add this skipper as an observer
-                        const success = await toggleObserver(
-                          currentEvent.id,
-                          selectedHeatForObserver,
-                          round, // Use the round being displayed
-                          index,
-                          skipper.name,
-                          skipper.sailNo,
-                          timesServed
+                              const timesServed = existingObserver?.times_served || 0;
+
+                              const success = await toggleObserver(
+                                currentEvent.id,
+                                selectedHeatForObserver,
+                                round,
+                                index,
+                                skipper.name,
+                                skipper.sailNo,
+                                timesServed
+                              );
+
+                              if (success) {
+                                const updatedObservers = await getObserverAssignments(
+                                  currentEvent.id,
+                                  selectedHeatForObserver,
+                                  round
+                                );
+                                setObserversByHeat(prev => {
+                                  const newMap = new Map(prev);
+                                  newMap.set(selectedHeatForObserver, updatedObservers || []);
+                                  return newMap;
+                                });
+                              }
+                            }}
+                            className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
+                              isSelected
+                                ? darkMode
+                                  ? 'bg-purple-900/40 border-purple-500 ring-1 ring-purple-500/50'
+                                  : 'bg-purple-50 border-purple-500 ring-1 ring-purple-200'
+                                : isAtLimit
+                                  ? darkMode
+                                    ? 'bg-slate-700/50 border-slate-700 opacity-50 cursor-not-allowed'
+                                    : 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                                  : darkMode
+                                    ? 'bg-slate-700 border-slate-600 hover:border-purple-500'
+                                    : 'bg-white border-slate-200 hover:border-purple-500'
+                            }`}
+                          >
+                            {isSelected && (
+                              <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                                <Check size={12} className="text-white" />
+                              </div>
+                            )}
+                            {!isSelected && (
+                              <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+                                darkMode ? 'border-slate-500' : 'border-slate-300'
+                              }`} />
+                            )}
+                            {skipper.avatarUrl ? (
+                              <img
+                                src={skipper.avatarUrl}
+                                alt={skipper.name}
+                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                                isSelected
+                                  ? 'bg-purple-600 text-white'
+                                  : darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
+                              }`}>
+                                {skipper.name.split(' ').map(n => n[0]).join('')}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className={`font-medium truncate text-sm ${
+                                isSelected
+                                  ? (darkMode ? 'text-purple-200' : 'text-purple-900')
+                                  : (darkMode ? 'text-white' : 'text-slate-900')
+                              }`}>
+                                {skipper.name}
+                              </p>
+                              <p className={`text-xs truncate ${
+                                darkMode ? 'text-slate-400' : 'text-slate-600'
+                              }`}>
+                                #{skipper.sailNo}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <Eye size={14} className="text-purple-400 flex-shrink-0" />
+                            )}
+                          </button>
                         );
-
-                        if (success) {
-                          // Reload observers
-                          const updatedObservers = await getObserverAssignments(
-                            currentEvent.id,
-                            selectedHeatForObserver,
-                            round // Use the round being displayed
-                          );
-
-                          // Update state
-                          setObserversByHeat(prev => {
-                            const newMap = new Map(prev);
-                            newMap.set(selectedHeatForObserver, updatedObservers || []);
-                            return newMap;
-                          });
-
-                          // Close modal
-                          setShowObserverSelector(false);
-                        }
-                      }}
-                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all hover:scale-[1.02] ${
-                        darkMode
-                          ? 'bg-slate-700 border-slate-600 hover:border-purple-500'
-                          : 'bg-white border-slate-200 hover:border-purple-500'
-                      }`}
-                    >
-                      {skipper.avatarUrl ? (
-                        <img
-                          src={skipper.avatarUrl}
-                          alt={skipper.name}
-                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                          darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
-                        }`}>
-                          {skipper.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className={`font-medium truncate text-sm ${
-                          darkMode ? 'text-white' : 'text-slate-900'
-                        }`}>
-                          {skipper.name}
-                        </p>
-                        <p className={`text-xs truncate ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>
-                          #{skipper.sailNo}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                      })}
                     </div>
-                    {availableSkippers.length === 0 && (
+                    {allAvailableSkippers.length === 0 && (
                       <p className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        No skippers available to add as observers.
+                        No skippers available as observers.
                       </p>
                     )}
                   </>
@@ -1739,11 +1789,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             is_custom_observer: true
                           };
 
-                          // Add the custom observer
-                          const currentObservers = observersByHeat.get(selectedHeatForObserver) || [];
-                          const updatedObservers = [...currentObservers, customObserver];
+                          const currentObs = observersByHeat.get(selectedHeatForObserver) || [];
+                          const updatedObservers = [...currentObs, customObserver];
 
-                          // Save to database
                           const success = await saveObserverAssignments(
                             currentEvent.id,
                             selectedHeatForObserver,
@@ -1752,17 +1800,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           );
 
                           if (success) {
-                            // Update state
                             setObserversByHeat(prev => {
                               const newMap = new Map(prev);
                               newMap.set(selectedHeatForObserver, updatedObservers);
                               return newMap;
                             });
-
-                            // Reset and close
                             setCustomObserverName('');
                             setShowCustomObserverInput(false);
-                            setShowObserverSelector(false);
                           }
                         }}
                         disabled={!customObserverName.trim()}
@@ -1779,6 +1823,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className={`flex items-center justify-end p-4 border-t ${
+                darkMode ? 'border-slate-700' : 'border-slate-200'
+              }`}>
+                <button
+                  onClick={() => {
+                    setShowObserverSelector(false);
+                    setShowCustomObserverInput(false);
+                    setCustomObserverName('');
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    darkMode
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-purple-500 hover:bg-purple-600 text-white'
+                  }`}
+                >
+                  Done
+                </button>
               </div>
             </div>
           </div>
