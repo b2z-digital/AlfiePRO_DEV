@@ -1316,17 +1316,82 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                       );
 
                       if (output) {
-                        console.log('[GoLive] Found existing output. State:', output.state, 'Enabled:', output.enabled);
+                        // Check both 'state' and 'status' fields as Cloudflare API might use either
+                        const outputState = output.state || output.status;
+                        console.log('[GoLive] Found existing output:', {
+                          uid: output.uid,
+                          state: output.state,
+                          status: output.status,
+                          effectiveState: outputState,
+                          enabled: output.enabled,
+                          url: output.url,
+                          streamKey: output.streamKey ? `${output.streamKey.substring(0, 10)}...` : 'none'
+                        });
 
-                        if (output.state === 'connected' || output.state === 'streaming') {
+                        // Check for active streaming states
+                        const activeStates = ['connected', 'streaming', 'live'];
+                        if (activeStates.includes(outputState)) {
                           console.log('[GoLive] ✅ Output is actively streaming! YouTube should detect it soon.');
                         } else {
-                          console.warn('[GoLive] ⚠️ Output exists but state is:', output.state || 'undefined');
+                          console.warn('[GoLive] ⚠️ Output exists but state is:', outputState || 'undefined');
                           console.warn('[GoLive] This means Cloudflare is NOT sending video to YouTube yet.');
 
-                          // If we've tried multiple times and output is still not connected, suggest action
-                          if (attemptNumber >= 4) {
+                          // If we've tried multiple times and output is still not connected, try recreating with plain RTMP
+                          if (attemptNumber >= 4 && (!outputState || outputState === 'undefined' || outputState === 'disconnected' || outputState === 'error')) {
                             console.error('[GoLive] ❌ Output has been stuck in non-streaming state for multiple attempts.');
+                            console.error('[GoLive] Attempting to recreate output with plain RTMP (non-secure) URL...');
+
+                            try {
+                              // Get the original RTMP URL (not RTMPS)
+                              let plainRtmpUrl = activeSession.youtube_stream_url || activeSession.youtube_rtmp_url || '';
+
+                              // If it's RTMPS, convert back to plain RTMP
+                              if (plainRtmpUrl.includes('rtmps://')) {
+                                plainRtmpUrl = plainRtmpUrl.replace('rtmps://a.rtmps.', 'rtmp://a.rtmp.');
+                                if (!plainRtmpUrl.includes(':1935')) {
+                                  plainRtmpUrl = plainRtmpUrl.replace('/live2', ':1935/live2');
+                                }
+                                console.log('[GoLive] Converting to plain RTMP:', plainRtmpUrl);
+                              }
+
+                              const recreateResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                                method: 'POST',
+                                headers: {
+                                  'Authorization': `Bearer ${session.access_token}`,
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  action: 'recreateOutput',
+                                  clubId: clubId,
+                                  sessionData: {
+                                    liveInputId: activeSession.cloudflare_live_input_id,
+                                    outputId: activeSession.cloudflare_output_id,
+                                    streamUrl: plainRtmpUrl,
+                                    streamKey: activeSession.youtube_stream_key
+                                  }
+                                })
+                              });
+
+                              const recreateData = await recreateResponse.json();
+                              console.log('[GoLive] Recreate output response:', recreateData);
+
+                              if (recreateResponse.ok && recreateData.output) {
+                                console.log('[GoLive] ✅ Successfully recreated output with plain RTMP');
+
+                                // Update session with new output ID
+                                await livestreamStorage.updateSession(activeSession.id, {
+                                  cloudflare_output_id: recreateData.output.uid || recreateData.newOutputId
+                                });
+                                activeSession.cloudflare_output_id = recreateData.output.uid || recreateData.newOutputId;
+
+                                addNotification('info', 'Recreated YouTube output with plain RTMP. Checking connection...', 5000);
+                              } else {
+                                console.error('[GoLive] Failed to recreate output:', recreateData);
+                              }
+                            } catch (err) {
+                              console.error('[GoLive] Error recreating output:', err);
+                            }
+                          } else if (attemptNumber >= 3) {
                             console.error('[GoLive] Possible causes:');
                             console.error('[GoLive]   1. YouTube stream key is invalid or expired');
                             console.error('[GoLive]   2. YouTube RTMP URL is incorrect');

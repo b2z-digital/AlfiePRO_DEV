@@ -220,7 +220,10 @@ async function getLiveInput(
           uid: o.uid,
           url: o.url,
           enabled: o.enabled,
-          status: o.status
+          state: o.state,
+          status: o.status,
+          streamKey: o.streamKey ? `${o.streamKey.substring(0, 10)}...` : 'none',
+          errorMessage: o.errorMessage || o.error
         });
       });
     }
