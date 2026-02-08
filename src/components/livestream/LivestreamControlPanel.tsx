@@ -1,4 +1,4 @@
-// Build: 2026-02-08-deferred-output-creation
+// Build: 2026-02-08-no-cloudflare-outputs
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Video,
@@ -770,13 +770,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         console.log('[GoLive] Session configuration:', {
           whipUrl: activeSession.cloudflare_whip_url,
           liveInputId: activeSession.cloudflare_live_input_id,
-          outputId: activeSession.cloudflare_output_id,
           youtubeStreamUrl: activeSession.youtube_stream_url,
           youtubeStreamKeyLength: activeSession.youtube_stream_key?.length,
           youtubeBroadcastId: activeSession.youtube_broadcast_id
         });
-
-        console.log('[GoLive] Session configuration verified. Starting stream...');
 
         addNotification('info', 'Connecting to streaming server...', 3000);
 
@@ -788,77 +785,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           return;
         }
 
-        console.log('[GoLive] WHIP streaming started successfully');
+        console.log('[GoLive] WHIP streaming to Cloudflare started successfully');
 
-        // Check Cloudflare Live Input status to verify video is being received
-        console.log('[GoLive] Checking Cloudflare Live Input status...');
-        try {
-          const liveInputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'getLiveInput',
-              clubId: clubId,
-              sessionData: {
-                liveInputId: activeSession.cloudflare_live_input_id
-              }
-            })
-          });
-
-          const liveInputData = await liveInputResponse.json();
-          console.log('[GoLive] Cloudflare Live Input status:', JSON.stringify(liveInputData, null, 2));
-
-          if (liveInputData.liveInput) {
-            console.log('[GoLive] Live Input UID:', liveInputData.liveInput.uid);
-            console.log('[GoLive] Live Input status:', liveInputData.liveInput.status);
-            console.log('[GoLive] Live Input created:', liveInputData.liveInput.created);
-
-            // Check if output exists on the live input
-            if (liveInputData.liveInput.outputs) {
-              console.log('[GoLive] Outputs configured on Live Input:', liveInputData.liveInput.outputs.length);
-              liveInputData.liveInput.outputs.forEach((output: any, i: number) => {
-                console.log(`[GoLive] Output ${i + 1}:`, {
-                  uid: output.uid,
-                  url: output.url,
-                  enabled: output.enabled,
-                  status: output.status
-                });
-              });
-
-              const youtubeOutput = liveInputData.liveInput.outputs.find(
-                (o: any) => o.url?.includes('youtube.com') || o.url?.includes('rtmp://a.rtmp') || o.url?.includes('rtmps://a.rtmps')
-              );
-
-              if (youtubeOutput) {
-                console.log('[GoLive] YouTube output exists:', {
-                  uid: youtubeOutput.uid,
-                  enabled: youtubeOutput.enabled,
-                  status: youtubeOutput.status,
-                  note: 'null status is normal for newly created outputs'
-                });
-
-                // Don't recreate if status is null - that's normal for new outputs!
-                // The output will be recreated later if YouTube continues reporting noData
-              } else {
-                console.warn('[GoLive] No YouTube output found on Live Input!');
-              }
-            } else {
-              console.warn('[GoLive] No outputs configured on Live Input!');
-            }
-          }
-        } catch (cfError) {
-          console.error('[GoLive] Error checking Cloudflare Live Input:', cfError);
-        }
-
-        // Cloudflare Stream WebRTC/WHIP beta does NOT support output restreaming (simulcasting).
-        // Outputs only work with RTMP or SRT ingest protocols.
-        // YouTube streaming requires an external RTMP encoder (OBS, Streamlabs, etc.)
         if (activeSession.youtube_broadcast_id && activeSession.youtube_stream_url) {
-          console.log('[GoLive] YouTube broadcast configured. RTMP URL:', activeSession.youtube_stream_url);
-          console.log('[GoLive] Cloudflare WebRTC does not support simulcasting. External RTMP encoder required.');
+          console.log('[GoLive] YouTube broadcast configured. External RTMP encoder required for YouTube.');
           addNotification('info',
             'Cloudflare preview is live. To stream on YouTube, connect an RTMP encoder (e.g., OBS) using the credentials in Stream Settings.',
             12000
@@ -959,18 +889,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               const broadcast = statusData.items[0];
               const currentStatus = broadcast?.status?.lifeCycleStatus;
               const streamStatus = broadcast?.status?.streamStatus;
-              const recordingStatus = broadcast?.status?.recordingStatus;
               const boundStreamId = broadcast?.contentDetails?.boundStreamId;
 
-              console.log('[GoLive] Broadcast lifecycle status:', currentStatus);
-              console.log('[GoLive] Stream status:', streamStatus);
-              console.log('[GoLive] Recording status:', recordingStatus);
-              console.log('[GoLive] Bound stream ID:', boundStreamId);
-              console.log('[GoLive] Full broadcast.status object:', broadcast?.status);
+              console.log('[GoLive] YouTube status:', { currentStatus, streamStatus, boundStreamId });
 
               if (boundStreamId) {
                 try {
-                  console.log('[GoLive] Checking YouTube stream health status...');
                   const streamStatusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
                     method: 'POST',
                     headers: {
@@ -987,32 +911,21 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   });
 
                   const streamStatusData = await streamStatusResponse.json();
-                  console.log('[GoLive] YouTube stream status:', JSON.stringify(streamStatusData, null, 2));
 
                   if (streamStatusData?.items && streamStatusData.items.length > 0) {
                     const stream = streamStatusData.items[0];
                     const healthStatus = stream?.status?.healthStatus?.status;
-                    const streamHealthDetails = stream?.status?.healthStatus?.configurationIssues;
 
-                    console.log('[GoLive] Stream health status:', healthStatus);
-                    console.log('[GoLive] Stream RTMP URL:', stream?.cdn?.ingestionInfo?.ingestionAddress);
-                    console.log('[GoLive] Stream key exists:', !!stream?.cdn?.ingestionInfo?.streamName);
+                    console.log('[GoLive] YouTube stream health:', healthStatus);
 
-                    if (healthStatus === 'noData') {
-                      console.log('[GoLive] YouTube stream health: noData - waiting for external RTMP encoder to connect');
-                      if (attemptNumber === 1) {
-                        addNotification('info', 'Waiting for RTMP encoder to connect to YouTube... Start streaming in OBS or your encoder software.', 8000);
-                      }
+                    if (healthStatus === 'noData' && attemptNumber === 1) {
+                      addNotification('info', 'Waiting for RTMP encoder to connect to YouTube... Start streaming in OBS or your encoder software.', 8000);
                     } else if (healthStatus === 'good' || healthStatus === 'ok') {
                       console.log('[GoLive] YouTube is receiving video data!');
                     }
-
-                    if (streamHealthDetails && streamHealthDetails.length > 0) {
-                      console.warn('[GoLive] Stream configuration issues:', streamHealthDetails);
-                    }
                   }
                 } catch (streamError) {
-                  console.error('[GoLive] Error checking stream status:', streamError);
+                  console.error('[GoLive] Error checking stream health:', streamError);
                 }
               }
 
