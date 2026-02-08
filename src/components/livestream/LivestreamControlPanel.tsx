@@ -907,8 +907,47 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         addNotification('success', 'Cloudflare preview is live!', 4000);
 
         if (activeSession.youtube_broadcast_id) {
-          const hasCloudflareOutput = !!(activeSession as any).cloudflare_output_id;
+          let hasCloudflareOutput = !!(activeSession as any).cloudflare_output_id;
           const hasRtmpsUrl = !!(activeSession as any).cloudflare_rtmps_url;
+          const liveInputId = activeSession.cloudflare_live_input_id;
+          const ytStreamUrl = activeSession.youtube_stream_url;
+          const ytStreamKey = activeSession.youtube_stream_key;
+
+          if (!hasCloudflareOutput && liveInputId && ytStreamUrl && ytStreamKey) {
+            console.log('[GoLive] No Cloudflare output found. Attempting to create one on-the-fly...');
+            console.log('[GoLive] liveInputId:', liveInputId, 'ytStreamUrl:', ytStreamUrl, 'ytKeyLen:', ytStreamKey.length);
+            try {
+              const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'addOutput',
+                  clubId,
+                  sessionData: {
+                    liveInputId,
+                    streamUrl: ytStreamUrl,
+                    streamKey: ytStreamKey
+                  }
+                })
+              });
+              const outputData = await outputResponse.json();
+              if (outputResponse.ok && outputData.output) {
+                console.log('[GoLive] Cloudflare output created on-the-fly:', outputData.output.uid);
+                hasCloudflareOutput = true;
+                await supabase
+                  .from('livestream_sessions')
+                  .update({ cloudflare_output_id: outputData.output.uid })
+                  .eq('id', activeSession.id);
+              } else {
+                console.warn('[GoLive] Failed to create Cloudflare output on-the-fly:', outputData);
+              }
+            } catch (outputErr) {
+              console.warn('[GoLive] Error creating Cloudflare output on-the-fly:', outputErr);
+            }
+          }
 
           if (hasCloudflareOutput && hasRtmpsUrl) {
             console.log('[GoLive] YouTube relay configured via Cloudflare output. Connect OBS to Cloudflare RTMP to relay to YouTube.');
