@@ -850,8 +850,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
         if (activeSession.youtube_stream_url && activeSession.youtube_stream_key && activeSession.cloudflare_live_input_id) {
           let streamUrl = activeSession.youtube_stream_url;
-          if (streamUrl.startsWith('rtmp://') && !streamUrl.startsWith('rtmps://')) {
-            streamUrl = streamUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
+          // IMPORTANT: Cloudflare Stream outputs require plain RTMP, not RTMPS
+          // Convert any RTMPS URL back to plain RTMP for Cloudflare compatibility
+          if (streamUrl.includes('rtmps://')) {
+            streamUrl = streamUrl.replace('rtmps://a.rtmps.', 'rtmp://a.rtmp.');
+            console.log('[GoLive] Converted RTMPS to plain RTMP for Cloudflare:', streamUrl);
           }
           console.log('[GoLive] Will create output with URL:', streamUrl);
 
@@ -913,79 +916,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               activeSession.cloudflare_output_id = outputData.output.uid;
               activeSession.youtube_stream_url = streamUrl;
 
-              // CRITICAL: Verify output is actually attached to live input
-              console.log('[GoLive] Verifying output attachment to live input...');
-              let outputAttached = false;
-              let verifyAttempts = 0;
-              const maxVerifyAttempts = 12;
-
-              while (!outputAttached && verifyAttempts < maxVerifyAttempts) {
-                verifyAttempts++;
-                console.log(`[GoLive] Verification attempt ${verifyAttempts}/${maxVerifyAttempts}...`);
-
-                await new Promise(r => setTimeout(r, 5000)); // Wait 5s for Cloudflare to establish RTMP connection
-
-                try {
-                  const verifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${session.access_token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      action: 'getLiveInput',
-                      clubId: clubId,
-                      sessionData: {
-                        liveInputId: activeSession.cloudflare_live_input_id
-                      }
-                    })
-                  });
-
-                  const verifyData = await verifyResponse.json();
-                  if (verifyData.liveInput?.outputs) {
-                    console.log(`[GoLive] Verification: Found ${verifyData.liveInput.outputs.length} outputs on live input`);
-
-                    const attachedOutput = verifyData.liveInput.outputs.find(
-                      (o: any) => o.uid === outputData.output.uid
-                    );
-
-                    if (attachedOutput) {
-                      console.log('[GoLive] Output found. State:', attachedOutput.state, 'Enabled:', attachedOutput.enabled);
-
-                      // Check if output is actually streaming, not just attached
-                      if (attachedOutput.state === 'connected' || attachedOutput.state === 'streaming') {
-                        outputAttached = true;
-                        console.log('[GoLive] ✅ Output verified and actively streaming to YouTube!');
-                        console.log('[GoLive] Output state:', attachedOutput.state);
-                        addNotification('success', 'YouTube relay active and streaming. Waiting for YouTube to detect video...', 5000);
-                      } else {
-                        console.log(`[GoLive] ⚠️ Output exists but not streaming yet. State: ${attachedOutput.state || 'undefined'}`);
-                        if (verifyAttempts < maxVerifyAttempts) {
-                          console.log('[GoLive] Output not ready, will retry verification in 5 seconds...');
-                        } else {
-                          console.error('[GoLive] ❌ Output never reached streaming state after 60 seconds');
-                          addNotification('warning', 'YouTube relay created but taking longer than expected to connect. Please wait...', 10000);
-                        }
-                      }
-                    } else {
-                      console.warn(`[GoLive] ⚠️ Output ${outputData.output.uid} not found in live input's output list yet`);
-                      if (verifyAttempts < maxVerifyAttempts) {
-                        console.log('[GoLive] Will retry verification...');
-                      }
-                    }
-                  } else {
-                    console.warn('[GoLive] ⚠️ Live input has no outputs yet');
-                  }
-                } catch (verifyErr) {
-                  console.error('[GoLive] Error during output verification:', verifyErr);
-                }
-              }
-
-              if (!outputAttached) {
-                console.error('[GoLive] ❌ Output was created but did not become active within 60 seconds');
-                console.error('[GoLive] This may indicate Cloudflare is experiencing delays or the YouTube key is invalid');
-                addNotification('error', 'YouTube relay created but not active after 60 seconds. Check your stream key or try again.', 12000);
-              }
+              // Cloudflare outputs API does NOT expose a state/status field for live input outputs.
+              // The output is created and enabled - Cloudflare will start forwarding RTMP automatically.
+              // We simply wait a short period and then proceed to check YouTube's stream health,
+              // which is the authoritative source for whether video is arriving.
+              console.log('[GoLive] Output created and enabled. Waiting 10s for Cloudflare to establish RTMP connection to YouTube...');
+              addNotification('info', 'YouTube relay configured. Waiting for video to reach YouTube...', 8000);
+              await new Promise(r => setTimeout(r, 10000));
             } else {
               console.error('[GoLive] Failed to create output:', outputData);
               addNotification('warning', 'Failed to connect YouTube relay. Will retry...', 8000);
@@ -1217,9 +1154,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   addNotification('info', 'Setting up YouTube output in Cloudflare...', 5000);
 
                   let rtmpUrl = activeSession.youtube_stream_url || '';
-                  if (rtmpUrl.startsWith('rtmp://') && !rtmpUrl.startsWith('rtmps://')) {
-                    rtmpUrl = rtmpUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
-                    console.log('[GoLive] Converted to RTMPS URL:', rtmpUrl);
+                  // IMPORTANT: Cloudflare Stream outputs require plain RTMP, not RTMPS
+                  if (rtmpUrl.includes('rtmps://')) {
+                    rtmpUrl = rtmpUrl.replace('rtmps://a.rtmps.', 'rtmp://a.rtmp.');
+                    console.log('[GoLive] Converted RTMPS to plain RTMP for Cloudflare:', rtmpUrl);
                   }
 
                   const streamKey = activeSession.youtube_stream_key;
@@ -1278,137 +1216,57 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   }
                 }
 
-                // Skip output status checks entirely - they're unreliable immediately after creation
-                // The output creation response already tells us if it succeeded
+                // Cloudflare outputs API does not expose a state field for live input outputs.
+                // The output is created and enabled, Cloudflare forwards RTMP automatically.
+                // We rely on YouTube's stream health to confirm video is arriving.
                 if (outputJustCreated) {
-                  console.log('[GoLive] Output just created. Trusting creation was successful.');
-                  console.log('[GoLive] If video doesn\'t reach YouTube, check: 1) RTMP URL is correct, 2) Stream key is valid, 3) Cloudflare Live Input is receiving video');
+                  console.log('[GoLive] Output just created with plain RTMP. Waiting for YouTube to detect video...');
                 }
 
-                // If output exists but YouTube is not detecting stream, verify output status
-                // Check on attempt 2 to give initial connection time, then every attempt after
-                if (activeSession.cloudflare_output_id && !outputJustCreated && attemptNumber >= 2) {
-                  console.log(`[GoLive] Attempt ${attemptNumber}: Verifying Cloudflare output status...`);
+                // If output exists but YouTube still hasn't detected stream after multiple attempts,
+                // try recreating the output in case the initial one failed silently
+                if (activeSession.cloudflare_output_id && !outputJustCreated && attemptNumber >= 3) {
+                  console.log(`[GoLive] Attempt ${attemptNumber}: YouTube still not detecting stream. Recreating Cloudflare output...`);
                   try {
-                    const verifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                    let plainRtmpUrl = activeSession.youtube_stream_url || '';
+                    if (plainRtmpUrl.includes('rtmps://')) {
+                      plainRtmpUrl = plainRtmpUrl.replace('rtmps://a.rtmps.', 'rtmp://a.rtmp.');
+                    }
+
+                    const recreateResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
                       method: 'POST',
                       headers: {
                         'Authorization': `Bearer ${session.access_token}`,
                         'Content-Type': 'application/json',
                       },
                       body: JSON.stringify({
-                        action: 'getLiveInput',
+                        action: 'recreateOutput',
                         clubId: clubId,
                         sessionData: {
-                          liveInputId: activeSession.cloudflare_live_input_id
+                          liveInputId: activeSession.cloudflare_live_input_id,
+                          outputId: activeSession.cloudflare_output_id,
+                          streamUrl: plainRtmpUrl,
+                          streamKey: activeSession.youtube_stream_key
                         }
                       })
                     });
 
-                    const verifyData = await verifyResponse.json();
-                    console.log('[GoLive] Live input verification response:', verifyData);
+                    const recreateData = await recreateResponse.json();
+                    console.log('[GoLive] Recreate output response:', recreateData);
 
-                    if (verifyData.liveInput?.outputs) {
-                      console.log(`[GoLive] Found ${verifyData.liveInput.outputs.length} output(s) on live input`);
-
-                      const output = verifyData.liveInput.outputs.find(
-                        (o: any) => o.uid === activeSession.cloudflare_output_id
-                      );
-
-                      if (output) {
-                        // Check both 'state' and 'status' fields as Cloudflare API might use either
-                        const outputState = output.state || output.status;
-                        console.log('[GoLive] Found existing output:', {
-                          uid: output.uid,
-                          state: output.state,
-                          status: output.status,
-                          effectiveState: outputState,
-                          enabled: output.enabled,
-                          url: output.url,
-                          streamKey: output.streamKey ? `${output.streamKey.substring(0, 10)}...` : 'none'
-                        });
-
-                        // Check for active streaming states
-                        const activeStates = ['connected', 'streaming', 'live'];
-                        if (activeStates.includes(outputState)) {
-                          console.log('[GoLive] ✅ Output is actively streaming! YouTube should detect it soon.');
-                        } else {
-                          console.warn('[GoLive] ⚠️ Output exists but state is:', outputState || 'undefined');
-                          console.warn('[GoLive] This means Cloudflare is NOT sending video to YouTube yet.');
-
-                          // If we've tried multiple times and output is still not connected, try recreating with plain RTMP
-                          if (attemptNumber >= 4 && (!outputState || outputState === 'undefined' || outputState === 'disconnected' || outputState === 'error')) {
-                            console.error('[GoLive] ❌ Output has been stuck in non-streaming state for multiple attempts.');
-                            console.error('[GoLive] Attempting to recreate output with plain RTMP (non-secure) URL...');
-
-                            try {
-                              // Get the original RTMP URL (not RTMPS)
-                              let plainRtmpUrl = activeSession.youtube_stream_url || activeSession.youtube_rtmp_url || '';
-
-                              // If it's RTMPS, convert back to plain RTMP
-                              if (plainRtmpUrl.includes('rtmps://')) {
-                                plainRtmpUrl = plainRtmpUrl.replace('rtmps://a.rtmps.', 'rtmp://a.rtmp.');
-                                if (!plainRtmpUrl.includes(':1935')) {
-                                  plainRtmpUrl = plainRtmpUrl.replace('/live2', ':1935/live2');
-                                }
-                                console.log('[GoLive] Converting to plain RTMP:', plainRtmpUrl);
-                              }
-
-                              const recreateResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                                method: 'POST',
-                                headers: {
-                                  'Authorization': `Bearer ${session.access_token}`,
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                  action: 'recreateOutput',
-                                  clubId: clubId,
-                                  sessionData: {
-                                    liveInputId: activeSession.cloudflare_live_input_id,
-                                    outputId: activeSession.cloudflare_output_id,
-                                    streamUrl: plainRtmpUrl,
-                                    streamKey: activeSession.youtube_stream_key
-                                  }
-                                })
-                              });
-
-                              const recreateData = await recreateResponse.json();
-                              console.log('[GoLive] Recreate output response:', recreateData);
-
-                              if (recreateResponse.ok && recreateData.output) {
-                                console.log('[GoLive] ✅ Successfully recreated output with plain RTMP');
-
-                                // Update session with new output ID
-                                await livestreamStorage.updateSession(activeSession.id, {
-                                  cloudflare_output_id: recreateData.output.uid || recreateData.newOutputId
-                                });
-                                activeSession.cloudflare_output_id = recreateData.output.uid || recreateData.newOutputId;
-
-                                addNotification('info', 'Recreated YouTube output with plain RTMP. Checking connection...', 5000);
-                              } else {
-                                console.error('[GoLive] Failed to recreate output:', recreateData);
-                              }
-                            } catch (err) {
-                              console.error('[GoLive] Error recreating output:', err);
-                            }
-                          } else if (attemptNumber >= 3) {
-                            console.error('[GoLive] Possible causes:');
-                            console.error('[GoLive]   1. YouTube stream key is invalid or expired');
-                            console.error('[GoLive]   2. YouTube RTMP URL is incorrect');
-                            console.error('[GoLive]   3. Cloudflare cannot reach YouTube RTMP servers');
-                            console.error('[GoLive]   4. Cloudflare live input is not receiving video from browser');
-                          }
-                        }
-                      } else {
-                        console.error('[GoLive] ❌ Output ID exists in session but NOT found in live input!');
-                        console.error('[GoLive] Output may have been deleted or never created properly.');
-                        console.error('[GoLive] Suggestion: Stop and restart the livestream to recreate the output.');
-                      }
+                    if (recreateResponse.ok && recreateData.output) {
+                      const newId = recreateData.output.uid || recreateData.newOutputId;
+                      console.log('[GoLive] Output recreated successfully:', newId);
+                      await livestreamStorage.updateSession(activeSession.id, {
+                        cloudflare_output_id: newId
+                      });
+                      activeSession.cloudflare_output_id = newId;
+                      addNotification('info', 'Recreated YouTube relay. Checking connection...', 5000);
                     } else {
-                      console.error('[GoLive] ❌ Live input has no outputs!');
+                      console.error('[GoLive] Failed to recreate output:', recreateData);
                     }
                   } catch (err) {
-                    console.error('[GoLive] Error verifying output:', err);
+                    console.error('[GoLive] Error recreating output:', err);
                   }
                 }
 
