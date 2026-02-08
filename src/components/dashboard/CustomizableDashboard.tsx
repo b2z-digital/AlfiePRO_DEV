@@ -316,7 +316,8 @@ export const CustomizableDashboard: React.FC = () => {
         return true;
       } else {
         console.error('❌ Layout save failed:', result.error);
-        addNotification('error', 'Failed to save dashboard layout');
+        const errorMessage = result.error?.message || result.error?.toString() || 'Unknown error';
+        addNotification('error', `Failed to save dashboard layout: ${errorMessage}`);
         return false;
       }
     } catch (error) {
