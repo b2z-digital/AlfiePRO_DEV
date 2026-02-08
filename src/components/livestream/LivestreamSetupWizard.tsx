@@ -529,8 +529,8 @@ export function LivestreamSetupWizard({
 
                   setLoadingMessage('Creating Cloudflare → YouTube relay output...');
                   try {
-                    const fullRtmpUrl = `${rtmpUrl || rtmpsUrl}/${streamKey}`;
-                    console.log('[LivestreamWizard] Creating Cloudflare output to YouTube RTMP:', fullRtmpUrl);
+                    const outputStreamUrl = rtmpUrl || rtmpsUrl;
+                    console.log('[LivestreamWizard] Creating Cloudflare output to YouTube RTMP:', outputStreamUrl, 'key:', streamKey?.substring(0, 4) + '...');
                     const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
                       method: 'POST',
                       headers,
@@ -539,8 +539,8 @@ export function LivestreamSetupWizard({
                         clubId,
                         sessionData: {
                           liveInputId: cfData.liveInput.uid,
-                          url: fullRtmpUrl,
-                          enabled: true
+                          streamUrl: outputStreamUrl,
+                          streamKey: streamKey
                         }
                       })
                     });
