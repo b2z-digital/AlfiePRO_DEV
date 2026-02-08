@@ -908,14 +908,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
         if (activeSession.youtube_broadcast_id) {
           let hasCloudflareOutput = !!(activeSession as any).cloudflare_output_id;
-          const hasRtmpsUrl = !!(activeSession as any).cloudflare_rtmps_url;
+          let outputId = (activeSession as any).cloudflare_output_id;
           const liveInputId = activeSession.cloudflare_live_input_id;
           const ytStreamUrl = activeSession.youtube_stream_url;
           const ytStreamKey = activeSession.youtube_stream_key;
 
           if (!hasCloudflareOutput && liveInputId && ytStreamUrl && ytStreamKey) {
-            console.log('[GoLive] No Cloudflare output found. Attempting to create one on-the-fly...');
-            console.log('[GoLive] liveInputId:', liveInputId, 'ytStreamUrl:', ytStreamUrl, 'ytKeyLen:', ytStreamKey.length);
+            console.log('[GoLive] No Cloudflare output found. Creating one...');
             try {
               const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
                 method: 'POST',
@@ -926,39 +925,57 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                 body: JSON.stringify({
                   action: 'addOutput',
                   clubId,
-                  sessionData: {
-                    liveInputId,
-                    streamUrl: ytStreamUrl,
-                    streamKey: ytStreamKey
-                  }
+                  sessionData: { liveInputId, streamUrl: ytStreamUrl, streamKey: ytStreamKey }
                 })
               });
               const outputData = await outputResponse.json();
               if (outputResponse.ok && outputData.output) {
-                console.log('[GoLive] Cloudflare output created on-the-fly:', outputData.output.uid);
+                console.log('[GoLive] Cloudflare output created:', outputData.output.uid);
                 hasCloudflareOutput = true;
+                outputId = outputData.output.uid;
                 await supabase
                   .from('livestream_sessions')
                   .update({ cloudflare_output_id: outputData.output.uid })
                   .eq('id', activeSession.id);
               } else {
-                console.warn('[GoLive] Failed to create Cloudflare output on-the-fly:', outputData);
+                console.warn('[GoLive] Failed to create Cloudflare output:', outputData);
               }
             } catch (outputErr) {
-              console.warn('[GoLive] Error creating Cloudflare output on-the-fly:', outputErr);
+              console.warn('[GoLive] Error creating Cloudflare output:', outputErr);
             }
           }
 
-          if (hasCloudflareOutput && hasRtmpsUrl) {
-            console.log('[GoLive] YouTube relay configured via Cloudflare output. Connect OBS to Cloudflare RTMP to relay to YouTube.');
+          if (hasCloudflareOutput && liveInputId && outputId) {
+            console.log('[GoLive] Restarting Cloudflare output to begin YouTube relay...');
+            addNotification('info', 'Connecting camera feed to YouTube...', 5000);
+            try {
+              const restartResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'restartOutput',
+                  clubId,
+                  sessionData: { liveInputId, outputId }
+                })
+              });
+              const restartData = await restartResponse.json();
+              if (restartResponse.ok) {
+                console.log('[GoLive] Cloudflare output restarted successfully. YouTube relay active.');
+                addNotification('success', 'Camera feed is being relayed to YouTube. It may take 30-60 seconds to appear.', 8000);
+              } else {
+                console.warn('[GoLive] Failed to restart output:', restartData);
+                addNotification('warning', 'YouTube relay may need manual restart. Check Stream Settings.', 8000);
+              }
+            } catch (restartErr) {
+              console.warn('[GoLive] Error restarting output:', restartErr);
+            }
+          } else if (!hasCloudflareOutput) {
+            console.log('[GoLive] No Cloudflare output available. YouTube needs manual RTMP streaming.');
             addNotification('info',
-              'To go live on YouTube: Open OBS and stream to the Cloudflare RTMP URL shown in Stream Settings. Cloudflare will relay to YouTube automatically.',
-              15000
-            );
-          } else {
-            console.log('[GoLive] YouTube configured but no Cloudflare relay output. OBS must stream directly to YouTube RTMP.');
-            addNotification('info',
-              'To go live on YouTube: Open OBS and stream to the YouTube RTMP URL shown in Stream Settings.',
+              'To stream to YouTube: Use OBS and stream to the YouTube RTMP URL in Stream Settings.',
               12000
             );
           }
