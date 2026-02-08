@@ -912,7 +912,68 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               });
               activeSession.cloudflare_output_id = outputData.output.uid;
               activeSession.youtube_stream_url = streamUrl;
-              addNotification('success', 'YouTube relay active. Waiting for YouTube to detect video...', 5000);
+
+              // CRITICAL: Verify output is actually attached to live input
+              console.log('[GoLive] Verifying output attachment to live input...');
+              let outputAttached = false;
+              let verifyAttempts = 0;
+              const maxVerifyAttempts = 5;
+
+              while (!outputAttached && verifyAttempts < maxVerifyAttempts) {
+                verifyAttempts++;
+                console.log(`[GoLive] Verification attempt ${verifyAttempts}/${maxVerifyAttempts}...`);
+
+                await new Promise(r => setTimeout(r, 3000)); // Wait 3s for Cloudflare API consistency
+
+                try {
+                  const verifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${session.access_token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      action: 'getLiveInput',
+                      clubId: clubId,
+                      sessionData: {
+                        liveInputId: activeSession.cloudflare_live_input_id
+                      }
+                    })
+                  });
+
+                  const verifyData = await verifyResponse.json();
+                  if (verifyData.liveInput?.outputs) {
+                    console.log(`[GoLive] Verification: Found ${verifyData.liveInput.outputs.length} outputs on live input`);
+
+                    const attachedOutput = verifyData.liveInput.outputs.find(
+                      (o: any) => o.uid === outputData.output.uid
+                    );
+
+                    if (attachedOutput) {
+                      outputAttached = true;
+                      console.log('[GoLive] ✅ Output verified and attached to live input!');
+                      console.log('[GoLive] Output enabled:', attachedOutput.enabled);
+                      console.log('[GoLive] Output state:', attachedOutput.state);
+                      addNotification('success', 'YouTube relay active and verified. Waiting for YouTube to detect video...', 5000);
+                    } else {
+                      console.warn(`[GoLive] ⚠️ Output ${outputData.output.uid} not found in live input's output list yet`);
+                      if (verifyAttempts < maxVerifyAttempts) {
+                        console.log('[GoLive] Will retry verification...');
+                      }
+                    }
+                  } else {
+                    console.warn('[GoLive] ⚠️ Live input has no outputs yet');
+                  }
+                } catch (verifyErr) {
+                  console.error('[GoLive] Error during output verification:', verifyErr);
+                }
+              }
+
+              if (!outputAttached) {
+                console.error('[GoLive] ❌ Output was created but never appeared in live input\'s output list!');
+                console.error('[GoLive] This indicates a Cloudflare API issue or the output is not properly linked');
+                addNotification('error', 'YouTube relay created but not active. Cloudflare may be experiencing issues.', 10000);
+              }
             } else {
               console.error('[GoLive] Failed to create output:', outputData);
               addNotification('warning', 'Failed to connect YouTube relay. Will retry...', 8000);
