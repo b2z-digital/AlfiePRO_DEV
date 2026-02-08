@@ -1,4 +1,4 @@
-// Build: 2026-02-08-recreate-output-after-whip
+// Build: 2026-02-08-whip-no-simulcast-fix
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Video,
@@ -907,178 +907,19 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         addNotification('success', 'Cloudflare preview is live!', 4000);
 
         if (activeSession.youtube_broadcast_id) {
-          let hasCloudflareOutput = !!(activeSession as any).cloudflare_output_id;
-          let outputId = (activeSession as any).cloudflare_output_id;
-          const liveInputId = activeSession.cloudflare_live_input_id;
-          const ytStreamUrl = activeSession.youtube_stream_url;
-          const ytStreamKey = activeSession.youtube_stream_key;
-
-          if (!hasCloudflareOutput && liveInputId && ytStreamUrl && ytStreamKey) {
-            console.log('[GoLive] No Cloudflare output found. Creating one...');
-            try {
-              const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action: 'addOutput',
-                  clubId,
-                  sessionData: { liveInputId, streamUrl: ytStreamUrl, streamKey: ytStreamKey }
-                })
-              });
-              const outputData = await outputResponse.json();
-              if (outputResponse.ok && outputData.output) {
-                console.log('[GoLive] Cloudflare output created:', outputData.output.uid);
-                hasCloudflareOutput = true;
-                outputId = outputData.output.uid;
-                await supabase
-                  .from('livestream_sessions')
-                  .update({ cloudflare_output_id: outputData.output.uid })
-                  .eq('id', activeSession.id);
-              } else {
-                console.warn('[GoLive] Failed to create Cloudflare output:', outputData);
-              }
-            } catch (outputErr) {
-              console.warn('[GoLive] Error creating Cloudflare output:', outputErr);
-            }
+          console.log('[GoLive] YouTube broadcast configured. Note: Cloudflare WHIP does not support simulcasting/output re-streaming. OBS with RTMPS is required for YouTube relay.');
+          const hasRtmpsUrl = !!(activeSession as any)?.cloudflare_rtmps_url;
+          if (hasRtmpsUrl) {
+            addNotification('info',
+              'YouTube requires RTMPS input. Open OBS and stream to the Cloudflare RTMP URL in Stream Settings below. Cloudflare will relay to YouTube automatically.',
+              15000
+            );
+          } else {
+            addNotification('info',
+              'YouTube requires an RTMPS encoder like OBS. Browser camera streaming does not support YouTube relay.',
+              12000
+            );
           }
-
-          if (liveInputId) {
-            console.log('[GoLive] Waiting 5 seconds for Cloudflare to register WHIP input...');
-            addNotification('info', 'Connecting camera feed to YouTube...', 8000);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-
-            try {
-              const statusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action: 'getLiveInput',
-                  clubId,
-                  sessionData: { liveInputId }
-                })
-              });
-              const statusData = await statusResponse.json();
-              console.log('[GoLive] Cloudflare live input status:', JSON.stringify(statusData?.liveInput?.status));
-              console.log('[GoLive] Cloudflare live input details:', {
-                uid: statusData?.liveInput?.uid,
-                status: statusData?.liveInput?.status,
-                outputCount: statusData?.liveInput?.outputs?.length,
-                outputs: statusData?.liveInput?.outputs?.map((o: any) => ({
-                  uid: o.uid,
-                  url: o.url,
-                  enabled: o.enabled,
-                  state: o.state,
-                  status: o.status
-                }))
-              });
-            } catch (diagErr) {
-              console.warn('[GoLive] Diagnostics failed:', diagErr);
-            }
-
-            if (hasCloudflareOutput && outputId && ytStreamUrl && ytStreamKey) {
-              console.log('[GoLive] Recreating Cloudflare output (delete + create) while WHIP is active...');
-              try {
-                const recreateResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    action: 'recreateOutput',
-                    clubId,
-                    sessionData: {
-                      liveInputId,
-                      outputId,
-                      streamUrl: ytStreamUrl,
-                      streamKey: ytStreamKey
-                    }
-                  })
-                });
-                const recreateData = await recreateResponse.json();
-                if (recreateResponse.ok && recreateData.newOutputId) {
-                  console.log('[GoLive] Output recreated successfully. New output ID:', recreateData.newOutputId);
-                  outputId = recreateData.newOutputId;
-                  await supabase
-                    .from('livestream_sessions')
-                    .update({ cloudflare_output_id: recreateData.newOutputId })
-                    .eq('id', activeSession.id);
-
-                  await new Promise(resolve => setTimeout(resolve, 3000));
-
-                  try {
-                    const outputStatusResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${session.access_token}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        action: 'getOutputStatus',
-                        clubId,
-                        sessionData: { liveInputId, outputId: recreateData.newOutputId }
-                      })
-                    });
-                    const outputStatusData = await outputStatusResp.json();
-                    console.log('[GoLive] New output status after recreation:', JSON.stringify(outputStatusData?.output || outputStatusData, null, 2));
-                  } catch (statusErr) {
-                    console.warn('[GoLive] Output status check failed:', statusErr);
-                  }
-
-                  addNotification('success', 'Camera feed is being relayed to YouTube. It may take 30-60 seconds to appear.', 8000);
-                } else {
-                  console.warn('[GoLive] Failed to recreate output:', recreateData);
-                  addNotification('warning', 'YouTube relay may need manual setup. Check Stream Settings.', 8000);
-                }
-              } catch (recreateErr) {
-                console.warn('[GoLive] Error recreating output:', recreateErr);
-              }
-            } else if (!hasCloudflareOutput && ytStreamUrl && ytStreamKey) {
-              console.log('[GoLive] No existing output. Creating new output while WHIP is active...');
-              try {
-                const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    action: 'addOutput',
-                    clubId,
-                    sessionData: { liveInputId, streamUrl: ytStreamUrl, streamKey: ytStreamKey }
-                  })
-                });
-                const outputData = await outputResponse.json();
-                if (outputResponse.ok && outputData.output) {
-                  console.log('[GoLive] New output created:', outputData.output.uid);
-                  outputId = outputData.output.uid;
-                  await supabase
-                    .from('livestream_sessions')
-                    .update({ cloudflare_output_id: outputData.output.uid })
-                    .eq('id', activeSession.id);
-                  addNotification('success', 'Camera feed is being relayed to YouTube. It may take 30-60 seconds to appear.', 8000);
-                } else {
-                  console.warn('[GoLive] Failed to create output:', outputData);
-                  addNotification('warning', 'YouTube relay setup failed. Check Stream Settings.', 8000);
-                }
-              } catch (outputErr) {
-                console.warn('[GoLive] Error creating output:', outputErr);
-              }
-            } else {
-              console.log('[GoLive] Missing YouTube stream URL or key. YouTube relay not possible.');
-              addNotification('info',
-                'YouTube stream credentials missing. Use OBS to stream to the YouTube RTMP URL.',
-                10000
-              );
-            }
-          }
-
           startYouTubeMonitor(activeSession.youtube_broadcast_id, clubId, session.access_token);
         }
       } else if (activeSession.youtube_broadcast_id) {
@@ -1996,7 +1837,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     <span className="text-xs text-slate-300">
                       YouTube: {youtubeStatus === 'live' ? 'Live' :
                         youtubeStatus === 'testing' ? 'Testing - receiving video' :
-                        youtubeStatus === 'ready' ? 'Waiting for video...' :
+                        youtubeStatus === 'ready' ? 'Waiting for RTMPS (OBS)...' :
                         youtubeStatus}
                     </span>
                   </div>
@@ -2006,10 +1847,14 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           )}
 
           {(activeSession as any)?.cloudflare_rtmps_url && (
-            <div className="p-5 border-t border-slate-700/50">
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Cloudflare RTMP (OBS)</h4>
+            <div className={`p-5 border-t ${activeSession.youtube_broadcast_id ? 'border-amber-600/30 bg-amber-950/20' : 'border-slate-700/50'}`}>
+              <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${activeSession.youtube_broadcast_id ? 'text-amber-400' : 'text-slate-500'}`}>
+                {activeSession.youtube_broadcast_id ? 'OBS Required for YouTube' : 'Cloudflare RTMP (OBS)'}
+              </h4>
               <p className="text-xs text-slate-400 mb-3">
-                Stream to Cloudflare with OBS. Cloudflare relays to YouTube automatically.
+                {activeSession.youtube_broadcast_id
+                  ? 'Cloudflare does not support browser-to-YouTube relay. Stream to this RTMP URL with OBS to go live on YouTube.'
+                  : 'Stream to Cloudflare with OBS. Cloudflare relays to YouTube automatically.'}
               </p>
               <div className="space-y-3">
                 <div>

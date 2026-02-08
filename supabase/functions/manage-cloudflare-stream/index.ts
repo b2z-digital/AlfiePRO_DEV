@@ -435,8 +435,30 @@ async function getOutputStatus(
 
     console.log("[CF Stream] Output status HTTP response status:", response.status);
 
-    const data = await response.json();
-    console.log("[CF Stream] Output status response data:", JSON.stringify(data, null, 2));
+    const responseText = await response.text();
+    console.log("[CF Stream] Output status raw response:", responseText);
+
+    let data;
+    try {
+      data = responseText ? JSON.parse(responseText) : { success: false, errors: [{ message: "Empty response from Cloudflare" }] };
+    } catch {
+      console.warn("[CF Stream] Could not parse response as JSON, using list endpoint instead");
+      const listResponse = await fetch(
+        `${CF_API_BASE}/accounts/${credentials.account_id}/stream/live_inputs/${liveInputId}/outputs`,
+        { method: "GET", headers: { "Authorization": `Bearer ${credentials.api_token}` } }
+      );
+      const listData = await listResponse.json();
+      if (listResponse.ok && listData.success) {
+        const matchingOutput = listData.result?.find((o: any) => o.uid === outputId);
+        if (matchingOutput) {
+          return new Response(
+            JSON.stringify({ success: true, output: matchingOutput }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      data = { success: false, errors: [{ message: "Could not parse individual output response and list fallback failed" }] };
+    }
 
     if (!response.ok || !data.success) {
       console.error("[CF Stream] Error getting output status. HTTP status:", response.status, "Response:", data);
