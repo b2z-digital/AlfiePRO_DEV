@@ -950,11 +950,23 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     );
 
                     if (attachedOutput) {
-                      outputAttached = true;
-                      console.log('[GoLive] ✅ Output verified and attached to live input!');
-                      console.log('[GoLive] Output enabled:', attachedOutput.enabled);
-                      console.log('[GoLive] Output state:', attachedOutput.state);
-                      addNotification('success', 'YouTube relay active and verified. Waiting for YouTube to detect video...', 5000);
+                      console.log('[GoLive] Output found. State:', attachedOutput.state, 'Enabled:', attachedOutput.enabled);
+
+                      // Check if output is actually streaming, not just attached
+                      if (attachedOutput.state === 'connected' || attachedOutput.state === 'streaming') {
+                        outputAttached = true;
+                        console.log('[GoLive] ✅ Output verified and actively streaming to YouTube!');
+                        console.log('[GoLive] Output state:', attachedOutput.state);
+                        addNotification('success', 'YouTube relay active and streaming. Waiting for YouTube to detect video...', 5000);
+                      } else {
+                        console.log(`[GoLive] ⚠️ Output exists but not streaming yet. State: ${attachedOutput.state || 'undefined'}`);
+                        if (verifyAttempts < maxVerifyAttempts) {
+                          console.log('[GoLive] Output not ready, will retry verification...');
+                        } else {
+                          console.error('[GoLive] ❌ Output never reached streaming state after max attempts');
+                          addNotification('warning', 'YouTube relay created but not streaming yet. This may take a moment...', 8000);
+                        }
+                      }
                     } else {
                       console.warn(`[GoLive] ⚠️ Output ${outputData.output.uid} not found in live input's output list yet`);
                       if (verifyAttempts < maxVerifyAttempts) {
