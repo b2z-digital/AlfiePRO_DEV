@@ -1,4 +1,4 @@
-// Build: 2026-01-23-fix-youtube-streaming
+// Build: 2026-02-08-deferred-output-creation
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Video,
@@ -848,59 +848,24 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           console.error('[GoLive] Error checking Cloudflare Live Input:', cfError);
         }
 
-        if (activeSession.cloudflare_output_id && activeSession.cloudflare_live_input_id) {
-          const currentUrl = activeSession.youtube_stream_url || '';
-          const needsRtmpsUpgrade = currentUrl.startsWith('rtmp://') && !currentUrl.startsWith('rtmps://');
+        if (activeSession.youtube_stream_url && activeSession.youtube_stream_key && activeSession.cloudflare_live_input_id) {
+          let streamUrl = activeSession.youtube_stream_url;
+          if (streamUrl.startsWith('rtmp://') && !streamUrl.startsWith('rtmps://')) {
+            streamUrl = streamUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
+          }
+          console.log('[GoLive] Will create output with URL:', streamUrl);
 
-          if (needsRtmpsUpgrade) {
-            const rtmpsUrl = currentUrl.replace('rtmp://a.rtmp.', 'rtmps://a.rtmps.').replace(':1935', '');
-            console.log('[GoLive] Current output uses RTMP. Recreating with RTMPS:', rtmpsUrl);
-            addNotification('info', 'Connecting securely to YouTube (RTMPS)...', 5000);
+          if (activeSession.cloudflare_output_id) {
+            console.log('[GoLive] Removing stale output from previous attempt:', activeSession.cloudflare_output_id);
             try {
-              const recreateResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+              await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${session.access_token}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  action: 'recreateOutput',
-                  clubId: clubId,
-                  sessionData: {
-                    liveInputId: activeSession.cloudflare_live_input_id,
-                    outputId: activeSession.cloudflare_output_id,
-                    streamUrl: rtmpsUrl,
-                    streamKey: activeSession.youtube_stream_key
-                  }
-                })
-              });
-              const recreateData = await recreateResp.json();
-              if (recreateData.success && recreateData.newOutputId) {
-                console.log('[GoLive] Output recreated with RTMPS. New output ID:', recreateData.newOutputId);
-                await livestreamStorage.updateSession(activeSession.id, {
-                  cloudflare_output_id: recreateData.newOutputId,
-                  youtube_stream_url: rtmpsUrl
-                });
-                activeSession.cloudflare_output_id = recreateData.newOutputId;
-                activeSession.youtube_stream_url = rtmpsUrl;
-              } else {
-                console.warn('[GoLive] RTMPS recreate failed, falling back to restart:', recreateData);
-              }
-            } catch (recreateErr) {
-              console.error('[GoLive] Error recreating output with RTMPS:', recreateErr);
-            }
-          } else {
-            console.log('[GoLive] Restarting Cloudflare output to trigger fresh connection to YouTube...');
-            addNotification('info', 'Establishing connection to YouTube...', 5000);
-            try {
-              const restartResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action: 'restartOutput',
+                  action: 'removeOutput',
                   clubId: clubId,
                   sessionData: {
                     liveInputId: activeSession.cloudflare_live_input_id,
@@ -908,16 +873,52 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   }
                 })
               });
-              const restartData = await restartResponse.json();
-              console.log('[GoLive] Output restart result:', restartData);
-              if (restartData.success) {
-                console.log('[GoLive] Output restarted successfully.');
-              } else {
-                console.warn('[GoLive] Output restart returned error:', restartData);
-              }
-            } catch (restartError) {
-              console.error('[GoLive] Error restarting output:', restartError);
+            } catch (e) {
+              console.warn('[GoLive] Error removing old output:', e);
             }
+            await new Promise(r => setTimeout(r, 2000));
+          }
+
+          console.log('[GoLive] Waiting 5s for video to stabilize in Cloudflare before creating output...');
+          addNotification('info', 'Video connected. Setting up YouTube relay...', 5000);
+          await new Promise(r => setTimeout(r, 5000));
+
+          try {
+            const createOutputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'addOutput',
+                clubId: clubId,
+                sessionData: {
+                  liveInputId: activeSession.cloudflare_live_input_id,
+                  streamUrl: streamUrl,
+                  streamKey: activeSession.youtube_stream_key
+                }
+              })
+            });
+
+            const outputData = await createOutputResponse.json();
+            console.log('[GoLive] Output creation response:', outputData);
+
+            if (createOutputResponse.ok && outputData.output) {
+              console.log('[GoLive] Output created successfully:', outputData.output.uid);
+              await livestreamStorage.updateSession(activeSession.id, {
+                cloudflare_output_id: outputData.output.uid,
+                youtube_stream_url: streamUrl
+              });
+              activeSession.cloudflare_output_id = outputData.output.uid;
+              activeSession.youtube_stream_url = streamUrl;
+              addNotification('success', 'YouTube relay active. Waiting for YouTube to detect video...', 5000);
+            } else {
+              console.error('[GoLive] Failed to create output:', outputData);
+              addNotification('warning', 'Failed to connect YouTube relay. Will retry...', 8000);
+            }
+          } catch (err) {
+            console.error('[GoLive] Error creating output:', err);
           }
         }
 
@@ -1288,8 +1289,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             }
           };
 
-          // Start the transition attempt after 10 seconds
-          setTimeout(() => attemptYouTubeTransition(1, 6), 20000);
+          setTimeout(() => attemptYouTubeTransition(1, 6), 10000);
         }
       } else if (activeSession.youtube_broadcast_id) {
         try {

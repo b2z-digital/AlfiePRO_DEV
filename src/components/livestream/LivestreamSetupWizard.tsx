@@ -529,40 +529,8 @@ export function LivestreamSetupWizard({
                   console.log('[LivestreamWizard] YouTube broadcast is ready. Will auto-detect video when stream starts.');
                   addNotification('success', 'YouTube broadcast created successfully', 3000);
 
-                  // Step 4: Add YouTube as output destination in Cloudflare
-                  // Add the output immediately - YouTube will detect video when cameras connect
-                  if (preferredUrl && streamKey) {
-                    setLoadingMessage('Connecting Cloudflare to YouTube...');
-                    console.log('[LivestreamWizard] Adding YouTube output to Cloudflare...');
-                    console.log('[LivestreamWizard] YouTube Stream URL:', preferredUrl);
-                    console.log('[LivestreamWizard] YouTube Stream Key:', streamKey?.substring(0, 10) + '...');
-
-                    const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify({
-                        action: 'addOutput',
-                        clubId,
-                        sessionData: {
-                          liveInputId: cfData.liveInput.uid,
-                          streamUrl: preferredUrl,
-                          streamKey: streamKey
-                        }
-                      })
-                    });
-
-                    const outputData = await outputResponse.json();
-                    console.log('[LivestreamWizard] Cloudflare addOutput response:', outputData);
-
-                    if (outputResponse.ok && outputData.output) {
-                      sessionData.cloudflare_output_id = outputData.output.uid;
-                      console.log('✅ YouTube output added to Cloudflare');
-                      addNotification('success', 'Successfully configured Cloudflare to YouTube relay', 4000);
-                    } else {
-                      console.error('❌ Failed to add YouTube output to Cloudflare:', outputData);
-                      addNotification('warning', 'Cloudflare output setup failed. Video may not relay to YouTube.', 6000);
-                    }
-                  }
+                  console.log('[LivestreamWizard] YouTube output will be created at GoLive time (after video is flowing)');
+                  setLoadingMessage('Finalizing YouTube configuration...');
                 } else {
                   console.error('❌ Failed to bind broadcast to stream:', bindData);
                   addNotification('error', 'Failed to bind YouTube broadcast to stream', 5000);
