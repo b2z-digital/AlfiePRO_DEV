@@ -5,20 +5,24 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    fetchPendingApplications();
-  }, [currentClub]);
+    if (!orgContext.isLoading) {
+      fetchPendingApplications();
+    }
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchPendingApplications = async () => {
-    if (!currentClub?.clubId) {
+    if (orgContext.clubIds.length === 0) {
       setLoading(false);
       return;
     }
@@ -27,7 +31,7 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
       const { count, error } = await supabase
         .from('membership_applications')
         .select('id', { count: 'exact', head: true })
-        .eq('club_id', currentClub.clubId)
+        .in('club_id', orgContext.clubIds)
         .eq('status', 'pending')
         .eq('is_draft', false);
 
@@ -74,7 +78,7 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
         <div className="flex-1 min-w-0">
           <p className="text-xs text-slate-400 mb-0.5">Pending Applications</p>
           <p className="text-2xl font-bold text-white mb-0.5">
-            {loading ? '...' : pendingCount}
+            {loading || orgContext.isLoading ? '...' : pendingCount}
           </p>
           <p className="text-xs text-slate-400">
             {pendingCount > 0

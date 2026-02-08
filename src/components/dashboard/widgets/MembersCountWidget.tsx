@@ -5,10 +5,12 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
+import { useOrganizationContext, getContextLabel } from '../../../hooks/useOrganizationContext';
 
 export const MembersCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const [memberCount, setMemberCount] = useState(0);
   const [participationRate, setParticipationRate] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -16,21 +18,23 @@ export const MembersCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    fetchMemberData();
-  }, [currentClub]);
+    if (!orgContext.isLoading) {
+      fetchMemberData();
+    }
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchMemberData = async () => {
-    if (!currentClub?.clubId) {
+    if (orgContext.clubIds.length === 0) {
       setLoading(false);
       return;
     }
 
     try {
-      // Fetch all members with active membership status
+      // Fetch all members across all clubs in the organization
       const { data, error } = await supabase
         .from('members')
         .select('id, membership_status, payment_status')
-        .eq('club_id', currentClub.clubId)
+        .in('club_id', orgContext.clubIds)
         .in('membership_status', ['active', 'pending', 'expired']);
 
       if (error) throw error;
@@ -79,9 +83,9 @@ export const MembersCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Club Members</p>
+          <p className="text-xs text-slate-400 mb-0.5">{getContextLabel(orgContext.type)} Members</p>
           <p className="text-2xl font-bold text-white mb-0.5">
-            {loading ? '...' : memberCount}
+            {loading || orgContext.isLoading ? '...' : memberCount}
           </p>
           <p className="text-xs text-slate-400">
             {memberCount > 0 ? `${participationRate}% participation rate` : 'No members yet'}

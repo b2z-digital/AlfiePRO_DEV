@@ -5,6 +5,7 @@ import { supabase } from '../../../utils/supabase';
 import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import { useOrganizationContext, getContextLabel } from '../../../hooks/useOrganizationContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -23,17 +24,18 @@ export const EventParticipationWidget: React.FC<EventParticipationWidgetProps> =
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const [chartData, setChartData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (currentClub) {
+    if (!orgContext.isLoading) {
       fetchEventParticipation();
     }
-  }, [currentClub]);
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchEventParticipation = async () => {
-    if (!currentClub?.clubId) {
+    if (orgContext.clubIds.length === 0) {
       setLoading(false);
       return;
     }
@@ -42,12 +44,12 @@ export const EventParticipationWidget: React.FC<EventParticipationWidgetProps> =
       const { data: singleEvents, error: singleError } = await supabase
         .from('event_attendance')
         .select('event_id')
-        .eq('club_id', currentClub.clubId);
+        .in('club_id', orgContext.clubIds);
 
       const { data: seriesEvents, error: seriesError } = await supabase
         .from('event_attendance')
         .select('series_id')
-        .eq('club_id', currentClub.clubId)
+        .in('club_id', orgContext.clubIds)
         .not('series_id', 'is', null);
 
       if (singleError || seriesError) throw singleError || seriesError;
@@ -125,7 +127,7 @@ export const EventParticipationWidget: React.FC<EventParticipationWidgetProps> =
 
   return (
     <ThemedWidgetWrapper
-      title="Event Participation"
+      title={`Event Participation - ${getContextLabel(orgContext.type)}`}
       icon={Activity}
       isEditMode={isEditMode}
       onRemove={onRemove}
