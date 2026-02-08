@@ -89,7 +89,8 @@ function App() {
                               hostname.match(/^\d+\.\d+\.\d+\.\d+$/) || // IP address
                               hostname.includes('webcontainer') || // StackBlitz/WebContainer
                               hostname.includes('bolt.new') ||
-                              hostname.includes('stackblitz.io');
+                              hostname.includes('stackblitz.io') ||
+                              hostname.includes('amplifyapp.com');
 
   const isCustomDomain = !isAlfieproDomain && !isDevelopmentDomain;
   const subdomain = isSubdomain ? hostname.split('.')[0] : (isCustomDomain ? hostname : null);
