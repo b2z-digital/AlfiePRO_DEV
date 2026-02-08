@@ -1285,6 +1285,68 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   console.log('[GoLive] If video doesn\'t reach YouTube, check: 1) RTMP URL is correct, 2) Stream key is valid, 3) Cloudflare Live Input is receiving video');
                 }
 
+                // If output exists but YouTube is not detecting stream, verify output status
+                // Check on attempt 2 to give initial connection time, then every attempt after
+                if (activeSession.cloudflare_output_id && !outputJustCreated && attemptNumber >= 2) {
+                  console.log(`[GoLive] Attempt ${attemptNumber}: Verifying Cloudflare output status...`);
+                  try {
+                    const verifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        action: 'getLiveInput',
+                        clubId: clubId,
+                        sessionData: {
+                          liveInputId: activeSession.cloudflare_live_input_id
+                        }
+                      })
+                    });
+
+                    const verifyData = await verifyResponse.json();
+                    console.log('[GoLive] Live input verification response:', verifyData);
+
+                    if (verifyData.liveInput?.outputs) {
+                      console.log(`[GoLive] Found ${verifyData.liveInput.outputs.length} output(s) on live input`);
+
+                      const output = verifyData.liveInput.outputs.find(
+                        (o: any) => o.uid === activeSession.cloudflare_output_id
+                      );
+
+                      if (output) {
+                        console.log('[GoLive] Found existing output. State:', output.state, 'Enabled:', output.enabled);
+
+                        if (output.state === 'connected' || output.state === 'streaming') {
+                          console.log('[GoLive] ✅ Output is actively streaming! YouTube should detect it soon.');
+                        } else {
+                          console.warn('[GoLive] ⚠️ Output exists but state is:', output.state || 'undefined');
+                          console.warn('[GoLive] This means Cloudflare is NOT sending video to YouTube yet.');
+
+                          // If we've tried multiple times and output is still not connected, suggest action
+                          if (attemptNumber >= 4) {
+                            console.error('[GoLive] ❌ Output has been stuck in non-streaming state for multiple attempts.');
+                            console.error('[GoLive] Possible causes:');
+                            console.error('[GoLive]   1. YouTube stream key is invalid or expired');
+                            console.error('[GoLive]   2. YouTube RTMP URL is incorrect');
+                            console.error('[GoLive]   3. Cloudflare cannot reach YouTube RTMP servers');
+                            console.error('[GoLive]   4. Cloudflare live input is not receiving video from browser');
+                          }
+                        }
+                      } else {
+                        console.error('[GoLive] ❌ Output ID exists in session but NOT found in live input!');
+                        console.error('[GoLive] Output may have been deleted or never created properly.');
+                        console.error('[GoLive] Suggestion: Stop and restart the livestream to recreate the output.');
+                      }
+                    } else {
+                      console.error('[GoLive] ❌ Live input has no outputs!');
+                    }
+                  } catch (err) {
+                    console.error('[GoLive] Error verifying output:', err);
+                  }
+                }
+
                 if (attemptNumber < maxAttempts) {
                   addNotification('info', `Waiting for YouTube to detect video stream... (attempt ${attemptNumber}/${maxAttempts})`, 5000);
                   setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 15000);
