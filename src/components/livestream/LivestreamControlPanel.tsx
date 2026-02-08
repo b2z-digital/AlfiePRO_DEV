@@ -917,13 +917,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               console.log('[GoLive] Verifying output attachment to live input...');
               let outputAttached = false;
               let verifyAttempts = 0;
-              const maxVerifyAttempts = 5;
+              const maxVerifyAttempts = 12;
 
               while (!outputAttached && verifyAttempts < maxVerifyAttempts) {
                 verifyAttempts++;
                 console.log(`[GoLive] Verification attempt ${verifyAttempts}/${maxVerifyAttempts}...`);
 
-                await new Promise(r => setTimeout(r, 3000)); // Wait 3s for Cloudflare API consistency
+                await new Promise(r => setTimeout(r, 5000)); // Wait 5s for Cloudflare to establish RTMP connection
 
                 try {
                   const verifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
@@ -961,10 +961,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                       } else {
                         console.log(`[GoLive] ⚠️ Output exists but not streaming yet. State: ${attachedOutput.state || 'undefined'}`);
                         if (verifyAttempts < maxVerifyAttempts) {
-                          console.log('[GoLive] Output not ready, will retry verification...');
+                          console.log('[GoLive] Output not ready, will retry verification in 5 seconds...');
                         } else {
-                          console.error('[GoLive] ❌ Output never reached streaming state after max attempts');
-                          addNotification('warning', 'YouTube relay created but not streaming yet. This may take a moment...', 8000);
+                          console.error('[GoLive] ❌ Output never reached streaming state after 60 seconds');
+                          addNotification('warning', 'YouTube relay created but taking longer than expected to connect. Please wait...', 10000);
                         }
                       }
                     } else {
@@ -982,9 +982,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               }
 
               if (!outputAttached) {
-                console.error('[GoLive] ❌ Output was created but never appeared in live input\'s output list!');
-                console.error('[GoLive] This indicates a Cloudflare API issue or the output is not properly linked');
-                addNotification('error', 'YouTube relay created but not active. Cloudflare may be experiencing issues.', 10000);
+                console.error('[GoLive] ❌ Output was created but did not become active within 60 seconds');
+                console.error('[GoLive] This may indicate Cloudflare is experiencing delays or the YouTube key is invalid');
+                addNotification('error', 'YouTube relay created but not active after 60 seconds. Check your stream key or try again.', 12000);
               }
             } else {
               console.error('[GoLive] Failed to create output:', outputData);
