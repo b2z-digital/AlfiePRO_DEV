@@ -523,6 +523,25 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         pc.addTrack(track, streamToSend);
       });
 
+      try {
+        const transceivers = pc.getTransceivers();
+        for (const transceiver of transceivers) {
+          if (transceiver.sender.track?.kind === 'video') {
+            const codecs = RTCRtpSender.getCapabilities('video')?.codecs;
+            if (codecs) {
+              const h264Codecs = codecs.filter(c => c.mimeType === 'video/H264');
+              const otherCodecs = codecs.filter(c => c.mimeType !== 'video/H264');
+              if (h264Codecs.length > 0) {
+                transceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
+                console.log('[WHIP] Set H.264 as preferred codec for RTMP compatibility');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[WHIP] Could not set H.264 preference:', e);
+      }
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
@@ -829,9 +848,39 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           console.error('[GoLive] Error checking Cloudflare Live Input:', cfError);
         }
 
+        if (activeSession.cloudflare_output_id && activeSession.cloudflare_live_input_id) {
+          console.log('[GoLive] Restarting Cloudflare output to trigger fresh RTMP connection to YouTube...');
+          addNotification('info', 'Establishing connection to YouTube...', 5000);
+          try {
+            const restartResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'restartOutput',
+                clubId: clubId,
+                sessionData: {
+                  liveInputId: activeSession.cloudflare_live_input_id,
+                  outputId: activeSession.cloudflare_output_id
+                }
+              })
+            });
+            const restartData = await restartResponse.json();
+            console.log('[GoLive] Output restart result:', restartData);
+            if (restartData.success) {
+              console.log('[GoLive] Output restarted successfully. Waiting for RTMP connection to establish...');
+            } else {
+              console.warn('[GoLive] Output restart returned error:', restartData);
+            }
+          } catch (restartError) {
+            console.error('[GoLive] Error restarting output:', restartError);
+          }
+        }
+
         if (activeSession.youtube_broadcast_id) {
-          // IMMEDIATELY check and transition YouTube broadcast to testing if needed
-          console.log('[GoLive] Immediately checking YouTube broadcast status...');
+          console.log('[GoLive] Checking YouTube broadcast status...');
           try {
             const initialStatusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
               method: 'POST',
@@ -1010,15 +1059,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   console.log('[GoLive] No Cloudflare output found. Creating one now...');
                   addNotification('info', 'Setting up YouTube output in Cloudflare...', 5000);
 
-                  // Get RTMP URL from session and ensure it's RTMP (not RTMPS)
-                  let rtmpUrl = activeSession.youtube_stream_url;
-
-                  // CRITICAL: Cloudflare Stream doesn't support RTMPS for outputs, only RTMP
-                  if (rtmpUrl && rtmpUrl.startsWith('rtmps://')) {
-                    console.log('[GoLive] ⚠️ Converting RTMPS to RTMP for Cloudflare output');
-                    rtmpUrl = rtmpUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-                    console.log('[GoLive] Converted URL:', rtmpUrl);
-                  }
+                  const rtmpUrl = activeSession.youtube_stream_url;
 
                   const streamKey = activeSession.youtube_stream_key;
 
@@ -1085,7 +1126,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
                 if (attemptNumber < maxAttempts) {
                   addNotification('info', `Waiting for YouTube to detect video stream... (attempt ${attemptNumber}/${maxAttempts})`, 5000);
-                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 10000);
+                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 15000);
                   return;
                 } else {
                   addNotification('warning',
@@ -1134,7 +1175,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
                 if (attemptNumber < maxAttempts) {
                   addNotification('info', `Video detected. Waiting for YouTube to start testing... (${attemptNumber}/${maxAttempts})`, 5000);
-                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 15000); // Wait 15 seconds for YouTube to detect
+                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 15000);
                 } else {
                   addNotification('warning',
                     'Video is streaming but YouTube has not started testing mode yet. This usually takes 30-60 seconds. Check YouTube Studio.',
@@ -1146,7 +1187,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
                 if (attemptNumber < maxAttempts) {
                   addNotification('info', `Broadcast status: ${currentStatus}. Checking again... (${attemptNumber}/${maxAttempts})`, 5000);
-                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 10000);
+                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 15000);
                 } else {
                   addNotification('warning',
                     `Unable to go live. Status: ${currentStatus}, Stream: ${streamStatus || 'undefined'}. Check YouTube Studio for more details.`,
@@ -1161,7 +1202,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           };
 
           // Start the transition attempt after 10 seconds
-          setTimeout(() => attemptYouTubeTransition(1, 3), 10000);
+          setTimeout(() => attemptYouTubeTransition(1, 6), 20000);
         }
       } else if (activeSession.youtube_broadcast_id) {
         try {

@@ -279,17 +279,7 @@ async function addOutput(
   let { liveInputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Adding output to live input:", liveInputId);
-  console.log("[CF Stream] Original URL received:", streamUrl);
-
-  // CRITICAL: Cloudflare Stream outputs only support RTMP, not RTMPS
-  // YouTube API often returns RTMPS URLs, so we must convert them
-  if (streamUrl && streamUrl.startsWith('rtmps://')) {
-    console.log("[CF Stream] ⚠️ RTMPS URL detected! Converting to RTMP...");
-    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-    console.log("[CF Stream] ✅ Converted URL:", streamUrl);
-  }
-
-  console.log("[CF Stream] Final RTMP URL:", streamUrl);
+  console.log("[CF Stream] Stream URL:", streamUrl);
   console.log("[CF Stream] Stream key length:", streamKey?.length);
   console.log("[CF Stream] Stream key first 10 chars:", streamKey?.substring(0, 10));
 
@@ -601,17 +591,7 @@ async function recreateOutput(
   let { liveInputId, outputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Recreating output:", { liveInputId, outputId });
-  console.log("[CF Stream] Original URL received:", streamUrl);
-
-  // CRITICAL: Cloudflare Stream outputs only support RTMP, not RTMPS
-  // YouTube API often returns RTMPS URLs, so we must convert them
-  if (streamUrl && streamUrl.startsWith('rtmps://')) {
-    console.log("[CF Stream] ⚠️ RTMPS URL detected! Converting to RTMP...");
-    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-    console.log("[CF Stream] ✅ Converted URL:", streamUrl);
-  }
-
-  console.log("[CF Stream] Final RTMP URL for recreation:", streamUrl);
+  console.log("[CF Stream] Stream URL:", streamUrl);
   console.log("[CF Stream] StreamKey provided:", !!streamKey);
 
   if (!liveInputId) {

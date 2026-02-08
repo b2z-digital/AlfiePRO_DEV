@@ -490,17 +490,8 @@ export function LivestreamSetupWizard({
               const streamData = await streamResponse.json();
 
               if (streamResponse.ok && streamData.stream) {
-                // Get the ingestion URL from YouTube
-                let rtmpUrl = streamData.stream.cdn?.ingestionInfo?.ingestionAddress;
+                const rtmpUrl = streamData.stream.cdn?.ingestionInfo?.ingestionAddress;
                 const streamKey = streamData.stream.cdn?.ingestionInfo?.streamName;
-
-                // CRITICAL: Ensure we use RTMP (not RTMPS) for Cloudflare output
-                // YouTube sometimes returns RTMPS URLs, but Cloudflare expects RTMP
-                if (rtmpUrl && rtmpUrl.startsWith('rtmps://')) {
-                  console.log('[LivestreamWizard] ⚠️ YouTube returned RTMPS URL, converting to RTMP');
-                  rtmpUrl = rtmpUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-                  console.log('[LivestreamWizard] Converted URL:', rtmpUrl);
-                }
 
                 sessionData.youtube_stream_key = streamKey;
                 sessionData.youtube_stream_url = rtmpUrl;
