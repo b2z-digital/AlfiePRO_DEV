@@ -57,6 +57,8 @@ interface ClubMetrics {
   clubName: string;
   memberCount: number;
   financialCount: number;
+  newMembersThisYear: number;
+  retentionRate: number;
   growthRate: number;
 }
 
@@ -200,6 +202,16 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
       const clubMetricsData: ClubMetrics[] = clubs.map(club => {
         const clubMembers = members.filter(m => m.club_id === club.id && m.membership_status === 'active');
         const clubFinancial = clubMembers.filter(m => m.is_financial).length;
+
+        // New members this year for this club
+        const clubNewMembers = members.filter(m => {
+          if (m.club_id !== club.id) return false;
+          if (!m.date_joined) return false;
+          const joinDate = new Date(m.date_joined);
+          return joinDate >= yearStart;
+        }).length;
+
+        // Last year's member count for this club
         const clubLastYear = members.filter(m => {
           if (m.club_id !== club.id) return false;
           if (!m.date_joined) return false;
@@ -211,11 +223,25 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
           ? ((clubMembers.length - clubLastYear) / clubLastYear) * 100
           : 0;
 
+        // Retention rate for this club
+        const clubRenewalsThisYear = members.filter(m => {
+          if (m.club_id !== club.id) return false;
+          if (!m.renewal_date) return false;
+          const renewalDate = new Date(m.renewal_date);
+          return renewalDate.getFullYear() === currentYear;
+        }).length;
+
+        const clubRetention = clubLastYear > 0
+          ? (clubRenewalsThisYear / clubLastYear) * 100
+          : 0;
+
         return {
           clubId: club.id,
           clubName: club.name,
           memberCount: clubMembers.length,
           financialCount: clubFinancial,
+          newMembersThisYear: clubNewMembers,
+          retentionRate: clubRetention,
           growthRate: clubGrowth
         };
       });
@@ -330,12 +356,14 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
       club.clubName,
       club.memberCount.toString(),
       club.financialCount.toString(),
+      club.newMembersThisYear.toString(),
+      `${club.retentionRate.toFixed(1)}%`,
       `${club.growthRate.toFixed(1)}%`
     ]);
 
     (doc as any).autoTable({
       startY: 25,
-      head: [['Club', 'Members', 'Financial', 'Growth']],
+      head: [['Club', 'Total Members', 'Financial Members', 'New Members', 'Retention', 'Growth']],
       body: clubData,
       theme: 'grid'
     });
@@ -684,10 +712,11 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
                   <thead className="bg-slate-700/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Club</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Members</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Financial</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Financial %</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Growth</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Total Members</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Financial Members</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">New Members</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Retention Rate</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Member Growth</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/50">
@@ -695,12 +724,19 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
                       <tr key={club.clubId} className="hover:bg-slate-700/30">
                         <td className="px-4 py-3 text-white">{club.clubName}</td>
                         <td className="px-4 py-3 text-right text-white">{club.memberCount}</td>
-                        <td className="px-4 py-3 text-right text-emerald-400">{club.financialCount}</td>
-                        <td className="px-4 py-3 text-right text-blue-400">
-                          {((club.financialCount / club.memberCount) * 100).toFixed(1)}%
+                        <td className="px-4 py-3 text-right text-emerald-400">
+                          {club.financialCount}
+                          <span className="text-slate-500 text-xs ml-1">
+                            ({club.memberCount > 0 ? ((club.financialCount / club.memberCount) * 100).toFixed(0) : 0}%)
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-blue-400">{club.newMembersThisYear}</td>
+                        <td className="px-4 py-3 text-right text-purple-400">
+                          {club.retentionRate.toFixed(1)}%
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className={`${club.growthRate >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <span className={`flex items-center justify-end gap-1 ${club.growthRate >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {club.growthRate >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                             {club.growthRate.toFixed(1)}%
                           </span>
                         </td>
