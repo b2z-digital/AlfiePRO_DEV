@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, ArrowRight, ChevronLeft } from 'lucide-react';
 import Papa from 'papaparse';
 import { supabase } from '../../utils/supabase';
@@ -401,8 +402,8 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl shadow-xl border ${darkMode ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-gray-900 border-slate-200'}`}>
         {/* Header */}
         <div className={`p-6 border-b sticky top-0 z-10 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
@@ -695,6 +696,7 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
