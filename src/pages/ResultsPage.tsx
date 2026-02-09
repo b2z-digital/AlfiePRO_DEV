@@ -323,9 +323,17 @@ export const ResultsPage: React.FC = () => {
       }
 
       // Combine club events with public events
-      const allEvents = [...events, ...publicEvents];
+      // For state/national associations, only show public events (not club events)
+      const allEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
+        ? publicEvents
+        : [...events, ...publicEvents];
 
-      const enrichedSeries = await enrichSeriesWithRoundData(series);
+      // For state/national associations, don't show club series
+      const filteredSeries = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
+        ? []
+        : series;
+
+      const enrichedSeries = await enrichSeriesWithRoundData(filteredSeries);
 
       // Fetch member avatars if online
       let memberAvatarMap: Record<string, string> = {};
