@@ -1518,16 +1518,6 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
 
   const renderCategoriesTab = () => (
     <div className="space-y-6">
-      {/* Debug Info Banner */}
-      <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-3">
-        <p className="text-blue-300 text-sm">
-          <strong>Viewing:</strong> {isAssociation ? `${associationType?.toUpperCase()} Association (ID: ${associationId})` : `Club (ID: ${currentClub?.clubId})`}
-        </p>
-        <p className="text-blue-300 text-xs mt-1">
-          {isAssociation ? 'Categories from association_budget_categories table' : 'Categories from budget_categories table'}
-        </p>
-      </div>
-
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-white">Financial Categories</h3>

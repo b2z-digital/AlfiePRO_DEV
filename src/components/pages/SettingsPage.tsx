@@ -1691,39 +1691,39 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-tax' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="taxes" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="taxes" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'finance-categories' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'finance-documents' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'finance-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-types' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="types" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="types" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-renewals' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-emails' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="emails" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="emails" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-conduct' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'race-documents' && (
