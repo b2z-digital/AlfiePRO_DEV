@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { FinancialChart } from '../../finances/FinancialChart';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface FinancialPositionWidgetProps {
   widgetId: string;
@@ -17,6 +18,17 @@ export const FinancialPositionWidget: React.FC<FinancialPositionWidgetProps> = (
   settings,
   colorTheme = 'default'
 }) => {
+  const { type, stateAssociationId, nationalAssociationId } = useOrganizationContext();
+
+  // Determine which association ID and type to pass to the chart
+  const associationId = type === 'state'
+    ? stateAssociationId
+    : type === 'national'
+      ? nationalAssociationId
+      : undefined;
+
+  const associationType = type === 'state' ? 'state' : type === 'national' ? 'national' : undefined;
+
   return (
     <div className="relative w-full h-full [&>div]:!mb-0">
       {isEditMode && (
@@ -28,7 +40,11 @@ export const FinancialPositionWidget: React.FC<FinancialPositionWidgetProps> = (
           <X size={16} />
         </button>
       )}
-      <FinancialChart darkMode={true} />
+      <FinancialChart
+        darkMode={true}
+        associationId={associationId || undefined}
+        associationType={associationType}
+      />
     </div>
   );
 };

@@ -5,10 +5,12 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 export const FinancialHealthWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { currentClub } = useAuth();
+  const { type, stateAssociationId, nationalAssociationId } = useOrganizationContext();
   const [financialData, setFinancialData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const darkMode = true;
@@ -16,28 +18,117 @@ export const FinancialHealthWidget: React.FC<WidgetProps> = ({ widgetId, isEditM
 
   useEffect(() => {
     fetchFinancialData();
-  }, [currentClub]);
+  }, [currentClub, type, stateAssociationId, nationalAssociationId]);
 
   const fetchFinancialData = async () => {
-    if (!currentClub?.clubId || !navigator.onLine) {
+    if (!navigator.onLine) {
       setLoading(false);
       return;
     }
 
     try {
-      // Use membership_transactions as the finance source
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { data: transactions, error } = await supabase
-        .from('membership_transactions')
-        .select('amount, payment_status, created_at')
-        .eq('club_id', currentClub.clubId)
-        .gte('created_at', thirtyDaysAgo.toISOString());
+      // For associations, query association_transactions
+      if (type === 'state' && stateAssociationId) {
+        const { data: transactions, error } = await supabase
+          .from('association_transactions')
+          .select('amount, type, payment_status, date')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
 
-      if (error) {
-        console.error('Error fetching transactions:', error);
-        // Set empty data instead of throwing
+        if (error) {
+          console.error('Error fetching association transactions:', error);
+          setFinancialData({
+            income: 0,
+            expenses: 0,
+            netIncome: 0,
+            outstanding: 0,
+            transactionCount: 0
+          });
+          setLoading(false);
+          return;
+        }
+
+        const completedTransactions = transactions?.filter(t => t.payment_status === 'completed') || [];
+        const income = completedTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (t.amount || 0), 0);
+        const expenses = completedTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (t.amount || 0), 0);
+        const outstanding = transactions?.filter(t => t.payment_status === 'pending').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+
+        setFinancialData({
+          income,
+          expenses,
+          netIncome: income - expenses,
+          outstanding,
+          transactionCount: transactions?.length || 0
+        });
+      } else if (type === 'national' && nationalAssociationId) {
+        const { data: transactions, error } = await supabase
+          .from('association_transactions')
+          .select('amount, type, payment_status, date')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        if (error) {
+          console.error('Error fetching association transactions:', error);
+          setFinancialData({
+            income: 0,
+            expenses: 0,
+            netIncome: 0,
+            outstanding: 0,
+            transactionCount: 0
+          });
+          setLoading(false);
+          return;
+        }
+
+        const completedTransactions = transactions?.filter(t => t.payment_status === 'completed') || [];
+        const income = completedTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (t.amount || 0), 0);
+        const expenses = completedTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (t.amount || 0), 0);
+        const outstanding = transactions?.filter(t => t.payment_status === 'pending').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+
+        setFinancialData({
+          income,
+          expenses,
+          netIncome: income - expenses,
+          outstanding,
+          transactionCount: transactions?.length || 0
+        });
+      } else if (currentClub?.clubId) {
+        // For clubs, use membership_transactions as the finance source
+        const { data: transactions, error } = await supabase
+          .from('membership_transactions')
+          .select('amount, payment_status, created_at')
+          .eq('club_id', currentClub.clubId)
+          .gte('created_at', thirtyDaysAgo.toISOString());
+
+        if (error) {
+          console.error('Error fetching transactions:', error);
+          setFinancialData({
+            income: 0,
+            expenses: 0,
+            netIncome: 0,
+            outstanding: 0,
+            transactionCount: 0
+          });
+          setLoading(false);
+          return;
+        }
+
+        const income = transactions?.filter(t => t.payment_status === 'paid').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+        const outstanding = transactions?.filter(t => t.payment_status === 'pending').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+
+        setFinancialData({
+          income,
+          expenses: 0,
+          netIncome: income,
+          outstanding,
+          transactionCount: transactions?.length || 0
+        });
+      } else {
         setFinancialData({
           income: 0,
           expenses: 0,
@@ -45,20 +136,7 @@ export const FinancialHealthWidget: React.FC<WidgetProps> = ({ widgetId, isEditM
           outstanding: 0,
           transactionCount: 0
         });
-        setLoading(false);
-        return;
       }
-
-      const income = transactions?.filter(t => t.payment_status === 'paid').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-      const outstanding = transactions?.filter(t => t.payment_status === 'pending').reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-
-      setFinancialData({
-        income,
-        expenses: 0,
-        netIncome: income,
-        outstanding,
-        transactionCount: transactions?.length || 0
-      });
     } catch (err) {
       console.error('Error fetching financial data:', err);
       setFinancialData({
