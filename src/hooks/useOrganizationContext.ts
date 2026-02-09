@@ -17,6 +17,8 @@ interface OrganizationContext {
   /** List of club IDs under this organization (for associations) */
   clubIds: string[];
   isLoading: boolean;
+  /** The current organization object (for associations) */
+  currentOrganization: { id: string; type: string; name?: string } | null;
 }
 
 /**
@@ -49,14 +51,20 @@ export const useOrganizationContext = (): OrganizationContext => {
 
       // If viewing as a State Association, fetch all clubs in that state
       if (currentOrganization.type === 'state') {
+        console.log('🔍 useOrganizationContext: Fetching clubs for state association:', currentOrganization.id);
+
         const { data: clubs, error } = await supabase
           .from('clubs')
           .select('id')
           .eq('state_association_id', currentOrganization.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('❌ useOrganizationContext: Error fetching clubs:', error);
+          throw error;
+        }
 
         const ids = clubs?.map(c => c.id) || [];
+        console.log(`✅ useOrganizationContext: Found ${ids.length} clubs for state association:`, ids);
         setClubIds(ids);
         setIsLoading(false);
         return;
@@ -116,7 +124,8 @@ export const useOrganizationContext = (): OrganizationContext => {
     stateAssociationId: currentOrganization?.type === 'state' ? currentOrganization.id : null,
     nationalAssociationId: currentOrganization?.type === 'national' ? currentOrganization.id : null,
     clubIds,
-    isLoading
+    isLoading,
+    currentOrganization: currentOrganization || null
   };
 };
 
