@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Sailboat, Image as ImageIcon, X, Upload } from 'lucide-react';
 import { BoatClass } from '../types/boatClass';
 import {
-  getBoatClassesByAssociation,
+  getBoatClasses,
   createBoatClass,
   updateBoatClass,
   deleteBoatClass,
@@ -51,7 +51,7 @@ export const BoatClassManagement: React.FC<BoatClassManagementProps> = ({
     try {
       setLoading(true);
       console.log('Fetching boat classes for:', { associationType, associationId, associationName });
-      const data = await getBoatClassesByAssociation(associationType, associationId);
+      const data = await getBoatClasses();
       console.log('Boat classes loaded:', data);
       setBoatClasses(data);
     } catch (error) {

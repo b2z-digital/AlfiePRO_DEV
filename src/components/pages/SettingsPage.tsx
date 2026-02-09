@@ -6,7 +6,8 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { ClubSettings } from './ClubSettings';
 import { ClubProfileSettings } from './ClubProfileSettings';
 import { AssociationProfileSettings } from './AssociationProfileSettings';
-import { FeeStructureSettings } from '../membership/FeeStructureSettings';
+import { StateAssociationFeeSettings } from '../membership/StateAssociationFeeSettings';
+import { NationalAssociationFeeSettings } from '../membership/NationalAssociationFeeSettings';
 import { CommitteeManagement } from './CommitteeManagement';
 import { DashboardTemplateManager } from './DashboardTemplateManager';
 import { IntegrationsPage } from './IntegrationsPage';
@@ -1656,11 +1657,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'association-fees' && currentOrganization && (
-            <FeeStructureSettings
-              darkMode={darkMode}
-              stateAssociationId={currentOrganization.type === 'state' ? currentOrganization.id : ''}
-              nationalAssociationId={currentOrganization.type === 'national' ? currentOrganization.id : ''}
-            />
+            currentOrganization.type === 'state' ? (
+              <StateAssociationFeeSettings
+                darkMode={darkMode}
+                stateAssociationId={currentOrganization.id}
+              />
+            ) : (
+              <NationalAssociationFeeSettings
+                darkMode={darkMode}
+                nationalAssociationId={currentOrganization.id}
+              />
+            )
           )}
 
           {activeTab === 'team' && (
