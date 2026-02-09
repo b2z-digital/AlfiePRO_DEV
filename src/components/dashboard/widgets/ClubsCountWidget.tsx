@@ -70,11 +70,8 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
 
   const handleNavigate = () => {
     if (!isEditMode) {
-      if (orgContext.type === 'state') {
-        navigate('/state-dashboard/clubs');
-      } else if (orgContext.type === 'national') {
-        navigate('/national-dashboard/clubs');
-      }
+      // Both state and national associations use the same /clubs route
+      navigate('/clubs');
     }
   };
 

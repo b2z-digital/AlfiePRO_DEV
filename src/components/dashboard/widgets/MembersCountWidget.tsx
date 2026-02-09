@@ -73,7 +73,16 @@ export const MembersCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
         </button>
       )}
       <button
-        onClick={() => !isEditMode && navigate('/membership-dashboard?tab=members')}
+        onClick={() => {
+          if (!isEditMode) {
+            // Navigate to association members page for state/national, or club members for individual clubs
+            if (orgContext.type === 'state' || orgContext.type === 'national') {
+              navigate('/association-members');
+            } else {
+              navigate('/membership-dashboard?tab=members');
+            }
+          }
+        }}
         disabled={isEditMode}
         className={`relative rounded-2xl p-4 text-left transition-all w-full h-full flex items-center gap-3 border backdrop-blur-sm ${themeColors.background} ${isEditMode ? '' : 'cursor-pointer transform hover:scale-[1.02]'}`}
       >
