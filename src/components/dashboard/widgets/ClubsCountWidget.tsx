@@ -18,52 +18,51 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
     if (!orgContext.isLoading) {
       fetchClubData();
     }
-  }, [orgContext.currentOrganization, orgContext.isLoading]);
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchClubData = async () => {
     try {
-      console.log('📊 Fetching club count for:', orgContext.currentOrganization);
+      console.log('📊 Fetching club count for:', {
+        type: orgContext.type,
+        orgId: orgContext.currentOrganization?.id,
+        clubIds: orgContext.clubIds,
+        clubIdsLength: orgContext.clubIds.length
+      });
 
       // Only show this widget for state or national associations
-      if (!orgContext.currentOrganization) {
+      if (orgContext.type === 'club' || orgContext.clubIds.length === 0) {
+        console.log('⚠️ Widget not applicable for club view or no clubs found');
         setLoading(false);
         return;
       }
 
-      let query = supabase
+      // Use the clubIds from the organization context (same approach as MembersCountWidget)
+      const { data, error } = await supabase
         .from('clubs')
-        .select('id, subscription_status', { count: 'exact' });
+        .select('id, subscription_status')
+        .in('id', orgContext.clubIds);
 
-      // Filter based on organization type
-      if (orgContext.type === 'state') {
-        query = query.eq('state_association_id', orgContext.currentOrganization.id);
-      } else if (orgContext.type === 'national') {
-        query = query.eq('national_association_id', orgContext.currentOrganization.id);
-      } else {
-        // This widget is only for associations, not individual clubs
-        setLoading(false);
-        return;
+      if (error) {
+        console.error('❌ Error fetching clubs:', error);
+        throw error;
       }
 
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-
-      const totalClubs = count || 0;
+      const totalClubs = data?.length || 0;
       setClubCount(totalClubs);
+
+      console.log(`🏢 Found ${totalClubs} clubs from clubIds:`, orgContext.clubIds);
 
       // Calculate active rate (clubs with active subscriptions)
       if (data && data.length > 0) {
         const activeClubs = data.filter(c => c.subscription_status === 'active').length;
         const rate = Math.round((activeClubs / data.length) * 100);
         setActiveRate(rate);
+        console.log(`📊 Active rate: ${activeClubs}/${data.length} = ${rate}%`);
       } else {
         setActiveRate(0);
       }
-
-      console.log(`🏢 Found ${totalClubs} clubs, ${activeRate}% active`);
     } catch (err) {
-      console.error('Error fetching club data:', err);
+      console.error('❌ Error fetching club data:', err);
     } finally {
       setLoading(false);
     }
