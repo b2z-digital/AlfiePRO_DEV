@@ -8,7 +8,9 @@ interface CategoryCreationModalProps {
   onClose: () => void;
   onCategoryCreated: (category: any) => void;
   darkMode: boolean;
-  type: 'income' | 'expense';
+  type?: 'income' | 'expense';
+  associationId?: string;
+  associationType?: 'state' | 'national';
 }
 
 export const CategoryCreationModal: React.FC<CategoryCreationModalProps> = ({
@@ -16,23 +18,28 @@ export const CategoryCreationModal: React.FC<CategoryCreationModalProps> = ({
   onClose,
   onCategoryCreated,
   darkMode = true,
-  type
+  type,
+  associationId,
+  associationType
 }) => {
   const { currentClub } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [categoryType, setCategoryType] = useState<'income' | 'expense'>(type || 'expense');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isAssociation = !!associationId && !!associationType;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name.trim()) {
       setError('Category name is required');
       return;
     }
 
-    if (!currentClub?.clubId) {
+    if (!isAssociation && !currentClub?.clubId) {
       setError('No club selected');
       return;
     }
@@ -41,22 +48,43 @@ export const CategoryCreationModal: React.FC<CategoryCreationModalProps> = ({
       setLoading(true);
       setError(null);
 
-      const { data, error: insertError } = await supabase
-        .from('budget_categories')
-        .insert({
-          club_id: currentClub.clubId,
-          name: name.trim(),
-          description: description.trim() || null,
-          type,
-          is_active: true
-        })
-        .select()
-        .single();
+      if (isAssociation) {
+        const { data, error: insertError } = await supabase
+          .from('association_budget_categories')
+          .insert({
+            association_id: associationId,
+            association_type: associationType,
+            name: name.trim(),
+            description: description.trim() || null,
+            type: categoryType,
+            is_active: true
+          })
+          .select()
+          .single();
 
-      if (insertError) throw insertError;
+        if (insertError) throw insertError;
 
-      if (data) {
-        onCategoryCreated(data);
+        if (data) {
+          onCategoryCreated(data);
+        }
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('budget_categories')
+          .insert({
+            club_id: currentClub?.clubId,
+            name: name.trim(),
+            description: description.trim() || null,
+            type: categoryType,
+            is_active: true
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        if (data) {
+          onCategoryCreated(data);
+        }
       }
 
       setName('');
@@ -115,6 +143,42 @@ export const CategoryCreationModal: React.FC<CategoryCreationModalProps> = ({
                 required
               />
             </div>
+
+            {!type && (
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Category Type *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryType('income')}
+                    className={`
+                      px-4 py-3 rounded-lg border-2 transition-all
+                      ${categoryType === 'income'
+                        ? 'border-green-500 bg-green-500/20 text-green-400'
+                        : darkMode ? 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}
+                    `}
+                  >
+                    <div className="text-sm font-medium">Income</div>
+                    <div className="text-xs opacity-75 mt-1">Money coming in</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryType('expense')}
+                    className={`
+                      px-4 py-3 rounded-lg border-2 transition-all
+                      ${categoryType === 'expense'
+                        ? 'border-red-500 bg-red-500/20 text-red-400'
+                        : darkMode ? 'border-slate-600 bg-slate-700/50 text-slate-400 hover:border-slate-500' : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}
+                    `}
+                  >
+                    <div className="text-sm font-medium">Expense</div>
+                    <div className="text-xs opacity-75 mt-1">Money going out</div>
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>

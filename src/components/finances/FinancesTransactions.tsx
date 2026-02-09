@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { supabase } from '../../utils/supabase';
 import { NewTransactionModal } from './NewTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { ConfirmationModal } from '../ConfirmationModal';
+import { CategoryCreationModal } from './CategoryCreationModal';
+import { TransactionImportModal } from './TransactionImportModal';
 
 interface Transaction {
   id: string;
@@ -65,6 +67,8 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Summary calculations
@@ -477,11 +481,18 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
           <select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value === '__add_category__') {
+                setShowCategoryModal(true);
+                e.target.value = categoryFilter;
+              } else {
+                setCategoryFilter(e.target.value);
+              }
+            }}
             className={`
               px-4 py-2 rounded-lg border
-              ${darkMode 
-                ? 'bg-slate-700 border-slate-600 text-white' 
+              ${darkMode
+                ? 'bg-slate-700 border-slate-600 text-white'
                 : 'bg-white border-slate-300 text-slate-900'}
             `}
           >
@@ -491,6 +502,9 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                 {category.name}
               </option>
             ))}
+            <option value="__add_category__" className="font-semibold text-blue-400">
+              + Add Category
+            </option>
           </select>
         </div>
 
@@ -549,6 +563,24 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                 <div>
                   <div className="text-white font-medium text-sm">New Expense</div>
                   <div className="text-slate-400 text-xs">Record money spent or outgoing payments</div>
+                </div>
+              </button>
+
+              <div className="my-2 border-t border-slate-700"></div>
+
+              <button
+                onClick={() => {
+                  setShowImportModal(true);
+                  setShowDropdown(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+              >
+                <div className="p-2 rounded-lg bg-purple-600/20">
+                  <Upload className="text-purple-400" size={18} />
+                </div>
+                <div>
+                  <div className="text-white font-medium text-sm">Import Transactions</div>
+                  <div className="text-slate-400 text-xs">Import from CSV file with smart mapping</div>
                 </div>
               </button>
             </div>
@@ -733,6 +765,33 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
         confirmText="Delete"
         cancelText="Cancel"
         darkMode={darkMode}
+      />
+
+      {/* Category Creation Modal */}
+      <CategoryCreationModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onCategoryCreated={() => {
+          loadCategories();
+          setShowCategoryModal(false);
+        }}
+        darkMode={darkMode}
+        associationId={associationId}
+        associationType={associationType}
+      />
+
+      {/* Transaction Import Modal */}
+      <TransactionImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false);
+          loadTransactions();
+        }}
+        darkMode={darkMode}
+        clubId={!isAssociation ? currentClub?.clubId : undefined}
+        associationId={associationId}
+        associationType={associationType}
       />
     </div>
   );
