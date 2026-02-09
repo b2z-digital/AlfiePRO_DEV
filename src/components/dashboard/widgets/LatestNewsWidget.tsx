@@ -15,7 +15,7 @@ interface Article {
 
 export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
-  const { currentClub } = useAuth();
+  const { currentClub, currentOrganization } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const darkMode = true;
@@ -23,22 +23,31 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
 
   useEffect(() => {
     loadArticles();
-  }, [currentClub]);
+  }, [currentClub, currentOrganization]);
 
   const loadArticles = async () => {
-    if (!currentClub?.clubId) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('articles')
         .select('id, title, created_at, status')
-        .eq('club_id', currentClub.clubId)
         .eq('status', 'published')
         .order('created_at', { ascending: false })
         .limit(3);
+
+      if (currentOrganization.type === 'state') {
+        query = query.or(`state_association_id.eq.${currentOrganization.id},national_association_id.not.is.null`);
+      } else if (currentOrganization.type === 'national') {
+        query = query.eq('national_association_id', currentOrganization.id);
+      } else {
+        query = query.eq('club_id', currentOrganization.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setArticles(data || []);
