@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload, Filter, Tag, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -48,6 +48,84 @@ interface FinancesTransactionsProps {
   associationId?: string;
   associationType?: 'state' | 'national';
 }
+
+interface DropdownOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+  className?: string;
+}
+
+const CustomDropdown: React.FC<{
+  darkMode: boolean;
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+}> = ({ darkMode, icon, value, label, options, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          ${darkMode
+            ? 'bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 border border-slate-600/50'
+            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}
+          ${open ? (darkMode ? 'ring-2 ring-blue-500/40' : 'ring-2 ring-blue-500/30') : ''}
+        `}
+      >
+        <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>{icon}</span>
+        <span className="whitespace-nowrap">{label}</span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''} ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+      </button>
+
+      {open && (
+        <div className={`
+          absolute z-50 mt-2 min-w-[200px] rounded-xl shadow-xl border overflow-hidden
+          ${darkMode
+            ? 'bg-slate-800 border-slate-700 shadow-black/40'
+            : 'bg-white border-slate-200 shadow-slate-200/60'}
+        `}>
+          <div className="py-1">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  if (opt.value !== '__add_category__') setOpen(false);
+                }}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${opt.className || ''}
+                  ${value === opt.value
+                    ? (darkMode ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-50 text-blue-600')
+                    : (darkMode ? 'text-slate-300 hover:bg-slate-700/80' : 'text-slate-700 hover:bg-slate-50')}
+                `}
+              >
+                {opt.icon && <span>{opt.icon}</span>}
+                <span className="flex-1">{opt.label}</span>
+                {value === opt.value && <Check size={14} className="text-blue-400" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ darkMode, associationId, associationType }) => {
   const { currentClub } = useAuth();
@@ -477,48 +555,37 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
             />
           </div>
 
-          <select
+          <CustomDropdown
+            darkMode={darkMode}
+            icon={<Filter size={15} />}
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as 'all' | 'deposit' | 'expense')}
-            className={`
-              px-4 py-2 rounded-lg border
-              ${darkMode 
-                ? 'bg-slate-700 border-slate-600 text-white' 
-                : 'bg-white border-slate-300 text-slate-900'}
-            `}
-          >
-            <option value="all">All Types</option>
-            <option value="deposit">Income</option>
-            <option value="expense">Expense</option>
-          </select>
+            label={typeFilter === 'all' ? 'All Types' : typeFilter === 'deposit' ? 'Income' : 'Expense'}
+            options={[
+              { value: 'all', label: 'All Types' },
+              { value: 'deposit', label: 'Income', icon: <TrendingUp size={14} className="text-green-400" /> },
+              { value: 'expense', label: 'Expense', icon: <TrendingDown size={14} className="text-red-400" /> },
+            ]}
+            onChange={(val) => setTypeFilter(val as 'all' | 'deposit' | 'expense')}
+          />
 
-          <select
+          <CustomDropdown
+            darkMode={darkMode}
+            icon={<Tag size={15} />}
             value={categoryFilter}
-            onChange={(e) => {
-              if (e.target.value === '__add_category__') {
+            label={categoryFilter === 'all' ? 'All Categories' : categories.find(c => c.id === categoryFilter)?.name || 'All Categories'}
+            options={[
+              { value: 'all', label: 'All Categories' },
+              ...categories.map(c => ({ value: c.id, label: c.name })),
+              { value: '__add_category__', label: '+ Add Category', className: 'text-blue-400 font-medium' },
+            ]}
+            onChange={(val) => {
+              if (val === '__add_category__') {
                 setShowCategoryModal(true);
-                e.target.value = categoryFilter;
               } else {
-                setCategoryFilter(e.target.value);
+                setCategoryFilter(val);
               }
             }}
-            className={`
-              px-4 py-2 rounded-lg border
-              ${darkMode
-                ? 'bg-slate-700 border-slate-600 text-white'
-                : 'bg-white border-slate-300 text-slate-900'}
-            `}
-          >
-            <option value="all">All Categories</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-            <option value="__add_category__" className="font-semibold text-blue-400">
-              + Add Category
-            </option>
-          </select>
+          />
         </div>
 
         <div className="relative" ref={dropdownRef}>
