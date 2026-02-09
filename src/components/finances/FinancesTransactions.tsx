@@ -94,12 +94,17 @@ const CustomDropdown: React.FC<{
 
       {open && (
         <div className={`
-          absolute z-50 mt-2 min-w-[200px] rounded-xl shadow-xl border overflow-hidden
+          absolute z-50 mt-2 min-w-[220px] rounded-xl shadow-xl border
           ${darkMode
             ? 'bg-slate-800 border-slate-700 shadow-black/40'
             : 'bg-white border-slate-200 shadow-slate-200/60'}
         `}>
-          <div className="py-1">
+          <div className={`
+            py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full
+            ${darkMode ? '[&::-webkit-scrollbar-thumb]:bg-slate-600/50' : '[&::-webkit-scrollbar-thumb]:bg-slate-300'}
+          `}>
             {options.map((opt) => (
               <button
                 key={opt.value}
