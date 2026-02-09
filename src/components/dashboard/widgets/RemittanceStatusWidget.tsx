@@ -85,9 +85,9 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
         // Get remittances from ALL clubs in the state association
         const { data, error } = await supabase
           .from('membership_remittances')
-          .select('total_fee, due_date, payment_status, club_id')
+          .select('state_contribution_amount, membership_end_date, club_to_state_status, club_id')
           .in('club_id', clubIds)
-          .neq('payment_status', 'paid');
+          .neq('club_to_state_status', 'paid');
 
         if (error) throw error;
         remittances = data;
@@ -100,8 +100,8 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
         // Get ALL remittances from ALL clubs in the nation
         const { data, error } = await supabase
           .from('membership_remittances')
-          .select('total_fee, due_date, payment_status, club_id')
-          .neq('payment_status', 'paid');
+          .select('national_contribution_amount, membership_end_date, state_to_national_status, club_id')
+          .neq('state_to_national_status', 'paid');
 
         if (error) throw error;
         remittances = data;
@@ -114,9 +114,9 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
         // Get remittances for this specific club only
         const { data, error } = await supabase
           .from('membership_remittances')
-          .select('total_fee, due_date, payment_status')
+          .select('state_contribution_amount, membership_end_date, club_to_state_status')
           .eq('club_id', currentClub.clubId)
-          .neq('payment_status', 'paid');
+          .neq('club_to_state_status', 'paid');
 
         if (error) throw error;
         remittances = data;
@@ -144,16 +144,25 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
         let dueThisMonth = 0;
         let pending = 0;
 
-        remittances.forEach(r => {
-          const amount = Number(r.total_fee) || 0;
+        remittances.forEach((r: any) => {
+          // Use the appropriate amount field based on organization type
+          const amount = currentOrganization?.type === 'national'
+            ? Number(r.national_contribution_amount) || 0
+            : Number(r.state_contribution_amount) || 0;
           totalOwing += amount;
 
-          if (r.payment_status === 'pending') {
+          // Check payment status based on organization type
+          const paymentStatus = currentOrganization?.type === 'national'
+            ? r.state_to_national_status
+            : r.club_to_state_status;
+
+          if (paymentStatus === 'pending') {
             pending += amount;
           }
 
-          if (r.due_date) {
-            const dueDate = new Date(r.due_date);
+          // Use membership_end_date as the "due date"
+          if (r.membership_end_date) {
+            const dueDate = new Date(r.membership_end_date);
             if (dueDate < now) {
               overdue += amount;
             } else if (dueDate <= endOfMonth) {
