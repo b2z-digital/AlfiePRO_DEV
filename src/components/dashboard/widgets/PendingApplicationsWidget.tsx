@@ -28,6 +28,13 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
     }
 
     try {
+      console.log('📊 Fetching pending applications for:', {
+        type: orgContext.type,
+        orgId: orgContext.currentOrganization?.id,
+        clubIds: orgContext.clubIds,
+        clubIdsLength: orgContext.clubIds.length
+      });
+
       const { count, error } = await supabase
         .from('membership_applications')
         .select('id', { count: 'exact', head: true })
@@ -37,6 +44,7 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
 
       if (error) throw error;
 
+      console.log(`📋 Found ${count || 0} pending applications across ${orgContext.clubIds.length} clubs`);
       setPendingCount(count || 0);
     } catch (err) {
       console.error('Error fetching pending applications:', err);
@@ -47,7 +55,12 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
 
   const handleClick = () => {
     if (!isEditMode) {
-      navigate('/membership', { state: { activeTab: 'applications', filterStatus: 'pending' } });
+      // Navigate to association members page for state/national, or club membership for individual clubs
+      if (orgContext.type === 'state' || orgContext.type === 'national') {
+        navigate('/association-members', { state: { activeTab: 'applications', filterStatus: 'pending' } });
+      } else {
+        navigate('/membership', { state: { activeTab: 'applications', filterStatus: 'pending' } });
+      }
     }
   };
 
