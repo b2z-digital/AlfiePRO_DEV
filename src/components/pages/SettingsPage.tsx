@@ -6,6 +6,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { ClubSettings } from './ClubSettings';
 import { ClubProfileSettings } from './ClubProfileSettings';
 import { AssociationProfileSettings } from './AssociationProfileSettings';
+import { FeeStructureSettings } from '../membership/FeeStructureSettings';
 import { CommitteeManagement } from './CommitteeManagement';
 import { DashboardTemplateManager } from './DashboardTemplateManager';
 import { IntegrationsPage } from './IntegrationsPage';
@@ -29,7 +30,7 @@ interface SettingsPageProps {
   darkMode: boolean;
 }
 
-type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'team' | 'subscriptions' | 'integrations' |
+type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'team' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising';
@@ -1078,6 +1079,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
+                {/* Association Fees Card */}
+                <button
+                  onClick={() => setActiveTab('association-fees')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'association-fees'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
+                      <DollarSign size={20} className="text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
+                        Membership Fees
+                      </h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Set {currentOrganization.type === 'state' ? 'club' : 'state association'} membership fees
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
               </div>
             </div>
           )}
@@ -1625,6 +1653,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'association' && (
             <AssociationProfileSettings darkMode={darkMode} />
+          )}
+
+          {activeTab === 'association-fees' && currentOrganization && (
+            <FeeStructureSettings
+              darkMode={darkMode}
+              stateAssociationId={currentOrganization.type === 'state' ? currentOrganization.id : ''}
+              nationalAssociationId={currentOrganization.type === 'national' ? currentOrganization.id : ''}
+            />
           )}
 
           {activeTab === 'team' && (
