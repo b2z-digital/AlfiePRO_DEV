@@ -211,17 +211,41 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
           return joinDate >= yearStart;
         }).length;
 
-        // Last year's member count for this club
-        const clubLastYear = members.filter(m => {
-          if (m.club_id !== club.id) return false;
+        // Calculate YoY membership growth
+        // Current active members
+        const currentActive = clubMembers.length;
+
+        // Estimate last year's member count:
+        // Returning members (active now, joined before this year) + new members this year
+        // = would give us current count, so:
+        // Last year ≈ Current active members - New members this year + Members who left
+        // Since we can't easily track members who left, use:
+        // Returning members = current active who joined before this year
+        const returningMembers = clubMembers.filter(m => {
           if (!m.date_joined) return false;
           const joinDate = new Date(m.date_joined);
-          return joinDate <= lastYearEnd;
+          return joinDate < yearStart;
         }).length;
 
-        const clubGrowth = clubLastYear > 0
-          ? ((clubMembers.length - clubLastYear) / clubLastYear) * 100
-          : 0;
+        // Last year's estimate = returning members (this is conservative, assumes these were the only members last year)
+        // Better estimate: Check if we have renewal data from last year
+        const clubMembersRenewedLastYear = members.filter(m => {
+          if (m.club_id !== club.id) return false;
+          if (!m.renewal_date) return false;
+          const renewalDate = new Date(m.renewal_date);
+          return renewalDate.getFullYear() === lastYear;
+        }).length;
+
+        // Use whichever gives us a better estimate of last year's membership
+        // If we have renewal data from last year, use that as it's more accurate
+        const clubLastYearActive = clubMembersRenewedLastYear > 0
+          ? clubMembersRenewedLastYear
+          : returningMembers;
+
+        // Calculate YoY growth: ((Current - Last Year) / Last Year) * 100
+        const clubGrowth = clubLastYearActive > 0
+          ? ((currentActive - clubLastYearActive) / clubLastYearActive) * 100
+          : (currentActive > 0 ? 100 : 0);
 
         // Retention rate for this club
         const clubRenewalsThisYear = members.filter(m => {
