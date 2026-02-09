@@ -39,7 +39,7 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       // Use the clubIds from the organization context (same approach as MembersCountWidget)
       const { data, error } = await supabase
         .from('clubs')
-        .select('id, subscription_tier')
+        .select('id, subscription_tier, onboarding_completed, created_at')
         .in('id', orgContext.clubIds);
 
       if (error) {
@@ -51,14 +51,18 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       setClubCount(totalClubs);
 
       console.log(`🏢 Found ${totalClubs} clubs from clubIds:`, orgContext.clubIds);
-      console.log('📋 Club subscription tiers:', data?.map(c => ({ id: c.id, tier: c.subscription_tier })));
+      console.log('📋 Club details:', data?.map(c => ({
+        id: c.id,
+        tier: c.subscription_tier,
+        onboarded: c.onboarding_completed
+      })));
 
-      // Calculate active rate (clubs with any subscription tier, including trial)
+      // Calculate active rate
+      // For associations: all member clubs are considered "active" (100%)
+      // They're in the association's member list, so they're active by definition
       if (data && data.length > 0) {
-        const activeClubs = data.filter(c => c.subscription_tier).length;
-        const rate = Math.round((activeClubs / data.length) * 100);
-        setActiveRate(rate);
-        console.log(`📊 Active subscriptions: ${activeClubs}/${data.length} = ${rate}%`);
+        setActiveRate(100);
+        console.log(`📊 All ${data.length} member clubs are active`);
       } else {
         setActiveRate(0);
       }
@@ -111,7 +115,7 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
             {loading || orgContext.isLoading ? '...' : clubCount}
           </p>
           <p className="text-xs text-slate-400">
-            {clubCount > 0 ? `${activeRate}% active subscriptions` : 'No clubs yet'}
+            {clubCount > 0 ? `${clubCount} active member ${clubCount === 1 ? 'club' : 'clubs'}` : 'No clubs yet'}
           </p>
         </div>
         <div className="flex-shrink-0">
