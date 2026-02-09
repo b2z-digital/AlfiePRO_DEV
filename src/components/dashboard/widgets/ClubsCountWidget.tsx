@@ -39,7 +39,7 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       // Use the clubIds from the organization context (same approach as MembersCountWidget)
       const { data, error } = await supabase
         .from('clubs')
-        .select('id, subscription_status')
+        .select('id, subscription_tier')
         .in('id', orgContext.clubIds);
 
       if (error) {
@@ -54,7 +54,7 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
 
       // Calculate active rate (clubs with active subscriptions)
       if (data && data.length > 0) {
-        const activeClubs = data.filter(c => c.subscription_status === 'active').length;
+        const activeClubs = data.filter(c => c.subscription_tier && c.subscription_tier !== 'trial').length;
         const rate = Math.round((activeClubs / data.length) * 100);
         setActiveRate(rate);
         console.log(`📊 Active rate: ${activeClubs}/${data.length} = ${rate}%`);
