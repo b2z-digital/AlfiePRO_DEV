@@ -51,13 +51,14 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       setClubCount(totalClubs);
 
       console.log(`🏢 Found ${totalClubs} clubs from clubIds:`, orgContext.clubIds);
+      console.log('📋 Club subscription tiers:', data?.map(c => ({ id: c.id, tier: c.subscription_tier })));
 
-      // Calculate active rate (clubs with active subscriptions)
+      // Calculate active rate (clubs with any subscription tier, including trial)
       if (data && data.length > 0) {
-        const activeClubs = data.filter(c => c.subscription_tier && c.subscription_tier !== 'trial').length;
+        const activeClubs = data.filter(c => c.subscription_tier).length;
         const rate = Math.round((activeClubs / data.length) * 100);
         setActiveRate(rate);
-        console.log(`📊 Active rate: ${activeClubs}/${data.length} = ${rate}%`);
+        console.log(`📊 Active subscriptions: ${activeClubs}/${data.length} = ${rate}%`);
       } else {
         setActiveRate(0);
       }
