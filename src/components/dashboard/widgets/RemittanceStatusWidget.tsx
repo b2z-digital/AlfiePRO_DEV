@@ -194,7 +194,12 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
 
   const handleNavigate = () => {
     if (!isEditMode) {
-      navigate('/membership?tab=remittances');
+      // Route to association finances for state/national orgs, otherwise membership
+      if (currentOrganization?.type === 'state' || currentOrganization?.type === 'national') {
+        navigate('/finances?tab=remittances');
+      } else {
+        navigate('/membership?tab=remittances');
+      }
     }
   };
 

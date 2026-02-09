@@ -368,7 +368,9 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
               onClick={() => {
                 if (isEditMode) return;
 
-                if (event.isPublicEvent) {
+                // For associations, always route to calendar
+                // For clubs, route to race management for their own events or calendar for public events
+                if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
                   navigate('/calendar');
                 } else {
                   // Navigate to race management which will handle event selection
