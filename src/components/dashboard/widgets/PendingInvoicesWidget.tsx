@@ -5,6 +5,7 @@ import { supabase } from '../../../utils/supabase';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { formatCurrency } from '../../../utils/formatCurrency';
 import { useNavigate } from 'react-router-dom';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface PendingInvoicesWidgetProps {
   widgetId: string;
@@ -22,6 +23,7 @@ export const PendingInvoicesWidget: React.FC<PendingInvoicesWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const { type: orgType, stateAssociationId, nationalAssociationId } = useOrganizationContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
@@ -29,20 +31,37 @@ export const PendingInvoicesWidget: React.FC<PendingInvoicesWidgetProps> = ({
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadPendingInvoices();
-    }
-  }, [currentClub]);
+    loadPendingInvoices();
+  }, [currentClub, orgType, stateAssociationId, nationalAssociationId]);
 
   const loadPendingInvoices = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('id, status')
-        .eq('club_id', currentClub.clubId)
-        .neq('status', 'paid');
+      let invoices: any[] | null = null;
+
+      if (orgType === 'state' && stateAssociationId) {
+        const { data } = await supabase
+          .from('association_invoices')
+          .select('id, status')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .neq('status', 'paid');
+        invoices = data;
+      } else if (orgType === 'national' && nationalAssociationId) {
+        const { data } = await supabase
+          .from('association_invoices')
+          .select('id, status')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .neq('status', 'paid');
+        invoices = data;
+      } else if (currentClub?.clubId) {
+        const { data } = await supabase
+          .from('invoices')
+          .select('id, status')
+          .eq('club_id', currentClub.clubId)
+          .neq('status', 'paid');
+        invoices = data;
+      }
 
       const pending = invoices?.filter(inv => inv.status === 'pending').length || 0;
       const awaiting = invoices?.filter(inv => inv.status === 'sent').length || 0;

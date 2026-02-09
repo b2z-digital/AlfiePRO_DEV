@@ -5,14 +5,18 @@ import { supabase } from '../../../utils/supabase';
 import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface Transaction {
   id: string;
-  type: 'deposit' | 'expense';
+  type: 'deposit' | 'expense' | 'income';
   description: string;
   amount: number;
   date: string;
   budget_categories?: {
+    name: string;
+  };
+  association_budget_categories?: {
     name: string;
   };
 }
@@ -33,37 +37,82 @@ export const RecentTransactionsWidget: React.FC<RecentTransactionsWidgetProps> =
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const { type: orgType, stateAssociationId, nationalAssociationId } = useOrganizationContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadRecentTransactions();
-    }
-  }, [currentClub]);
+    loadRecentTransactions();
+  }, [currentClub, orgType, stateAssociationId, nationalAssociationId]);
 
   const loadRecentTransactions = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
-      const { data } = await supabase
-        .from('transactions')
-        .select(`
-          id,
-          type,
-          description,
-          amount,
-          date,
-          budget_categories (
-            name
-          )
-        `)
-        .eq('club_id', currentClub.clubId)
-        .order('date', { ascending: false })
-        .limit(5);
+      if (orgType === 'state' && stateAssociationId) {
+        const { data } = await supabase
+          .from('association_transactions')
+          .select(`
+            id,
+            type,
+            description,
+            amount,
+            date,
+            association_budget_categories (
+              name
+            )
+          `)
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .order('date', { ascending: false })
+          .limit(5);
 
-      setTransactions(data || []);
+        setTransactions((data || []).map(t => ({
+          ...t,
+          type: t.type === 'income' ? 'deposit' : t.type,
+          budget_categories: t.association_budget_categories
+        })) as Transaction[]);
+      } else if (orgType === 'national' && nationalAssociationId) {
+        const { data } = await supabase
+          .from('association_transactions')
+          .select(`
+            id,
+            type,
+            description,
+            amount,
+            date,
+            association_budget_categories (
+              name
+            )
+          `)
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .order('date', { ascending: false })
+          .limit(5);
+
+        setTransactions((data || []).map(t => ({
+          ...t,
+          type: t.type === 'income' ? 'deposit' : t.type,
+          budget_categories: t.association_budget_categories
+        })) as Transaction[]);
+      } else if (currentClub?.clubId) {
+        const { data } = await supabase
+          .from('transactions')
+          .select(`
+            id,
+            type,
+            description,
+            amount,
+            date,
+            budget_categories (
+              name
+            )
+          `)
+          .eq('club_id', currentClub.clubId)
+          .order('date', { ascending: false })
+          .limit(5);
+
+        setTransactions(data || []);
+      }
     } catch (error) {
       console.error('Error loading recent transactions:', error);
     } finally {

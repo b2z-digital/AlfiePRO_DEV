@@ -19,15 +19,20 @@ interface InvoiceEmailPreviewModalProps {
   onClose: () => void;
   invoice: Invoice;
   darkMode: boolean;
+  associationId?: string;
+  associationType?: 'state' | 'national';
 }
 
 export const InvoiceEmailPreviewModal: React.FC<InvoiceEmailPreviewModalProps> = ({
   isOpen,
   onClose,
   invoice,
-  darkMode
+  darkMode,
+  associationId,
+  associationType
 }) => {
   const { currentClub, user } = useAuth();
+  const isAssociation = !!associationId && !!associationType;
   const [emailData, setEmailData] = useState({
     to: invoice.customer_email || '',
     subject: `Invoice ${invoice.invoice_number} from ${currentClub?.club?.name || 'Your Club'}`,
@@ -73,10 +78,10 @@ ${currentClub?.club?.name || 'Your Club'}`
       // Simulate sending delay
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Update invoice status to 'sent' if it was 'draft'
       if (invoice.status === 'draft') {
+        const invoiceTable = isAssociation ? 'association_invoices' : 'invoices';
         const { error: updateError } = await supabase
-          .from('invoices')
+          .from(invoiceTable)
           .update({ status: 'sent' })
           .eq('id', invoice.id);
 

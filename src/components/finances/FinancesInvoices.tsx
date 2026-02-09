@@ -270,10 +270,18 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
 
     try {
       const tableName = isAssociation ? 'association_transactions' : 'transactions';
-      const { error } = await supabase
+      let query = supabase
         .from(tableName)
         .delete()
         .eq('id', transactionToDelete.id);
+
+      if (isAssociation) {
+        query = query.eq('association_id', associationId).eq('association_type', associationType);
+      } else {
+        query = query.eq('club_id', currentClub?.clubId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
@@ -1254,9 +1262,11 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
           onClose={() => {
             setShowInvoiceEmailModal(false);
             setInvoiceToEmail(null);
-            loadData(); // Refresh to update status if invoice was sent
+            loadData();
           }}
           darkMode={darkMode}
+          associationId={associationId}
+          associationType={associationType}
         />
       )}
     </div>

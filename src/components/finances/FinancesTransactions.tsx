@@ -225,22 +225,27 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
       if (transactionsError) throw transactionsError;
 
-      // Load transaction line items with their categories
-      const { data: lineItemsData, error: lineItemsError } = await supabase
-        .from('transaction_line_items')
-        .select(`
-          id,
-          transaction_id,
-          description,
-          amount,
-          category_id,
-          budget_categories!left (
+      const transactionIds = (transactionsData || []).map(t => t.id);
+      let lineItemsData: any[] = [];
+      if (transactionIds.length > 0) {
+        const { data, error: lineItemsError } = await supabase
+          .from('transaction_line_items')
+          .select(`
             id,
-            name
-          )
-        `);
+            transaction_id,
+            description,
+            amount,
+            category_id,
+            budget_categories!left (
+              id,
+              name
+            )
+          `)
+          .in('transaction_id', transactionIds);
 
-      if (lineItemsError) throw lineItemsError;
+        if (lineItemsError) throw lineItemsError;
+        lineItemsData = data || [];
+      }
 
       // Group line items by transaction
       const lineItemsByTransaction: { [key: string]: TransactionLineItem[] } = {};
@@ -324,10 +329,18 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
     try {
       const tableName = isAssociation ? 'association_transactions' : 'transactions';
-      const { error } = await supabase
+      let query = supabase
         .from(tableName)
         .delete()
         .eq('id', transactionToDelete);
+
+      if (isAssociation) {
+        query = query.eq('association_id', associationId).eq('association_type', associationType);
+      } else {
+        query = query.eq('club_id', currentClub?.clubId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
