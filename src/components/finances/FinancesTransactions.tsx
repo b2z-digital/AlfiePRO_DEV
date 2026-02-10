@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload, Filter, Tag, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -65,19 +66,47 @@ const CustomDropdown: React.FC<{
   onChange: (value: string) => void;
 }> = ({ darkMode, icon, value, label, options, onChange }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, minWidth: 0 });
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + 8,
+      left: rect.left,
+      minWidth: Math.max(rect.width, 220),
+    });
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePosition();
+    document.addEventListener('mousedown', handler);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePosition]);
+
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setOpen(!open)}
         className={`
           flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
@@ -92,13 +121,17 @@ const CustomDropdown: React.FC<{
         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''} ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
       </button>
 
-      {open && (
-        <div className={`
-          absolute z-50 mt-2 min-w-[220px] rounded-xl shadow-xl border
-          ${darkMode
-            ? 'bg-slate-800 border-slate-700 shadow-black/40'
-            : 'bg-white border-slate-200 shadow-slate-200/60'}
-        `}>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, minWidth: menuPos.minWidth, zIndex: 9999 }}
+          className={`
+            rounded-xl shadow-xl border
+            ${darkMode
+              ? 'bg-slate-800 border-slate-700 shadow-black/40'
+              : 'bg-white border-slate-200 shadow-slate-200/60'}
+          `}
+        >
           <div className={`
             py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
             [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
@@ -126,7 +159,8 @@ const CustomDropdown: React.FC<{
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
