@@ -247,7 +247,7 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col bg-slate-900 border border-slate-700/50">
+      <div className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] border border-slate-700/50">
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/15 rounded-xl">
