@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Filter, ChevronDown, BookmarkPlus } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Plus, Trash2, Filter, ChevronDown, Check } from 'lucide-react';
 import {
   FilterCondition,
   FilterGroup,
@@ -13,6 +14,202 @@ import {
   createEmptyGroup,
   validateFilterConfig
 } from '../../utils/memberFilters';
+
+interface DropdownOption {
+  value: string;
+  label: string;
+}
+
+const FilterDropdown: React.FC<{
+  value: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  minWidth?: number;
+}> = ({ value, options, onChange, placeholder = 'Select...', disabled, minWidth = 180 }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, minWidth) });
+  }, [minWidth]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onClickOut = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePos();
+    document.addEventListener('mousedown', onClickOut);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onClickOut);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePos]);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => !disabled && setOpen(!open)}
+        className={`
+          flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          bg-slate-800/80 text-slate-200 border border-slate-700/60
+          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80'}
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        `}
+        style={{ minWidth }}
+      >
+        <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
+          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+        >
+          <div className="py-1 max-h-[260px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`
+                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
+                `}
+              >
+                <span>{opt.label}</span>
+                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
+const FilterMultiSelect: React.FC<{
+  value: string[];
+  options: DropdownOption[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+}> = ({ value, options, onChange, placeholder = 'Select...' }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 200) });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onClickOut = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePos();
+    document.addEventListener('mousedown', onClickOut);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onClickOut);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePos]);
+
+  const toggle = (val: string) => {
+    if (value.includes(val)) {
+      onChange(value.filter(v => v !== val));
+    } else {
+      onChange([...value, val]);
+    }
+  };
+
+  const selectedLabels = value.map(v => options.find(o => o.value === v)?.label).filter(Boolean);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          bg-slate-800/80 text-slate-200 border border-slate-700/60
+          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80'}
+        `}
+        style={{ minWidth: 200 }}
+      >
+        <span className={selectedLabels.length > 0 ? 'text-slate-200 truncate' : 'text-slate-500'}>
+          {selectedLabels.length > 0 ? `${selectedLabels.length} selected` : placeholder}
+        </span>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
+          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+        >
+          <div className="py-1 max-h-[260px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => toggle(opt.value)}
+                className={`
+                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${value.includes(opt.value) ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
+                `}
+              >
+                <span>{opt.label}</span>
+                {value.includes(opt.value) && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 interface AdvancedMemberFilterProps {
   isOpen: boolean;
@@ -31,7 +228,6 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
   initialConfig,
   boatClasses,
   memberCount,
-  darkMode
 }) => {
   const [filterConfig, setFilterConfig] = useState<MemberFilterConfig>(
     initialConfig || {
@@ -140,6 +336,8 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
     });
   };
 
+  const inputClass = "px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all";
+
   const renderConditionValue = (
     groupId: string,
     condition: FilterCondition
@@ -147,66 +345,44 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
     const field = getFilterField(condition.field);
     if (!field) return null;
 
-    // Operators that don't need a value
     const noValueOperators = ['is_empty', 'is_not_empty', 'is_true', 'is_false'];
     if (noValueOperators.includes(condition.operator)) {
       return null;
     }
 
-    // Special handling for boat class
     if (field.id === 'boat_class') {
       return (
-        <select
-          multiple
-          value={condition.value || []}
-          onChange={(e) => {
-            const selected = Array.from(e.target.selectedOptions, option => option.value);
-            updateCondition(groupId, condition.id, { value: selected });
-          }}
-          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
-        >
-          {boatClasses.map(bc => (
-            <option key={bc} value={bc}>{bc}</option>
-          ))}
-        </select>
+        <FilterMultiSelect
+          value={Array.isArray(condition.value) ? condition.value : []}
+          options={boatClasses.map(bc => ({ value: bc, label: bc }))}
+          onChange={(selected) => updateCondition(groupId, condition.id, { value: selected })}
+          placeholder="Select classes..."
+        />
       );
     }
 
-    // Select type
     if (field.type === 'select' && field.options) {
       if (condition.operator === 'in' || condition.operator === 'not_in') {
         return (
-          <select
-            multiple
-            value={condition.value || []}
-            onChange={(e) => {
-              const selected = Array.from(e.target.selectedOptions, option => option.value);
-              updateCondition(groupId, condition.id, { value: selected });
-            }}
-            className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
-          >
-            {field.options.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          <FilterMultiSelect
+            value={Array.isArray(condition.value) ? condition.value : []}
+            options={field.options.map(opt => ({ value: opt.value, label: opt.label }))}
+            onChange={(selected) => updateCondition(groupId, condition.id, { value: selected })}
+            placeholder="Select values..."
+          />
         );
       }
 
       return (
-        <select
-          value={condition.value || ''}
-          onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
-          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
-        >
-          <option value="">Select...</option>
-          {field.options.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+        <FilterDropdown
+          value={typeof condition.value === 'string' ? condition.value : ''}
+          options={field.options.map(opt => ({ value: opt.value, label: opt.label }))}
+          onChange={(val) => updateCondition(groupId, condition.id, { value: val })}
+          placeholder="Select value..."
+        />
       );
     }
 
-    // Date type
     if (field.type === 'date') {
       if (condition.operator === 'in_last' || condition.operator === 'in_next') {
         return (
@@ -216,9 +392,9 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               value={condition.value || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
               placeholder="Number"
-              className="w-24 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+              className={`w-24 ${inputClass}`}
             />
-            <span className="text-slate-400">days</span>
+            <span className="text-slate-400 text-sm">days</span>
           </div>
         );
       }
@@ -230,14 +406,14 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               type="date"
               value={condition.value || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
-              className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+              className={inputClass}
             />
-            <span className="text-slate-400">and</span>
+            <span className="text-slate-400 text-sm">and</span>
             <input
               type="date"
               value={condition.value2 || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value2: e.target.value })}
-              className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+              className={inputClass}
             />
           </div>
         );
@@ -248,12 +424,11 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
           type="date"
           value={condition.value || ''}
           onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
-          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+          className={inputClass}
         />
       );
     }
 
-    // Number type
     if (field.type === 'number') {
       if (condition.operator === 'between') {
         return (
@@ -263,15 +438,15 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               value={condition.value || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
               placeholder="From"
-              className="w-32 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+              className={`w-32 ${inputClass}`}
             />
-            <span className="text-slate-400">and</span>
+            <span className="text-slate-400 text-sm">and</span>
             <input
               type="number"
               value={condition.value2 || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value2: e.target.value })}
               placeholder="To"
-              className="w-32 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+              className={`w-32 ${inputClass}`}
             />
           </div>
         );
@@ -283,29 +458,32 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
           value={condition.value || ''}
           onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
           placeholder={field.placeholder}
-          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+          className={inputClass}
         />
       );
     }
 
-    // Text type (default)
     return (
       <input
         type="text"
         value={condition.value || ''}
         onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
         placeholder={field.placeholder}
-        className="flex-1 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
+        className={`flex-1 ${inputClass}`}
       />
     );
   };
 
   if (!isOpen) return null;
 
+  const fieldOptions: DropdownOption[] = [
+    { value: '', label: 'Select field...' },
+    ...MEMBER_FILTER_FIELDS.map(f => ({ value: f.id, label: f.label }))
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] border border-slate-700/50">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/15 rounded-xl">
@@ -326,10 +504,8 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
-            {/* Group Logic Selector */}
             {filterConfig.groups.length > 1 && (
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-sm font-medium text-slate-300">Combine groups with:</span>
@@ -358,13 +534,11 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               </div>
             )}
 
-            {/* Filter Groups */}
             {filterConfig.groups.map((group, groupIndex) => (
               <div
                 key={group.id}
                 className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50"
               >
-                {/* Group Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-slate-400">
@@ -372,7 +546,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                     </span>
                     {group.conditions.length > 1 && (
                       <>
-                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-500">&#8226;</span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateGroupLogic(group.id, 'AND')}
@@ -409,11 +583,15 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                   )}
                 </div>
 
-                {/* Conditions */}
                 <div className="space-y-3">
                   {group.conditions.map((condition, condIndex) => {
                     const field = getFilterField(condition.field);
                     const availableOperators = field ? field.operators : [];
+
+                    const operatorOptions: DropdownOption[] = availableOperators.map(op => ({
+                      value: op,
+                      label: getOperatorLabel(op)
+                    }));
 
                     return (
                       <div
@@ -421,55 +599,42 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                         className="flex items-start gap-2 p-3 rounded-xl bg-slate-900/40 border border-slate-700/30"
                       >
                         {condIndex > 0 && (
-                          <span className="text-xs font-medium text-slate-500 pt-2">
+                          <span className="text-xs font-medium text-slate-500 pt-2.5">
                             {group.logic}
                           </span>
                         )}
 
-                        {/* Field Selector */}
-                        <select
+                        <FilterDropdown
                           value={condition.field}
-                          onChange={(e) => {
-                            const newField = getFilterField(e.target.value);
+                          options={fieldOptions}
+                          onChange={(val) => {
+                            const newField = getFilterField(val);
                             updateCondition(group.id, condition.id, {
-                              field: e.target.value,
+                              field: val,
                               operator: newField?.operators[0] || 'equals',
                               value: '',
                               value2: undefined
                             });
                           }}
-                          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
-                        >
-                          <option value="">Select field...</option>
-                          {MEMBER_FILTER_FIELDS.map(f => (
-                            <option key={f.id} value={f.id}>
-                              {f.label}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="Select field..."
+                          minWidth={200}
+                        />
 
-                        {/* Operator Selector */}
-                        <select
+                        <FilterDropdown
                           value={condition.operator}
-                          onChange={(e) => updateCondition(group.id, condition.id, {
-                            operator: e.target.value as any,
+                          options={operatorOptions}
+                          onChange={(val) => updateCondition(group.id, condition.id, {
+                            operator: val as FilterCondition['operator'],
                             value: '',
                             value2: undefined
                           })}
+                          placeholder="Operator..."
                           disabled={!condition.field}
-                          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all disabled:opacity-50"
-                        >
-                          {availableOperators.map(op => (
-                            <option key={op} value={op}>
-                              {getOperatorLabel(op)}
-                            </option>
-                          ))}
-                        </select>
+                          minWidth={160}
+                        />
 
-                        {/* Value Input */}
                         {renderConditionValue(group.id, condition)}
 
-                        {/* Remove Condition */}
                         <button
                           onClick={() => removeCondition(group.id, condition.id)}
                           className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors flex-shrink-0"
@@ -481,7 +646,6 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                     );
                   })}
 
-                  {/* Add Condition Button */}
                   <button
                     onClick={() => addCondition(group.id)}
                     className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-colors"
@@ -493,7 +657,6 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               </div>
             ))}
 
-            {/* Add Group Button */}
             <button
               onClick={addGroup}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white border-2 border-dashed border-slate-700/50 hover:border-slate-600 rounded-xl transition-all"
@@ -504,7 +667,6 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-5 border-t border-slate-700/50">
           <div className="text-sm text-slate-400">
             {memberCount} member{memberCount !== 1 ? 's' : ''} will be displayed
