@@ -310,6 +310,20 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
 
         rows.push(row);
       });
+
+      // Add observer row for this heat
+      const observerRow: string[] = ['', 'Observers'];
+      completedRounds.forEach(round => {
+        const key = `${heat}-${round.round}`;
+        const observers = observersByHeatRound.get(key) || [];
+
+        const observerNames = observers.length > 0
+          ? observers.map(o => o.member_name).join(', ')
+          : 'No observers recorded';
+
+        observerRow.push('', observerNames, '');
+      });
+      rows.push(observerRow);
     });
 
     // Convert to CSV string

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -29,6 +29,8 @@ import ArticleDetailPage from '../pages/ArticleDetailPage';
 import ArticleEditorPage from '../pages/ArticleEditorPage';
 import { FinancesPage } from '../pages/FinancesPage';
 import { MeetingsPage } from './pages/MeetingsPage';
+import { RankingsManagement } from './pages/RankingsManagement';
+import { NameMappingManager } from './pages/NameMappingManager';
 import { TasksPage } from './tasks/TasksPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
@@ -343,8 +345,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         setup: (ch: any) => ch.on('postgres_changes', {
           event: '*',
           schema: 'public',
-          table: 'club_tasks',
-          filter: `assignee_id=eq.${userId}`
+          table: 'club_tasks'
         }, () => fetchUnreadTasksCount()).subscribe()
       },
       {
@@ -470,18 +471,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const fetchUnreadTasksCount = async () => {
     if (!user || !currentClub?.clubId) return;
 
-    // Skip if offline - not critical for offline functionality
-    if (!navigator.onLine) {
-      console.log('Offline - skipping tasks count fetch');
-      return;
-    }
+    if (!navigator.onLine) return;
 
     try {
-      // Count all active tasks assigned to user (pending or in_progress)
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('id')
+        .eq('club_id', currentClub.clubId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!memberData) {
+        setUnreadTasksCount(0);
+        return;
+      }
+
       const { count, error } = await supabase
         .from('club_tasks')
         .select('*', { count: 'exact', head: true })
-        .eq('assignee_id', user.id)
+        .eq('assignee_id', memberData.id)
         .eq('club_id', currentClub.clubId)
         .in('status', ['pending', 'in_progress']);
 
@@ -749,14 +757,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       collapsible: true,
       icon: Users,
       items: [
-        {
-          id: 'import-members',
-          label: 'Import Members',
-          icon: Upload,
-          description: 'Bulk import members from CSV',
-          path: '#',
-          onClick: () => setShowImportMembersModal(true)
-        },
         ...(currentOrganization?.type === 'state' ? [{
           id: 'clubs',
           label: 'Clubs',
@@ -781,7 +781,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           id: 'association-remittances',
           label: 'Remittances',
-          icon: DollarSign,
+          icon: Receipt,
           description: 'Track membership fee remittances',
           path: '/association-remittances'
         },
@@ -791,7 +791,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: DollarSign,
           description: 'Manage association finances',
           path: '/finances'
-        }
+        },
+        ...(currentOrganization?.type === 'national' ? [{
+          id: 'rankings',
+          label: 'National Rankings',
+          icon: Award,
+          description: 'Manage national skipper rankings',
+          path: '/rankings'
+        }, {
+          id: 'name-mapping',
+          label: 'Name Mapping',
+          icon: Link,
+          description: 'Map rankings to member records',
+          path: '/name-mapping'
+        }] : [])
       ]
     }] : []),
     ...(!currentOrganization ? [{
@@ -1120,7 +1133,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
@@ -1416,7 +1429,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
@@ -1494,6 +1507,29 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       <StateRemittanceDashboard
                         darkMode={darkMode}
                         stateAssociationId={currentOrganization.id}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              } />
+              <Route path="/rankings" element={
+                <div className="h-full overflow-y-auto">
+                  <div className="p-4 sm:p-6 lg:p-16">
+                    {currentOrganization?.type === 'national' ? (
+                      <RankingsManagement
+                        nationalAssociationId={currentOrganization.id}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              } />
+              <Route path="/name-mapping" element={
+                <div className="h-full overflow-y-auto">
+                  <div className="p-4 sm:p-6 lg:p-16">
+                    {currentOrganization?.type === 'national' && currentClub ? (
+                      <NameMappingManager
+                        nationalAssociationId={currentOrganization.id}
+                        clubId={currentClub.clubId}
                       />
                     ) : null}
                   </div>

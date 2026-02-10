@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Users, Shuffle, Trash2, UserPlus, Edit2 } from 'lucide-react';
+import { X, Users, Shuffle, Trash2, UserPlus, Edit2, Trophy } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatDesignation } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -24,6 +24,7 @@ interface ManualHeatAssignmentModalProps {
   onAddSkipper?: () => void;
   onEditSkipper?: (skipperIndex: number) => void;
   onSaveSkipper?: (skipperIndex: number, updatedSkipper: Skipper) => void;
+  onRankingAssignment?: () => void;
 }
 
 const adjustIndicesAfterDeletion = (indices: number[], deletedIndex: number): number[] => {
@@ -44,7 +45,8 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
   onDeleteSkipper,
   onAddSkipper,
   onEditSkipper,
-  onSaveSkipper
+  onSaveSkipper,
+  onRankingAssignment
 }) => {
   const [draggedSkipperIndex, setDraggedSkipperIndex] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<HeatAssignment[]>([]);
@@ -226,6 +228,15 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
               >
                 <UserPlus size={16} />
                 Add Skipper
+              </button>
+            )}
+            {onRankingAssignment && (
+              <button
+                onClick={onRankingAssignment}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-2"
+              >
+                <Trophy size={16} />
+                Ranking Assignment
               </button>
             )}
             <button

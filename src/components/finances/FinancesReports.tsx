@@ -376,8 +376,9 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     ? ((reportData.thisPeriod.netCash / reportData.thisPeriod.income) * 100)
     : 0;
 
-  const burnRate = monthlyData.length > 0
-    ? monthlyData.reduce((sum, m) => sum + m.expenses, 0) / monthlyData.filter(m => m.expenses > 0).length
+  const monthsWithExpenses = monthlyData.filter(m => m.expenses > 0).length;
+  const burnRate = monthsWithExpenses > 0
+    ? monthlyData.reduce((sum, m) => sum + m.expenses, 0) / monthsWithExpenses
     : 0;
 
   // Chart configurations

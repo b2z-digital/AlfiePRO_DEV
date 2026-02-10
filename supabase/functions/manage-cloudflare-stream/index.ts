@@ -220,7 +220,10 @@ async function getLiveInput(
           uid: o.uid,
           url: o.url,
           enabled: o.enabled,
-          status: o.status
+          state: o.state,
+          status: o.status,
+          streamKey: o.streamKey ? `${o.streamKey.substring(0, 10)}...` : 'none',
+          errorMessage: o.errorMessage || o.error
         });
       });
     }
@@ -279,17 +282,7 @@ async function addOutput(
   let { liveInputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Adding output to live input:", liveInputId);
-  console.log("[CF Stream] Original URL received:", streamUrl);
-
-  // CRITICAL: Cloudflare Stream outputs only support RTMP, not RTMPS
-  // YouTube API often returns RTMPS URLs, so we must convert them
-  if (streamUrl && streamUrl.startsWith('rtmps://')) {
-    console.log("[CF Stream] ⚠️ RTMPS URL detected! Converting to RTMP...");
-    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-    console.log("[CF Stream] ✅ Converted URL:", streamUrl);
-  }
-
-  console.log("[CF Stream] Final RTMP URL:", streamUrl);
+  console.log("[CF Stream] Stream URL:", streamUrl);
   console.log("[CF Stream] Stream key length:", streamKey?.length);
   console.log("[CF Stream] Stream key first 10 chars:", streamKey?.substring(0, 10));
 
@@ -442,8 +435,30 @@ async function getOutputStatus(
 
     console.log("[CF Stream] Output status HTTP response status:", response.status);
 
-    const data = await response.json();
-    console.log("[CF Stream] Output status response data:", JSON.stringify(data, null, 2));
+    const responseText = await response.text();
+    console.log("[CF Stream] Output status raw response:", responseText);
+
+    let data;
+    try {
+      data = responseText ? JSON.parse(responseText) : { success: false, errors: [{ message: "Empty response from Cloudflare" }] };
+    } catch {
+      console.warn("[CF Stream] Could not parse response as JSON, using list endpoint instead");
+      const listResponse = await fetch(
+        `${CF_API_BASE}/accounts/${credentials.account_id}/stream/live_inputs/${liveInputId}/outputs`,
+        { method: "GET", headers: { "Authorization": `Bearer ${credentials.api_token}` } }
+      );
+      const listData = await listResponse.json();
+      if (listResponse.ok && listData.success) {
+        const matchingOutput = listData.result?.find((o: any) => o.uid === outputId);
+        if (matchingOutput) {
+          return new Response(
+            JSON.stringify({ success: true, output: matchingOutput }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      data = { success: false, errors: [{ message: "Could not parse individual output response and list fallback failed" }] };
+    }
 
     if (!response.ok || !data.success) {
       console.error("[CF Stream] Error getting output status. HTTP status:", response.status, "Response:", data);
@@ -601,17 +616,7 @@ async function recreateOutput(
   let { liveInputId, outputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Recreating output:", { liveInputId, outputId });
-  console.log("[CF Stream] Original URL received:", streamUrl);
-
-  // CRITICAL: Cloudflare Stream outputs only support RTMP, not RTMPS
-  // YouTube API often returns RTMPS URLs, so we must convert them
-  if (streamUrl && streamUrl.startsWith('rtmps://')) {
-    console.log("[CF Stream] ⚠️ RTMPS URL detected! Converting to RTMP...");
-    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-    console.log("[CF Stream] ✅ Converted URL:", streamUrl);
-  }
-
-  console.log("[CF Stream] Final RTMP URL for recreation:", streamUrl);
+  console.log("[CF Stream] Stream URL:", streamUrl);
   console.log("[CF Stream] StreamKey provided:", !!streamKey);
 
   if (!liveInputId) {

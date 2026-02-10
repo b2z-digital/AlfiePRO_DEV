@@ -230,11 +230,27 @@ export const CustomizableDashboard: React.FC = () => {
       console.log('📥 CustomizableDashboard: Loading layout');
 
       // Build organization context
-      const context = {
-        clubId: currentClub?.clubId || null,
-        stateAssociationId: currentOrganization?.type === 'state' ? currentOrganization.id : null,
-        nationalAssociationId: currentOrganization?.type === 'national' ? currentOrganization.id : null
-      };
+      // IMPORTANT: Only ONE of these can be set at a time due to database constraint
+      let context;
+      if (currentOrganization?.type === 'national') {
+        context = {
+          clubId: null,
+          stateAssociationId: null,
+          nationalAssociationId: currentOrganization.id
+        };
+      } else if (currentOrganization?.type === 'state') {
+        context = {
+          clubId: null,
+          stateAssociationId: currentOrganization.id,
+          nationalAssociationId: null
+        };
+      } else {
+        context = {
+          clubId: currentClub?.clubId || null,
+          stateAssociationId: null,
+          nationalAssociationId: null
+        };
+      }
 
       // Add timeout to loadDashboardLayout
       const layoutPromise = loadDashboardLayout(user.id, context);
@@ -303,11 +319,27 @@ export const CustomizableDashboard: React.FC = () => {
       };
 
       // Build organization context
-      const context = {
-        clubId: currentClub?.clubId || null,
-        stateAssociationId: currentOrganization?.type === 'state' ? currentOrganization.id : null,
-        nationalAssociationId: currentOrganization?.type === 'national' ? currentOrganization.id : null
-      };
+      // IMPORTANT: Only ONE of these can be set at a time due to database constraint
+      let context;
+      if (currentOrganization?.type === 'national') {
+        context = {
+          clubId: null,
+          stateAssociationId: null,
+          nationalAssociationId: currentOrganization.id
+        };
+      } else if (currentOrganization?.type === 'state') {
+        context = {
+          clubId: null,
+          stateAssociationId: currentOrganization.id,
+          nationalAssociationId: null
+        };
+      } else {
+        context = {
+          clubId: currentClub?.clubId || null,
+          stateAssociationId: null,
+          nationalAssociationId: null
+        };
+      }
 
       const result = await saveDashboardLayout(user.id, context, layout);
       if (result.success) {
@@ -316,7 +348,8 @@ export const CustomizableDashboard: React.FC = () => {
         return true;
       } else {
         console.error('❌ Layout save failed:', result.error);
-        addNotification('error', 'Failed to save dashboard layout');
+        const errorMessage = result.error?.message || result.error?.toString() || 'Unknown error';
+        addNotification('error', `Failed to save dashboard layout: ${errorMessage}`);
         return false;
       }
     } catch (error) {
@@ -959,11 +992,27 @@ export const CustomizableDashboard: React.FC = () => {
 
     try {
       // Build organization context
-      const context = {
-        clubId: currentClub?.clubId || null,
-        stateAssociationId: currentOrganization?.type === 'state' ? currentOrganization.id : null,
-        nationalAssociationId: currentOrganization?.type === 'national' ? currentOrganization.id : null
-      };
+      // IMPORTANT: Only ONE of these can be set at a time due to database constraint
+      let context;
+      if (currentOrganization?.type === 'national') {
+        context = {
+          clubId: null,
+          stateAssociationId: null,
+          nationalAssociationId: currentOrganization.id
+        };
+      } else if (currentOrganization?.type === 'state') {
+        context = {
+          clubId: null,
+          stateAssociationId: currentOrganization.id,
+          nationalAssociationId: null
+        };
+      } else {
+        context = {
+          clubId: currentClub?.clubId || null,
+          stateAssociationId: null,
+          nationalAssociationId: null
+        };
+      }
 
       await resetDashboardLayout(user.id, context);
       await loadLayout();

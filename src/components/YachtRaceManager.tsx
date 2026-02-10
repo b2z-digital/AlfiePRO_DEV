@@ -2545,32 +2545,66 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   // Handler to update heat assignments for next round with manual overrides
-  const handleUpdateHeatAssignments = (updatedAssignments: any[]) => {
+  const handleUpdateHeatAssignments = async (updatedAssignments: any[], targetRound?: number) => {
     if (!heatManagement) return;
 
-    // Find the next round to update
+    console.log('🔧 handleUpdateHeatAssignments called with:', {
+      assignmentsCount: updatedAssignments.length,
+      targetRound,
+      currentRound: heatManagement.currentRound
+    });
+
     const currentRoundNumber = heatManagement.currentRound;
-    const nextRoundNumber = currentRoundNumber + 1;
+    const currentRound = heatManagement.rounds.find(r => r.round === currentRoundNumber);
 
-    // Check if next round exists
-    let nextRoundIndex = heatManagement.rounds.findIndex(r => r.round === nextRoundNumber);
+    // Determine which round to update
+    let roundNumberToUpdate: number;
 
+    if (targetRound) {
+      // Explicit target round specified by caller
+      roundNumberToUpdate = targetRound;
+    } else {
+      // Auto-detect: if current round is not complete, update current round (mid-round edit)
+      // Otherwise, update next round (between-round edit)
+      if (currentRound && !currentRound.completed) {
+        // Mid-round: check if any heats have results
+        const hasAnyResults = currentRound.results && currentRound.results.length > 0;
+        if (hasAnyResults) {
+          // Mid-round edit: update CURRENT round
+          roundNumberToUpdate = currentRoundNumber;
+          console.log('   → Mid-round edit detected, updating current round', currentRoundNumber);
+        } else {
+          // No results yet, create next round
+          roundNumberToUpdate = currentRoundNumber + 1;
+          console.log('   → No results yet, creating next round', roundNumberToUpdate);
+        }
+      } else {
+        // Between rounds: update next round
+        roundNumberToUpdate = currentRoundNumber + 1;
+        console.log('   → Between rounds, updating next round', roundNumberToUpdate);
+      }
+    }
+
+    // Find or create the target round
+    let targetRoundIndex = heatManagement.rounds.findIndex(r => r.round === roundNumberToUpdate);
     const updatedRounds = [...heatManagement.rounds];
 
-    if (nextRoundIndex === -1) {
-      // Next round doesn't exist yet - create it
+    if (targetRoundIndex === -1) {
+      // Round doesn't exist yet - create it
+      console.log('   → Creating new round', roundNumberToUpdate);
       const newRound = {
-        round: nextRoundNumber,
+        round: roundNumberToUpdate,
         heatAssignments: updatedAssignments,
         results: [],
         completed: false
       };
       updatedRounds.push(newRound);
-      nextRoundIndex = updatedRounds.length - 1;
+      targetRoundIndex = updatedRounds.length - 1;
     } else {
       // Update existing round
-      updatedRounds[nextRoundIndex] = {
-        ...updatedRounds[nextRoundIndex],
+      console.log('   → Updating existing round', roundNumberToUpdate);
+      updatedRounds[targetRoundIndex] = {
+        ...updatedRounds[targetRoundIndex],
         heatAssignments: updatedAssignments
       };
     }
@@ -2580,8 +2614,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       rounds: updatedRounds
     };
 
+    console.log('✅ Heat assignments updated for round', roundNumberToUpdate);
     setHeatManagement(updatedHeatManagement);
-    // Removed notification - heat operations should be silent
+
+    const event = getCurrentEvent();
+    if (event?.id) {
+      try {
+        await supabase
+          .from('quick_races')
+          .update({ heat_management: updatedHeatManagement })
+          .eq('id', event.isSeriesEvent ? event.seriesId : event.id);
+      } catch (err) {
+        console.error('Error saving heat assignments:', err);
+      }
+    }
   };
 
   const showHandicapOptions = !hasDeterminedInitialHcaps && !isManualHandicaps && 
@@ -2975,7 +3021,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           initialHeatManagement={heatManagement}
           initialNumRaces={currentNumRaces}
           initialDropRules={currentDropRules}
-          currentEvent={selectedEvent}
+          currentEvent={getCurrentEvent()}
           onSaveSettings={async (settings) => {
             await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);

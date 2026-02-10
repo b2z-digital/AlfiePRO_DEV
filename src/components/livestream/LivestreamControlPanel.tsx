@@ -1,4 +1,4 @@
-// Build: 2026-01-23-fix-youtube-streaming
+// Build: 2026-02-08-whip-no-simulcast-fix
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Video,
@@ -6,6 +6,7 @@ import {
   Square,
   Settings,
   Eye,
+  EyeOff,
   Calendar,
   Camera,
   Layers,
@@ -28,7 +29,9 @@ import {
   Trash2,
   StopCircle,
   Cloud,
-  CloudOff
+  CloudOff,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -74,6 +77,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const signalingChannelsRef = useRef<Record<string, ReturnType<typeof supabase.channel>>>({});
   const cameraLastConnectedRef = useRef<Record<string, string>>({});
   const whipPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const youtubeMonitorRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [youtubeStatus, setYoutubeStatus] = useState<string>('');
   const [whipStatus, setWhipStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [showMobileQR, setShowMobileQR] = useState(false);
   const [showSelectRace, setShowSelectRace] = useState(false);
@@ -81,6 +86,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showStreamKey, setShowStreamKey] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<SessionWithVenue | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [streamDuration, setStreamDuration] = useState(0);
@@ -131,14 +138,19 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         }
       );
 
+      const pollMs = (streamStatus === 'testing' || streamStatus === 'live') ? 5000 : 15000;
       const pollInterval = setInterval(() => {
         loadCameras(activeSession.id);
-      }, 5000);
+      }, pollMs);
 
       return () => {
         sessionSubscription.unsubscribe();
         cameraSubscription.unsubscribe();
         clearInterval(pollInterval);
+        if (youtubeMonitorRef.current) {
+          clearInterval(youtubeMonitorRef.current);
+          youtubeMonitorRef.current = null;
+        }
       };
     }
   }, [activeSession?.id]);
@@ -388,18 +400,17 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }, 500);
   };
 
-  useEffect(() => {
-    console.log('[ControlPanel] Mobile camera useEffect triggered. activeSession:', !!activeSession, 'streamStatus:', streamStatus, 'cameras:', cameras.length);
+  const cameraFingerprint = cameras.map(c => `${c.id}:${c.status}:${c.last_connected_at || ''}`).join(',');
 
-    if (!activeSession) {
-      console.log('[ControlPanel] Early return - no active session');
-      return;
-    }
+  useEffect(() => {
+    if (!activeSession) return;
 
     const mobileCameras = cameras.filter(c =>
       c.camera_type === 'mobile' &&
       (c.status === 'connected' || c.status === 'streaming')
     );
+
+    if (mobileCameras.length === 0) return;
 
     console.log('[ControlPanel] Mobile cameras found:', mobileCameras.length);
     mobileCameras.forEach(c => console.log(`  - ${c.camera_name}: ${c.status}, hasPc: ${!!peerConnectionsRef.current[c.id]}`));
@@ -420,7 +431,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         setupMobileCameraConnection(camera);
       }
     });
-  }, [activeSession?.id, cameras, streamStatus]);
+  }, [activeSession?.id, cameraFingerprint]);
 
   useEffect(() => {
     return () => {
@@ -522,6 +533,25 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         console.log('[WHIP] Adding track:', track.kind, track.label);
         pc.addTrack(track, streamToSend);
       });
+
+      try {
+        const transceivers = pc.getTransceivers();
+        for (const transceiver of transceivers) {
+          if (transceiver.sender.track?.kind === 'video') {
+            const codecs = RTCRtpSender.getCapabilities('video')?.codecs;
+            if (codecs) {
+              const h264Codecs = codecs.filter(c => c.mimeType === 'video/H264');
+              const otherCodecs = codecs.filter(c => c.mimeType !== 'video/H264');
+              if (h264Codecs.length > 0) {
+                transceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
+                console.log('[WHIP] Set H.264 as preferred codec for RTMP compatibility');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[WHIP] Could not set H.264 preference:', e);
+      }
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -722,6 +752,118 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }
   };
 
+  const stopYouTubeMonitor = () => {
+    if (youtubeMonitorRef.current) {
+      clearInterval(youtubeMonitorRef.current);
+      youtubeMonitorRef.current = null;
+    }
+  };
+
+  const startYouTubeMonitor = (broadcastId: string, monitorClubId: string, accessToken: string) => {
+    stopYouTubeMonitor();
+    let ytLiveTransitioned = false;
+    console.log('[YouTube Monitor] Starting passive background monitor for broadcast:', broadcastId);
+
+    const checkYouTube = async () => {
+      if (ytLiveTransitioned) {
+        stopYouTubeMonitor();
+        return;
+      }
+
+      try {
+        const statusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'getBroadcastStatus',
+            clubId: monitorClubId,
+            sessionData: { broadcastId }
+          }),
+        });
+
+        const statusData = await statusResponse.json();
+        if (!statusData?.items?.length) {
+          console.warn('[YouTube Monitor] Broadcast not found');
+          setYoutubeStatus('not_found');
+          return;
+        }
+
+        const broadcast = statusData.items[0];
+        const lifecycleStatus = broadcast?.status?.lifeCycleStatus;
+        const boundStreamId = broadcast?.contentDetails?.boundStreamId;
+        console.log('[YouTube Monitor] Status:', lifecycleStatus);
+        setYoutubeStatus(lifecycleStatus || 'unknown');
+
+        if (lifecycleStatus === 'live') {
+          console.log('[YouTube Monitor] Already live!');
+          ytLiveTransitioned = true;
+          stopYouTubeMonitor();
+          return;
+        }
+
+        if (boundStreamId) {
+          const streamResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'getStreamStatus',
+              clubId: monitorClubId,
+              sessionData: { streamId: boundStreamId }
+            }),
+          });
+
+          const streamData = await streamResponse.json();
+          if (streamData?.items?.length) {
+            const health = streamData.items[0]?.status?.healthStatus?.status;
+            console.log('[YouTube Monitor] Stream health:', health);
+
+            if (health === 'good' || health === 'ok') {
+              if (lifecycleStatus === 'testing') {
+                console.log('[YouTube Monitor] Stream healthy + testing. Transitioning to live...');
+                const transResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    action: 'transitionBroadcast',
+                    clubId: monitorClubId,
+                    sessionData: { broadcastId, broadcastStatus: 'live' }
+                  }),
+                });
+
+                if (transResponse.ok) {
+                  console.log('[YouTube Monitor] Transitioned to live!');
+                  addNotification('success', 'Now streaming live on YouTube!', 5000);
+                  ytLiveTransitioned = true;
+                  setYoutubeStatus('live');
+                  stopYouTubeMonitor();
+                } else {
+                  const errData = await transResponse.json();
+                  console.warn('[YouTube Monitor] Transition failed:', errData);
+                }
+              } else if (lifecycleStatus === 'ready') {
+                console.log('[YouTube Monitor] Stream healthy but still in ready state. YouTube will auto-transition to testing.');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[YouTube Monitor] Error:', err);
+      }
+    };
+
+    setTimeout(checkYouTube, 10000);
+    youtubeMonitorRef.current = setInterval(checkYouTube, 30000);
+  };
+
   const goLive = async () => {
     if (!activeSession || streamStatus !== 'testing') return;
 
@@ -746,13 +888,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         console.log('[GoLive] Session configuration:', {
           whipUrl: activeSession.cloudflare_whip_url,
           liveInputId: activeSession.cloudflare_live_input_id,
-          outputId: activeSession.cloudflare_output_id,
           youtubeStreamUrl: activeSession.youtube_stream_url,
           youtubeStreamKeyLength: activeSession.youtube_stream_key?.length,
           youtubeBroadcastId: activeSession.youtube_broadcast_id
         });
-
-        console.log('[GoLive] Session configuration verified. Starting stream...');
 
         addNotification('info', 'Connecting to streaming server...', 3000);
 
@@ -764,435 +903,29 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           return;
         }
 
-        console.log('[GoLive] WHIP streaming started successfully');
-
-        // Check Cloudflare Live Input status to verify video is being received
-        console.log('[GoLive] Checking Cloudflare Live Input status...');
-        try {
-          const liveInputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'getLiveInput',
-              clubId: clubId,
-              sessionData: {
-                liveInputId: activeSession.cloudflare_live_input_id
-              }
-            })
-          });
-
-          const liveInputData = await liveInputResponse.json();
-          console.log('[GoLive] Cloudflare Live Input status:', JSON.stringify(liveInputData, null, 2));
-
-          if (liveInputData.liveInput) {
-            console.log('[GoLive] Live Input UID:', liveInputData.liveInput.uid);
-            console.log('[GoLive] Live Input status:', liveInputData.liveInput.status);
-            console.log('[GoLive] Live Input created:', liveInputData.liveInput.created);
-
-            // Check if output exists on the live input
-            if (liveInputData.liveInput.outputs) {
-              console.log('[GoLive] Outputs configured on Live Input:', liveInputData.liveInput.outputs.length);
-              liveInputData.liveInput.outputs.forEach((output: any, i: number) => {
-                console.log(`[GoLive] Output ${i + 1}:`, {
-                  uid: output.uid,
-                  url: output.url,
-                  enabled: output.enabled,
-                  status: output.status
-                });
-              });
-
-              const youtubeOutput = liveInputData.liveInput.outputs.find(
-                (o: any) => o.url?.includes('youtube.com') || o.url?.includes('rtmp://a.rtmp') || o.url?.includes('rtmps://a.rtmps')
-              );
-
-              if (youtubeOutput) {
-                console.log('[GoLive] YouTube output exists:', {
-                  uid: youtubeOutput.uid,
-                  enabled: youtubeOutput.enabled,
-                  status: youtubeOutput.status,
-                  note: 'null status is normal for newly created outputs'
-                });
-
-                // Don't recreate if status is null - that's normal for new outputs!
-                // The output will be recreated later if YouTube continues reporting noData
-              } else {
-                console.warn('[GoLive] No YouTube output found on Live Input!');
-              }
-            } else {
-              console.warn('[GoLive] No outputs configured on Live Input!');
-            }
-          }
-        } catch (cfError) {
-          console.error('[GoLive] Error checking Cloudflare Live Input:', cfError);
-        }
+        console.log('[GoLive] WHIP streaming to Cloudflare started successfully');
+        addNotification('success', 'Cloudflare preview is live!', 4000);
 
         if (activeSession.youtube_broadcast_id) {
-          // IMMEDIATELY check and transition YouTube broadcast to testing if needed
-          console.log('[GoLive] Immediately checking YouTube broadcast status...');
-          try {
-            const initialStatusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                action: 'getBroadcastStatus',
-                clubId: clubId,
-                sessionData: {
-                  broadcastId: activeSession.youtube_broadcast_id
-                }
-              }),
-            });
-
-            const initialStatusData = await initialStatusResponse.json();
-            if (initialStatusData?.items && initialStatusData.items.length > 0) {
-              const broadcast = initialStatusData.items[0];
-              const currentStatus = broadcast?.status?.lifeCycleStatus;
-              console.log('[GoLive] Initial broadcast status:', currentStatus);
-
-              // YouTube automatically transitions from 'ready' to 'testing' when video is detected
-              // We cannot manually transition from 'ready' to 'testing' - it will cause 403 error
-              if (currentStatus === 'ready') {
-                console.log('[GoLive] Broadcast is in READY state. YouTube will auto-detect video and transition to TESTING.');
-                addNotification('info', 'Starting stream. YouTube will detect video automatically...', 5000);
-              } else if (currentStatus === 'testing') {
-                console.log('[GoLive] ✅ Broadcast already in TESTING state - YouTube has detected video');
-                addNotification('info', 'YouTube has detected video. Ready to go live!', 3000);
-              } else if (currentStatus === 'live') {
-                console.log('[GoLive] ⚠️ Broadcast is already LIVE');
-                addNotification('warning', 'Broadcast is already live on YouTube', 3000);
-              } else {
-                console.log('[GoLive] Broadcast status:', currentStatus);
-              }
-            }
-          } catch (error) {
-            console.error('[GoLive] Error checking initial broadcast status:', error);
+          console.log('[GoLive] YouTube broadcast configured. Note: Cloudflare WHIP does not support simulcasting/output re-streaming. OBS with RTMPS is required for YouTube relay.');
+          const hasRtmpsUrl = !!(activeSession as any)?.cloudflare_rtmps_url;
+          if (hasRtmpsUrl) {
+            addNotification('info',
+              'YouTube requires RTMPS input. Open OBS and stream to the Cloudflare RTMP URL in Stream Settings below. Cloudflare will relay to YouTube automatically.',
+              15000
+            );
+          } else {
+            addNotification('info',
+              'YouTube requires an RTMPS encoder like OBS. Browser camera streaming does not support YouTube relay.',
+              12000
+            );
           }
-
-          // Function to attempt YouTube transition with retries
-          const attemptYouTubeTransition = async (attemptNumber = 1, maxAttempts = 3) => {
-            try {
-              console.log(`[GoLive] Attempt ${attemptNumber}/${maxAttempts}: Checking YouTube broadcast status...`);
-
-              // Check the broadcast status
-              const statusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  action: 'getBroadcastStatus',
-                  clubId: clubId,
-                  sessionData: {
-                    broadcastId: activeSession.youtube_broadcast_id
-                  }
-                }),
-              });
-
-              const statusData = await statusResponse.json();
-              console.log('[GoLive] YouTube broadcast full status:', JSON.stringify(statusData, null, 2));
-
-              // Check if broadcast exists
-              if (!statusData?.items || statusData.items.length === 0) {
-                console.error('[GoLive] YouTube broadcast not found!');
-                console.error('[GoLive] Broadcast ID:', activeSession.youtube_broadcast_id);
-                console.error('[GoLive] This broadcast may have been deleted from YouTube Studio');
-
-                // IMPORTANT: Don't auto-recreate! That would break shared URLs
-                addNotification('error',
-                  'YouTube broadcast not found. The broadcast may have been deleted from YouTube Studio. Please delete this livestream and create a new one.',
-                  15000
-                );
-
-                setStreamStatus('testing');
-
-                // Stop WHIP streaming since we can't go live
-                if (whipPeerConnection) {
-                  console.log('[WHIP] Stopping WHIP connection');
-                  whipPeerConnection.close();
-                  setWhipPeerConnection(null);
-                }
-
-                return;
-              }
-
-              const broadcast = statusData.items[0];
-              const currentStatus = broadcast?.status?.lifeCycleStatus;
-              const streamStatus = broadcast?.status?.streamStatus;
-              const recordingStatus = broadcast?.status?.recordingStatus;
-              const boundStreamId = broadcast?.contentDetails?.boundStreamId;
-
-              console.log('[GoLive] Broadcast lifecycle status:', currentStatus);
-              console.log('[GoLive] Stream status:', streamStatus);
-              console.log('[GoLive] Recording status:', recordingStatus);
-              console.log('[GoLive] Bound stream ID:', boundStreamId);
-              console.log('[GoLive] Full broadcast.status object:', broadcast?.status);
-
-              if (boundStreamId) {
-                try {
-                  console.log('[GoLive] Checking YouTube stream health status...');
-                  const streamStatusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${session.access_token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      action: 'getStreamStatus',
-                      clubId: clubId,
-                      sessionData: {
-                        streamId: boundStreamId
-                      }
-                    }),
-                  });
-
-                  const streamStatusData = await streamStatusResponse.json();
-                  console.log('[GoLive] YouTube stream status:', JSON.stringify(streamStatusData, null, 2));
-
-                  if (streamStatusData?.items && streamStatusData.items.length > 0) {
-                    const stream = streamStatusData.items[0];
-                    const healthStatus = stream?.status?.healthStatus?.status;
-                    const streamHealthDetails = stream?.status?.healthStatus?.configurationIssues;
-
-                    console.log('[GoLive] Stream health status:', healthStatus);
-                    console.log('[GoLive] Stream RTMP URL:', stream?.cdn?.ingestionInfo?.ingestionAddress);
-                    console.log('[GoLive] Stream key exists:', !!stream?.cdn?.ingestionInfo?.streamName);
-
-                    if (healthStatus === 'noData') {
-                      // noData is NORMAL for the first 30-60 seconds after creating an output
-                      // Cloudflare needs time to establish the RTMP connection to YouTube
-                      console.log('[GoLive] YouTube stream health: noData (Cloudflare output is initializing - this is normal and can take 30-60 seconds)');
-                      if (attemptNumber === 1) {
-                        addNotification('info', 'Waiting for Cloudflare to connect to YouTube... This typically takes 30-60 seconds.', 8000);
-                      }
-                    } else if (healthStatus === 'good' || healthStatus === 'ok') {
-                      console.log('[GoLive] YouTube is receiving video data!');
-                    }
-
-                    if (streamHealthDetails && streamHealthDetails.length > 0) {
-                      console.warn('[GoLive] Stream configuration issues:', streamHealthDetails);
-                    }
-                  }
-                } catch (streamError) {
-                  console.error('[GoLive] Error checking stream status:', streamError);
-                }
-              }
-
-              // YouTube may not populate streamStatus immediately
-              // If streamStatus is undefined but lifecycle is 'testing' or 'live', stream is likely active
-              const isStreamActive = streamStatus === 'active' ||
-                                     (streamStatus === undefined && (currentStatus === 'testing' || currentStatus === 'live'));
-
-              // Check if stream is receiving video
-              if (!isStreamActive) {
-                console.warn('[GoLive] Stream is not active yet. Status:', streamStatus, 'Lifecycle:', currentStatus);
-
-                // Debug logging
-                console.log('[GoLive] Checking output creation conditions:', {
-                  hasOutputId: !!activeSession.cloudflare_output_id,
-                  hasStreamUrl: !!activeSession.youtube_stream_url,
-                  hasStreamKey: !!activeSession.youtube_stream_key,
-                  hasRtmpUrl: !!activeSession.youtube_rtmp_url,
-                  outputId: activeSession.cloudflare_output_id,
-                  streamUrl: activeSession.youtube_stream_url,
-                  streamKey: activeSession.youtube_stream_key
-                });
-
-                let outputJustCreated = false;
-
-                // Check if Cloudflare output exists, if not create it
-                if (!activeSession.cloudflare_output_id && (activeSession.youtube_stream_url || activeSession.youtube_rtmp_url) && activeSession.youtube_stream_key) {
-                  console.log('[GoLive] No Cloudflare output found. Creating one now...');
-                  addNotification('info', 'Setting up YouTube output in Cloudflare...', 5000);
-
-                  // Get RTMP URL from session and ensure it's RTMP (not RTMPS)
-                  let rtmpUrl = activeSession.youtube_stream_url;
-
-                  // CRITICAL: Cloudflare Stream doesn't support RTMPS for outputs, only RTMP
-                  if (rtmpUrl && rtmpUrl.startsWith('rtmps://')) {
-                    console.log('[GoLive] ⚠️ Converting RTMPS to RTMP for Cloudflare output');
-                    rtmpUrl = rtmpUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-                    console.log('[GoLive] Converted URL:', rtmpUrl);
-                  }
-
-                  const streamKey = activeSession.youtube_stream_key;
-
-                  if (!streamKey || !rtmpUrl) {
-                    console.error('[GoLive] Missing YouTube stream key or URL!');
-                    addNotification('error', 'YouTube stream configuration incomplete. Please recreate the livestream.', 8000);
-                    return;
-                  }
-
-                  try {
-                    const createOutputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${session.access_token}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        action: 'addOutput',
-                        clubId: clubId,
-                        sessionData: {
-                          liveInputId: activeSession.cloudflare_live_input_id,
-                          streamUrl: rtmpUrl,
-                          streamKey: streamKey
-                        }
-                      })
-                    });
-
-                    const outputData = await createOutputResponse.json();
-                    console.log('[GoLive] Create output response:', outputData);
-
-                    if (createOutputResponse.ok && outputData.output) {
-                      console.log('✅ Created Cloudflare output to YouTube');
-                      console.log('[GoLive] Output details:', {
-                        uid: outputData.output.uid,
-                        enabled: outputData.output.enabled,
-                        streamUrl: outputData.output.url || rtmpUrl
-                      });
-
-                      // Update session with output ID
-                      await livestreamStorage.updateSession(activeSession.id, {
-                        cloudflare_output_id: outputData.output.uid
-                      });
-                      activeSession.cloudflare_output_id = outputData.output.uid;
-                      outputJustCreated = true;
-                      addNotification('success', 'Successfully configured Cloudflare to relay to YouTube. Waiting for video...', 5000);
-                    } else {
-                      console.error('[GoLive] Failed to create output:', outputData);
-                      addNotification('error', 'Failed to create YouTube output. Please check Cloudflare integration.', 8000);
-                      return;
-                    }
-                  } catch (error) {
-                    console.error('[GoLive] Error creating output:', error);
-                    addNotification('error', 'Error setting up YouTube output', 5000);
-                    return;
-                  }
-                }
-
-                // Skip output status checks entirely - they're unreliable immediately after creation
-                // The output creation response already tells us if it succeeded
-                if (outputJustCreated) {
-                  console.log('[GoLive] Output just created. Trusting creation was successful.');
-                  console.log('[GoLive] If video doesn\'t reach YouTube, check: 1) RTMP URL is correct, 2) Stream key is valid, 3) Cloudflare Live Input is receiving video');
-                }
-
-                if (attemptNumber < maxAttempts) {
-                  addNotification('info', `Waiting for YouTube to detect video stream... (attempt ${attemptNumber}/${maxAttempts})`, 5000);
-                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 10000);
-                  return;
-                } else {
-                  addNotification('warning',
-                    `YouTube stream is not active (status: ${streamStatus || 'undefined'}). Video may not be reaching YouTube. Check Cloudflare Stream output configuration.`,
-                    15000
-                  );
-                  return;
-                }
-              }
-
-              // Stream is active, now check lifecycle status
-              if (currentStatus === 'testing') {
-                console.log('[GoLive] Stream is active and in testing mode. Transitioning to live...');
-                const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    action: 'transitionBroadcast',
-                    clubId: clubId,
-                    sessionData: {
-                      broadcastId: activeSession.youtube_broadcast_id,
-                      broadcastStatus: 'live'
-                    }
-                  }),
-                });
-
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  console.error('[GoLive] YouTube transition error:', errorData);
-                  addNotification('error',
-                    `Failed to go live: ${errorData.error || 'Unknown error'}`,
-                    10000
-                  );
-                } else {
-                  console.log('✅ YouTube broadcast transitioned to live successfully!');
-                  addNotification('success', 'Now streaming live on YouTube!', 5000);
-                }
-              } else if (currentStatus === 'ready') {
-                // YouTube automatically transitions to 'testing' when video is detected
-                // We cannot manually transition from 'ready' to 'testing'
-                // Wait for YouTube to detect video and auto-transition
-                console.log('[GoLive] Video is streaming but broadcast still in ready state. Waiting for YouTube to auto-detect and transition to testing...');
-
-                if (attemptNumber < maxAttempts) {
-                  addNotification('info', `Video detected. Waiting for YouTube to start testing... (${attemptNumber}/${maxAttempts})`, 5000);
-                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 15000); // Wait 15 seconds for YouTube to detect
-                } else {
-                  addNotification('warning',
-                    'Video is streaming but YouTube has not started testing mode yet. This usually takes 30-60 seconds. Check YouTube Studio.',
-                    15000
-                  );
-                }
-              } else {
-                console.warn('[GoLive] Unexpected broadcast state:', { currentStatus, streamStatus, isStreamActive });
-
-                if (attemptNumber < maxAttempts) {
-                  addNotification('info', `Broadcast status: ${currentStatus}. Checking again... (${attemptNumber}/${maxAttempts})`, 5000);
-                  setTimeout(() => attemptYouTubeTransition(attemptNumber + 1, maxAttempts), 10000);
-                } else {
-                  addNotification('warning',
-                    `Unable to go live. Status: ${currentStatus}, Stream: ${streamStatus || 'undefined'}. Check YouTube Studio for more details.`,
-                    10000
-                  );
-                }
-              }
-            } catch (ytError: any) {
-              console.error('[GoLive] YouTube API error:', ytError);
-              addNotification('error', `YouTube error: ${ytError.message}`, 8000);
-            }
-          };
-
-          // Start the transition attempt after 10 seconds
-          setTimeout(() => attemptYouTubeTransition(1, 3), 10000);
+          startYouTubeMonitor(activeSession.youtube_broadcast_id, clubId, session.access_token);
         }
       } else if (activeSession.youtube_broadcast_id) {
-        try {
-          console.log('[GoLive] Transitioning YouTube broadcast to live (direct mode)...');
-          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'transitionBroadcast',
-              clubId: clubId,
-              sessionData: {
-                broadcastId: activeSession.youtube_broadcast_id,
-                broadcastStatus: 'live'
-              }
-            }),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.warn('[GoLive] YouTube transition warning:', errorData);
-            addNotification('warning', 'YouTube transition failed - video requires external encoder (OBS) in direct mode.', 8000);
-          } else {
-            console.log('[GoLive] YouTube broadcast transitioned to live');
-          }
-        } catch (ytError) {
-          console.error('[GoLive] YouTube API error:', ytError);
-          addNotification('warning', 'Could not transition YouTube broadcast.', 5000);
-        }
+        console.log('[GoLive] No WHIP URL - YouTube-only mode.');
+        addNotification('info', 'Connect OBS to the YouTube RTMP URL in Stream Settings to go live.', 10000);
+        startYouTubeMonitor(activeSession.youtube_broadcast_id, clubId, session.access_token);
       }
 
       const { data: updatedSession, error: updateError } = await supabase
@@ -1256,6 +989,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     if (!activeSession) return;
 
     try {
+      stopYouTubeMonitor();
       stopWhipStreaming();
 
       if (mediaStream) {
@@ -2014,6 +1748,166 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               )}
             </div>
           </div>
+
+          {activeSession?.youtube_broadcast_id && activeSession?.youtube_stream_key && (
+            <div className="p-5 border-t border-slate-700/50">
+              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">YouTube RTMP Credentials</h4>
+              <p className="text-xs text-slate-400 mb-3">
+                Use these in OBS, Streamlabs, or any RTMP encoder to stream to YouTube.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Server URL</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-slate-700/50 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono truncate">
+                      {activeSession.youtube_stream_url || 'rtmp://a.rtmp.youtube.com/live2'}
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeSession.youtube_stream_url || 'rtmp://a.rtmp.youtube.com/live2');
+                        setCopiedField('url');
+                        setTimeout(() => setCopiedField(null), 2000);
+                      }}
+                      className="p-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg transition-colors"
+                      title="Copy URL"
+                    >
+                      {copiedField === 'url' ? (
+                        <span className="text-xs text-green-400">Copied</span>
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Stream Key</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-slate-700/50 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono truncate">
+                      {showStreamKey ? activeSession.youtube_stream_key : '••••••••••••••••'}
+                    </div>
+                    <button
+                      onClick={() => setShowStreamKey(!showStreamKey)}
+                      className="p-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg transition-colors"
+                      title={showStreamKey ? 'Hide key' : 'Show key'}
+                    >
+                      {showStreamKey ? (
+                        <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                      ) : (
+                        <Eye className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeSession.youtube_stream_key || '');
+                        setCopiedField('key');
+                        setTimeout(() => setCopiedField(null), 2000);
+                      }}
+                      className="p-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg transition-colors"
+                      title="Copy key"
+                    >
+                      {copiedField === 'key' ? (
+                        <span className="text-xs text-green-400">Copied</span>
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <a
+                  href="https://studio.youtube.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs text-red-400 hover:text-red-300 transition-colors mt-2"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Open YouTube Studio
+                </a>
+
+                {youtubeStatus && (
+                  <div className={`mt-3 flex items-center gap-2 p-2 rounded-lg ${
+                    youtubeStatus === 'live' ? 'bg-green-500/10 border border-green-500/20' :
+                    youtubeStatus === 'testing' ? 'bg-yellow-500/10 border border-yellow-500/20' :
+                    'bg-slate-700/30 border border-slate-600/20'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      youtubeStatus === 'live' ? 'bg-green-400 animate-pulse' :
+                      youtubeStatus === 'testing' ? 'bg-yellow-400 animate-pulse' :
+                      'bg-slate-500'
+                    }`} />
+                    <span className="text-xs text-slate-300">
+                      YouTube: {youtubeStatus === 'live' ? 'Live' :
+                        youtubeStatus === 'testing' ? 'Testing - receiving video' :
+                        youtubeStatus === 'ready' ? 'Waiting for RTMPS (OBS)...' :
+                        youtubeStatus}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {(activeSession as any)?.cloudflare_rtmps_url && (
+            <div className={`p-5 border-t ${activeSession.youtube_broadcast_id ? 'border-amber-600/30 bg-amber-950/20' : 'border-slate-700/50'}`}>
+              <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${activeSession.youtube_broadcast_id ? 'text-amber-400' : 'text-slate-500'}`}>
+                {activeSession.youtube_broadcast_id ? 'OBS Required for YouTube' : 'Cloudflare RTMP (OBS)'}
+              </h4>
+              <p className="text-xs text-slate-400 mb-3">
+                {activeSession.youtube_broadcast_id
+                  ? 'Cloudflare does not support browser-to-YouTube relay. Stream to this RTMP URL with OBS to go live on YouTube.'
+                  : 'Stream to Cloudflare with OBS. Cloudflare relays to YouTube automatically.'}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">RTMP URL</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-slate-700/50 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono truncate">
+                      {(activeSession as any).cloudflare_rtmps_url}
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText((activeSession as any).cloudflare_rtmps_url || '');
+                        setCopiedField('cf-url');
+                        setTimeout(() => setCopiedField(null), 2000);
+                      }}
+                      className="p-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg transition-colors"
+                      title="Copy URL"
+                    >
+                      {copiedField === 'cf-url' ? (
+                        <span className="text-xs text-green-400">Copied</span>
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {(activeSession as any)?.cloudflare_rtmps_stream_key && (
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Stream Key</label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-slate-700/50 rounded-lg px-3 py-2 text-xs text-slate-300 font-mono truncate">
+                        {showStreamKey ? (activeSession as any).cloudflare_rtmps_stream_key : '••••••••••••••••'}
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText((activeSession as any).cloudflare_rtmps_stream_key || '');
+                          setCopiedField('cf-key');
+                          setTimeout(() => setCopiedField(null), 2000);
+                        }}
+                        className="p-2 bg-slate-700/50 hover:bg-slate-600/50 rounded-lg transition-colors"
+                        title="Copy key"
+                      >
+                        {copiedField === 'cf-key' ? (
+                          <span className="text-xs text-green-400">Copied</span>
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2057,7 +1951,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
       {showAnalytics && activeSession && (
         <StreamAnalyticsModal
-          session={activeSession}
+          sessionId={activeSession.id}
+          clubId={clubId}
           onClose={() => setShowAnalytics(false)}
         />
       )}

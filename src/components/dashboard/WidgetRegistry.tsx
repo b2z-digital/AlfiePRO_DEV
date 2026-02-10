@@ -22,7 +22,8 @@ import {
   AlertCircle,
   PieChart,
   BarChart3,
-  Clock
+  Clock,
+  Building2
 } from 'lucide-react';
 import { WidgetDefinition } from '../../types/dashboard';
 import { FinancialHealthWidget } from './widgets/FinancialHealthWidget';
@@ -36,6 +37,7 @@ import { UpcomingEventsWidget } from './widgets/UpcomingEventsWidget';
 import { RecentResultsWidget } from './widgets/RecentResultsWidget';
 import { EventCountWidget } from './widgets/EventCountWidget';
 import { MembersCountWidget } from './widgets/MembersCountWidget';
+import { ClubsCountWidget } from './widgets/ClubsCountWidget';
 import { TasksCountWidget } from './widgets/TasksCountWidget';
 import { QuickEventSetupWidget } from './widgets/QuickEventSetupWidget';
 import { EventWebsitesWidget } from './widgets/EventWebsitesWidget';
@@ -142,6 +144,17 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     defaultSize: '1x1',
     component: MembersCountWidget,
     category: 'membership'
+  },
+  {
+    id: 'clubs-count',
+    type: 'clubs-count',
+    name: 'Member Clubs',
+    description: 'Total clubs in association and active subscription rate',
+    icon: Building2,
+    defaultSize: '1x1',
+    component: ClubsCountWidget,
+    category: 'membership',
+    associationOnly: true
   },
   {
     id: 'tasks-count',

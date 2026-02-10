@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload, Filter, Tag, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +8,8 @@ import { supabase } from '../../utils/supabase';
 import { NewTransactionModal } from './NewTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { ConfirmationModal } from '../ConfirmationModal';
+import { CategoryCreationModal } from './CategoryCreationModal';
+import { TransactionImportModal } from './TransactionImportModal';
 
 interface Transaction {
   id: string;
@@ -47,6 +50,122 @@ interface FinancesTransactionsProps {
   associationType?: 'state' | 'national';
 }
 
+interface DropdownOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+  className?: string;
+}
+
+const CustomDropdown: React.FC<{
+  darkMode: boolean;
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+}> = ({ darkMode, icon, value, label, options, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, minWidth: 0 });
+
+  const updatePosition = useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setMenuPos({
+      top: rect.bottom + 8,
+      left: rect.left,
+      minWidth: Math.max(rect.width, 220),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePosition();
+    document.addEventListener('mousedown', handler);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePosition]);
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          ${darkMode
+            ? 'bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 border border-slate-600/50'
+            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}
+          ${open ? (darkMode ? 'ring-2 ring-blue-500/40' : 'ring-2 ring-blue-500/30') : ''}
+        `}
+      >
+        <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>{icon}</span>
+        <span className="whitespace-nowrap">{label}</span>
+        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''} ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, minWidth: menuPos.minWidth, zIndex: 9999 }}
+          className={`
+            rounded-xl shadow-xl border
+            ${darkMode
+              ? 'bg-slate-800 border-slate-700 shadow-black/40'
+              : 'bg-white border-slate-200 shadow-slate-200/60'}
+          `}
+        >
+          <div className={`
+            py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full
+            ${darkMode ? '[&::-webkit-scrollbar-thumb]:bg-slate-600/50' : '[&::-webkit-scrollbar-thumb]:bg-slate-300'}
+          `}>
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  if (opt.value !== '__add_category__') setOpen(false);
+                }}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${opt.className || ''}
+                  ${value === opt.value
+                    ? (darkMode ? 'bg-blue-500/15 text-blue-400' : 'bg-blue-50 text-blue-600')
+                    : (darkMode ? 'text-slate-300 hover:bg-slate-700/80' : 'text-slate-700 hover:bg-slate-50')}
+                `}
+              >
+                {opt.icon && <span>{opt.icon}</span>}
+                <span className="flex-1">{opt.label}</span>
+                {value === opt.value && <Check size={14} className="text-blue-400" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
+
 export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ darkMode, associationId, associationType }) => {
   const { currentClub } = useAuth();
   const isAssociation = !!associationId && !!associationType;
@@ -65,6 +184,8 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Summary calculations
@@ -221,22 +342,27 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
       if (transactionsError) throw transactionsError;
 
-      // Load transaction line items with their categories
-      const { data: lineItemsData, error: lineItemsError } = await supabase
-        .from('transaction_line_items')
-        .select(`
-          id,
-          transaction_id,
-          description,
-          amount,
-          category_id,
-          budget_categories!left (
+      const transactionIds = (transactionsData || []).map(t => t.id);
+      let lineItemsData: any[] = [];
+      if (transactionIds.length > 0) {
+        const { data, error: lineItemsError } = await supabase
+          .from('transaction_line_items')
+          .select(`
             id,
-            name
-          )
-        `);
+            transaction_id,
+            description,
+            amount,
+            category_id,
+            budget_categories!left (
+              id,
+              name
+            )
+          `)
+          .in('transaction_id', transactionIds);
 
-      if (lineItemsError) throw lineItemsError;
+        if (lineItemsError) throw lineItemsError;
+        lineItemsData = data || [];
+      }
 
       // Group line items by transaction
       const lineItemsByTransaction: { [key: string]: TransactionLineItem[] } = {};
@@ -320,10 +446,18 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
 
     try {
       const tableName = isAssociation ? 'association_transactions' : 'transactions';
-      const { error } = await supabase
+      let query = supabase
         .from(tableName)
         .delete()
         .eq('id', transactionToDelete);
+
+      if (isAssociation) {
+        query = query.eq('association_id', associationId).eq('association_type', associationType);
+      } else {
+        query = query.eq('club_id', currentClub?.clubId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
@@ -460,38 +594,37 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
             />
           </div>
 
-          <select
+          <CustomDropdown
+            darkMode={darkMode}
+            icon={<Filter size={15} />}
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as 'all' | 'deposit' | 'expense')}
-            className={`
-              px-4 py-2 rounded-lg border
-              ${darkMode 
-                ? 'bg-slate-700 border-slate-600 text-white' 
-                : 'bg-white border-slate-300 text-slate-900'}
-            `}
-          >
-            <option value="all">All Types</option>
-            <option value="deposit">Income</option>
-            <option value="expense">Expense</option>
-          </select>
+            label={typeFilter === 'all' ? 'All Types' : typeFilter === 'deposit' ? 'Income' : 'Expense'}
+            options={[
+              { value: 'all', label: 'All Types' },
+              { value: 'deposit', label: 'Income', icon: <TrendingUp size={14} className="text-green-400" /> },
+              { value: 'expense', label: 'Expense', icon: <TrendingDown size={14} className="text-red-400" /> },
+            ]}
+            onChange={(val) => setTypeFilter(val as 'all' | 'deposit' | 'expense')}
+          />
 
-          <select
+          <CustomDropdown
+            darkMode={darkMode}
+            icon={<Tag size={15} />}
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className={`
-              px-4 py-2 rounded-lg border
-              ${darkMode 
-                ? 'bg-slate-700 border-slate-600 text-white' 
-                : 'bg-white border-slate-300 text-slate-900'}
-            `}
-          >
-            <option value="all">All Categories</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
+            label={categoryFilter === 'all' ? 'All Categories' : categories.find(c => c.id === categoryFilter)?.name || 'All Categories'}
+            options={[
+              { value: 'all', label: 'All Categories' },
+              ...categories.map(c => ({ value: c.id, label: c.name })),
+              { value: '__add_category__', label: '+ Add Category', className: 'text-blue-400 font-medium' },
+            ]}
+            onChange={(val) => {
+              if (val === '__add_category__') {
+                setShowCategoryModal(true);
+              } else {
+                setCategoryFilter(val);
+              }
+            }}
+          />
         </div>
 
         <div className="relative" ref={dropdownRef}>
@@ -549,6 +682,24 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                 <div>
                   <div className="text-white font-medium text-sm">New Expense</div>
                   <div className="text-slate-400 text-xs">Record money spent or outgoing payments</div>
+                </div>
+              </button>
+
+              <div className="my-2 border-t border-slate-700"></div>
+
+              <button
+                onClick={() => {
+                  setShowImportModal(true);
+                  setShowDropdown(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+              >
+                <div className="p-2 rounded-lg bg-purple-600/20">
+                  <Upload className="text-purple-400" size={18} />
+                </div>
+                <div>
+                  <div className="text-white font-medium text-sm">Import Transactions</div>
+                  <div className="text-slate-400 text-xs">Import from CSV file with smart mapping</div>
                 </div>
               </button>
             </div>
@@ -733,6 +884,33 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
         confirmText="Delete"
         cancelText="Cancel"
         darkMode={darkMode}
+      />
+
+      {/* Category Creation Modal */}
+      <CategoryCreationModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onCategoryCreated={() => {
+          loadCategories();
+          setShowCategoryModal(false);
+        }}
+        darkMode={darkMode}
+        associationId={associationId}
+        associationType={associationType}
+      />
+
+      {/* Transaction Import Modal */}
+      <TransactionImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false);
+          loadTransactions();
+        }}
+        darkMode={darkMode}
+        clubId={!isAssociation ? currentClub?.clubId : undefined}
+        associationId={associationId}
+        associationType={associationType}
       />
     </div>
   );

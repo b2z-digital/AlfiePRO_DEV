@@ -3,11 +3,14 @@ import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, Calend
 import { RaceType, BoatType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { storeRaceEvent, storeRaceSeries } from '../../utils/raceStorage';
+import { createTask } from '../../utils/taskStorage';
 import { addPublicEvent, updatePublicEvent } from '../../utils/publicEventStorage';
 import { getStoredClubs } from '../../utils/clubStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
+import { getClubBoatClasses } from '../../utils/boatClassStorage';
 import { Club } from '../../types/club';
 import { Venue } from '../../types/venue';
+import { BoatClass } from '../../types/boatClass';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -34,6 +37,22 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const { currentClub, currentOrganization, user } = useAuth();
   const { addNotification } = useNotifications();
   const isEditing = !!(editingEvent || editingSeries);
+  const raceClassOptions = [
+    { value: 'DF65', label: 'Dragon Force 65', keywords: ['dragon force 65', 'df65', 'dragonflite'] },
+    { value: 'DF95', label: 'Dragon Force 95', keywords: ['dragon force 95', 'df95', 'dragonflite 95'] },
+    { value: '10R', label: '10 Rater', keywords: ['10 rater', 'ten rater', '10r'] },
+    { value: 'IOM', label: 'IOM', keywords: ['iom', 'international one metre'] },
+    { value: 'Marblehead', label: 'Marblehead', keywords: ['marblehead'] },
+    { value: 'A Class', label: 'A Class', keywords: ['a class'] },
+    { value: 'RC Laser', label: 'RC Laser', keywords: ['rc laser'] },
+  ];
+
+  const findBoatClassForOption = (opt: typeof raceClassOptions[number]): BoatClass | undefined => {
+    return boatClasses.find(bc => {
+      const dbName = bc.name.toLowerCase();
+      return opt.keywords.some(kw => dbName.includes(kw));
+    });
+  };
   const [formData, setFormData] = useState({
     eventName: '',
     clubName: '',
@@ -58,11 +77,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     entriesClose: '',
     lateEntryUntil: '',
     // Results display settings
-    showClubState: false,
+    showClubState: true,
     showDesign: false,
     showCategory: false,
     showCountry: false,
-    showFlag: false,
+    showFlag: true,
     noticeOfRaceFile: null as File | null,
     noticeOfRaceUrl: '',
     sailingInstructionsFile: null as File | null,
@@ -108,16 +127,20 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const roundRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [showClubDropdown, setShowClubDropdown] = useState(false);
   const [showVenueDropdown, setShowVenueDropdown] = useState(false);
+  const [showClassDropdown, setShowClassDropdown] = useState(false);
+  const [boatClasses, setBoatClasses] = useState<BoatClass[]>([]);
   const clubDropdownRef = useRef<HTMLDivElement>(null);
   const venueDropdownRef = useRef<HTMLDivElement>(null);
+  const classDropdownRef = useRef<HTMLDivElement>(null);
 
   // Document scheduling state
   const [showScheduleDocumentModal, setShowScheduleDocumentModal] = useState(false);
   const [scheduleDocumentType, setScheduleDocumentType] = useState<'nor' | 'si'>('nor');
   const [scheduledDocuments, setScheduledDocuments] = useState<{
-    nor?: { scheduled: boolean; contacts: string[] };
-    si?: { scheduled: boolean; contacts: string[] };
+    nor?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[]; existingTaskIds?: string[] };
+    si?: { scheduled: boolean; contacts: string[]; dueDate?: string; memberIds?: string[]; existingTaskIds?: string[] };
   }>({});
+  const [loadingScheduledDocs, setLoadingScheduledDocs] = useState(false);
   const [linkDocumentSchedules, setLinkDocumentSchedules] = useState(true);
 
   useEffect(() => {
@@ -153,6 +176,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           console.error('Error fetching state associations:', stateAssocError);
         } else {
           setStateAssociations(stateAssocData || []);
+        }
+
+        if (currentClub?.clubId) {
+          try {
+            const clubClasses = await getClubBoatClasses(currentClub.clubId);
+            setBoatClasses(clubClasses);
+          } catch (e) {
+            console.error('Error fetching boat classes:', e);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -230,6 +262,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
       if (venueDropdownRef.current && !venueDropdownRef.current.contains(event.target as Node)) {
         setShowVenueDropdown(false);
       }
+      if (classDropdownRef.current && !classDropdownRef.current.contains(event.target as Node)) {
+        setShowClassDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -268,11 +303,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         entriesOpen: (editingEvent as any).entriesOpen || '',
         entriesClose: (editingEvent as any).entriesClose || '',
         lateEntryUntil: (editingEvent as any).lateEntryUntil || '',
-        showClubState: (editingEvent as any).showClubState || false,
-        showDesign: (editingEvent as any).showDesign || false,
-        showCategory: (editingEvent as any).showCategory || false,
-        showCountry: (editingEvent as any).showCountry || false,
-        showFlag: (editingEvent as any).showFlag || false,
+        showClubState: editingEvent.showClubState ?? false,
+        showDesign: editingEvent.showDesign ?? false,
+        showCategory: editingEvent.showCategory ?? false,
+        showCountry: editingEvent.showCountry ?? true,
+        showFlag: editingEvent.showFlag ?? true,
         noticeOfRaceFile: null,
         noticeOfRaceUrl: editingEvent.noticeOfRaceUrl || '',
         sailingInstructionsFile: null,
@@ -290,6 +325,64 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         seriesName: '',
         rounds: []
       });
+
+      const loadScheduledDocuments = async () => {
+        setLoadingScheduledDocs(true);
+        try {
+          const eventName = editingEvent.eventName || '';
+          const clubId = editingEvent.clubId || currentClub?.clubId;
+
+          const baseQuery = () => {
+            let q = supabase
+              .from('club_tasks')
+              .select('id, title, due_date, assignee_id, status')
+              .neq('status', 'completed');
+            if (clubId) {
+              q = q.eq('club_id', clubId);
+            }
+            return q;
+          };
+
+          const [norResult, siResult] = await Promise.all([
+            baseQuery().ilike('title', `%Notice of Race%${eventName}%`),
+            baseQuery().ilike('title', `%Sailing Instructions%${eventName}%`)
+          ]);
+
+          const schedules: any = {};
+
+          if (!norResult.error && norResult.data && norResult.data.length > 0) {
+            const norTasks = norResult.data;
+            schedules.nor = {
+              scheduled: true,
+              contacts: norTasks.map(t => t.assignee_id).filter(Boolean),
+              dueDate: norTasks[0].due_date?.substring(0, 10),
+              memberIds: norTasks.map(t => t.assignee_id).filter(Boolean),
+              existingTaskIds: norTasks.map(t => t.id)
+            };
+          }
+
+          if (!siResult.error && siResult.data && siResult.data.length > 0) {
+            const siTasks = siResult.data;
+            schedules.si = {
+              scheduled: true,
+              contacts: siTasks.map(t => t.assignee_id).filter(Boolean),
+              dueDate: siTasks[0].due_date?.substring(0, 10),
+              memberIds: siTasks.map(t => t.assignee_id).filter(Boolean),
+              existingTaskIds: siTasks.map(t => t.id)
+            };
+          }
+
+          if (Object.keys(schedules).length > 0) {
+            setScheduledDocuments(schedules);
+          }
+        } catch (err) {
+          console.error('Error loading scheduled documents:', err);
+        } finally {
+          setLoadingScheduledDocs(false);
+        }
+      };
+
+      loadScheduledDocuments();
     }
   }, [editingEvent, clubs, venues]);
 
@@ -325,11 +418,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         entriesOpen: (editingSeries as any).entriesOpen || '',
         entriesClose: (editingSeries as any).entriesClose || '',
         lateEntryUntil: (editingSeries as any).lateEntryUntil || '',
-        showClubState: (editingSeries as any).showClubState || false,
-        showDesign: (editingSeries as any).showDesign || false,
-        showCategory: (editingSeries as any).showCategory || false,
-        showCountry: (editingSeries as any).showCountry || false,
-        showFlag: (editingSeries as any).showFlag || false,
+        showClubState: (editingSeries as any).showClubState ?? false,
+        showDesign: (editingSeries as any).showDesign ?? false,
+        showCategory: (editingSeries as any).showCategory ?? false,
+        showCountry: (editingSeries as any).showCountry ?? true,
+        showFlag: (editingSeries as any).showFlag ?? true,
         noticeOfRaceFile: null,
         noticeOfRaceUrl: editingSeries.noticeOfRaceUrl || '',
         sailingInstructionsFile: null,
@@ -473,7 +566,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const handleScheduleDocument = (type: 'nor' | 'si') => {
     // Validate that event date is set
     if (!formData.raceDate) {
-      addNotification('Please set an event date first', 'error');
+      addNotification('error', 'Please set an event date first');
       return;
     }
 
@@ -481,41 +574,48 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     setShowScheduleDocumentModal(true);
   };
 
-  const handleDocumentScheduled = (documentType: 'nor' | 'si', contacts: string[], contactEmails: string[]) => {
+  const handleDocumentScheduled = (documentType: 'nor' | 'si', contacts: string[], contactEmails: string[], dueDate?: string, memberIds?: string[]) => {
     if (linkDocumentSchedules) {
-      // When linked, schedule both NOR and SI with the same settings
       setScheduledDocuments(prev => ({
         ...prev,
         nor: {
           scheduled: true,
           contacts: contacts,
-          contactEmails: contactEmails
+          contactEmails: contactEmails,
+          dueDate: dueDate,
+          memberIds: memberIds,
+          existingTaskIds: prev.nor?.existingTaskIds
         },
         si: {
           scheduled: true,
           contacts: contacts,
-          contactEmails: contactEmails
+          contactEmails: contactEmails,
+          dueDate: dueDate,
+          memberIds: memberIds,
+          existingTaskIds: prev.si?.existingTaskIds
         }
       }));
 
       addNotification(
-        'Notice of Race and Sailing Instructions creation scheduled successfully (linked)',
-        'success'
+        'success',
+        'NOR & SI document reminders successfully scheduled'
       );
     } else {
-      // When unlinked, only schedule the selected document
       setScheduledDocuments(prev => ({
         ...prev,
         [documentType]: {
           scheduled: true,
           contacts: contacts,
-          contactEmails: contactEmails
+          contactEmails: contactEmails,
+          dueDate: dueDate,
+          memberIds: memberIds,
+          existingTaskIds: prev[documentType]?.existingTaskIds
         }
       }));
 
       addNotification(
-        `${documentType === 'nor' ? 'Notice of Race' : 'Sailing Instructions'} creation scheduled successfully`,
-        'success'
+        'success',
+        `${documentType === 'nor' ? 'NOR' : 'SI'} document reminder successfully scheduled`
       );
     }
   };
@@ -880,6 +980,50 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         );
       }
 
+      if (currentClub?.clubId && user?.id) {
+        const eventDateFormatted = new Date(formData.raceDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const docsToCreate: { type: 'nor' | 'si'; label: string }[] = [];
+        if (scheduledDocuments.nor?.scheduled) docsToCreate.push({ type: 'nor', label: 'Notice of Race (NOR)' });
+        if (scheduledDocuments.si?.scheduled) docsToCreate.push({ type: 'si', label: 'Sailing Instructions (SI)' });
+
+        for (const docInfo of docsToCreate) {
+          const doc = scheduledDocuments[docInfo.type];
+          if (!doc?.memberIds?.length) continue;
+
+          if (doc.existingTaskIds && doc.existingTaskIds.length > 0) {
+            try {
+              await supabase
+                .from('club_tasks')
+                .update({
+                  due_date: doc.dueDate || null,
+                  reminder_date: doc.dueDate || null
+                })
+                .in('id', doc.existingTaskIds);
+            } catch (taskErr) {
+              console.error(`Error updating ${docInfo.type} tasks:`, taskErr);
+            }
+          } else {
+            for (const memberId of doc.memberIds) {
+              try {
+                await createTask(currentClub.clubId, user.id, {
+                  title: `Prepare ${docInfo.label} - ${formData.eventName}`,
+                  description: `Prepare and finalise the ${docInfo.label} for the event "${formData.eventName}" scheduled on ${eventDateFormatted}.`,
+                  due_date: doc.dueDate || null,
+                  priority: 'high',
+                  assignee_id: memberId,
+                  send_reminder: true,
+                  reminder_type: 'both',
+                  reminder_date: doc.dueDate || null,
+                  followers: [user.id]
+                });
+              } catch (taskErr) {
+                console.error(`Error creating ${docInfo.type} task for member ${memberId}:`, taskErr);
+              }
+            }
+          }
+        }
+      }
+
       onSuccess();
     } catch (err) {
       console.error('❌ Error creating event:', err);
@@ -1090,14 +1234,14 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
             {currentStep === 'details' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {type === 'quick' ? (
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <div className="lg:col-span-2">
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     Event Name *
                   </label>
                   <div className="relative">
-                    <FileText 
-                      size={18} 
-                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                    <FileText
+                      size={20}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}
                     />
                     <input
                       type="text"
@@ -1105,24 +1249,25 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       value={formData.eventName}
                       onChange={(e) => setFormData(prev => ({ ...prev, eventName: e.target.value }))}
                       className={`
-                        w-full pl-10 pr-4 py-2 rounded-lg transition-colors
-                        ${darkMode 
-                          ? 'bg-slate-700 text-slate-200' 
-                          : 'bg-white text-slate-900 border border-slate-200'}
+                        w-full pl-12 pr-4 py-3.5 rounded-xl transition-all text-lg font-medium
+                        focus:ring-2 focus:ring-emerald-500/50 focus:outline-none
+                        ${darkMode
+                          ? 'bg-slate-700/80 text-white border border-slate-600 focus:border-emerald-500'
+                          : 'bg-white text-slate-900 border-2 border-slate-200 focus:border-emerald-500'}
                       `}
                       placeholder="Enter event name"
                     />
                   </div>
                 </div>
               ) : (
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <div className="lg:col-span-2">
+                  <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     Series Name *
                   </label>
                   <div className="relative">
-                    <FileText 
-                      size={18} 
-                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                    <FileText
+                      size={20}
+                      className={`absolute left-4 top-1/2 -translate-y-1/2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}
                     />
                     <input
                       type="text"
@@ -1130,10 +1275,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       value={formData.seriesName}
                       onChange={(e) => setFormData(prev => ({ ...prev, seriesName: e.target.value }))}
                       className={`
-                        w-full pl-10 pr-4 py-2 rounded-lg transition-colors
-                        ${darkMode 
-                          ? 'bg-slate-700 text-slate-200' 
-                          : 'bg-white text-slate-900 border border-slate-200'}
+                        w-full pl-12 pr-4 py-3.5 rounded-xl transition-all text-lg font-medium
+                        focus:ring-2 focus:ring-emerald-500/50 focus:outline-none
+                        ${darkMode
+                          ? 'bg-slate-700/80 text-white border border-slate-600 focus:border-emerald-500'
+                          : 'bg-white text-slate-900 border-2 border-slate-200 focus:border-emerald-500'}
                       `}
                       placeholder="Enter series name"
                     />
@@ -1142,7 +1288,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               )}
 
               {/* Event Type Options - spans both columns */}
-              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 animate-slideIn">
+              <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-3 animate-slideIn">
                 <button
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, isInterclub: !prev.isInterclub }))}
@@ -1178,18 +1324,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Event between two or more clubs
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.isInterclub
-                        ? 'border-emerald-500 bg-emerald-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.isInterclub && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
 
                 <button
@@ -1231,18 +1365,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Event spanning multiple days
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.isMultiDay
-                        ? 'border-emerald-500 bg-emerald-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.isMultiDay && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
 
                 <button
@@ -1280,18 +1402,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Enable fleet board & skipper tracking
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.enableLiveTracking
-                        ? 'border-emerald-500 bg-emerald-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.enableLiveTracking && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
 
                 <button
@@ -1329,18 +1439,6 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
                     Broadcast race to YouTube live
                   </p>
-                  <div className="absolute top-4 right-4 z-10">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 transform
-                      ${formData.enableLiveStream
-                        ? 'border-red-500 bg-red-500 scale-110'
-                        : 'border-slate-400 group-hover:border-slate-300 group-hover:scale-105'}
-                    `}>
-                      {formData.enableLiveStream && (
-                        <div className="w-2.5 h-2.5 rounded-full bg-white animate-scaleIn"></div>
-                      )}
-                    </div>
-                  </div>
                 </button>
               </div>
 
@@ -1820,44 +1918,77 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
 
               {/* Race Class and Race Format Row */}
               <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div ref={classDropdownRef}>
                   <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Race Class *
                   </label>
                   <div className="relative">
-                    <Sailboat
-                      size={18}
-                      className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                    />
-                    <select
-                      required
-                      value={formData.raceClass}
-                      onChange={(e) => {
-                        const value = e.target.value as BoatType;
-                        const selectedOption = e.target.options[e.target.selectedIndex];
-                        const className = selectedOption.text;
-                        setFormData(prev => ({
-                          ...prev,
-                          raceClass: value,
-                          boatClassName: className
-                        }));
-                      }}
+                    <button
+                      type="button"
+                      onClick={() => setShowClassDropdown(!showClassDropdown)}
                       className={`
-                        w-full pl-10 pr-4 py-2 rounded-lg transition-colors appearance-none
+                        w-full pl-14 pr-10 py-2.5 rounded-lg transition-colors text-left hover:border-blue-400
                         ${darkMode
                           ? 'bg-slate-700 text-slate-200'
                           : 'bg-white text-slate-900 border border-slate-200'}
                       `}
                     >
-                      <option value="">Select race class</option>
-                      <option value="DF65">Dragon Force 65</option>
-                      <option value="DF95">Dragon Force 95</option>
-                      <option value="10R">10 Rater</option>
-                      <option value="IOM">IOM</option>
-                      <option value="Marblehead">Marblehead</option>
-                      <option value="A Class">A Class</option>
-                      <option value="RC Laser">RC Laser</option>
-                    </select>
+                      {formData.raceClass
+                        ? (raceClassOptions.find(o => o.value === formData.raceClass)?.label || formData.raceClass)
+                        : 'Select race class'}
+                    </button>
+                    {(() => {
+                      const opt = formData.raceClass ? raceClassOptions.find(o => o.value === formData.raceClass) : null;
+                      const bc = opt ? findBoatClassForOption(opt) : null;
+                      return bc?.class_image ? (
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg overflow-hidden border-2 border-slate-600">
+                          <img src={bc.class_image} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <Sailboat size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                      );
+                    })()}
+                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+
+                    {showClassDropdown && (
+                      <div className={`
+                        absolute bottom-full left-0 right-0 mb-1 max-h-60 overflow-auto rounded-lg shadow-xl z-50 border
+                        ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}
+                      `}>
+                        {raceClassOptions.map(opt => {
+                          const bc = findBoatClassForOption(opt);
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  raceClass: opt.value as BoatType,
+                                  boatClassName: opt.label
+                                }));
+                                setShowClassDropdown(false);
+                              }}
+                              className={`
+                                w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-500/10 transition-colors
+                                ${formData.raceClass === opt.value ? 'bg-blue-500/20' : ''}
+                              `}
+                            >
+                              {bc?.class_image ? (
+                                <img src={bc.class_image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border-2 border-slate-600" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center flex-shrink-0">
+                                  <Sailboat size={20} className="text-slate-300" />
+                                </div>
+                              )}
+                              <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {opt.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1991,7 +2122,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                     const norTemplate = availableTemplates.find(t => t.document_type === 'nor' && t.linked_form_id);
                                     console.log('NOR Template:', norTemplate);
                                     if (!norTemplate) {
-                                      addNotification('No NOR template found.', 'error');
+                                      addNotification('error', 'No NOR template found.');
                                       return;
                                     }
 
@@ -2020,7 +2151,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                     setShowDocumentWizard(true);
                                   } catch (err) {
                                     console.error('Error in Edit NOR handler:', err);
-                                    addNotification('Failed to load document for editing', 'error');
+                                    addNotification('error', 'Failed to load document for editing');
                                   }
                                 }}
                                 className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
@@ -2065,24 +2196,44 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                 Document Creation Scheduled
                               </p>
                               <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Task will be created for {scheduledDocuments.nor?.contacts?.length || 0} contact(s)
+                                {scheduledDocuments.nor?.existingTaskIds ? 'Task assigned' : 'Task will be created'} for {scheduledDocuments.nor?.memberIds?.length || scheduledDocuments.nor?.contacts?.length || 0} member(s)
+                                {scheduledDocuments.nor?.dueDate && (
+                                  <> - Due: {new Date(scheduledDocuments.nor.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                )}
                               </p>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setScheduledDocuments(prev => {
-                                const newState = { ...prev };
-                                delete newState.nor;
-                                return newState;
-                              });
-                            }}
-                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-                            title="Remove Schedule"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleScheduleDocument('nor')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                              title="Edit Schedule"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScheduledDocuments(prev => {
+                                  const newState = { ...prev };
+                                  delete newState.nor;
+                                  return newState;
+                                });
+                              }}
+                              className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                              title="Remove Schedule"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : loadingScheduledDocs && editingEvent ? (
+                      <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-700/30 border-slate-600' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
+                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Loading scheduled documents...</p>
                         </div>
                       </div>
                     ) : (
@@ -2133,13 +2284,13 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                               console.log('Generate NOR clicked');
                               console.log('Available templates:', availableTemplates);
                               if (availableTemplates.length === 0) {
-                                addNotification('No document templates found. Create a template in Settings > Race Documents first.', 'error');
+                                addNotification('error', 'No document templates found. Create a template in Settings > Race Documents first.');
                                 return;
                               }
                               const norTemplate = availableTemplates.find(t => t.document_type === 'nor' && t.linked_form_id);
                               console.log('Found NOR template:', norTemplate);
                               if (!norTemplate) {
-                                addNotification('No NOR template found. Link a form to your NOR template in Settings > Race Documents.', 'error');
+                                addNotification('error', 'No NOR template found. Link a form to your NOR template in Settings > Race Documents.');
                                 return;
                               }
                               setSelectedTemplate(norTemplate.id);
@@ -2199,24 +2350,44 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                                 Document Creation Scheduled
                               </p>
                               <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Task will be created for {scheduledDocuments.si?.contacts?.length || 0} contact(s)
+                                {scheduledDocuments.si?.existingTaskIds ? 'Task assigned' : 'Task will be created'} for {scheduledDocuments.si?.memberIds?.length || scheduledDocuments.si?.contacts?.length || 0} member(s)
+                                {scheduledDocuments.si?.dueDate && (
+                                  <> - Due: {new Date(scheduledDocuments.si.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                                )}
                               </p>
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setScheduledDocuments(prev => {
-                                const newState = { ...prev };
-                                delete newState.si;
-                                return newState;
-                              });
-                            }}
-                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-                            title="Remove Schedule"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleScheduleDocument('si')}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                              title="Edit Schedule"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScheduledDocuments(prev => {
+                                  const newState = { ...prev };
+                                  delete newState.si;
+                                  return newState;
+                                });
+                              }}
+                              className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                              title="Remove Schedule"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : loadingScheduledDocs && editingEvent ? (
+                      <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-700/30 border-slate-600' : 'bg-slate-100 border-slate-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent" />
+                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Loading scheduled documents...</p>
                         </div>
                       </div>
                     ) : (
@@ -2264,12 +2435,12 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                           type="button"
                           onClick={() => {
                             if (availableTemplates.length === 0) {
-                              addNotification('No document templates found. Create a template in Settings > Race Documents first.', 'error');
+                              addNotification('error', 'No document templates found. Create a template in Settings > Race Documents first.');
                               return;
                             }
                             const siTemplate = availableTemplates.find(t => t.document_type === 'si' && t.linked_form_id);
                             if (!siTemplate) {
-                              addNotification('No SI template found. Link a form to your SI template in Settings > Race Documents.', 'error');
+                              addNotification('error', 'No SI template found. Link a form to your SI template in Settings > Race Documents.');
                               return;
                             }
                             setSelectedTemplate(siTemplate.id);
@@ -2414,44 +2585,81 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                 </div>
 
                 <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, isPaid: !prev.isPaid }))}
-                    className={`
-                      w-full p-4 rounded-lg border-2 transition-all text-left
-                      ${formData.isPaid
-                        ? 'bg-emerald-600/20 border-emerald-500 ring-2 ring-emerald-500/20'
-                        : darkMode
-                          ? 'bg-slate-700/50 border-slate-600 hover:bg-slate-700'
-                          : 'bg-white border-slate-200 hover:border-slate-300'}
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${formData.isPaid ? 'bg-emerald-500/20' : darkMode ? 'bg-slate-600' : 'bg-slate-100'}`}>
-                          <DollarSign size={20} className={formData.isPaid ? 'text-emerald-600' : darkMode ? 'text-slate-400' : 'text-slate-600'} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, isPaid: false }))}
+                      className={`
+                        group relative p-5 rounded-xl border-2 transition-all duration-300 text-left transform hover:scale-[1.02]
+                        ${!formData.isPaid
+                          ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 border-blue-500 shadow-lg shadow-blue-500/20'
+                          : darkMode
+                            ? 'bg-slate-700/30 border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'}
+                      `}
+                    >
+                      {!formData.isPaid && (
+                        <div className="absolute inset-0 rounded-xl bg-blue-500/5 blur-xl"></div>
+                      )}
+                      <div className="flex items-center gap-3 mb-2 relative z-10">
+                        <div className={`
+                          p-2.5 rounded-xl transition-all duration-300 transform group-hover:scale-110
+                          ${!formData.isPaid
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                            : darkMode
+                              ? 'bg-slate-600 text-slate-300 group-hover:bg-slate-500'
+                              : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'}
+                        `}>
+                          <Users size={20} />
                         </div>
                         <div>
-                          <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Paid Event
-                          </div>
-                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Collect entry fees from participants
-                          </p>
+                          <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            Free Event
+                          </h3>
                         </div>
                       </div>
-                      <div className={`
-                        w-5 h-5 rounded-full border-2 flex items-center justify-center
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
+                        No entry fees required
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, isPaid: true }))}
+                      className={`
+                        group relative p-5 rounded-xl border-2 transition-all duration-300 text-left transform hover:scale-[1.02]
                         ${formData.isPaid
-                          ? 'border-emerald-500 bg-emerald-500'
-                          : darkMode ? 'border-slate-400' : 'border-slate-300'}
-                      `}>
-                        {formData.isPaid && (
-                          <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-                        )}
+                          ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border-emerald-500 shadow-lg shadow-emerald-500/20'
+                          : darkMode
+                            ? 'bg-slate-700/30 border-slate-600 hover:border-slate-500 hover:bg-slate-700/50'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'}
+                      `}
+                    >
+                      {formData.isPaid && (
+                        <div className="absolute inset-0 rounded-xl bg-emerald-500/5 blur-xl"></div>
+                      )}
+                      <div className="flex items-center gap-3 mb-2 relative z-10">
+                        <div className={`
+                          p-2.5 rounded-xl transition-all duration-300 transform group-hover:scale-110
+                          ${formData.isPaid
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                            : darkMode
+                              ? 'bg-slate-600 text-slate-300 group-hover:bg-slate-500'
+                              : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'}
+                        `}>
+                          <DollarSign size={20} />
+                        </div>
+                        <div>
+                          <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                            Paid Event
+                          </h3>
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'} relative z-10`}>
+                        Collect entry fees from participants
+                      </p>
+                    </button>
+                  </div>
 
                   {formData.isPaid && (
                     <div className="mt-4 space-y-6">
@@ -2638,9 +2846,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                 <div className={`p-6 rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Club/State Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showClubState
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2649,8 +2857,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showClubState: !prev.showClubState }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showClubState ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showClubState ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2665,9 +2873,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Design Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showDesign
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2676,8 +2884,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showDesign: !prev.showDesign }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showDesign ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showDesign ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2692,9 +2900,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Category Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showCategory
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2703,8 +2911,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showCategory: !prev.showCategory }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showCategory ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showCategory ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2719,9 +2927,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Country Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showCountry
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2730,8 +2938,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showCountry: !prev.showCountry }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showCountry ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showCountry ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -2746,9 +2954,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     </div>
 
                     {/* Show Flag Toggle */}
-                    <div className={`p-5 rounded-lg border-2 transition-all ${
+                    <div className={`p-5 rounded-lg border-2 transition-all flex flex-col items-center ${
                       formData.showFlag
-                        ? 'border-purple-500 bg-purple-500/10'
+                        ? 'border-blue-500 bg-blue-500/10'
                         : darkMode ? 'border-slate-600 bg-slate-700/30' : 'border-slate-200 bg-white'
                     }`}>
                       <label className={`block text-sm font-semibold mb-3 text-center ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -2757,8 +2965,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, showFlag: !prev.showFlag }))}
-                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors mx-auto block ${
-                          formData.showFlag ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
+                        className={`relative inline-flex h-10 w-20 items-center rounded-full transition-colors ${
+                          formData.showFlag ? 'bg-blue-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -3026,8 +3234,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
 
                         if (!hasNorDocument && !hasSiDocument) {
                           addNotification(
-                            `${formData.eventLevel === 'state' ? 'State' : 'National'} events require race documents. Please upload, generate, or schedule at least one document (NOR or SI).`,
-                            'error'
+                            'error',
+                            `${formData.eventLevel === 'state' ? 'State' : 'National'} events require race documents. Please upload, generate, or schedule at least one document (NOR or SI).`
                           );
                           return;
                         }
@@ -3204,8 +3412,10 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         eventDate={formData.raceDate}
         eventName={formData.eventName}
         isLinked={linkDocumentSchedules}
-        onSchedule={(contacts, contactEmails) => {
-          handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails);
+        initialDueDate={scheduledDocuments[scheduleDocumentType]?.dueDate}
+        initialSelectedMembers={scheduledDocuments[scheduleDocumentType]?.memberIds}
+        onSchedule={(contacts, contactEmails, dueDate, memberIds) => {
+          handleDocumentScheduled(scheduleDocumentType, contacts, contactEmails, dueDate, memberIds);
           setShowScheduleDocumentModal(false);
         }}
       />

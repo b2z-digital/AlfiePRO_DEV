@@ -168,10 +168,16 @@ export const convertToRaceEvent = (publicEvent: PublicEvent): RaceEvent => {
     national_association_id: publicEvent.national_association_id,
     attendees: (publicEvent as any).registrations || [], // Pass through registrations as attendees
     eventLevel: publicEvent.event_level,
-    show_flag: (publicEvent as any).show_flag || false,
-    show_country: (publicEvent as any).show_country || false,
-    show_club_state: (publicEvent as any).show_club_state || false,
-    show_category: (publicEvent as any).show_category || false
+    show_flag: (publicEvent as any).show_flag ?? false,
+    show_country: (publicEvent as any).show_country ?? false,
+    show_club_state: (publicEvent as any).show_club_state ?? false,
+    show_design: (publicEvent as any).show_design ?? false,
+    show_category: (publicEvent as any).show_category ?? false,
+    showFlag: (publicEvent as any).show_flag ?? false,
+    showCountry: (publicEvent as any).show_country ?? false,
+    showClubState: (publicEvent as any).show_club_state ?? false,
+    showDesign: (publicEvent as any).show_design ?? false,
+    showCategory: (publicEvent as any).show_category ?? false
   };
 };
 

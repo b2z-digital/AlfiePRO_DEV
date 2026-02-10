@@ -148,17 +148,31 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   useEffect(() => {
     console.log('👀 TouchMode heatObservers updated:', {
       count: heatObservers.length,
+      race: currentRace,
       observers: heatObservers.map(obs => ({
         name: obs.skipper_name,
         sailNo: obs.skipper_sail_number,
-        index: obs.skipper_index
+        index: obs.skipper_index,
+        round: obs.round,
+        heatNumber: obs.heat_number
       }))
     });
-    console.log('👥 Skippers in heat:', skippers.map(s => ({
+    console.log('👥 Skippers in heat:', skippers.map((s, idx) => ({
+      index: idx,
       name: s.name,
       sailNo: s.sailNumber || s.sailNo
     })));
-  }, [heatObservers, skippers]);
+
+    // Warn if observers don't match expected pattern
+    if (heatObservers.length > 0 && skippers.length > 0) {
+      const observerSailNumbers = new Set(heatObservers.map(o => String(o.skipper_sail_number)));
+      const skipperSailNumbers = skippers.map(s => String(s.sailNumber || s.sailNo));
+      const observersInSkipperList = skipperSailNumbers.filter(sn => observerSailNumbers.has(sn));
+      if (observersInSkipperList.length > 0) {
+        console.warn('⚠️ Some observers are in the skipper list!', observersInSkipperList);
+      }
+    }
+  }, [heatObservers, skippers, currentRace]);
 
   // Auto-update race status to "live" when scoring starts
   useEffect(() => {
@@ -1109,9 +1123,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {heatObservers.map((observer, idx) => {
+                console.log(`👁️ Rendering observer ${idx + 1}/${heatObservers.length}:`, observer.skipper_name, '#' + observer.skipper_sail_number);
                 return (
                   <div
-                    key={idx}
+                    key={`${observer.skipper_index}-${observer.skipper_sail_number}-${idx}`}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs ${
                       darkMode
                         ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50'

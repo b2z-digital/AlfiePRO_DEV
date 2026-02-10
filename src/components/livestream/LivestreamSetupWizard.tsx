@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown } from 'lucide-react';
+import { X, Check, Calendar, Video, ArrowLeft, ArrowRight, ChevronDown, Radio, Globe, Link, Lock, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -108,8 +108,6 @@ export function LivestreamSetupWizard({
 
   const checkYouTubeIntegration = async () => {
     try {
-      console.log('🔍 Checking YouTube integration for club:', clubId);
-
       const { data: integration, error } = await supabase
         .from('integrations')
         .select('platform, is_active, credentials')
@@ -119,37 +117,21 @@ export function LivestreamSetupWizard({
         .maybeSingle();
 
       if (error) {
-        console.error('❌ Error checking YouTube integration:', error);
-        addNotification('error', 'Failed to check YouTube integration');
+        console.error('Error checking YouTube integration:', error);
         return;
       }
 
       if (!integration) {
-        console.warn('⚠️ No active YouTube integration found for this club');
-        console.log('💡 To schedule streams to YouTube, you need to:');
-        console.log('   1. Go to Settings → Integrations');
-        console.log('   2. Connect your YouTube account');
-        console.log('   3. Grant the necessary permissions');
-        addNotification('warning', 'YouTube not connected. Streams will only use Cloudflare.', 5000);
+        addNotification('info', 'Streaming via AlfiePRO default YouTube account.', 4000);
         return;
       }
 
       const credentials = integration.credentials as any;
-      console.log('✅ YouTube integration found:', {
-        platform: integration.platform,
-        isActive: integration.is_active,
-        hasCredentials: !!credentials,
-        hasAccessToken: !!credentials?.access_token,
-        accessTokenLength: credentials?.access_token?.length || 0
-      });
-
-      if (!credentials?.access_token) {
-        console.error('❌ YouTube integration has no access token');
-        addNotification('error', 'YouTube integration is invalid. Please reconnect in Settings.');
+      if (credentials?.channel_name) {
+        addNotification('success', `YouTube connected: ${credentials.channel_name}`, 3000);
       }
     } catch (error) {
-      console.error('❌ Error checking YouTube integration:', error);
-      addNotification('error', 'Failed to check YouTube integration');
+      console.error('Error checking YouTube integration:', error);
     }
   };
 
@@ -448,6 +430,9 @@ export function LivestreamSetupWizard({
           sessionData.cloudflare_live_input_id = cfData.liveInput.uid;
           sessionData.cloudflare_whip_url = cfData.liveInput.webRTC?.url;
           sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
+          sessionData.cloudflare_rtmps_url = cfData.liveInput.rtmps?.url;
+          sessionData.cloudflare_rtmps_stream_key = cfData.liveInput.rtmps?.streamKey;
+          console.log('[LivestreamWizard] Cloudflare RTMPS ingest URL:', cfData.liveInput.rtmps?.url);
 
           // Step 2: Create YouTube broadcast (always if integration exists)
           try {
@@ -508,21 +493,20 @@ export function LivestreamSetupWizard({
               const streamData = await streamResponse.json();
 
               if (streamResponse.ok && streamData.stream) {
-                // Get the ingestion URL from YouTube
-                let rtmpUrl = streamData.stream.cdn?.ingestionInfo?.ingestionAddress;
+                const rtmpsUrl = streamData.stream.cdn?.ingestionInfo?.rtmpsIngestionAddress;
+                const rtmpUrl = streamData.stream.cdn?.ingestionInfo?.ingestionAddress;
                 const streamKey = streamData.stream.cdn?.ingestionInfo?.streamName;
+                const preferredUrl = rtmpsUrl || rtmpUrl;
 
-                // CRITICAL: Ensure we use RTMP (not RTMPS) for Cloudflare output
-                // YouTube sometimes returns RTMPS URLs, but Cloudflare expects RTMP
-                if (rtmpUrl && rtmpUrl.startsWith('rtmps://')) {
-                  console.log('[LivestreamWizard] ⚠️ YouTube returned RTMPS URL, converting to RTMP');
-                  rtmpUrl = rtmpUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
-                  console.log('[LivestreamWizard] Converted URL:', rtmpUrl);
-                }
+                console.log('[LivestreamWizard] YouTube ingestion URLs:', {
+                  rtmps: rtmpsUrl,
+                  rtmp: rtmpUrl,
+                  using: preferredUrl
+                });
 
                 sessionData.youtube_stream_key = streamKey;
-                sessionData.youtube_stream_url = rtmpUrl;
-                sessionData.youtube_rtmp_url = rtmpUrl ? `${rtmpUrl}/${streamKey}` : undefined;
+                sessionData.youtube_stream_url = preferredUrl;
+                sessionData.youtube_rtmp_url = preferredUrl ? `${preferredUrl}/${streamKey}` : undefined;
 
                 // Bind broadcast to stream
                 setLoadingMessage('Connecting broadcast to stream...');
@@ -541,21 +525,12 @@ export function LivestreamSetupWizard({
 
                 const bindData = await bindResponse.json();
                 if (bindResponse.ok) {
-                  console.log('✅ Broadcast bound to stream');
+                  console.log('[LivestreamWizard] Broadcast bound to stream');
 
-                  // YouTube will automatically transition from 'ready' to 'testing' when video is detected
-                  // Do NOT manually transition - it will cause 403 error
-                  console.log('[LivestreamWizard] YouTube broadcast is ready. Will auto-detect video when stream starts.');
-                  addNotification('success', 'YouTube broadcast created successfully', 3000);
-
-                  // Step 4: Add YouTube as output destination in Cloudflare
-                  // Add the output immediately - YouTube will detect video when cameras connect
-                  if (rtmpUrl && streamKey) {
-                    setLoadingMessage('Connecting Cloudflare to YouTube...');
-                    console.log('[LivestreamWizard] Adding YouTube output to Cloudflare...');
-                    console.log('[LivestreamWizard] YouTube RTMP URL:', rtmpUrl);
-                    console.log('[LivestreamWizard] YouTube Stream Key:', streamKey?.substring(0, 10) + '...');
-
+                  setLoadingMessage('Creating Cloudflare → YouTube relay output...');
+                  try {
+                    const outputStreamUrl = rtmpUrl || rtmpsUrl;
+                    console.log('[LivestreamWizard] Creating Cloudflare output to YouTube RTMP:', outputStreamUrl, 'key:', streamKey?.substring(0, 4) + '...');
                     const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
                       method: 'POST',
                       headers,
@@ -564,24 +539,24 @@ export function LivestreamSetupWizard({
                         clubId,
                         sessionData: {
                           liveInputId: cfData.liveInput.uid,
-                          streamUrl: rtmpUrl,
+                          streamUrl: outputStreamUrl,
                           streamKey: streamKey
                         }
                       })
                     });
-
                     const outputData = await outputResponse.json();
-                    console.log('[LivestreamWizard] Cloudflare addOutput response:', outputData);
-
                     if (outputResponse.ok && outputData.output) {
                       sessionData.cloudflare_output_id = outputData.output.uid;
-                      console.log('✅ YouTube output added to Cloudflare');
-                      addNotification('success', 'Successfully configured Cloudflare to YouTube relay', 4000);
+                      console.log('[LivestreamWizard] Cloudflare output created:', outputData.output.uid);
                     } else {
-                      console.error('❌ Failed to add YouTube output to Cloudflare:', outputData);
-                      addNotification('warning', 'Cloudflare output setup failed. Video may not relay to YouTube.', 6000);
+                      console.warn('[LivestreamWizard] Failed to create Cloudflare output:', outputData);
                     }
+                  } catch (outputError) {
+                    console.warn('[LivestreamWizard] Cloudflare output creation error:', outputError);
                   }
+
+                  addNotification('success', 'YouTube broadcast created successfully', 3000);
+                  setLoadingMessage('Finalizing YouTube configuration...');
                 } else {
                   console.error('❌ Failed to bind broadcast to stream:', bindData);
                   addNotification('error', 'Failed to bind YouTube broadcast to stream', 5000);
@@ -658,7 +633,7 @@ export function LivestreamSetupWizard({
       {/* Loading Modal Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60]">
-          <div className="bg-gray-900 rounded-lg p-8 max-w-md w-full mx-4 border border-blue-500/30 shadow-2xl">
+          <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl p-8 max-w-md w-full mx-4 border border-cyan-500/30 shadow-2xl">
             <div className="flex flex-col items-center">
               {/* Animated Spinner */}
               <div className="relative w-20 h-20 mb-6">
@@ -668,7 +643,7 @@ export function LivestreamSetupWizard({
 
               {/* Loading Message */}
               <h3 className="text-xl font-semibold text-white mb-2">Setting Up Your Stream</h3>
-              <p className="text-gray-400 text-center">{loadingMessage}</p>
+              <p className="text-slate-400 text-center">{loadingMessage}</p>
 
               {/* Progress Dots */}
               <div className="flex space-x-2 mt-6">
@@ -681,31 +656,38 @@ export function LivestreamSetupWizard({
         </div>
       )}
 
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-700/50">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 relative">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-white hover:text-gray-200"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">{getStepTitle()}</h2>
-            {currentStep === 'timing' && (
-              <p className="text-blue-100">When do you want to go live?</p>
-            )}
+        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
+                <Radio className="text-white drop-shadow-lg w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white drop-shadow-lg">{getStepTitle()}</h2>
+                {currentStep === 'timing' && (
+                  <p className="text-cyan-100 text-sm mt-0.5">When do you want to go live?</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Progress Indicator */}
-          <div className="mt-6 flex justify-center space-x-2">
+          <div className="mt-5 flex justify-center space-x-2 relative z-10">
             {steps.map((step, index) => (
               <div
                 key={step}
-                className={`h-1 w-16 rounded-full transition-colors ${
-                  index <= currentStepIndex ? 'bg-white' : 'bg-blue-400 bg-opacity-30'
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  index <= currentStepIndex ? 'bg-white w-20' : 'bg-white/20 w-16'
                 }`}
               />
             ))}
@@ -721,18 +703,18 @@ export function LivestreamSetupWizard({
                   updateWizardData({ timing: 'now' });
                   handleNext();
                 }}
-                className="w-full bg-gray-800 hover:bg-gray-700 p-6 rounded-lg flex items-center justify-between group transition-colors"
+                className="w-full bg-slate-800/80 hover:bg-slate-700/80 p-6 rounded-xl flex items-center justify-between group transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/5"
               >
                 <div className="flex items-center space-x-4">
-                  <div className="bg-gray-700 p-3 rounded-full group-hover:bg-gray-600">
+                  <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-3 rounded-xl group-hover:scale-105 transition-transform shadow-lg">
                     <Video className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
                     <h3 className="text-white font-semibold text-lg">Go Live Now</h3>
-                    <p className="text-gray-400">Set up your stream and start broadcasting immediately</p>
+                    <p className="text-slate-400 text-sm">Set up your stream and start broadcasting immediately</p>
                   </div>
                 </div>
-                <div className="bg-white text-gray-900 px-4 py-2 rounded-lg font-semibold">
+                <div className="bg-white text-slate-900 px-5 py-2 rounded-xl font-semibold text-sm shadow-md group-hover:shadow-lg transition-shadow">
                   Now
                 </div>
               </button>
@@ -742,18 +724,18 @@ export function LivestreamSetupWizard({
                   updateWizardData({ timing: 'later' });
                   handleNext();
                 }}
-                className="w-full bg-gray-800 hover:bg-gray-700 p-6 rounded-lg flex items-center justify-between group transition-colors"
+                className="w-full bg-slate-800/80 hover:bg-slate-700/80 p-6 rounded-xl flex items-center justify-between group transition-all duration-200 border border-slate-700/50 hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/5"
               >
                 <div className="flex items-center space-x-4">
-                  <div className="bg-gray-700 p-3 rounded-full group-hover:bg-gray-600">
+                  <div className="bg-gradient-to-br from-slate-600 to-slate-700 p-3 rounded-xl group-hover:scale-105 transition-transform shadow-lg">
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
                     <h3 className="text-white font-semibold text-lg">Schedule Stream</h3>
-                    <p className="text-gray-400">Set up a stream for a later time or future event</p>
+                    <p className="text-slate-400 text-sm">Set up a stream for a later time or future event</p>
                   </div>
                 </div>
-                <div className="bg-white text-gray-900 px-4 py-2 rounded-lg font-semibold">
+                <div className="bg-white text-slate-900 px-5 py-2 rounded-xl font-semibold text-sm shadow-md group-hover:shadow-lg transition-shadow">
                   Later
                 </div>
               </button>
@@ -764,17 +746,17 @@ export function LivestreamSetupWizard({
           {currentStep === 'event' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-white font-semibold text-lg mb-2">Select Event</h3>
-                <p className="text-gray-400 text-sm mb-4">Choose which race or event this livestream will cover</p>
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-2">Select Event</h3>
+                <p className="text-slate-400 text-sm mb-4">Choose which race or event this livestream will cover</p>
 
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Link to Race/Event <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <select
                     value={wizardData.eventId || ''}
                     onChange={(e) => handleEventSelection(e.target.value)}
-                    className="w-full px-3 py-2 pr-10 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 appearance-none"
+                    className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
                   >
                     <option value="">No event selected</option>
                     {events.map(event => (
@@ -783,7 +765,7 @@ export function LivestreamSetupWizard({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                 </div>
                 {events.length === 0 && (
                   <p className="mt-2 text-sm text-yellow-400">
@@ -804,7 +786,7 @@ export function LivestreamSetupWizard({
 
                 return isMultiDay && wizardData.eventId && wizardData.timing === 'later' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Event Day
                     </label>
                     <div className="relative">
@@ -836,15 +818,15 @@ export function LivestreamSetupWizard({
                             updateWizardData({ eventDay: dayNumber });
                           }
                         }}
-                        className="w-full px-3 py-2 pr-10 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 appearance-none"
+                        className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
                       >
                         {Array.from({ length: selectedEvent.number_of_days || 5 }, (_, i) => i + 1).map(day => (
                           <option key={day} value={day}>Day {day}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                     </div>
-                    <p className="mt-2 text-sm text-gray-400">
+                    <p className="mt-2 text-sm text-slate-400">
                       This is a {selectedEvent.number_of_days || 'multi'}-day event - select which day this stream covers
                     </p>
                   </div>
@@ -857,20 +839,20 @@ export function LivestreamSetupWizard({
             <div className="space-y-6">
               {wizardData.timing === 'later' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
                     Scheduled Start Time
                   </label>
                   <input
                     type="datetime-local"
                     value={wizardData.scheduledTime || ''}
                     onChange={(e) => updateWizardData({ scheduledTime: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 [color-scheme:dark]"
+                    className="w-full px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors [color-scheme:dark]"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Title <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -878,12 +860,12 @@ export function LivestreamSetupWizard({
                   value={wizardData.title}
                   onChange={(e) => updateWizardData({ title: e.target.value })}
                   placeholder="Add a title that describes your stream"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Description
                 </label>
                 <textarea
@@ -891,19 +873,19 @@ export function LivestreamSetupWizard({
                   onChange={(e) => updateWizardData({ description: e.target.value })}
                   placeholder="Tell viewers more about your stream"
                   rows={4}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Category
                 </label>
                 <div className="relative">
                   <select
                     value={wizardData.category}
                     onChange={(e) => updateWizardData({ category: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500 appearance-none"
+                    className="w-full px-3 py-2 pr-10 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 appearance-none backdrop-blur-sm transition-colors"
                   >
                     <option value="Sports">Sports</option>
                     <option value="Entertainment">Entertainment</option>
@@ -911,7 +893,7 @@ export function LivestreamSetupWizard({
                     <option value="Gaming">Gaming</option>
                     <option value="People & Blogs">People & Blogs</option>
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                 </div>
               </div>
             </div>
@@ -919,102 +901,96 @@ export function LivestreamSetupWizard({
 
           {currentStep === 'customization' && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-white font-semibold mb-4">Live Chat</h3>
-                <div className="space-y-3">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={wizardData.enableChat}
-                      onChange={(e) => updateWizardData({ enableChat: e.target.checked })}
-                      className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                    />
-                    <span className="text-gray-300">Enable live chat</span>
-                  </label>
-
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={wizardData.enableLeaderboard}
-                      onChange={(e) => updateWizardData({ enableLeaderboard: e.target.checked })}
-                      className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                    />
-                    <span className="text-gray-300">Show live leaderboard overlay</span>
-                  </label>
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5 space-y-4">
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Features</h3>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ enableChat: !wizardData.enableChat })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <span className="text-slate-200">Live chat</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableChat ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableChat ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-700/30" />
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ enableLeaderboard: !wizardData.enableLeaderboard })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <span className="text-slate-200">Live leaderboard overlay</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableLeaderboard ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableLeaderboard ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-700/30" />
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ enableReactions: !wizardData.enableReactions })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <span className="text-slate-200">Live reactions</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.enableReactions ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.enableReactions ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
+                  <div className="border-t border-slate-700/30" />
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ slowMode: !wizardData.slowMode })}
+                    className="w-full flex items-center justify-between py-3 px-1 group"
+                  >
+                    <div>
+                      <span className="text-slate-200">Slow mode</span>
+                      {wizardData.slowMode && (
+                        <span className="text-slate-400 text-sm ml-2">({wizardData.slowModeSeconds}s delay)</span>
+                      )}
+                    </div>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${wizardData.slowMode ? 'bg-cyan-500' : 'bg-slate-600'}`}>
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ${wizardData.slowMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <h3 className="text-white font-semibold mb-4">Participant Modes</h3>
-                <p className="text-gray-400 text-sm mb-3">Who can send messages</p>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.chatMode === 'anyone'}
-                      onChange={() => updateWizardData({ chatMode: 'anyone' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Anyone</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.chatMode === 'subscribers'}
-                      onChange={() => updateWizardData({ chatMode: 'subscribers' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Subscribers only</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.chatMode === 'members'}
-                      onChange={() => updateWizardData({ chatMode: 'members' })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Club members only</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-white font-semibold mb-4">Reactions</h3>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={wizardData.enableReactions}
-                    onChange={(e) => updateWizardData({ enableReactions: e.target.checked })}
-                    className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                  />
-                  <span className="text-gray-300">Enable live reactions</span>
-                </label>
-              </div>
-
-              <div>
-                <h3 className="text-white font-semibold mb-4">Message Delay</h3>
-                <label className="flex items-center space-x-3 mb-3">
-                  <input
-                    type="checkbox"
-                    checked={wizardData.slowMode}
-                    onChange={(e) => updateWizardData({ slowMode: e.target.checked })}
-                    className="w-5 h-5 bg-gray-800 border-gray-700 rounded"
-                  />
-                  <span className="text-gray-300">Enable slow mode</span>
-                </label>
                 {wizardData.slowMode && (
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">Seconds between messages</label>
+                  <div className="pt-2 pl-1">
+                    <label className="block text-sm text-slate-400 mb-2">Seconds between messages</label>
                     <input
                       type="number"
                       min="1"
                       max="300"
                       value={wizardData.slowModeSeconds}
                       onChange={(e) => updateWizardData({ slowModeSeconds: parseInt(e.target.value) || 60 })}
-                      className="w-32 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500"
+                      className="w-32 px-3 py-2 bg-slate-800/30 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 backdrop-blur-sm transition-colors"
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5">
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-2">Chat Permissions</h3>
+                <p className="text-slate-400 text-sm mb-4">Who can send messages</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'anyone', label: 'Anyone' },
+                    { value: 'subscribers', label: 'Subscribers' },
+                    { value: 'members', label: 'Members' },
+                  ] as const).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateWizardData({ chatMode: option.value })}
+                      className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 ${
+                        wizardData.chatMode === option.value
+                          ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                          : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                      } border`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1022,69 +998,77 @@ export function LivestreamSetupWizard({
           {currentStep === 'visibility' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-white font-semibold mb-4">Who can watch this stream?</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3 p-3 bg-gray-800 rounded">
-                    <input
-                      type="radio"
-                      checked={wizardData.visibility === 'public'}
-                      onChange={() => updateWizardData({ visibility: 'public' })}
-                      className="w-4 h-4"
-                    />
-                    <div>
-                      <div className="text-white font-medium">Public</div>
-                      <div className="text-gray-400 text-sm">Anyone can watch your stream</div>
-                    </div>
-                  </label>
-                  <label className="flex items-center space-x-3 p-3 bg-gray-800 rounded">
-                    <input
-                      type="radio"
-                      checked={wizardData.visibility === 'unlisted'}
-                      onChange={() => updateWizardData({ visibility: 'unlisted' })}
-                      className="w-4 h-4"
-                    />
-                    <div>
-                      <div className="text-white font-medium">Unlisted</div>
-                      <div className="text-gray-400 text-sm">Only people with the link can watch</div>
-                    </div>
-                  </label>
-                  <label className="flex items-center space-x-3 p-3 bg-gray-800 rounded">
-                    <input
-                      type="radio"
-                      checked={wizardData.visibility === 'private'}
-                      onChange={() => updateWizardData({ visibility: 'private' })}
-                      className="w-4 h-4"
-                    />
-                    <div>
-                      <div className="text-white font-medium">Private</div>
-                      <div className="text-gray-400 text-sm">Only club members can watch</div>
-                    </div>
-                  </label>
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-4">Who can watch this stream?</h3>
+                <div className="space-y-3">
+                  {([
+                    { value: 'public' as const, label: 'Public', desc: 'Anyone can watch your stream', icon: Globe },
+                    { value: 'unlisted' as const, label: 'Unlisted', desc: 'Only people with the link can watch', icon: Link },
+                    { value: 'private' as const, label: 'Private', desc: 'Only club members can watch', icon: Lock },
+                  ]).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => updateWizardData({ visibility: option.value })}
+                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all duration-200 text-left ${
+                        wizardData.visibility === option.value
+                          ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/20'
+                          : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600/50'
+                      } backdrop-blur-sm`}
+                    >
+                      <div className={`p-2.5 rounded-xl ${
+                        wizardData.visibility === option.value
+                          ? 'bg-cyan-500/20 text-cyan-400'
+                          : 'bg-slate-700/50 text-slate-400'
+                      }`}>
+                        <option.icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-white font-medium">{option.label}</div>
+                        <div className="text-slate-400 text-sm">{option.desc}</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        wizardData.visibility === option.value
+                          ? 'border-cyan-500 bg-cyan-500'
+                          : 'border-slate-500'
+                      }`}>
+                        {wizardData.visibility === option.value && (
+                          <Check className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="bg-gray-800 p-4 rounded">
-                <h3 className="text-white font-semibold mb-2">Audience</h3>
-                <p className="text-gray-400 text-sm mb-4">Is this stream made for kids?</p>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.madeForKids === true}
-                      onChange={() => updateWizardData({ madeForKids: true })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">Yes, it's made for kids</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="radio"
-                      checked={wizardData.madeForKids === false}
-                      onChange={() => updateWizardData({ madeForKids: false })}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-300">No, it's not made for kids</span>
-                  </label>
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-5">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-4 h-4 text-slate-400" />
+                  <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Audience</h3>
+                </div>
+                <p className="text-slate-400 text-sm mb-4">Is this stream made for kids?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ madeForKids: true })}
+                    className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 border ${
+                      wizardData.madeForKids === true
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    Yes, for kids
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateWizardData({ madeForKids: false })}
+                    className={`py-2.5 px-4 rounded-xl text-sm font-medium transition-all duration-200 border ${
+                      wizardData.madeForKids === false
+                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 ring-1 ring-cyan-500/30'
+                        : 'bg-slate-700/30 border-slate-600/30 text-slate-300 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    No, not for kids
+                  </button>
                 </div>
               </div>
             </div>
@@ -1092,63 +1076,63 @@ export function LivestreamSetupWizard({
 
           {currentStep === 'review' && (
             <div className="space-y-6">
-              <div className="bg-gray-800 p-6 rounded-lg space-y-4">
-                <h3 className="text-white font-semibold text-lg">Review Your Stream Settings</h3>
+              <div className="bg-slate-800/30 rounded-2xl border border-slate-700/50 backdrop-blur-sm p-6 space-y-4">
+                <h3 className="text-white font-semibold text-sm uppercase tracking-wider">Stream Summary</h3>
 
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Timing:</span>
+                <div className="space-y-0 text-sm">
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Timing</span>
                     <span className="text-white font-medium">
                       {wizardData.timing === 'now' ? 'Go Live Now' : 'Scheduled'}
                     </span>
                   </div>
 
                   {wizardData.timing === 'later' && wizardData.scheduledTime && (
-                    <div className="flex justify-between border-b border-gray-700 pb-2">
-                      <span className="text-gray-400">Start Time:</span>
+                    <div className="flex justify-between py-3 border-b border-slate-700/30">
+                      <span className="text-slate-400">Start Time</span>
                       <span className="text-white font-medium">
                         {new Date(wizardData.scheduledTime).toLocaleString()}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Title:</span>
-                    <span className="text-white font-medium">{wizardData.title || 'Not set'}</span>
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Title</span>
+                    <span className="text-white font-medium max-w-[60%] text-right">{wizardData.title || 'Not set'}</span>
                   </div>
 
                   {wizardData.eventId && (
-                    <div className="flex justify-between border-b border-gray-700 pb-2">
-                      <span className="text-gray-400">Linked Event:</span>
+                    <div className="flex justify-between py-3 border-b border-slate-700/30">
+                      <span className="text-slate-400">Linked Event</span>
                       <span className="text-white font-medium">
                         {events.find(e => e.id === wizardData.eventId)?.name || 'Selected'}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Visibility:</span>
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Visibility</span>
                     <span className="text-white font-medium capitalize">{wizardData.visibility}</span>
                   </div>
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Chat:</span>
-                    <span className="text-white font-medium">
+                  <div className="flex justify-between py-3 border-b border-slate-700/30">
+                    <span className="text-slate-400">Chat</span>
+                    <span className={`font-medium ${wizardData.enableChat ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {wizardData.enableChat ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
 
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Leaderboard:</span>
-                    <span className="text-white font-medium">
+                  <div className="flex justify-between py-3">
+                    <span className="text-slate-400">Leaderboard</span>
+                    <span className={`font-medium ${wizardData.enableLeaderboard ? 'text-cyan-400' : 'text-slate-500'}`}>
                       {wizardData.enableLeaderboard ? 'Enabled' : 'Disabled'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-blue-900 bg-opacity-30 border border-blue-700 p-4 rounded">
-                <p className="text-blue-200 text-sm">
+              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-2xl p-4">
+                <p className="text-cyan-200 text-sm">
                   {wizardData.timing === 'now'
                     ? 'Click "Go Live" to create your stream session. You can then configure cameras and overlays before starting the broadcast.'
                     : 'Your stream will be scheduled and you can configure additional settings later.'}
@@ -1159,10 +1143,10 @@ export function LivestreamSetupWizard({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-800 px-6 py-4 flex justify-between items-center border-t border-gray-700">
+        <div className="bg-slate-800/30 backdrop-blur-sm px-6 py-4 flex justify-between items-center border-t border-slate-700/50">
           <button
             onClick={currentStepIndex === 0 ? onClose : handleBack}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-300 hover:text-white transition-colors"
+            className="flex items-center space-x-2 px-4 py-2.5 text-slate-300 hover:text-white transition-colors rounded-xl hover:bg-slate-700/50"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{currentStepIndex === 0 ? 'Cancel' : 'Back'}</span>
@@ -1172,7 +1156,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleNext}
               disabled={currentStep === 'details' && (!wizardData.title || !wizardData.eventId)}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
             >
               <span>Next</span>
               <ArrowRight className="w-4 h-4" />
@@ -1181,7 +1165,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleComplete}
               disabled={loading || !wizardData.title || !wizardData.eventId}
-              className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-500 hover:to-green-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
             >
               <Check className="w-4 h-4" />
               <span>{loading ? 'Creating...' : wizardData.timing === 'now' ? 'Go Live' : 'Schedule Stream'}</span>

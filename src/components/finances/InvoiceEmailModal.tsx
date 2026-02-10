@@ -21,15 +21,20 @@ interface InvoiceEmailModalProps {
   isOpen: boolean;
   onClose: () => void;
   darkMode: boolean;
+  associationId?: string;
+  associationType?: 'state' | 'national';
 }
 
 export const InvoiceEmailModal: React.FC<InvoiceEmailModalProps> = ({
   invoice,
   isOpen,
   onClose,
-  darkMode
+  darkMode,
+  associationId,
+  associationType
 }) => {
   const { currentClub } = useAuth();
+  const isAssociation = !!associationId && !!associationType;
   const { addNotification } = useNotifications();
   const [sending, setSending] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(invoice.customer_email || '');
@@ -38,36 +43,49 @@ export const InvoiceEmailModal: React.FC<InvoiceEmailModalProps> = ({
   const [includeAttachment, setIncludeAttachment] = useState(true);
   const [clubName, setClubName] = useState<string>('');
 
-  // Fetch club name from the invoice
   useEffect(() => {
-    const fetchClubName = async () => {
+    const fetchOrgName = async () => {
       if (!invoice.id) return;
 
       try {
-        const { data, error } = await supabase
-          .from('invoices')
-          .select('club_id, clubs(name)')
-          .eq('id', invoice.id)
-          .single();
+        if (isAssociation) {
+          const assocTable = associationType === 'state' ? 'state_associations' : 'national_associations';
+          const { data, error } = await supabase
+            .from(assocTable)
+            .select('name')
+            .eq('id', associationId)
+            .maybeSingle();
 
-        if (error) {
-          console.error('Error fetching club name:', error);
-          setClubName(currentClub?.name || 'Your Club');
-        } else if (data?.clubs && typeof data.clubs === 'object' && 'name' in data.clubs) {
-          setClubName(data.clubs.name);
+          if (error || !data) {
+            setClubName('Your Association');
+          } else {
+            setClubName(data.name);
+          }
         } else {
-          setClubName(currentClub?.name || 'Your Club');
+          const { data, error } = await supabase
+            .from('invoices')
+            .select('club_id, clubs(name)')
+            .eq('id', invoice.id)
+            .single();
+
+          if (error) {
+            setClubName(currentClub?.name || 'Your Club');
+          } else if (data?.clubs && typeof data.clubs === 'object' && 'name' in data.clubs) {
+            setClubName(data.clubs.name);
+          } else {
+            setClubName(currentClub?.name || 'Your Club');
+          }
         }
       } catch (err) {
         console.error('Error:', err);
-        setClubName(currentClub?.name || 'Your Club');
+        setClubName(isAssociation ? 'Your Association' : (currentClub?.name || 'Your Club'));
       }
     };
 
     if (isOpen) {
-      fetchClubName();
+      fetchOrgName();
     }
-  }, [isOpen, invoice.id, currentClub]);
+  }, [isOpen, invoice.id, currentClub, isAssociation, associationId, associationType]);
 
   useEffect(() => {
     if (isOpen && clubName) {
@@ -143,9 +161,9 @@ ${clubName}`;
         throw new Error(result.error || 'Failed to send email');
       }
 
-      // Update invoice status to 'sent' if it was 'draft'
+      const invoiceTable = isAssociation ? 'association_invoices' : 'invoices';
       const { error: updateError } = await supabase
-        .from('invoices')
+        .from(invoiceTable)
         .update({
           status: 'sent',
           updated_at: new Date().toISOString()

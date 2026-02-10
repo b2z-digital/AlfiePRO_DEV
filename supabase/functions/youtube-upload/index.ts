@@ -1,11 +1,10 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
+};
 
 interface UploadRequest {
   videoFile: string;
@@ -19,10 +18,157 @@ interface UploadRequest {
   raceClass?: string;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
+interface YouTubeCredentials {
+  access_token: string;
+  refresh_token: string;
+  channel_id?: string;
+  channel_name?: string;
+  expires_at?: string;
+}
+
+async function getYouTubeCredentials(
+  supabase: any,
+  clubId: string
+): Promise<{ credentials: YouTubeCredentials; isDefault: boolean; integrationId?: string }> {
+  const { data: integration } = await supabase
+    .from('integrations')
+    .select('id, credentials')
+    .eq('club_id', clubId)
+    .eq('platform', 'youtube')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (integration?.credentials?.refresh_token) {
+    return {
+      credentials: integration.credentials as YouTubeCredentials,
+      isDefault: false,
+      integrationId: integration.id,
+    };
+  }
+
+  const { data: defaultIntegration } = await supabase
+    .from('integrations')
+    .select('id, credentials')
+    .eq('platform', 'youtube')
+    .eq('is_active', true)
+    .eq('is_default', true)
+    .maybeSingle();
+
+  if (!defaultIntegration?.credentials?.refresh_token) {
+    throw new Error('No YouTube integration found. The default AlfiePRO account is not configured.');
+  }
+
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing Google OAuth credentials');
+  }
+
+  const creds = defaultIntegration.credentials as YouTubeCredentials;
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: creds.refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to authenticate with default AlfiePRO YouTube account.');
+  }
+
+  const tokenData = await response.json();
+  creds.access_token = tokenData.access_token;
+
+  if (!creds.channel_id) {
+    try {
+      const channelResponse = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+        { headers: { 'Authorization': `Bearer ${creds.access_token}` } }
+      );
+      if (channelResponse.ok) {
+        const channelData = await channelResponse.json();
+        if (channelData.items?.length > 0) {
+          creds.channel_id = channelData.items[0].id;
+          creds.channel_name = channelData.items[0].snippet.title;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch channel info:', e);
+    }
+  }
+
+  const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
+  await supabase
+    .from('integrations')
+    .update({
+      credentials: { ...creds, expires_at: expiresAt },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', defaultIntegration.id);
+
+  return {
+    credentials: creds,
+    isDefault: true,
+    integrationId: defaultIntegration.id,
+  };
+}
+
+async function refreshYouTubeToken(
+  credentials: YouTubeCredentials,
+  supabase: any,
+  isDefault: boolean,
+  integrationId?: string
+): Promise<string> {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing Google OAuth credentials');
+  }
+
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: credentials.refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to refresh YouTube access token');
+  }
+
+  const data = await response.json();
+  const newAccessToken = data.access_token;
+  const expiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
+
+  if (integrationId) {
+    await supabase
+      .from('integrations')
+      .update({
+        credentials: { ...credentials, access_token: newAccessToken, expires_at: expiresAt },
+      })
+      .eq('id', integrationId);
+  }
+
+  return newAccessToken;
+}
+
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   try {
@@ -36,64 +182,37 @@ serve(async (req) => {
       eventType,
       eventName,
       raceClass
-    }: UploadRequest = await req.json()
+    }: UploadRequest = await req.json();
 
     if (!videoFile || !title || !clubId) {
-      throw new Error('Missing required parameters: videoFile, title, or clubId')
+      throw new Error('Missing required parameters: videoFile, title, or clubId');
     }
 
-    // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase environment variables')
+      throw new Error('Missing Supabase environment variables');
     }
 
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the club's YouTube integration
-    const { data: integration, error: integrationError } = await supabase
-      .from('club_integrations')
-      .select('youtube_access_token, youtube_refresh_token, youtube_token_expires_at, youtube_channel_id')
-      .eq('club_id', clubId)
-      .eq('provider', 'youtube')
-      .maybeSingle()
+    const { credentials, isDefault, integrationId } = await getYouTubeCredentials(supabase, clubId);
 
-    if (integrationError) {
-      console.error('Integration query error:', integrationError)
-      throw new Error(`Failed to query YouTube integration: ${integrationError.message}`)
-    }
+    let accessToken = credentials.access_token;
 
-    if (!integration) {
-      throw new Error('YouTube integration not found. Please connect your YouTube account in Settings > Integrations first.')
-    }
-
-    if (!integration.youtube_access_token) {
-      throw new Error('YouTube access token is missing. Please reconnect your YouTube account in Settings > Integrations.')
-    }
-
-    let accessToken = integration.youtube_access_token
-
-    // Check if token needs refresh
-    if (integration.youtube_token_expires_at) {
-      const expiryTime = new Date(integration.youtube_token_expires_at).getTime()
-      const currentTime = Date.now()
-      
-      if (currentTime >= expiryTime - 300000) { // Refresh 5 minutes before expiry
-        accessToken = await refreshYouTubeToken(integration.youtube_refresh_token, clubId, supabase)
+    if (credentials.expires_at) {
+      const expiryTime = new Date(credentials.expires_at).getTime();
+      if (Date.now() >= expiryTime - 300000) {
+        accessToken = await refreshYouTubeToken(credentials, supabase, isDefault, integrationId);
       }
     }
 
-    // Convert base64 to blob
-    const base64Data = videoFile.split(',')[1] // Remove data:video/mp4;base64, prefix
-    const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+    const base64Data = videoFile.split(',')[1];
+    const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
 
-    // Upload video to YouTube
-    const videoId = await uploadToYouTube(binaryData, title, description, privacy, accessToken)
+    const videoId = await uploadToYouTube(binaryData, title, description, privacy, accessToken);
 
-    // Store media record in database
     const { error: mediaError } = await supabase
       .from('event_media')
       .insert({
@@ -106,11 +225,10 @@ serve(async (req) => {
         event_ref_type: eventType || null,
         event_name: eventName || null,
         race_class: raceClass || null
-      })
+      });
 
     if (mediaError) {
-      console.error('Failed to store media record:', mediaError)
-      // Don't throw here as the video was successfully uploaded
+      console.error('Failed to store media record:', mediaError);
     }
 
     return new Response(
@@ -121,11 +239,11 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
-      },
-    )
+      }
+    );
 
   } catch (error) {
-    console.error('YouTube upload error:', error)
+    console.error('YouTube upload error:', error);
     return new Response(
       JSON.stringify({
         error: error.message || 'Failed to upload video to YouTube'
@@ -133,54 +251,10 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
-      },
-    )
+      }
+    );
   }
-})
-
-async function refreshYouTubeToken(refreshToken: string, clubId: string, supabase: any): Promise<string> {
-  const clientId = Deno.env.get('YOUTUBE_CLIENT_ID')
-  const clientSecret = Deno.env.get('YOUTUBE_CLIENT_SECRET')
-
-  if (!clientId || !clientSecret) {
-    throw new Error('Missing YouTube OAuth credentials')
-  }
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to refresh YouTube access token')
-  }
-
-  const data = await response.json()
-  const newAccessToken = data.access_token
-  const expiresIn = data.expires_in
-
-  // Update the token in the database
-  const expiresAt = new Date(Date.now() + (expiresIn * 1000)).toISOString()
-  
-  await supabase
-    .from('club_integrations')
-    .update({
-      youtube_access_token: newAccessToken,
-      youtube_token_expires_at: expiresAt
-    })
-    .eq('club_id', clubId)
-    .eq('provider', 'youtube')
-
-  return newAccessToken
-}
+});
 
 async function uploadToYouTube(
   videoData: Uint8Array,
@@ -189,19 +263,17 @@ async function uploadToYouTube(
   privacy: string,
   accessToken: string
 ): Promise<string> {
-  // Step 1: Create video metadata
   const metadata = {
     snippet: {
       title,
       description,
-      categoryId: '17' // Sports category
+      categoryId: '17'
     },
     status: {
       privacyStatus: privacy
     }
-  }
+  };
 
-  // Step 2: Upload video using resumable upload
   const uploadResponse = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status',
     {
@@ -212,47 +284,45 @@ async function uploadToYouTube(
       },
       body: createMultipartBody(metadata, videoData)
     }
-  )
+  );
 
   if (!uploadResponse.ok) {
-    const errorText = await uploadResponse.text()
-    throw new Error(`YouTube upload failed: ${errorText}`)
+    const errorText = await uploadResponse.text();
+    throw new Error(`YouTube upload failed: ${errorText}`);
   }
 
-  const uploadData = await uploadResponse.json()
-  return uploadData.id
+  const uploadData = await uploadResponse.json();
+  return uploadData.id;
 }
 
 function createMultipartBody(metadata: any, videoData: Uint8Array): Uint8Array {
-  const boundary = 'boundary'
-  const delimiter = `\r\n--${boundary}\r\n`
-  const closeDelimiter = `\r\n--${boundary}--`
+  const boundary = 'boundary';
+  const delimiter = `\r\n--${boundary}\r\n`;
+  const closeDelimiter = `\r\n--${boundary}--`;
 
   const metadataPart = delimiter +
     'Content-Type: application/json\r\n\r\n' +
-    JSON.stringify(metadata)
+    JSON.stringify(metadata);
 
   const videoPart = delimiter +
-    'Content-Type: video/mp4\r\n\r\n'
+    'Content-Type: video/mp4\r\n\r\n';
 
-  // Convert strings to Uint8Array
-  const encoder = new TextEncoder()
-  const metadataBytes = encoder.encode(metadataPart)
-  const videoPartBytes = encoder.encode(videoPart)
-  const closeDelimiterBytes = encoder.encode(closeDelimiter)
+  const encoder = new TextEncoder();
+  const metadataBytes = encoder.encode(metadataPart);
+  const videoPartBytes = encoder.encode(videoPart);
+  const closeDelimiterBytes = encoder.encode(closeDelimiter);
 
-  // Combine all parts
-  const totalLength = metadataBytes.length + videoPartBytes.length + videoData.length + closeDelimiterBytes.length
-  const result = new Uint8Array(totalLength)
+  const totalLength = metadataBytes.length + videoPartBytes.length + videoData.length + closeDelimiterBytes.length;
+  const result = new Uint8Array(totalLength);
 
-  let offset = 0
-  result.set(metadataBytes, offset)
-  offset += metadataBytes.length
-  result.set(videoPartBytes, offset)
-  offset += videoPartBytes.length
-  result.set(videoData, offset)
-  offset += videoData.length
-  result.set(closeDelimiterBytes, offset)
+  let offset = 0;
+  result.set(metadataBytes, offset);
+  offset += metadataBytes.length;
+  result.set(videoPartBytes, offset);
+  offset += videoPartBytes.length;
+  result.set(videoData, offset);
+  offset += videoData.length;
+  result.set(closeDelimiterBytes, offset);
 
-  return result
+  return result;
 }

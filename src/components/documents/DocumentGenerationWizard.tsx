@@ -192,9 +192,39 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
                 break;
               }
 
-              case 'boat_class_name':
-                prePopulatedData[field.field_name] = eventData.raceClass || eventData.boatClassName || eventData.race_class || '';
+              case 'boat_class_name': {
+                const classValue = eventData.raceClass || eventData.boatClassName || eventData.race_class || '';
+                if (classValue && field.options && field.options.length > 0) {
+                  const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const norm = normalise(classValue);
+                  const classAliases: Record<string, string[]> = {
+                    '10r': ['internationaltengater', 'internationaltengater', 'international10rater', '10rater', 'tenrater', '10r'],
+                    'df65': ['dragonforce65', 'df65', 'dragonflite65'],
+                    'df95': ['dragonforce95', 'df95', 'dragonflite95'],
+                    'iom': ['internationalonemétre', 'internationalonemetre', 'iom', 'iomusdollars'],
+                    'marblehead': ['marblehead', 'm'],
+                    'rg65': ['rg65'],
+                  };
+                  let matched = field.options.find(o => normalise(o.value) === norm || normalise(o.label) === norm);
+                  if (!matched) {
+                    const aliases = Object.entries(classAliases).find(([, vals]) => vals.includes(norm));
+                    if (aliases) {
+                      matched = field.options.find(o => {
+                        const ov = normalise(o.value);
+                        const ol = normalise(o.label);
+                        return aliases[1].some(a => ov.includes(a) || ol.includes(a)) || ov.includes(aliases[0]) || ol.includes(aliases[0]);
+                      });
+                    }
+                  }
+                  if (!matched) {
+                    matched = field.options.find(o => normalise(o.label).includes(norm) || normalise(o.value).includes(norm) || norm.includes(normalise(o.label)) || norm.includes(normalise(o.value)));
+                  }
+                  prePopulatedData[field.field_name] = matched ? matched.value : classValue;
+                } else {
+                  prePopulatedData[field.field_name] = classValue;
+                }
                 break;
+              }
 
               case 'club_id':
                 prePopulatedData[field.field_name] = eventData.clubId || eventData.club_id || '';
@@ -380,7 +410,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
       if (submissionError) throw submissionError;
 
       // Generate PDF client-side using jsPDF
-      const pdf = await generatePDFDocument(formData, template, currentClub, { clubs, venues, stateAssociations });
+      const pdf = await generatePDFDocument(formData, template, currentClub, { clubs, venues, stateAssociations }, form?.fields || []);
 
       // Convert PDF to blob
       const pdfBlob = pdf.output('blob');
@@ -449,9 +479,9 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
           <select
             value={formData[field.field_name] || ''}
             onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-            className={`w-full px-4 py-2.5 rounded-lg border transition-all duration-200 appearance-none cursor-pointer ${
+            className={`w-full px-4 py-3 rounded-xl border transition-all duration-200 appearance-none cursor-pointer ${
               darkMode
-                ? 'bg-slate-700/50 border-slate-600 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
+                ? 'bg-slate-900/50 border-slate-600/50 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
                 : 'bg-white border-slate-300 text-slate-900 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
             } ${errors[field.field_name] ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''} focus:outline-none pr-12`}
             required={field.is_required}
@@ -471,15 +501,15 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
       );
     }
 
-    const baseInputClass = `w-full px-4 py-2.5 rounded-lg border transition-all duration-200 ${
+    const baseInputClass = `w-full px-4 py-3 rounded-xl border transition-all duration-200 ${
       darkMode
-        ? 'bg-slate-700/50 border-slate-600 text-slate-100 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 [color-scheme:dark]'
+        ? 'bg-slate-900/50 border-slate-600/50 text-slate-100 placeholder-slate-500 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 [color-scheme:dark]'
         : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
     } ${errors[field.field_name] ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''} focus:outline-none`;
 
-    const selectClass = `w-full px-4 py-2.5 rounded-lg border transition-all duration-200 appearance-none cursor-pointer ${
+    const selectClass = `w-full px-4 py-3 rounded-xl border transition-all duration-200 appearance-none cursor-pointer ${
       darkMode
-        ? 'bg-slate-700/50 border-slate-600 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
+        ? 'bg-slate-900/50 border-slate-600/50 text-slate-100 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
         : 'bg-white border-slate-300 text-slate-900 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20'
     } ${errors[field.field_name] ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''} focus:outline-none pr-12`;
 
@@ -589,24 +619,49 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
 
       case 'radio':
         return (
-          <div className="space-y-4">
-            {field.options?.map((option, i) => (
-              <label key={i} className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative flex items-center">
+          <div className="space-y-2">
+            {field.options?.map((option, i) => {
+              const isSelected = formData[field.field_name] === option.value;
+              return (
+                <label
+                  key={i}
+                  className={`flex items-center gap-3 cursor-pointer group px-4 py-3 rounded-xl border transition-all duration-200 ${
+                    isSelected
+                      ? darkMode
+                        ? 'border-cyan-500/50 bg-cyan-500/10'
+                        : 'border-cyan-500 bg-cyan-50'
+                      : darkMode
+                        ? 'border-slate-700/50 bg-slate-900/30 hover:border-slate-600'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                    isSelected
+                      ? 'border-cyan-500 bg-cyan-500'
+                      : darkMode
+                        ? 'border-slate-500'
+                        : 'border-slate-400'
+                  }`}>
+                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
                   <input
                     type="radio"
                     name={field.field_name}
                     value={option.value}
-                    checked={formData[field.field_name] === option.value}
+                    checked={isSelected}
                     onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-                    className="w-5 h-5 text-cyan-500 border-slate-400 focus:ring-0 focus:ring-offset-0 cursor-pointer rounded-sm"
+                    className="sr-only"
                   />
-                </div>
-                <span className={`${darkMode ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-slate-900'} transition-colors`}>
-                  {option.label}
-                </span>
-              </label>
-            ))}
+                  <span className={`text-sm ${
+                    isSelected
+                      ? darkMode ? 'text-white font-medium' : 'text-slate-900 font-medium'
+                      : darkMode ? 'text-slate-300' : 'text-slate-700'
+                  } transition-colors`}>
+                    {option.label}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         );
 
@@ -659,11 +714,33 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+      {generating && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[60]">
+          <div className="bg-gradient-to-br from-cyan-600 to-blue-700 rounded-2xl p-8 shadow-2xl max-w-md mx-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <Sparkles className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white" size={32} />
+              </div>
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-white mb-2">Generating Document...</h3>
+                <p className="text-cyan-100 text-sm">
+                  Building your professional document with formatting and layout
+                </p>
+              </div>
+              <div className="flex gap-1 mt-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`w-full max-w-5xl my-8 rounded-2xl shadow-2xl overflow-hidden border ${
         darkMode ? 'bg-slate-800/80 backdrop-blur-2xl border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl border-slate-200'
       }`}>
-        {/* Header with Blue Gradient */}
-        <div className="relative px-8 py-6 border-b bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 border-blue-700/20">
+        <div className="relative px-8 py-6 border-b bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-600 border-blue-700/20">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl shadow-lg bg-white/20 backdrop-blur-sm">
@@ -707,9 +784,9 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
                 <Sparkles className="text-white" size={16} />
               </div>
             </div>
-            <div className="relative w-full h-2.5 rounded-full overflow-hidden bg-white/20">
+            <div className="relative w-full h-2 rounded-full overflow-hidden bg-white/20">
               <div
-                className="h-full transition-all duration-700 ease-out rounded-full bg-white shadow-lg shadow-white/30"
+                className="h-full transition-all duration-700 ease-out rounded-full bg-gradient-to-r from-white via-cyan-200 to-white shadow-lg shadow-white/30"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -815,8 +892,16 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
                           const stateAssoc = stateAssociations.find(s => s.id === value);
                           displayValue = stateAssoc ? `${stateAssoc.name} (${stateAssoc.state})` : value;
                         }
-                        // Handle underscores in values - replace with spaces
-                        else if (typeof displayValue === 'string') {
+                        else if (field.options && field.options.length > 0) {
+                          const opt = field.options.find(o => o.value === value);
+                          if (opt) displayValue = opt.label;
+                          else if (typeof displayValue === 'string') displayValue = displayValue.replace(/_/g, ' ');
+                        }
+                        else if (typeof displayValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(displayValue)) {
+                          const [y, m, d] = displayValue.split('-');
+                          displayValue = `${d}/${m}/${y.slice(2)}`;
+                        }
+                        else if (typeof displayValue === 'string' && displayValue.includes('_')) {
                           displayValue = displayValue.replace(/_/g, ' ');
                         }
 
@@ -865,11 +950,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
             {!isReviewPage ? (
               <button
                 onClick={handleNext}
-                className={`flex items-center gap-2 px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg ${
-                  darkMode
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-500/20'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-green-500/30'
-                }`}
+                className="flex items-center gap-2 px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-500/20"
               >
                 Next Step
                 <ChevronRight size={20} />
@@ -878,14 +959,8 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all duration-200 shadow-lg ${
-                  generating
-                    ? 'opacity-60 cursor-not-allowed'
-                    : ''
-                } ${
-                  darkMode
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-500/20'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-green-500/30'
+                className={`flex items-center gap-2 px-8 py-3 rounded-xl font-bold transition-all duration-200 shadow-lg bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white shadow-emerald-500/20 ${
+                  generating ? 'opacity-60 cursor-not-allowed' : ''
                 }`}
               >
                 {generating ? (
@@ -913,19 +988,11 @@ async function generatePDFDocument(
   formData: any,
   template: any,
   club: any,
-  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] }
+  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] },
+  formFields: FormField[] = []
 ): Promise<jsPDF> {
-  // Debug logging
-  console.log('=== PDF GENERATION DEBUG ===');
-  console.log('Template type:', template.template_type);
-  console.log('Has html_content:', !!template.html_content);
-  console.log('Template ID:', template.id);
-  console.log('Template name:', template.name);
-
-  // Check if this is an HTML template from WYSIWYG builder
   if (template.template_type === 'html' && template.html_content) {
-    console.log('✅ Using HTML template generation');
-    return await generatePDFFromHTML(formData, template, club);
+    return await generatePDFFromHTML(formData, template, club, lookupData, formFields);
   }
 
   // Legacy structured template processing
@@ -1287,201 +1354,435 @@ function generateDaySchedule(formData: any): string {
 }
 
 // Helper function to generate PDF from HTML template using html2canvas
+function resolveFieldDisplayValue(key: string, rawValue: string, formFields: FormField[], lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] }): string {
+  if (!rawValue) return rawValue;
+
+  if (key === 'state_association' || key === 'state_association_id') {
+    const assoc = lookupData.stateAssociations.find(a => a.id === rawValue);
+    if (assoc) return assoc.name + (assoc.state ? ` (${assoc.state})` : '');
+  }
+  if (key === 'clubs' || key === 'club' || key === 'club_id') {
+    const c = lookupData.clubs.find(c => c.id === rawValue);
+    if (c) return c.name;
+  }
+  if (key === 'venue' || key === 'venue_id') {
+    const v = lookupData.venues.find(v => v.id === rawValue);
+    if (v) return v.name;
+  }
+
+  const field = formFields.find(f => f.field_name === key);
+  if (field && field.options && field.options.length > 0) {
+    const option = field.options.find(o => o.value === rawValue);
+    if (option) return option.label;
+  }
+
+  if (typeof rawValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    const [y, m, d] = rawValue.split('-');
+    return `${d}/${m}/${y.slice(2)}`;
+  }
+
+  if (typeof rawValue === 'string' && rawValue.includes('_') && !/^\d{4}[-_]\d{2}[-_]\d{2}/.test(rawValue) && !rawValue.includes('://') && !rawValue.includes('@')) {
+    return rawValue.replace(/_/g, ' ');
+  }
+
+  return rawValue;
+}
+
 async function generatePDFFromHTML(
   formData: any,
   template: any,
-  club: any
+  club: any,
+  lookupData: { clubs: any[]; venues: any[]; stateAssociations: any[] },
+  formFields: FormField[] = []
 ): Promise<jsPDF> {
-  console.log('=== GENERATE PDF FROM HTML (html2canvas method) ===');
-
-  // Replace merge fields in HTML content
   let processedHTML = template.html_content;
 
-  // Replace form data merge fields
+  const resolvedFormData: Record<string, string> = {};
   Object.keys(formData).forEach((key) => {
-    const placeholder = `{{${key}}}`;
     const value = formData[key] || "";
+    resolvedFormData[key] = resolveFieldDisplayValue(key, value, formFields, lookupData);
+  });
+
+  Object.keys(resolvedFormData).forEach((key) => {
+    const placeholder = `{{${key}}}`;
+    const value = resolvedFormData[key];
     processedHTML = processedHTML.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "g"), value);
   });
 
-  // Replace club merge fields
   if (club) {
     processedHTML = processedHTML.replace(/{{club_name}}/g, club.name || "");
     processedHTML = processedHTML.replace(/{{club_email}}/g, club.email || "");
     processedHTML = processedHTML.replace(/{{club_website}}/g, club.website || "");
   }
 
-  // Create a temporary container for rendering with full styling
-  const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '210mm'; // A4 width
-  container.style.padding = '20mm';
-  container.style.backgroundColor = 'white';
-  container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-  container.style.fontSize = '14px';
-  container.style.lineHeight = '1.8';
-  container.style.color = '#000000';
+  processedHTML = processedHTML.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_match, y, m, d) => {
+    return `${d}/${m}/${y.slice(2)}`;
+  });
 
-  // Add logo if available
-  if (template.header_logo_url) {
-    const logoImg = document.createElement('img');
-    logoImg.src = template.header_logo_url;
-    logoImg.style.display = 'block';
-    logoImg.style.margin = '0 auto 20px';
-    logoImg.style.maxWidth = '100px';
-    logoImg.style.maxHeight = '100px';
-    container.appendChild(logoImg);
+  processedHTML = processedHTML.replace(/{{[^}]+}}/g, '');
+
+  let logoDataUrl = '';
+  if (template.logo_url) {
+    const logoUrl: string = template.logo_url;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+
+    if (supabaseUrl && logoUrl.includes(supabaseUrl)) {
+      try {
+        const pathMatch = logoUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/([^?]+)/);
+        if (pathMatch) {
+          const fullPath = decodeURIComponent(pathMatch[1]);
+          const slashIdx = fullPath.indexOf('/');
+          const bucket = fullPath.substring(0, slashIdx);
+          const filePath = fullPath.substring(slashIdx + 1);
+          const { data } = await supabase.storage.from(bucket).download(filePath);
+          if (data) {
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(data);
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase storage download failed:', e);
+      }
+    }
+
+    if (!logoDataUrl) {
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve) => {
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                logoDataUrl = canvas.toDataURL('image/png');
+              }
+            } catch (_) {}
+            resolve();
+          };
+          img.onerror = () => resolve();
+          setTimeout(resolve, 5000);
+          img.src = logoUrl;
+        });
+      } catch (_) {}
+    }
+
+    if (!logoDataUrl) {
+      try {
+        const resp = await fetch(logoUrl);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch (_) {}
+    }
   }
 
-  // Add content with proper styling
-  const contentDiv = document.createElement('div');
-  contentDiv.innerHTML = processedHTML;
+  const A4_WIDTH_PX = 794;
+  const A4_HEIGHT_PX = 1123;
+  const SCALE = 2;
+  const MARGIN_MM = 20;
+  const FOOTER_HEIGHT_MM = 12;
+  const CONTENT_HEIGHT_MM = 297 - MARGIN_MM - MARGIN_MM - FOOTER_HEIGHT_MM;
 
-  // Apply comprehensive text formatting styles
-  contentDiv.style.fontSize = '14px';
-  contentDiv.style.lineHeight = '1.8';
+  const documentStyles = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html { background: white; }
+    .pdf-page {
+      width: ${A4_WIDTH_PX}px;
+      background: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #1a1a1a;
+    }
+    .pdf-content {
+      white-space: pre-wrap;
+      tab-size: 4;
+    }
+    .pdf-content h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      line-height: 1.3;
+    }
+    .pdf-content h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 1em;
+      margin-bottom: 0.5em;
+      line-height: 1.3;
+    }
+    .pdf-content h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 0.75em;
+      margin-bottom: 0.5em;
+      line-height: 1.3;
+    }
+    .pdf-content p {
+      margin-bottom: 1.25em;
+      white-space: pre-wrap;
+    }
+    .pdf-content ol, .pdf-content ul {
+      margin-left: 1.5em;
+      margin-bottom: 1.25em;
+    }
+    .pdf-content li {
+      margin-bottom: 0.25em;
+      line-height: 1.6;
+    }
+    .pdf-content strong { font-weight: 700; }
+    .pdf-content em { font-style: italic; }
+    .pdf-content u { text-decoration: underline; }
+    .pdf-content s { text-decoration: line-through; }
+    .pdf-content .ql-align-center { text-align: center; }
+    .pdf-content .ql-align-right { text-align: right; }
+    .pdf-content .ql-align-justify { text-align: justify; }
+    .pdf-content .ql-indent-1 { padding-left: 3em; }
+    .pdf-content .ql-indent-2 { padding-left: 6em; }
+    .pdf-content .ql-indent-3 { padding-left: 9em; }
+    .pdf-content .hanging-indent { padding-left: 3em; text-indent: -3em; }
+    .pdf-content a { color: #1a1a1a; text-decoration: underline; }
+    .pdf-content img { max-width: 100%; height: auto; }
+    .pdf-content br { display: inline; content: ''; }
+    .pdf-logo { display: block; margin: 0 auto 24px; max-width: 120px; max-height: 120px; object-fit: contain; }
+    .pdf-footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 10px;
+      color: #888;
+      border-top: 1px solid #ddd;
+      padding-top: 6px;
+    }
+  `;
 
-  // Style all headings
-  const h1s = contentDiv.getElementsByTagName('h1');
-  Array.from(h1s).forEach(h1 => {
-    (h1 as HTMLElement).style.fontSize = '28px';
-    (h1 as HTMLElement).style.fontWeight = 'bold';
-    (h1 as HTMLElement).style.marginTop = '20px';
-    (h1 as HTMLElement).style.marginBottom = '15px';
-    (h1 as HTMLElement).style.lineHeight = '1.3';
-  });
+  const paddingPx = Math.round((MARGIN_MM / 210) * A4_WIDTH_PX);
 
-  const h2s = contentDiv.getElementsByTagName('h2');
-  Array.from(h2s).forEach(h2 => {
-    (h2 as HTMLElement).style.fontSize = '22px';
-    (h2 as HTMLElement).style.fontWeight = 'bold';
-    (h2 as HTMLElement).style.marginTop = '18px';
-    (h2 as HTMLElement).style.marginBottom = '12px';
-    (h2 as HTMLElement).style.lineHeight = '1.4';
-  });
+  const measuringContainer = document.createElement('div');
+  measuringContainer.style.position = 'absolute';
+  measuringContainer.style.left = '-9999px';
+  measuringContainer.style.top = '0';
 
-  const h3s = contentDiv.getElementsByTagName('h3');
-  Array.from(h3s).forEach(h3 => {
-    (h3 as HTMLElement).style.fontSize = '18px';
-    (h3 as HTMLElement).style.fontWeight = 'bold';
-    (h3 as HTMLElement).style.marginTop = '16px';
-    (h3 as HTMLElement).style.marginBottom = '10px';
-    (h3 as HTMLElement).style.lineHeight = '1.4';
-  });
+  const styleEl = document.createElement('style');
+  styleEl.textContent = documentStyles;
+  measuringContainer.appendChild(styleEl);
 
-  // Style paragraphs
-  const ps = contentDiv.getElementsByTagName('p');
-  Array.from(ps).forEach(p => {
-    (p as HTMLElement).style.marginTop = '8px';
-    (p as HTMLElement).style.marginBottom = '8px';
-    (p as HTMLElement).style.lineHeight = '1.8';
-  });
+  const measurePage = document.createElement('div');
+  measurePage.className = 'pdf-page';
+  measurePage.style.padding = `${paddingPx}px`;
 
-  // Style lists
-  const uls = contentDiv.getElementsByTagName('ul');
-  Array.from(uls).forEach(ul => {
-    (ul as HTMLElement).style.marginTop = '8px';
-    (ul as HTMLElement).style.marginBottom = '8px';
-    (ul as HTMLElement).style.paddingLeft = '25px';
-    (ul as HTMLElement).style.listStyleType = 'disc';
-  });
+  let logoHTML = '';
+  if (logoDataUrl || template.logo_url) {
+    const logoSrc = logoDataUrl || template.logo_url;
+    logoHTML = `<img class="pdf-logo" src="${logoSrc}" />`;
+  }
 
-  const ols = contentDiv.getElementsByTagName('ol');
-  Array.from(ols).forEach(ol => {
-    (ol as HTMLElement).style.marginTop = '8px';
-    (ol as HTMLElement).style.marginBottom = '8px';
-    (ol as HTMLElement).style.paddingLeft = '25px';
-    (ol as HTMLElement).style.listStyleType = 'decimal';
-  });
-
-  const lis = contentDiv.getElementsByTagName('li');
-  Array.from(lis).forEach(li => {
-    (li as HTMLElement).style.marginTop = '4px';
-    (li as HTMLElement).style.marginBottom = '4px';
-    (li as HTMLElement).style.lineHeight = '1.6';
-  });
-
-  // Style strong/bold text
-  const strongs = contentDiv.getElementsByTagName('strong');
-  Array.from(strongs).forEach(strong => {
-    (strong as HTMLElement).style.fontWeight = 'bold';
-  });
-
-  // Style emphasized text
-  const ems = contentDiv.getElementsByTagName('em');
-  Array.from(ems).forEach(em => {
-    (em as HTMLElement).style.fontStyle = 'italic';
-  });
-
-  container.appendChild(contentDiv);
-
-  document.body.appendChild(container);
+  measurePage.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
+  measuringContainer.appendChild(measurePage);
+  document.body.appendChild(measuringContainer);
 
   try {
-    // Wait for images to load
-    const images = container.getElementsByTagName('img');
+    const images = measuringContainer.getElementsByTagName('img');
     await Promise.all(
       Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = resolve; // Continue even if image fails
-          setTimeout(resolve, 3000); // Timeout after 3 seconds
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          setTimeout(resolve, 5000);
         });
       })
     );
 
-    // Capture the container as canvas with optimized settings
-    const canvas = await html2canvas(container, {
-      scale: 1.5, // Reduced from 2 for smaller file size
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      windowWidth: 794, // A4 width in pixels at 96 DPI
-      windowHeight: 1123 // A4 height in pixels at 96 DPI
-    });
+    const contentAreaHeightPx = Math.round((CONTENT_HEIGHT_MM / 297) * A4_HEIGHT_PX);
 
-    // Create PDF
+    const contentDiv = measurePage.querySelector('.pdf-content');
+    const allBlockElements: HTMLElement[] = [];
+    if (contentDiv) {
+      const BLOCK_TAGS = /^(P|H[1-6]|DIV|BLOCKQUOTE|TABLE|HR|PRE|SECTION|ARTICLE|HEADER|FOOTER|NAV|ASIDE|FIGURE)$/;
+      const collectLeafBlocks = (parent: Element) => {
+        Array.from(parent.children).forEach(child => {
+          const el = child as HTMLElement;
+          if (!el.tagName) return;
+          const tag = el.tagName.toUpperCase();
+          const display = getComputedStyle(el).display;
+
+          if (display === 'none') return;
+          if (display === 'inline' || display === 'inline-block') return;
+
+          if (tag === 'UL' || tag === 'OL') {
+            Array.from(el.children).forEach(li => {
+              const liEl = li as HTMLElement;
+              if (liEl.tagName?.toUpperCase() === 'LI') {
+                allBlockElements.push(liEl);
+              }
+            });
+            return;
+          }
+
+          let hasBlockChildren = false;
+          for (const ch of Array.from(el.children)) {
+            const chEl = ch as HTMLElement;
+            if (!chEl.tagName) continue;
+            const chTag = chEl.tagName.toUpperCase();
+            const chDisplay = getComputedStyle(chEl).display;
+            if (chDisplay === 'block' || chDisplay === 'list-item' || chDisplay === 'flex' || chDisplay === 'grid' ||
+                BLOCK_TAGS.test(chTag) || chTag === 'UL' || chTag === 'OL' || chTag === 'LI') {
+              hasBlockChildren = true;
+              break;
+            }
+          }
+
+          if (hasBlockChildren) {
+            collectLeafBlocks(el);
+          } else if (display === 'block' || display === 'list-item' || BLOCK_TAGS.test(tag)) {
+            allBlockElements.push(el);
+          }
+        });
+      };
+      collectLeafBlocks(contentDiv);
+    }
+
+    const measureRect = measurePage.getBoundingClientRect();
+    const contentOrigin = measureRect.top + paddingPx;
+    const breakOffsets: number[] = [0];
+    let nextBoundary = contentAreaHeightPx;
+    const SAFETY_MARGIN = 4;
+
+    for (const el of allBlockElements) {
+      const rect = el.getBoundingClientRect();
+      const elTop = rect.top - contentOrigin;
+      const elBottom = rect.bottom - contentOrigin;
+
+      if (elBottom > nextBoundary - SAFETY_MARGIN && elTop > breakOffsets[breakOffsets.length - 1] + SAFETY_MARGIN) {
+        breakOffsets.push(elTop);
+        nextBoundary = elTop + contentAreaHeightPx;
+      }
+
+      if (el.offsetHeight > contentAreaHeightPx && elTop >= breakOffsets[breakOffsets.length - 1]) {
+        const baseOffset = breakOffsets[breakOffsets.length - 1];
+        let extra = baseOffset + contentAreaHeightPx;
+        while (extra < elBottom) {
+          breakOffsets.push(extra);
+          extra += contentAreaHeightPx;
+        }
+        nextBoundary = extra;
+      }
+    }
+
+    const totalPages = breakOffsets.length;
+
+    document.body.removeChild(measuringContainer);
+
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
-      compress: true // Enable compression
+      compress: true
     });
 
-    const imgWidth = 210; // A4 width in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const pageHeight = 297; // A4 height in mm
-    let heightLeft = imgHeight;
-    let position = 0;
+    const footerText = template.footer_text || '';
 
-    // Convert to JPEG with compression for smaller file size
-    const imgData = canvas.toDataURL('image/jpeg', 0.85); // 85% quality JPEG
+    for (let pageNum = 0; pageNum < totalPages; pageNum++) {
+      if (pageNum > 0) pdf.addPage();
 
-    // Add first page
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
+      const pageOffset = breakOffsets[pageNum];
 
-    // Add additional pages if content is longer than one page
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
+      const pageContainer = document.createElement('div');
+      pageContainer.style.position = 'absolute';
+      pageContainer.style.left = '-9999px';
+      pageContainer.style.top = '0';
+
+      const pageStyle = document.createElement('style');
+      pageStyle.textContent = documentStyles;
+      pageContainer.appendChild(pageStyle);
+
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'pdf-page';
+      pageDiv.style.width = `${A4_WIDTH_PX}px`;
+      pageDiv.style.height = `${A4_HEIGHT_PX}px`;
+      pageDiv.style.padding = `${paddingPx}px`;
+      pageDiv.style.position = 'relative';
+      pageDiv.style.overflow = 'hidden';
+
+      const contentWrapper = document.createElement('div');
+      contentWrapper.style.position = 'relative';
+      contentWrapper.style.top = `-${pageOffset}px`;
+      contentWrapper.style.width = '100%';
+      contentWrapper.innerHTML = `${logoHTML}<div class="pdf-content">${processedHTML}</div>`;
+
+      const nextOffset = pageNum < totalPages - 1 ? breakOffsets[pageNum + 1] : pageOffset + contentAreaHeightPx;
+      const clipHeight = Math.min(nextOffset - pageOffset, contentAreaHeightPx);
+
+      const clipper = document.createElement('div');
+      clipper.style.overflow = 'hidden';
+      clipper.style.height = `${clipHeight}px`;
+      clipper.appendChild(contentWrapper);
+      pageDiv.appendChild(clipper);
+
+      if (footerText) {
+        const footer = document.createElement('div');
+        footer.className = 'pdf-footer';
+        footer.style.position = 'absolute';
+        footer.style.bottom = `${paddingPx}px`;
+        footer.style.left = `${paddingPx}px`;
+        footer.style.right = `${paddingPx}px`;
+        footer.textContent = footerText
+          .replace(/\{page\}/g, String(pageNum + 1))
+          .replace(/\{pages\}/g, String(totalPages));
+        pageDiv.appendChild(footer);
+      }
+
+      pageContainer.appendChild(pageDiv);
+      document.body.appendChild(pageContainer);
+
+      const pageImages = pageContainer.getElementsByTagName('img');
+      await Promise.all(
+        Array.from(pageImages).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            setTimeout(resolve, 5000);
+          });
+        })
+      );
+
+      const canvas = await html2canvas(pageDiv, {
+        scale: SCALE,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: A4_WIDTH_PX,
+        height: A4_HEIGHT_PX
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297, `page-${pageNum}`, 'FAST');
+
+      document.body.removeChild(pageContainer);
     }
-
-    // Cleanup
-    document.body.removeChild(container);
 
     return pdf;
   } catch (error) {
     console.error('Error generating PDF from HTML:', error);
-    // Cleanup on error
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
+    const leftover = document.querySelector('[style*="-9999px"]');
+    if (leftover) leftover.remove();
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 import { supabase } from '../../../utils/supabase';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../../../utils/formatCurrency';
@@ -28,6 +29,7 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const { currentOrganization } = useOrganizationContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<RemittanceStats>({
@@ -38,22 +40,101 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
   });
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadRemittanceStats();
-    }
-  }, [currentClub]);
+    loadRemittanceStats();
+  }, [currentClub, currentOrganization]);
 
   const loadRemittanceStats = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
-      // Get all unpaid remittances
-      const { data: remittances } = await supabase
-        .from('membership_remittances')
-        .select('total_fee, due_date, payment_status')
-        .eq('club_id', currentClub.clubId)
-        .neq('payment_status', 'paid');
+      console.log('📊 Loading remittance stats', {
+        currentOrg: currentOrganization,
+        currentClub: currentClub?.clubId
+      });
 
+      let remittances;
+
+      // Check if viewing as State Association
+      if (currentOrganization?.type === 'state') {
+        console.log('📍 Loading remittances for State Association:', currentOrganization.id);
+
+        // Get all clubs under this state association
+        const { data: clubs, error: clubsError } = await supabase
+          .from('clubs')
+          .select('id')
+          .eq('state_association_id', currentOrganization.id);
+
+        if (clubsError) {
+          console.error('Error fetching clubs:', clubsError);
+          throw clubsError;
+        }
+
+        console.log(`🏢 Found ${clubs?.length || 0} clubs in state association`);
+
+        if (!clubs || clubs.length === 0) {
+          // No clubs under this state association
+          setStats({
+            totalOwing: 0,
+            overdue: 0,
+            dueThisMonth: 0,
+            pending: 0
+          });
+          return;
+        }
+
+        const clubIds = clubs.map(c => c.id);
+
+        // Get remittances from ALL clubs in the state association
+        const { data, error } = await supabase
+          .from('membership_remittances')
+          .select('state_contribution_amount, membership_end_date, club_to_state_status, club_id')
+          .in('club_id', clubIds)
+          .neq('club_to_state_status', 'paid');
+
+        if (error) throw error;
+        remittances = data;
+
+        console.log(`💰 Found ${remittances?.length || 0} unpaid remittances across all clubs`);
+
+      } else if (currentOrganization?.type === 'national') {
+        console.log('📍 Loading remittances for National Association:', currentOrganization.id);
+
+        // Get ALL remittances from ALL clubs in the nation
+        const { data, error } = await supabase
+          .from('membership_remittances')
+          .select('national_contribution_amount, membership_end_date, state_to_national_status, club_id')
+          .neq('state_to_national_status', 'paid');
+
+        if (error) throw error;
+        remittances = data;
+
+        console.log(`💰 Found ${remittances?.length || 0} unpaid remittances nationally`);
+
+      } else if (currentClub?.clubId) {
+        console.log('📍 Loading remittances for single club:', currentClub.clubId);
+
+        // Get remittances for this specific club only
+        const { data, error } = await supabase
+          .from('membership_remittances')
+          .select('state_contribution_amount, membership_end_date, club_to_state_status')
+          .eq('club_id', currentClub.clubId)
+          .neq('club_to_state_status', 'paid');
+
+        if (error) throw error;
+        remittances = data;
+
+        console.log(`💰 Found ${remittances?.length || 0} unpaid remittances for club`);
+
+      } else {
+        console.log('⚠️ No organization or club context available');
+        setStats({
+          totalOwing: 0,
+          overdue: 0,
+          dueThisMonth: 0,
+          pending: 0
+        });
+        return;
+      }
+
+      // Calculate statistics
       if (remittances) {
         const now = new Date();
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -63,22 +144,38 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
         let dueThisMonth = 0;
         let pending = 0;
 
-        remittances.forEach(r => {
-          const amount = Number(r.total_fee) || 0;
+        remittances.forEach((r: any) => {
+          // Use the appropriate amount field based on organization type
+          const amount = currentOrganization?.type === 'national'
+            ? Number(r.national_contribution_amount) || 0
+            : Number(r.state_contribution_amount) || 0;
           totalOwing += amount;
 
-          if (r.payment_status === 'pending') {
+          // Check payment status based on organization type
+          const paymentStatus = currentOrganization?.type === 'national'
+            ? r.state_to_national_status
+            : r.club_to_state_status;
+
+          if (paymentStatus === 'pending') {
             pending += amount;
           }
 
-          if (r.due_date) {
-            const dueDate = new Date(r.due_date);
+          // Use membership_end_date as the "due date"
+          if (r.membership_end_date) {
+            const dueDate = new Date(r.membership_end_date);
             if (dueDate < now) {
               overdue += amount;
             } else if (dueDate <= endOfMonth) {
               dueThisMonth += amount;
             }
           }
+        });
+
+        console.log('📈 Calculated stats:', {
+          totalOwing,
+          overdue,
+          dueThisMonth,
+          pending
         });
 
         setStats({
@@ -89,7 +186,7 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
         });
       }
     } catch (error) {
-      console.error('Error loading remittance stats:', error);
+      console.error('❌ Error loading remittance stats:', error);
     } finally {
       setLoading(false);
     }
@@ -97,7 +194,12 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
 
   const handleNavigate = () => {
     if (!isEditMode) {
-      navigate('/membership?tab=remittances');
+      // Route to association remittances for state/national orgs, otherwise membership
+      if (currentOrganization?.type === 'state' || currentOrganization?.type === 'national') {
+        navigate('/association-remittances');
+      } else {
+        navigate('/membership?tab=remittances');
+      }
     }
   };
 

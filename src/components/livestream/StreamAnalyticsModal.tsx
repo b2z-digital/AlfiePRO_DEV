@@ -23,6 +23,10 @@ export function StreamAnalyticsModal({
   }, [sessionId, clubId]);
 
   const loadAnalytics = async () => {
+    if (!sessionId || !clubId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const [sessionData, archivesData] = await Promise.all([

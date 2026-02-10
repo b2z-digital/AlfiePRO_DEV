@@ -30,6 +30,8 @@ interface AuthContextType {
   currentClub: UserClub | null;
   currentOrganization: CurrentOrganization | null;
   loading: boolean;
+  clubsLoaded: boolean;
+  isLoggingOut: boolean;
   isSuperAdmin: boolean;
   isNationalOrgAdmin: boolean;
   isStateOrgAdmin: boolean;
@@ -58,6 +60,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [currentClub, setCurrentClub] = useState<UserClub | null>(null);
   const [currentOrganization, setCurrentOrganization] = useState<CurrentOrganization | null>(null);
   const [loading, setLoading] = useState(true);
+  const [clubsLoaded, setClubsLoaded] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
@@ -212,7 +216,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       console.log('Fetched user clubs with details:', validClubs);
       setUserClubs(validClubs);
-      
+      setClubsLoaded(true);
+
       // Set current club if none is selected or restore from localStorage
       // Get user's default club preference
       let defaultClubId: string | null = null;
@@ -320,16 +325,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signOut = async () => {
     try {
       console.log('Signing out...');
+      setIsLoggingOut(true);
 
-      // Clear all local state first
-      setUser(null);
-      setUserClubs([]);
-      setCurrentClub(null);
-      setCurrentOrganization(null);
-      setIsSuperAdmin(false);
-      setIsNationalOrgAdmin(false);
-      setIsStateOrgAdmin(false);
-      setUserSubscription(null);
+      // Sign out from Supabase first
+      await supabase.auth.signOut();
 
       // Clear local storage items
       localStorage.removeItem('currentClubId');
@@ -337,16 +336,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.removeItem(CURRENT_EVENT_KEY);
       sessionStorage.clear();
 
-      // Then sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error('Error signing out from Supabase:', error);
-      } else {
-        console.log('Sign out from Supabase successful');
-      }
-
-      // Force redirect to login page regardless of Supabase signOut result
+      // Force immediate redirect to login page to avoid white screen
       window.location.href = '/login';
     } catch (error) {
       console.error('Error in signOut function:', error);
@@ -614,6 +604,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     currentClub,
     currentOrganization,
     loading,
+    clubsLoaded,
+    isLoggingOut,
     isSuperAdmin,
     isNationalOrgAdmin,
     isStateOrgAdmin,

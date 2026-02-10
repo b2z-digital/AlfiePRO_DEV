@@ -1,6 +1,26 @@
-export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+function isServiceWorkerSupported(): boolean {
+  // Check if service workers are supported at all
   if (!('serviceWorker' in navigator)) {
-    console.log('Service Worker not supported');
+    return false;
+  }
+
+  // Detect StackBlitz environment
+  const isStackBlitz =
+    window.location.hostname.includes('stackblitz') ||
+    window.location.hostname.includes('webcontainer') ||
+    typeof (window as any).process !== 'undefined';
+
+  // Detect other development/preview environments that may not support SW
+  const isUnsupportedEnvironment =
+    window.location.protocol === 'file:' ||
+    (window.location.hostname === 'localhost' && import.meta.env.DEV);
+
+  return !isStackBlitz && !isUnsupportedEnvironment;
+}
+
+export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!isServiceWorkerSupported()) {
+    // Silently skip registration in unsupported environments
     return null;
   }
 
@@ -26,7 +46,12 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 
     return registration;
   } catch (error) {
-    console.error('Service Worker registration failed:', error);
+    // Silently handle registration errors in development
+    if (import.meta.env.DEV) {
+      console.log('Service Worker registration skipped in development');
+    } else {
+      console.error('Service Worker registration failed:', error);
+    }
     return null;
   }
 }

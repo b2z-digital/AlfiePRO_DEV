@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
+import { useOrganizationContext, getContextLabel } from '../../../hooks/useOrganizationContext';
 
 export const ActiveMembersWidget: React.FC<WidgetProps> = ({
   widgetId,
@@ -14,18 +15,19 @@ export const ActiveMembersWidget: React.FC<WidgetProps> = ({
 }) => {
   const navigate = useNavigate();
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const [count, setCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    if (currentClub) {
+    if (!orgContext.isLoading) {
       fetchActiveMembers();
     }
-  }, [currentClub]);
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchActiveMembers = async () => {
-    if (!currentClub?.clubId) {
+    if (orgContext.clubIds.length === 0) {
       setLoading(false);
       return;
     }
@@ -34,7 +36,7 @@ export const ActiveMembersWidget: React.FC<WidgetProps> = ({
       const { count, error } = await supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
-        .eq('club_id', currentClub.clubId)
+        .in('club_id', orgContext.clubIds)
         .eq('membership_status', 'active');
 
       if (error) throw error;
@@ -71,9 +73,9 @@ export const ActiveMembersWidget: React.FC<WidgetProps> = ({
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Active Members</p>
+          <p className="text-xs text-slate-400 mb-0.5">Active {getContextLabel(orgContext.type)} Members</p>
           <p className="text-2xl font-bold text-white mb-0.5">
-            {loading ? '...' : count}
+            {loading || orgContext.isLoading ? '...' : count}
           </p>
           <p className="text-xs text-slate-400">
             {count > 0 ? 'Currently active' : 'No active members'}

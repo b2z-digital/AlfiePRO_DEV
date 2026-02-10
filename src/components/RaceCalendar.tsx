@@ -323,7 +323,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         );
 
         // Combine all events (using local copies instead of original public events where they exist)
-        const allEvents = [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents];
+        // For associations, only show public events (state/national level events)
+        // For clubs, show all events including club-specific events
+        const allEvents = currentOrganization?.type === 'state' || currentOrganization?.type === 'national'
+          ? [...filteredPublicEvents]  // Associations: only public state/national events
+          : [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents];  // Clubs: all events
+
         const enrichedEvents = await enrichEventsWithAttendance(allEvents);
         setEvents(enrichedEvents);
       } catch (error) {

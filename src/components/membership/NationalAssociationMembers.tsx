@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, MapPin } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, MapPin, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
+import AssociationMemberImportModal from './AssociationMemberImportModal';
 
 interface NationalAssociationMembersProps {
   darkMode: boolean;
@@ -28,7 +29,7 @@ interface MemberWithClub {
 }
 
 export const NationalAssociationMembers: React.FC<NationalAssociationMembersProps> = ({ darkMode }) => {
-  const { user } = useAuth();
+  const { user, currentOrganization } = useAuth();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<MemberWithClub[]>([]);
@@ -41,6 +42,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
   const [clubs, setClubs] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [memberRemittanceStatus, setMemberRemittanceStatus] = useState<Record<string, { statePaid: boolean; nationalPaid: boolean }>>({});
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Check for viewClubId in location state
   useEffect(() => {
@@ -444,7 +446,18 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
           </select>
         </div>
 
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end mt-4 gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+              darkMode
+                ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                : 'bg-slate-200 hover:bg-slate-300 text-gray-900'
+            } transition-colors`}
+          >
+            <Upload size={18} />
+            Import Members
+          </button>
           <button
             onClick={exportToCSV}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
@@ -603,6 +616,19 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
           </table>
         </div>
       </div>
+
+      {showImportModal && currentOrganization && (
+        <AssociationMemberImportModal
+          isOpen={showImportModal}
+          onClose={() => {
+            setShowImportModal(false);
+            loadNationalAssociationData();
+          }}
+          associationId={currentOrganization.id}
+          associationType={currentOrganization.type as 'state' | 'national'}
+          associationName={currentOrganization.name}
+        />
+      )}
     </div>
   );
 };

@@ -43,7 +43,7 @@ interface HeatScoringTableProps {
   onGoToRound?: (roundNumber: number) => void;
   onAdvanceToNextRound?: (currentHeat: HeatDesignation) => void;
   onClearHeatRaceResults?: (heatDesignation: HeatDesignation, round: number, race: number, skipperIndices: number[]) => void;
-  onUpdateHeatAssignments?: (assignments: any) => void;
+  onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
 }
 
@@ -123,8 +123,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Track which round was last auto-advanced to prevent loops
   const lastAutoAdvancedRound = React.useRef<number | null>(null);
 
-  // Track if we've shown the initial modal
-  const hasShownInitialModal = React.useRef<boolean>(false);
+  // Track if we've shown the initial modal (reset on each render cycle)
+  const [hasShownInitialModal, setHasShownInitialModal] = React.useState<boolean>(false);
 
   // Track last promotion to avoid showing modal multiple times
   const lastPromotionShown = React.useRef<string | null>(null);
@@ -174,7 +174,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
       for (const heat of availableHeats) {
         const progress = getHeatProgress(heat);
-        const isComplete = progress.scored === progress.total && progress.total > 0;
+        const isComplete = progress.scored >= progress.total && progress.total > 0;
 
         if (isInitialLoad || isRoundChange) {
           console.log(`Heat ${heat}: ${progress.scored}/${progress.total} - ${isComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
@@ -255,17 +255,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     }
   }, [heatManagement, currentRound?.results]);
 
-  // Show modal on initial load for Round 1 if no scores yet
+  // Show modal on initial load when continuing scoring
+  // This ensures the user sees heat assignments when clicking "Continue Scoring"
   React.useEffect(() => {
-    if (!hasShownInitialModal.current && currentRound && currentRound.round === 1) {
-      const hasScores = currentRound.results && currentRound.results.length > 0;
-      if (!hasScores && availableHeats.length > 0) {
-        console.log('🎯 Initial heat allocation - showing assignments modal');
-        setShowHeatAssignments(true);
-        hasShownInitialModal.current = true;
-      }
+    if (!hasShownInitialModal && currentRound && availableHeats.length > 0) {
+      console.log('🎯 Initial load - showing heat assignments modal for Round', currentRound.round);
+      setShowHeatAssignments(true);
+      setHasShownInitialModal(true);
     }
-  }, [currentRound, availableHeats]);
+  }, [currentRound, availableHeats, hasShownInitialModal]);
 
   // Show modal when a round completes and next round assignments are generated
   const lastCompletedRoundShown = React.useRef<number | null>(null);
@@ -289,7 +287,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
     // Check if current heat is complete
     const progress = getHeatProgress(selectedHeat);
-    const currentHeatComplete = progress.scored === progress.total && progress.total > 0;
+    const currentHeatComplete = progress.scored >= progress.total && progress.total > 0;
 
     if (currentHeatComplete) {
       // Prevent advancing FROM the same heat multiple times
@@ -308,7 +306,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       if (nextHeatIndex < availableHeats.length) {
         const nextHeat = availableHeats[nextHeatIndex];
         const nextProgress = getHeatProgress(nextHeat);
-        const nextHeatComplete = nextProgress.scored === nextProgress.total && nextProgress.total > 0;
+        const nextHeatComplete = nextProgress.scored >= nextProgress.total && nextProgress.total > 0;
 
         // Only auto-advance if next heat is NOT complete
         if (!nextHeatComplete) {
@@ -653,7 +651,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const isHeatComplete = (heat: HeatDesignation) => {
     const progress = getHeatProgress(heat);
-    return progress.scored === progress.total && progress.total > 0;
+    return progress.scored >= progress.total && progress.total > 0;
   };
 
   // Check if all heats are complete for current race
@@ -665,7 +663,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     // Use the getHeatProgress function which already works correctly
     const allComplete = availableHeats.every(heat => {
       const progress = getHeatProgress(heat);
-      return progress.scored === progress.total && progress.total > 0;
+      return progress.scored >= progress.total && progress.total > 0;
     });
 
     if (allComplete) {
@@ -685,7 +683,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     const otherHeats = availableHeats.filter(heat => heat !== selectedHeat);
     const allOthersComplete = otherHeats.every(heat => {
       const progress = getHeatProgress(heat);
-      return progress.scored === progress.total && progress.total > 0;
+      return progress.scored >= progress.total && progress.total > 0;
     });
 
     // Check if the selected heat is not yet complete
@@ -736,12 +734,26 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     setShowManualAssignModal(true);
   };
 
+  // Force reload observers when Heat Assignments Modal opens
+  // This ensures fresh observer data when continuing scoring after exiting
+  React.useEffect(() => {
+    if (showHeatAssignments) {
+      console.log('📋 Heat Assignments Modal opened - triggering observer refresh');
+      setObserverReloadTrigger(prev => prev + 1);
+    }
+  }, [showHeatAssignments]);
+
   // Load observers for the current heat
   React.useEffect(() => {
     const loadObservers = async () => {
       if (!currentEvent?.id || !selectedHeat || !currentEvent.enable_observers) {
         console.log(`🚫 Not loading observers: eventId=${currentEvent?.id}, heat=${selectedHeat}, enable_observers=${currentEvent?.enable_observers}`);
-        setCurrentHeatObservers([]);
+        // Clear observers if we can't load them
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (currentHeatObservers.length > 0) {
+          console.log('🧹 Clearing stale observers');
+          setCurrentHeatObservers([]);
+        }
         return;
       }
 
@@ -762,9 +774,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           round: o.round,
           heat_number: o.heat_number
         })));
+
+        // Always update state, even if empty, to trigger re-render
+        console.log(`🔄 Setting currentHeatObservers to ${observers?.length || 0} observers`);
         setCurrentHeatObservers(observers || []);
       } catch (error) {
-        console.error('Error loading observers for current heat:', error);
+        console.error('❌ Error loading observers for current heat:', error);
         setCurrentHeatObservers([]);
       }
     };
@@ -1132,7 +1147,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
-          // Trigger observer reload to ensure scoring screen gets the latest observers
+          // CRITICAL: Force observer reload when modal closes to ensure fresh observers for scoring
+          // This ensures observers are reloaded from the database, not stale modal state
           setObserverReloadTrigger(prev => prev + 1);
         }}
         heatManagement={heatManagement}
@@ -1207,6 +1223,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         skippers={skippers}
         heatManagement={heatManagement}
         darkMode={darkMode}
+        currentEvent={currentEvent}
       />
 
       {/* Overall Results Modal */}

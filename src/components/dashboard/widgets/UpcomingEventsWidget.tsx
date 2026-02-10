@@ -8,6 +8,7 @@ import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { getStoredRaceEvents, getStoredRaceSeries } from '../../../utils/raceStorage';
 import { getPublicEvents } from '../../../utils/publicEventStorage';
 import { getBoatClassBadge, getRaceFormatBadge } from '../../../constants/colors';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface RaceEvent {
   id: string;
@@ -31,10 +32,21 @@ interface RaceEvent {
 export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { currentClub, currentOrganization } = useAuth();
+  const orgContext = useOrganizationContext();
   const [upcomingEvents, setUpcomingEvents] = useState<RaceEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const darkMode = true;
   const themeColors = useWidgetTheme(colorTheme);
+
+  // Determine the widget title based on organization type
+  const getWidgetTitle = () => {
+    if (orgContext.type === 'state') {
+      return 'Upcoming State Events';
+    } else if (orgContext.type === 'national') {
+      return 'Upcoming National Events';
+    }
+    return 'Upcoming Events';
+  };
 
   useEffect(() => {
     fetchUpcomingEvents();
@@ -326,7 +338,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-2">
           <Calendar className="text-blue-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">Upcoming Events</h2>
+          <h2 className="text-lg font-semibold text-white">{getWidgetTitle()}</h2>
         </div>
         {!isEditMode && (
           <button
@@ -356,7 +368,9 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
               onClick={() => {
                 if (isEditMode) return;
 
-                if (event.isPublicEvent) {
+                // For associations, always route to calendar
+                // For clubs, route to race management for their own events or calendar for public events
+                if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
                   navigate('/calendar');
                 } else {
                   // Navigate to race management which will handle event selection

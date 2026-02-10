@@ -6,6 +6,8 @@ import { ModalProvider } from './contexts/ModalContext';
 import { RaceEvent } from './types/race';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
+import { ForgotPassword } from './components/auth/ForgotPassword';
+import { ResetPassword } from './components/auth/ResetPassword';
 import { useAuth } from './contexts/AuthContext';
 import { SubscriptionSelection } from './pages/SubscriptionSelection';
 import { SubscriptionSuccess } from './pages/SubscriptionSuccess';
@@ -69,7 +71,7 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, onboardingCompleted, hasPendingApplication, userClubs } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, userClubs } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
   useDataPreloader();
@@ -87,7 +89,8 @@ function App() {
                               hostname.match(/^\d+\.\d+\.\d+\.\d+$/) || // IP address
                               hostname.includes('webcontainer') || // StackBlitz/WebContainer
                               hostname.includes('bolt.new') ||
-                              hostname.includes('stackblitz.io');
+                              hostname.includes('stackblitz.io') ||
+                              hostname.includes('amplifyapp.com');
 
   const isCustomDomain = !isAlfieproDomain && !isDevelopmentDomain;
   const subdomain = isSubdomain ? hostname.split('.')[0] : (isCustomDomain ? hostname : null);
@@ -126,11 +129,14 @@ function App() {
   });
 
   // Show loading state while checking authentication (but not for public routes)
-  if (loading && !isPublicRoute) {
+  if ((loading && !isPublicRoute) || isLoggingOut) {
     console.log('⏳ Showing loading screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="text-white text-xl">{isLoggingOut ? 'Signing out...' : 'Loading...'}</div>
+        </div>
       </div>
     );
   }
@@ -199,6 +205,7 @@ function App() {
         <Route path="/nor/:slug" element={<PublicNorGenerator />} />
 
         {/* Live Tracking Routes (Public) */}
+        <Route path="/t/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token/dashboard" element={<LiveDashboardPage />} />
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
@@ -239,6 +246,8 @@ function App() {
 
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
         <Route path="/register" element={isAuthenticated ? <Navigate to="/" /> : <Register />} />
+        <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/" /> : <ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/invite/:token" element={<InvitationSignup />} />
         {/* OAuth callback - allow even when not authenticated, component handles auth internally */}
         <Route path="/stripe-oauth-callback" element={<StripeOAuthCallback />} />
@@ -285,7 +294,7 @@ function App() {
               <Navigate to="/login" />
             ) : hasPendingApplication ? (
               <Navigate to="/application-pending" />
-            ) : userClubs.length === 0 && !onboardingCompleted ? (
+            ) : clubsLoaded && userClubs.length === 0 && !onboardingCompleted ? (
               <Navigate to="/onboarding" />
             ) : (
               <DashboardLayout

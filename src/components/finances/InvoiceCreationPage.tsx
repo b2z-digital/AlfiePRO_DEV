@@ -539,36 +539,54 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
   };
 
   const handleExportPDF = async () => {
-    if (!editingInvoice || !currentClub?.clubId) return;
+    if (!editingInvoice) return;
+    if (!isAssociation && !currentClub?.clubId) return;
 
     try {
-      // Fetch invoice data
+      const invoiceTable = isAssociation ? 'association_invoices' : 'invoices';
+      const lineItemsTable = isAssociation ? 'association_invoice_line_items' : 'invoice_line_items';
+
       const { data: invoiceData, error: invoiceError } = await supabase
-        .from('invoices')
+        .from(invoiceTable)
         .select('*')
         .eq('id', editingInvoice.id)
         .single();
 
       if (invoiceError) throw invoiceError;
 
-      // Fetch club details separately
-      const { data: clubData, error: clubError } = await supabase
-        .from('clubs')
-        .select('name, bank_name, bsb, account_number, logo, address')
-        .eq('id', currentClub.clubId)
-        .single();
+      let orgName = '';
+      let orgDetails: any = {};
 
-      if (clubError) throw clubError;
+      if (isAssociation) {
+        const assocTable = associationType === 'state' ? 'state_associations' : 'national_associations';
+        const { data: assocData, error: assocError } = await supabase
+          .from(assocTable)
+          .select('name, logo, address')
+          .eq('id', associationId)
+          .single();
 
-      // Combine invoice with club data
+        if (assocError) throw assocError;
+        orgName = assocData?.name || 'Association';
+        orgDetails = assocData || {};
+      } else {
+        const { data: clubData, error: clubError } = await supabase
+          .from('clubs')
+          .select('name, bank_name, bsb, account_number, logo, address')
+          .eq('id', currentClub!.clubId)
+          .single();
+
+        if (clubError) throw clubError;
+        orgName = clubData?.name || 'Club Name';
+        orgDetails = clubData || {};
+      }
+
       const invoice: any = {
         ...invoiceData,
-        clubs: clubData
+        clubs: { name: orgName, ...orgDetails }
       };
 
-      // Fetch line items
       const { data: lineItems, error: lineItemsError } = await supabase
-        .from('invoice_line_items')
+        .from(lineItemsTable)
         .select('*')
         .eq('invoice_id', editingInvoice.id)
         .order('created_at', { ascending: true });

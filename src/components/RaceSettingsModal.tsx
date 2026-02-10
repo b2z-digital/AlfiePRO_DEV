@@ -5,6 +5,7 @@ import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
 import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
+import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
 import { supabase } from '../utils/supabase';
 
@@ -77,10 +78,70 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   );
   const [currentHeatManagement, setCurrentHeatManagement] = useState<HeatManagement | null>(initialHeatManagement);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
+  const [nationalAssociationId, setNationalAssociationId] = useState<string | undefined>(undefined);
 
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
+
+  // Load national association ID from club's state association
+  useEffect(() => {
+    const loadNationalAssociationId = async () => {
+      console.log('RaceSettingsModal: Attempting to load national association ID', {
+        isOpen,
+        currentEvent,
+        clubId: currentEvent?.clubId,
+        hasCurrentEvent: !!currentEvent
+      });
+
+      if (!isOpen) {
+        console.log('Modal not open, skipping');
+        return;
+      }
+
+      if (!currentEvent?.clubId) {
+        console.warn('No clubId on currentEvent, cannot load national association ID');
+        return;
+      }
+
+      try {
+        console.log('Fetching club data for clubId:', currentEvent.clubId);
+        // Get club's state association
+        const { data: clubData, error: clubError } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', currentEvent.clubId)
+          .single();
+
+        console.log('Club data result:', { clubData, clubError });
+
+        if (clubData?.state_association_id) {
+          console.log('Fetching state association data for:', clubData.state_association_id);
+          // Get state association's national association
+          const { data: stateData, error: stateError } = await supabase
+            .from('state_associations')
+            .select('national_association_id')
+            .eq('id', clubData.state_association_id)
+            .single();
+
+          console.log('State association data result:', { stateData, stateError });
+
+          if (stateData?.national_association_id) {
+            setNationalAssociationId(stateData.national_association_id);
+            console.log('✓ Successfully loaded national association ID:', stateData.national_association_id);
+          } else {
+            console.warn('State association has no national_association_id');
+          }
+        } else {
+          console.warn('Club has no state_association_id');
+        }
+      } catch (err) {
+        console.error('Error loading national association ID:', err);
+      }
+    };
+
+    loadNationalAssociationId();
+  }, [isOpen, currentEvent?.clubId]);
 
   // Load user's scoring mode preference
   useEffect(() => {
@@ -214,12 +275,16 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
   const heatSizes = numHeats > 0 ? calculateHeatSizes(skippers.length, numHeats) : [];
 
-  const [initialAssignment, setInitialAssignment] = useState<'random' | 'manual'>('random');
+  const [initialAssignment, setInitialAssignment] = useState<'random' | 'manual' | 'hms'>('random');
   const [showManualAssignmentModal, setShowManualAssignmentModal] = useState(false);
+  const [showHMSSeedingModal, setShowHMSSeedingModal] = useState(false);
 
   useEffect(() => {
     if (initialHeatManagement?.configuration) {
       const config = initialHeatManagement.configuration;
+      // Determine assignment type based on configuration
+      // If it's manual and was seeded (not random), assume it could be HMS seeding
+      // For now, we'll default to manual for any non-random seeding
       setInitialAssignment(config.seedingMethod === 'random' ? 'random' : 'manual');
     }
   }, [initialHeatManagement]);
@@ -299,15 +364,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         });
       }
 
-      // For manual assignment, open modal instead of auto-seeding
-      if (initialAssignment === 'manual') {
-        setShowManualAssignmentModal(true);
-        return;
-      }
-
-      // DON'T seed heats immediately when toggling on
-      // Wait until user clicks "Save Settings" to seed with final configuration
-      // Just enable the UI for now
+      // DON'T open assignment modals or seed heats immediately when toggling on
+      // Wait until user configures settings and clicks "Save Settings"
+      // This prevents modals from opening before the race officer has set the number of heats
       return;
     } else if (!enabled) {
       // Disabling heat racing
@@ -395,6 +454,41 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     });
 
     setShowManualAssignmentModal(false);
+  };
+
+  const handleHMSSeedingConfirm = (assignments: any[]) => {
+    console.log('🎯 HMS Seeding assignments received:', JSON.stringify(assignments, null, 2));
+
+    const finalHeatManagement = {
+      configuration: {
+        enabled: true,
+        numberOfHeats: numHeats,
+        promotionCount: promotionCount,
+        seedingMethod: 'manual' as SeedingMethod, // Use 'manual' since we're setting specific assignments
+        autoAssign: false,
+        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+      },
+      currentRound: 1,
+      currentHeat: assignments[assignments.length - 1].heatDesignation,
+      rounds: [
+        {
+          round: 1,
+          heatAssignments: assignments,
+          results: [],
+          completed: false
+        }
+      ]
+    };
+
+    console.log('🎯 Saving HMS Seeding heat management:', JSON.stringify(finalHeatManagement, null, 2));
+
+    onSaveSettings({
+      numRaces: currentNumRaces,
+      dropRules: currentDropRules,
+      heatManagement: finalHeatManagement
+    });
+
+    setShowHMSSeedingModal(false);
   };
 
   const handleScoringModeChange = async (mode: 'pro' | 'touch') => {
@@ -553,6 +647,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         if (initialAssignment === 'manual') {
           setShowManualAssignmentModal(true);
           return; // Don't save yet, wait for manual assignments
+        }
+
+        // For HMS seeding, show the HMS seeding modal
+        if (initialAssignment === 'hms') {
+          setShowHMSSeedingModal(true);
+          return; // Don't save yet, wait for HMS seeding assignments
         }
 
         // Create new heat management with seeded heats
@@ -1368,12 +1468,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Initial Assignment
                   </label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setInitialAssignment('random')}
                       disabled={hasHeatScores}
                       className={`
-                        flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                        flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-lg text-sm font-medium transition-all
                         ${hasHeatScores
                           ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : initialAssignment === 'random'
@@ -1384,8 +1484,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         }
                       `}
                     >
-                      <Shuffle size={16} />
-                      Random Assignment
+                      <Shuffle size={18} />
+                      <span className="text-xs">Random</span>
                     </button>
                     <button
                       onClick={() => {
@@ -1397,7 +1497,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                       }}
                       disabled={hasHeatScores}
                       className={`
-                        flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                        flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-lg text-sm font-medium transition-all
                         ${hasHeatScores
                           ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : initialAssignment === 'manual'
@@ -1408,8 +1508,32 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         }
                       `}
                     >
-                      <Users size={16} />
-                      Manual Assignment
+                      <Users size={18} />
+                      <span className="text-xs">Manual</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInitialAssignment('hms');
+                        // If heat racing is enabled, open modal immediately
+                        if (isHeatRacingEnabled) {
+                          setShowHMSSeedingModal(true);
+                        }
+                      }}
+                      disabled={hasHeatScores}
+                      className={`
+                        flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-lg text-sm font-medium transition-all
+                        ${hasHeatScores
+                          ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : initialAssignment === 'hms'
+                            ? 'bg-green-600 text-white shadow-md'
+                            : darkMode
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }
+                      `}
+                    >
+                      <Award size={18} />
+                      <span className="text-xs">National Rankings</span>
                     </button>
                   </div>
                 </div>
@@ -1561,6 +1685,29 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         skippers={skippers}
         numHeats={numHeats}
         darkMode={darkMode}
+        onRankingAssignment={() => {
+          setShowManualAssignmentModal(false);
+          setShowHMSSeedingModal(true);
+        }}
+      />
+
+      {/* National Rankings Modal */}
+      {showHMSSeedingModal && console.log('Rendering HMSSeedingModal with props:', {
+        nationalAssociationId,
+        yachtClassName: currentEvent?.raceClass,
+        currentEventKeys: currentEvent ? Object.keys(currentEvent) : [],
+        currentEventRaceClass: currentEvent?.raceClass
+      })}
+      <HMSSeedingModal
+        isOpen={showHMSSeedingModal}
+        onClose={() => setShowHMSSeedingModal(false)}
+        onConfirm={handleHMSSeedingConfirm}
+        skippers={skippers}
+        numHeats={numHeats}
+        darkMode={darkMode}
+        currentEvent={currentEvent}
+        nationalAssociationId={nationalAssociationId}
+        yachtClassName={currentEvent?.raceClass}
       />
 
       {/* Clear All Results Confirmation Modal */}

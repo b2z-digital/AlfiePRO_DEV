@@ -120,7 +120,17 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             show_flag: race.show_flag ?? true,
             show_country: race.show_country ?? true,
             show_club_state: race.show_club_state ?? false,
-            show_category: race.show_category ?? false
+            show_design: race.show_design ?? false,
+            show_category: race.show_category ?? false,
+            showFlag: race.show_flag ?? true,
+            showCountry: race.show_country ?? true,
+            showClubState: race.show_club_state ?? false,
+            showDesign: race.show_design ?? false,
+            showCategory: race.show_category ?? false,
+            enable_observers: race.enable_observers || false,
+            observers_per_heat: race.observers_per_heat || undefined,
+            enableLiveTracking: race.enable_live_tracking || false,
+            enableLiveStream: race.enable_livestream || false
           } as any;
 
           console.log(`🔍 [raceStorage] Loading event "${race.event_name}":`, {
@@ -250,10 +260,17 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           drop_rules: Array.isArray(event.dropRules) ? event.dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
           club_id: event.clubId,
           // Display settings for results table
-          show_flag: (event as any).show_flag ?? true,
-          show_country: (event as any).show_country ?? true,
-          show_club_state: (event as any).show_club_state ?? false,
-          show_category: (event as any).show_category ?? false
+          show_flag: (event as any).showFlag ?? (event as any).show_flag ?? true,
+          show_country: (event as any).showCountry ?? (event as any).show_country ?? true,
+          show_club_state: (event as any).showClubState ?? (event as any).show_club_state ?? false,
+          show_design: (event as any).showDesign ?? (event as any).show_design ?? false,
+          show_category: (event as any).showCategory ?? (event as any).show_category ?? false,
+          // Live tracking and streaming
+          enable_live_tracking: (event as any).enableLiveTracking || false,
+          enable_livestream: (event as any).enableLiveStream || false,
+          // Observer settings
+          enable_observers: (event as any).enable_observers || false,
+          observers_per_heat: (event as any).observers_per_heat || undefined
         });
 
       if (error) {

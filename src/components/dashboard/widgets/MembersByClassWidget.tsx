@@ -5,6 +5,7 @@ import { supabase } from '../../../utils/supabase';
 import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import { useOrganizationContext, getContextLabel } from '../../../hooks/useOrganizationContext';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -23,28 +24,29 @@ export const MembersByClassWidget: React.FC<MembersByClassWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const [chartData, setChartData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (currentClub) {
+    if (!orgContext.isLoading) {
       fetchMembersByClass();
     }
-  }, [currentClub]);
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchMembersByClass = async () => {
-    if (!currentClub?.clubId) {
+    if (orgContext.clubIds.length === 0) {
       setLoading(false);
       return;
     }
 
     try {
-      console.log('[MembersByClassWidget] Fetching for clubId:', currentClub.clubId);
-      // Query member_boats to get boat types for members in this club
+      console.log('[MembersByClassWidget] Fetching for clubIds:', orgContext.clubIds);
+      // Query member_boats to get boat types for members across all clubs in organization
       const { data: boats, error } = await supabase
         .from('member_boats')
         .select('boat_type, member_id, members!inner(club_id)')
-        .eq('members.club_id', currentClub.clubId)
+        .in('members.club_id', orgContext.clubIds)
         .not('boat_type', 'is', null);
 
       console.log('[MembersByClassWidget] Query result:', { boats, error, count: boats?.length });
@@ -134,7 +136,7 @@ export const MembersByClassWidget: React.FC<MembersByClassWidgetProps> = ({
 
   return (
     <ThemedWidgetWrapper
-      title="Members by Class"
+      title={`Members by Class - ${getContextLabel(orgContext.type)}`}
       icon={BarChart3}
       isEditMode={isEditMode}
       onRemove={onRemove}
