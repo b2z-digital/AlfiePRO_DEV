@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
@@ -10,6 +10,7 @@ import { MemberFilterConfig } from '../../types/memberFilters';
 import { filterMembers as applyMemberFilters } from '../../utils/memberFilters';
 import { ManageFiltersModal } from './ManageFiltersModal';
 import { SaveFilterModal } from './SaveFilterModal';
+import AssociationMemberImportModal from './AssociationMemberImportModal';
 
 interface StateAssociationMembersProps {
   darkMode: boolean;
@@ -36,7 +37,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   darkMode,
   stateAssociationId: propStateAssociationId
 }) => {
-  const { user } = useAuth();
+  const { user, currentOrganization } = useAuth();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<MemberWithClub[]>([]);
@@ -53,6 +54,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [showManageFilters, setShowManageFilters] = useState(false);
   const [savedFilters, setSavedFilters] = useState<any[]>([]);
   const [boatClasses, setBoatClasses] = useState<string[]>([]);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Check for viewClubId in location state
   useEffect(() => {
@@ -476,17 +478,30 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
             </button>
           </div>
 
-          <button
-            onClick={exportToCSV}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-              darkMode
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            } transition-colors`}
-          >
-            <Download size={18} />
-            Export CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                darkMode
+                  ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                  : 'bg-slate-200 hover:bg-slate-300 text-gray-900'
+              } transition-colors`}
+            >
+              <Upload size={18} />
+              Import Members
+            </button>
+            <button
+              onClick={exportToCSV}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                darkMode
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              } transition-colors`}
+            >
+              <Download size={18} />
+              Export CSV
+            </button>
+          </div>
         </div>
       </div>
 
@@ -664,6 +679,19 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         }}
         darkMode={darkMode}
       />
+
+      {showImportModal && currentOrganization && (
+        <AssociationMemberImportModal
+          isOpen={showImportModal}
+          onClose={() => {
+            setShowImportModal(false);
+            loadStateAssociationData();
+          }}
+          associationId={currentOrganization.id}
+          associationType={currentOrganization.type as 'state' | 'national'}
+          associationName={currentOrganization.name}
+        />
+      )}
     </div>
   );
 };

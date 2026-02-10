@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -757,14 +757,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       collapsible: true,
       icon: Users,
       items: [
-        {
-          id: 'import-members',
-          label: 'Import Members',
-          icon: Upload,
-          description: 'Bulk import members from CSV',
-          path: '#',
-          onClick: () => setShowImportMembersModal(true)
-        },
         ...(currentOrganization?.type === 'state' ? [{
           id: 'clubs',
           label: 'Clubs',
@@ -789,7 +781,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           id: 'association-remittances',
           label: 'Remittances',
-          icon: DollarSign,
+          icon: Receipt,
           description: 'Track membership fee remittances',
           path: '/association-remittances'
         },
