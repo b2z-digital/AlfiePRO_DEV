@@ -71,21 +71,20 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   });
 
   useEffect(() => {
-    if (!isEditing) {
-      setFormData({
-        description: initialTransaction.description,
-        amount: initialTransaction.amount,
-        date: initialTransaction.date,
-        category_id: initialTransaction.category_id || '',
-        payer: initialTransaction.payer || '',
-        payee: initialTransaction.payee || '',
-        reference: initialTransaction.reference || '',
-        notes: initialTransaction.notes || '',
-        payment_method: initialTransaction.payment_method,
-        payment_status: initialTransaction.payment_status
-      });
-    }
-  }, [initialTransaction]);
+    setFormData({
+      description: initialTransaction.description,
+      amount: initialTransaction.amount,
+      date: initialTransaction.date,
+      category_id: initialTransaction.category_id || '',
+      payer: initialTransaction.payer || '',
+      payee: initialTransaction.payee || '',
+      reference: initialTransaction.reference || '',
+      notes: initialTransaction.notes || '',
+      payment_method: initialTransaction.payment_method,
+      payment_status: initialTransaction.payment_status
+    });
+    setIsEditing(false);
+  }, [initialTransaction.id]);
 
   useEffect(() => {
     if (currentClub?.clubId || isAssociation) {
