@@ -100,7 +100,7 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Newspaper className="text-amber-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">Latest News</h2>
+          <h2 className="text-lg font-semibold text-white">{currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? 'Association News' : 'Latest News'}</h2>
         </div>
         <button
           onClick={handleCreateArticle}

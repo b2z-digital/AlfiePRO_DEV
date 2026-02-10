@@ -148,7 +148,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
     id: 'clubs-count',
     type: 'clubs-count',
-    name: 'Member Clubs',
+    name: 'Association Clubs',
     description: 'Total clubs in association and active subscription rate',
     icon: Building2,
     defaultSize: '1x1',

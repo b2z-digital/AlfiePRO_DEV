@@ -92,7 +92,7 @@ export const MembersCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">{getContextLabel(orgContext.type)} Members</p>
+          <p className="text-xs text-slate-400 mb-0.5">{orgContext.type === 'club' ? 'Club' : 'Association'} Members</p>
           <p className="text-2xl font-bold text-white mb-0.5">
             {loading || orgContext.isLoading ? '...' : memberCount}
           </p>
