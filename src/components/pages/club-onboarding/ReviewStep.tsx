@@ -1,11 +1,23 @@
-import React from 'react';
-import { CheckCircle, Building, Palette, MapPin, Users, DollarSign, UserPlus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus } from 'lucide-react';
 import { StepProps } from './types';
+import { BoatClass } from '../../../types/boatClass';
+import { getBoatClasses } from '../../../utils/boatClassStorage';
 
 export const ReviewStep: React.FC<StepProps> = ({
   formData,
   darkMode
 }) => {
+  const [allClasses, setAllClasses] = useState<BoatClass[]>([]);
+
+  useEffect(() => {
+    getBoatClasses().then(setAllClasses).catch(() => {});
+  }, []);
+
+  const selectedClassNames = allClasses
+    .filter(c => (formData.selectedBoatClassIds || []).includes(c.id))
+    .map(c => c.name);
+
   const sectionClass = `p-4 rounded-xl border ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-200'}`;
   const labelClass = `text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`;
   const valueClass = `text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`;
@@ -97,6 +109,33 @@ export const ReviewStep: React.FC<StepProps> = ({
             <div className={labelClass}>Introduction</div>
             <div className={`${valueClass} line-clamp-2`}>{formData.clubIntroduction}</div>
           </div>
+        )}
+      </div>
+
+      <div className={sectionClass}>
+        <div className="flex items-center gap-2 mb-3">
+          <Sailboat size={16} className="text-sky-500" />
+          <h4 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+            Yacht Classes ({selectedClassNames.length})
+          </h4>
+        </div>
+        {selectedClassNames.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {selectedClassNames.map((name) => (
+              <span
+                key={name}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                  darkMode
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                    : 'bg-sky-100 text-sky-700 border border-sky-200'
+                }`}
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className={emptyClass}>No classes selected</p>
         )}
       </div>
 

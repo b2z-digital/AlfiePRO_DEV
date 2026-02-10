@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Building, Palette, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2 } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { BasicInfoStep } from './club-onboarding/BasicInfoStep';
 import { BrandingStep } from './club-onboarding/BrandingStep';
+import { YachtClassesStep } from './club-onboarding/YachtClassesStep';
 import { VenueStep } from './club-onboarding/VenueStep';
 import { MembershipStep } from './club-onboarding/MembershipStep';
 import { FinanceStep } from './club-onboarding/FinanceStep';
@@ -20,7 +21,7 @@ interface ClubOnboardingWizardProps {
   darkMode: boolean;
 }
 
-const STEP_ICONS = [Building, Palette, MapPin, Users, DollarSign, UserPlus, CheckCircle];
+const STEP_ICONS = [Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle];
 
 const INITIAL_FORM_DATA: ClubOnboardingFormData = {
   name: '',
@@ -40,6 +41,7 @@ const INITIAL_FORM_DATA: ClubOnboardingFormData = {
   venueDescription: '',
   venueLatitude: -32.9688,
   venueLongitude: 151.7174,
+  selectedBoatClassIds: [],
   membershipTypes: [],
   currency: 'AUD',
   taxName: 'GST',
@@ -94,15 +96,17 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       case 2:
         return true;
       case 3:
-        return formData.membershipTypes.every(t => t.name.trim() !== '');
-      case 4:
         return true;
+      case 4:
+        return formData.membershipTypes.every(t => t.name.trim() !== '');
       case 5:
+        return true;
+      case 6:
         if (!formData.assignAdmin) return true;
         return formData.adminEmail.trim() !== '' &&
                formData.adminFirstName.trim() !== '' &&
                formData.adminLastName.trim() !== '';
-      case 6:
+      case 7:
         return true;
       default:
         return false;
@@ -205,6 +209,14 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           is_active: true,
         }));
         await supabase.from('membership_types').insert(typesToInsert);
+      }
+
+      if (formData.selectedBoatClassIds.length > 0) {
+        const boatClassRows = formData.selectedBoatClassIds.map(bcId => ({
+          club_id: club.id,
+          boat_class_id: bcId,
+        }));
+        await supabase.from('club_boat_classes').insert(boatClassRows);
       }
 
       if (formData.taxEnabled && formData.taxName) {
@@ -366,18 +378,21 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
             <BrandingStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 2 && (
-            <VenueStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <YachtClassesStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 3 && (
-            <MembershipStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <VenueStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 4 && (
-            <FinanceStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <MembershipStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 5 && (
-            <AdminStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <FinanceStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 6 && (
+            <AdminStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+          )}
+          {currentStep === 7 && (
             <ReviewStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
         </div>

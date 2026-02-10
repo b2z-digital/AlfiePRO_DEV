@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Check, Loader2, Building2, Mail, MapPin, DollarSign, CreditCard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Check, Loader2, Building2, Mail, MapPin, Sailboat, DollarSign, CreditCard } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 import type { ClubSetupData } from '../ClubSetupWizard';
+import { BoatClass } from '../../../types/boatClass';
+import { getBoatClasses } from '../../../utils/boatClassStorage';
 
 interface ClubReviewStepProps {
   data: ClubSetupData;
@@ -19,6 +21,15 @@ export const ClubReviewStep: React.FC<ClubReviewStepProps> = ({
   const [loading, setLoading] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [allClasses, setAllClasses] = useState<BoatClass[]>([]);
+
+  useEffect(() => {
+    getBoatClasses().then(setAllClasses).catch(() => {});
+  }, []);
+
+  const selectedClassNames = allClasses
+    .filter(c => (data.selectedBoatClassIds || []).includes(c.id))
+    .map(c => c.name);
 
   const handleSubmit = async () => {
     if (!agreed) {
@@ -85,6 +96,14 @@ export const ClubReviewStep: React.FC<ClubReviewStepProps> = ({
             club_id: club.id,
             is_default: true,
           });
+      }
+
+      if (data.selectedBoatClassIds && data.selectedBoatClassIds.length > 0) {
+        const boatClassRows = data.selectedBoatClassIds.map(bcId => ({
+          club_id: club.id,
+          boat_class_id: bcId,
+        }));
+        await supabase.from('club_boat_classes').insert(boatClassRows);
       }
 
       const trialEndDate = new Date();
@@ -233,6 +252,31 @@ export const ClubReviewStep: React.FC<ClubReviewStepProps> = ({
             </dl>
           </div>
         )}
+
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-sky-500/20 rounded-lg flex items-center justify-center border border-sky-500/30">
+              <Sailboat className="w-5 h-5 text-sky-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-white">
+              Yacht Classes ({selectedClassNames.length})
+            </h3>
+          </div>
+          {selectedClassNames.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {selectedClassNames.map((name) => (
+                <span
+                  key={name}
+                  className="px-3 py-1.5 text-sm font-medium rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-500 italic text-sm">No classes selected</p>
+          )}
+        </div>
 
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-4">

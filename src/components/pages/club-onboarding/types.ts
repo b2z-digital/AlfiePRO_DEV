@@ -28,6 +28,8 @@ export interface ClubOnboardingFormData {
   venueLatitude: number;
   venueLongitude: number;
 
+  selectedBoatClassIds: string[];
+
   membershipTypes: MembershipTypeEntry[];
 
   currency: string;
@@ -51,6 +53,7 @@ export interface StepProps {
 export const STEP_CONFIG = [
   { key: 'basic', label: 'Club Details', shortLabel: 'Details' },
   { key: 'branding', label: 'Branding', shortLabel: 'Branding' },
+  { key: 'yachtClasses', label: 'Yacht Classes', shortLabel: 'Classes' },
   { key: 'venue', label: 'Venue', shortLabel: 'Venue' },
   { key: 'membership', label: 'Memberships', shortLabel: 'Members' },
   { key: 'finance', label: 'Finance', shortLabel: 'Finance' },
