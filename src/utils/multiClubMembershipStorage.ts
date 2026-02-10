@@ -196,6 +196,112 @@ export async function importAssociationMembers(
   return { created, existing, errors };
 }
 
+// Extended import: accepts mapped fields from smart CSV importer
+export async function importAssociationMembersExtended(
+  members: Array<Record<string, string>>,
+  associationId: string,
+  associationType: 'state' | 'national',
+  countryCode: string = 'AUS'
+): Promise<{ created: number; existing: number; errors: number }> {
+  let created = 0;
+  let existing = 0;
+  let errors = 0;
+
+  for (const member of members) {
+    try {
+      const email = (member.email || '').toLowerCase().trim();
+      const firstName = (member.first_name || '').trim();
+      const lastName = (member.last_name || '').trim();
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      if (!email && !fullName) {
+        errors++;
+        continue;
+      }
+
+      if (email) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (existingProfile) {
+          const profileUpdate: Record<string, any> = { registration_source: 'association_import' };
+          if (member.member_number) profileUpdate.member_number = member.member_number;
+          if (fullName) profileUpdate.full_name = fullName;
+
+          await supabase
+            .from('profiles')
+            .update(profileUpdate)
+            .eq('id', existingProfile.id);
+
+          existing++;
+        } else {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([{
+              email,
+              full_name: fullName || email,
+              member_number: member.member_number || null,
+              nationality: member.country || countryCode,
+              registration_source: 'association_import'
+            }])
+            .select()
+            .single();
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            errors++;
+            continue;
+          }
+          created++;
+        }
+      }
+
+      if (firstName && lastName) {
+        const { data: existingMember } = await supabase
+          .from('members')
+          .select('id')
+          .ilike('email', email || 'NO_MATCH_PLACEHOLDER')
+          .maybeSingle();
+
+        const memberData: Record<string, any> = {
+          first_name: firstName,
+          last_name: lastName,
+        };
+        if (email) memberData.email = email;
+        if (member.phone) memberData.phone = member.phone;
+        if (member.street) memberData.street = member.street;
+        if (member.city) memberData.city = member.city;
+        if (member.state) memberData.state = member.state;
+        if (member.postcode) memberData.postcode = member.postcode;
+        if (member.country) memberData.country = member.country;
+        if (member.membership_level) memberData.membership_level = member.membership_level;
+        if (member.date_joined) memberData.date_joined = member.date_joined;
+        if (member.nickname) memberData.club = member.nickname;
+
+        if (existingMember) {
+          await supabase
+            .from('members')
+            .update(memberData)
+            .eq('id', existingMember.id);
+        } else {
+          memberData.membership_status = 'active';
+          await supabase
+            .from('members')
+            .insert([memberData]);
+        }
+      }
+    } catch (err) {
+      console.error('Error processing member:', err);
+      errors++;
+    }
+  }
+
+  return { created, existing, errors };
+}
+
 // Create member claims for association import
 export async function createMemberClaimsForClub(
   clubId: string,
