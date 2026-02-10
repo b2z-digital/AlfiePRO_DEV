@@ -163,7 +163,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
             const selected = Array.from(e.target.selectedOptions, option => option.value);
             updateCondition(groupId, condition.id, { value: selected });
           }}
-          className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
         >
           {boatClasses.map(bc => (
             <option key={bc} value={bc}>{bc}</option>
@@ -183,7 +183,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               const selected = Array.from(e.target.selectedOptions, option => option.value);
               updateCondition(groupId, condition.id, { value: selected });
             }}
-            className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
           >
             {field.options.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -196,7 +196,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
         <select
           value={condition.value || ''}
           onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
-          className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
         >
           <option value="">Select...</option>
           {field.options.map(opt => (
@@ -216,7 +216,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               value={condition.value || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
               placeholder="Number"
-              className="w-24 px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-24 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
             />
             <span className="text-slate-400">days</span>
           </div>
@@ -230,14 +230,14 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               type="date"
               value={condition.value || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
-              className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
             />
             <span className="text-slate-400">and</span>
             <input
               type="date"
               value={condition.value2 || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value2: e.target.value })}
-              className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
             />
           </div>
         );
@@ -248,7 +248,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
           type="date"
           value={condition.value || ''}
           onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
-          className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
         />
       );
     }
@@ -263,7 +263,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               value={condition.value || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
               placeholder="From"
-              className="w-32 px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-32 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
             />
             <span className="text-slate-400">and</span>
             <input
@@ -271,7 +271,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
               value={condition.value2 || ''}
               onChange={(e) => updateCondition(groupId, condition.id, { value2: e.target.value })}
               placeholder="To"
-              className="w-32 px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-32 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
             />
           </div>
         );
@@ -283,7 +283,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
           value={condition.value || ''}
           onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
           placeholder={field.placeholder}
-          className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
         />
       );
     }
@@ -295,7 +295,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
         value={condition.value || ''}
         onChange={(e) => updateCondition(groupId, condition.id, { value: e.target.value })}
         placeholder={field.placeholder}
-        className="flex-1 px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex-1 px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
       />
     );
   };
@@ -304,25 +304,25 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-6xl bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-700/50">
+      <div className="w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] border border-slate-700/50">
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 bg-gradient-to-r from-slate-800/80 to-slate-700/80 border-b border-slate-600/50">
+        <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <Filter className="text-blue-400" size={24} />
+            <div className="p-2 bg-white/15 rounded-xl">
+              <Filter className="text-white" size={22} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Advanced Member Filters</h2>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <h2 className="text-xl font-bold text-white">Advanced Member Filters</h2>
+              <p className="text-sm text-blue-100 mt-0.5">
                 Build complex filters with multiple conditions
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all"
+            className="text-white/80 hover:text-white hover:bg-white/15 p-2 rounded-xl transition"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
 
@@ -336,20 +336,20 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setFilterConfig({ ...filterConfig, groupLogic: 'AND' })}
-                    className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       filterConfig.groupLogic === 'AND'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                     }`}
                   >
                     AND
                   </button>
                   <button
                     onClick={() => setFilterConfig({ ...filterConfig, groupLogic: 'OR' })}
-                    className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       filterConfig.groupLogic === 'OR'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                     }`}
                   >
                     OR
@@ -362,7 +362,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
             {filterConfig.groups.map((group, groupIndex) => (
               <div
                 key={group.id}
-                className="p-4 rounded-xl bg-slate-800/50 border border-slate-700"
+                className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50"
               >
                 {/* Group Header */}
                 <div className="flex items-center justify-between mb-4">
@@ -376,20 +376,20 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateGroupLogic(group.id, 'AND')}
-                            className={`px-2 py-1 rounded text-xs transition-colors ${
+                            className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${
                               group.logic === 'AND'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                             }`}
                           >
                             AND
                           </button>
                           <button
                             onClick={() => updateGroupLogic(group.id, 'OR')}
-                            className={`px-2 py-1 rounded text-xs transition-colors ${
+                            className={`px-2 py-1 rounded-md text-xs font-medium transition-all ${
                               group.logic === 'OR'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                             }`}
                           >
                             OR
@@ -401,7 +401,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                   {filterConfig.groups.length > 1 && (
                     <button
                       onClick={() => removeGroup(group.id)}
-                      className="p-1.5 rounded text-red-400 hover:bg-red-900/20 transition-colors"
+                      className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
                       title="Remove group"
                     >
                       <Trash2 size={16} />
@@ -418,7 +418,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                     return (
                       <div
                         key={condition.id}
-                        className="flex items-start gap-2 p-3 rounded-lg bg-slate-900/50"
+                        className="flex items-start gap-2 p-3 rounded-xl bg-slate-900/40 border border-slate-700/30"
                       >
                         {condIndex > 0 && (
                           <span className="text-xs font-medium text-slate-500 pt-2">
@@ -438,7 +438,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                               value2: undefined
                             });
                           }}
-                          className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all"
                         >
                           <option value="">Select field...</option>
                           {MEMBER_FILTER_FIELDS.map(f => (
@@ -457,7 +457,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                             value2: undefined
                           })}
                           disabled={!condition.field}
-                          className="px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                          className="px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all disabled:opacity-50"
                         >
                           {availableOperators.map(op => (
                             <option key={op} value={op}>
@@ -472,7 +472,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                         {/* Remove Condition */}
                         <button
                           onClick={() => removeCondition(group.id, condition.id)}
-                          className="p-2 rounded text-red-400 hover:bg-red-900/20 transition-colors flex-shrink-0"
+                          className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors flex-shrink-0"
                           title="Remove condition"
                         >
                           <Trash2 size={16} />
@@ -484,7 +484,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
                   {/* Add Condition Button */}
                   <button
                     onClick={() => addCondition(group.id)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-xl transition-colors"
                   >
                     <Plus size={16} />
                     Add condition
@@ -496,7 +496,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
             {/* Add Group Button */}
             <button
               onClick={addGroup}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-300 hover:text-white border-2 border-dashed border-slate-700 hover:border-slate-600 rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white border-2 border-dashed border-slate-700/50 hover:border-slate-600 rounded-xl transition-all"
             >
               <Plus size={18} />
               Add filter group
@@ -505,26 +505,26 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-8 py-6 bg-gradient-to-r from-slate-800/80 to-slate-700/80 border-t border-slate-600/50">
+        <div className="flex items-center justify-between px-6 py-5 border-t border-slate-700/50">
           <div className="text-sm text-slate-400">
             {memberCount} member{memberCount !== 1 ? 's' : ''} will be displayed
           </div>
           <div className="flex gap-3">
             <button
               onClick={handleClear}
-              className="px-6 py-2.5 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-medium"
+              className="px-5 py-2.5 rounded-xl font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800"
             >
               Clear All
             </button>
             <button
               onClick={onClose}
-              className="px-6 py-2.5 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-medium"
+              className="px-5 py-2.5 rounded-xl font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium"
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 font-medium transition-colors"
             >
               <Filter size={18} />
               Apply Filters
