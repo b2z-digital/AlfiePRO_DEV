@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Users, Plus, Trash2, DollarSign, Calendar } from 'lucide-react';
 import { StepProps, MembershipTypeEntry } from './types';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,35 +10,23 @@ const RENEWAL_PERIODS = [
   { value: 'lifetime', label: 'Lifetime' },
 ] as const;
 
-const SUGGESTED_TYPES = [
-  { name: 'Full Member', description: 'Standard membership with full racing privileges', amount: 100 },
-  { name: 'Junior Member', description: 'For members under 18 years of age', amount: 50 },
-  { name: 'Social Member', description: 'Non-racing social membership', amount: 50 },
-  { name: 'Family Member', description: 'Family membership covering all household members', amount: 150 },
-  { name: 'Associate Member', description: 'Secondary club membership', amount: 75 },
-  { name: 'Life Member', description: 'Honorary lifetime membership', amount: 0 },
-];
-
 export const MembershipStep: React.FC<StepProps> = ({
   formData,
   updateFormData,
   darkMode
 }) => {
-  const [showSuggestions, setShowSuggestions] = useState(formData.membershipTypes.length === 0);
-
-  const addType = (preset?: typeof SUGGESTED_TYPES[0]) => {
+  const addType = () => {
     const newType: MembershipTypeEntry = {
       id: uuidv4(),
-      name: preset?.name || '',
-      description: preset?.description || '',
-      amount: preset?.amount || 0,
+      name: '',
+      description: '',
+      amount: 0,
       currency: formData.currency || 'AUD',
       renewal_period: 'annual',
     };
     updateFormData({
       membershipTypes: [...formData.membershipTypes, newType]
     });
-    setShowSuggestions(false);
   };
 
   const updateType = (id: string, updates: Partial<MembershipTypeEntry>) => {
@@ -79,34 +67,24 @@ export const MembershipStep: React.FC<StepProps> = ({
         </p>
       </div>
 
-      {showSuggestions && formData.membershipTypes.length === 0 && (
-        <div className={`p-5 rounded-xl border ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-200'}`}>
-          <h4 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Quick Start - Common Membership Types
+      {formData.membershipTypes.length === 0 && (
+        <div className={`p-6 rounded-xl border text-center ${
+          darkMode ? 'bg-slate-700/20 border-slate-600/50' : 'bg-slate-50 border-slate-200'
+        }`}>
+          <Users className={`mx-auto mb-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={36} />
+          <h4 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+            No membership types yet
           </h4>
-          <p className={`text-xs mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Click to add any of these common types, or create your own below
+          <p className={`text-sm mb-5 max-w-md mx-auto ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            Every club has different membership structures. Add your membership types below, or skip this step and configure them later from the Membership Settings page.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {SUGGESTED_TYPES.map((preset) => (
-              <button
-                key={preset.name}
-                onClick={() => addType(preset)}
-                className={`text-left p-3 rounded-lg border transition-all hover:scale-[1.02] ${
-                  darkMode
-                    ? 'bg-slate-600/30 border-slate-600 hover:border-emerald-500 hover:bg-slate-600/50'
-                    : 'bg-white border-slate-200 hover:border-emerald-500'
-                }`}
-              >
-                <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  {preset.name}
-                </div>
-                <div className={`text-xs mt-0.5 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                  ${preset.amount}/yr
-                </div>
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={addType}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors text-sm"
+          >
+            <Plus size={16} />
+            Add Membership Type
+          </button>
         </div>
       )}
 
@@ -136,7 +114,7 @@ export const MembershipStep: React.FC<StepProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className={labelClass}>Name</label>
+                  <label className={labelClass}>Name <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={type.name}
@@ -192,36 +170,26 @@ export const MembershipStep: React.FC<StepProps> = ({
               </div>
             </div>
           ))}
+
+          <button
+            onClick={addType}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors text-sm ${
+              darkMode
+                ? 'bg-slate-700/50 border border-slate-600 hover:border-emerald-500 text-slate-300 hover:text-white'
+                : 'bg-white border border-slate-300 hover:border-emerald-500 text-slate-700'
+            }`}
+          >
+            <Plus size={16} />
+            Add Another Type
+          </button>
         </div>
       )}
-
-      <div className="flex gap-3">
-        <button
-          onClick={() => addType()}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors text-sm ${
-            darkMode
-              ? 'bg-slate-700/50 border border-slate-600 hover:border-emerald-500 text-slate-300 hover:text-white'
-              : 'bg-white border border-slate-300 hover:border-emerald-500 text-slate-700'
-          }`}
-        >
-          <Plus size={16} />
-          Add Custom Type
-        </button>
-        {formData.membershipTypes.length > 0 && !showSuggestions && (
-          <button
-            onClick={() => setShowSuggestions(true)}
-            className={`text-sm ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'} transition-colors`}
-          >
-            Show suggestions
-          </button>
-        )}
-      </div>
 
       <div className={`p-4 rounded-xl border ${
         darkMode ? 'bg-slate-700/20 border-slate-600/30' : 'bg-blue-50 border-blue-200'
       }`}>
         <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          You can always add, edit, or remove membership types later from the Membership Settings page.
+          This step is optional. You can skip it and configure membership types later once the club admin has set up their account.
         </p>
       </div>
     </div>

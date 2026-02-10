@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building, MapPin, Mail, Phone, Globe, Flag } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
+import { loadGoogleMaps } from '../../../utils/googleMaps';
 import { StepProps, COUNTRIES, COUNTRY_DEFAULTS } from './types';
 
 interface StateAssociation {
@@ -16,10 +17,29 @@ export const BasicInfoStep: React.FC<StepProps & { stateAssociationId: string }>
   stateAssociationId
 }) => {
   const [stateAssociations, setStateAssociations] = useState<StateAssociation[]>([]);
+  const [mapsReady, setMapsReady] = useState(false);
 
   useEffect(() => {
     loadStateAssociations();
+    loadGoogleMaps(() => setMapsReady(true));
   }, []);
+
+  useEffect(() => {
+    if (mapsReady) {
+      const input = document.getElementById('onboarding-club-location') as HTMLInputElement;
+      if (input && window.google) {
+        const searchBox = new google.maps.places.SearchBox(input);
+        searchBox.addListener('places_changed', () => {
+          const places = searchBox.getPlaces();
+          if (!places || places.length === 0) return;
+          const place = places[0];
+          updateFormData({
+            location: place.formatted_address || place.name || formData.location
+          });
+        });
+      }
+    }
+  }, [mapsReady]);
 
   const loadStateAssociations = async () => {
     const { data } = await supabase
@@ -126,11 +146,12 @@ export const BasicInfoStep: React.FC<StepProps & { stateAssociationId: string }>
           <div className="relative">
             <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={18} />
             <input
+              id="onboarding-club-location"
               type="text"
               value={formData.location}
               onChange={(e) => updateFormData({ location: e.target.value })}
               className={`${inputClass} pl-10`}
-              placeholder="e.g., Port Stephens, NSW"
+              placeholder="Search for location..."
             />
           </div>
         </div>
