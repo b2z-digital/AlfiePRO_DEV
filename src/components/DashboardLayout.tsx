@@ -169,7 +169,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     upcomingEvents: 0
   });
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin } = useAuth();
-  const { can, isMember } = usePermissions();
+  const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -667,7 +667,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'State Associations',
           icon: Building,
           description: 'Manage state associations',
-          path: '/associations'
+          path: '/associations',
+          permission: 'membership.manage'
         }
       ]
     }] : []),
@@ -762,48 +763,55 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'Clubs',
           icon: Building,
           description: 'Manage member clubs',
-          path: '/clubs'
+          path: '/clubs',
+          permission: 'membership.manage'
         }] : []),
         {
           id: 'association-members',
           label: 'Club Members',
           icon: Users,
           description: currentOrganization?.type === 'national' ? 'View all members across associations' : 'View all members in member clubs',
-          path: '/association-members'
+          path: '/association-members',
+          permission: 'membership.view'
         },
         {
           id: 'association-member-reports',
           label: 'Member Reports',
           icon: TrendingUp,
           description: 'View member analytics and custom reports',
-          path: '/association-member-reports'
+          path: '/association-member-reports',
+          permission: 'membership.view'
         },
         {
           id: 'association-remittances',
           label: 'Remittances',
           icon: Receipt,
           description: 'Track membership fee remittances',
-          path: '/association-remittances'
+          path: '/association-remittances',
+          permission: 'finance.manage'
         },
         {
           id: 'finances-assoc',
           label: 'Finances',
           icon: DollarSign,
           description: 'Manage association finances',
-          path: '/finances'
+          path: '/finances',
+          permission: 'finance.manage'
         },
         ...(currentOrganization?.type === 'national' ? [{
           id: 'rankings',
           label: 'National Rankings',
           icon: Award,
           description: 'Manage national skipper rankings',
-          path: '/rankings'
+          path: '/rankings',
+          permission: 'membership.manage'
         }, {
           id: 'name-mapping',
           label: 'Name Mapping',
           icon: Link,
           description: 'Map rankings to member records',
-          path: '/name-mapping'
+          path: '/name-mapping',
+          permission: 'membership.manage'
         }] : [])
       ]
     }] : []),
@@ -870,7 +878,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Send,
           description: 'Email campaigns and automation flows',
           path: '/marketing',
-          permission: 'admin'
+          permission: 'membership.manage'
         },
         {
           id: 'community',
@@ -926,7 +934,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         }
       ]
     },
-    {
+    ...(!isAssociationViewer ? [{
       id: 'website',
       label: 'Website',
       collapsible: true,
@@ -941,7 +949,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           permission: 'website.manage'
         }
       ]
-    }
+    }] : [])
   ];
 
   // Filter navigation sections based on permissions

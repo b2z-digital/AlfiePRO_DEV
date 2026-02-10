@@ -557,8 +557,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 </div>
               </button>
 
-              {/* Association Users Card - only show in association context */}
-              {currentOrganization && (
+              {/* Association Users Card - only show for association admins */}
+              {currentOrganization && can('users.manage') && (
                 <button
                   onClick={() => setActiveTab('association-users')}
                   className={`
@@ -1077,8 +1077,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
             </div>
           )}
 
-          {/* Association Settings Section */}
-          {currentOrganization && (
+          {/* Association Settings Section - admin only */}
+          {currentOrganization && can('settings.club') && (
             <div>
               <h2 className={`text-lg font-semibold mb-4 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association settings</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

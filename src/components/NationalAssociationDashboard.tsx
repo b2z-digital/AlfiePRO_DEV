@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Globe } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../utils/supabase';
 import CoverImageUploadModal from './CoverImageUploadModal';
 import { CustomizableDashboard } from './dashboard/CustomizableDashboard';
@@ -22,9 +23,9 @@ interface NationalAssociationData {
 
 export const NationalAssociationDashboard: React.FC<NationalAssociationDashboardProps> = ({ darkMode }) => {
   const { user, isSuperAdmin } = useAuth();
+  const { isNationalAdmin } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [nationalAssociation, setNationalAssociation] = useState<NationalAssociationData | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showCoverImageModal, setShowCoverImageModal] = useState(false);
 
   useEffect(() => {
@@ -60,7 +61,6 @@ export const NationalAssociationDashboard: React.FC<NationalAssociationDashboard
 
       const nationalAssocData = (userNationalAssoc as any).national_associations;
       setNationalAssociation(nationalAssocData);
-      setIsAdmin((userNationalAssoc as any).role === 'national_admin' || isSuperAdmin);
 
     } catch (error) {
       console.error('Error loading national association data:', error);
@@ -172,7 +172,7 @@ export const NationalAssociationDashboard: React.FC<NationalAssociationDashboard
             <Globe className="w-5 h-5" />
             <span className="hidden sm:inline">View Public Website</span>
           </a>
-          {isAdmin && (
+          {isNationalAdmin && (
             <button
               onClick={() => setShowCoverImageModal(true)}
               className="p-3 bg-slate-900 bg-opacity-70 hover:bg-opacity-90 text-white rounded-lg backdrop-blur-sm transition-all flex items-center gap-2"
