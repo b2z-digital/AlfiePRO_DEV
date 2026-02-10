@@ -251,6 +251,28 @@ export async function getStateOutstandingFromClubs(
   }
 }
 
+const OVERDUE_THRESHOLD_DAYS = 28;
+
+export function isRemittanceOverdue(remittance: MembershipRemittance): boolean {
+  if (remittance.club_to_state_status !== 'pending') return false;
+  const referenceDate = remittance.membership_start_date || remittance.created_at;
+  if (!referenceDate) return false;
+  const dueDate = new Date(referenceDate);
+  const now = new Date();
+  const diffMs = now.getTime() - dueDate.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  return diffDays >= OVERDUE_THRESHOLD_DAYS;
+}
+
+export function getOverdueDays(remittance: MembershipRemittance): number {
+  const referenceDate = remittance.membership_start_date || remittance.created_at;
+  if (!referenceDate) return 0;
+  const dueDate = new Date(referenceDate);
+  const now = new Date();
+  const diffMs = now.getTime() - dueDate.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
 // Get remittances with member details
 export async function getRemittancesWithMembers(
   clubId: string,
@@ -269,8 +291,10 @@ export async function getRemittancesWithMembers(
       .eq('club_id', clubId)
       .order('created_at', { ascending: false });
 
-    if (filters?.status) {
+    if (filters?.status && filters.status !== 'overdue') {
       query = query.eq('club_to_state_status', filters.status);
+    } else if (filters?.status === 'overdue') {
+      query = query.eq('club_to_state_status', 'pending');
     }
 
     if (filters?.year) {
@@ -280,7 +304,14 @@ export async function getRemittancesWithMembers(
     const { data, error } = await query;
 
     if (error) throw error;
-    return data || [];
+
+    let results = data || [];
+
+    if (filters?.status === 'overdue') {
+      results = results.filter(r => isRemittanceOverdue(r));
+    }
+
+    return results;
   } catch (error) {
     console.error('Error fetching remittances with members:', error);
     return [];

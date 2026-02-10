@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet } from 'lucide-react';
+import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -8,6 +8,8 @@ import {
   getClubOutstandingTotal,
   getRemittancesWithMembers,
   exportRemittancesToCSV,
+  isRemittanceOverdue,
+  getOverdueDays,
   MembershipRemittance,
   ClubOutstandingTotal
 } from '../../utils/remittanceStorage';
@@ -32,6 +34,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
   const [showBulkPaymentModal, setShowBulkPaymentModal] = useState(false);
+  const [overdueCount, setOverdueCount] = useState(0);
   const [bulkPaymentDetails, setBulkPaymentDetails] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'bank_transfer',
@@ -50,17 +53,19 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
 
     setLoading(true);
     try {
-      const [outstandingData, remittancesData] = await Promise.all([
+      const [outstandingData, remittancesData, allPendingData] = await Promise.all([
         getClubOutstandingTotal(currentClub.clubId),
         getRemittancesWithMembers(currentClub.clubId, {
           status: selectedStatus,
           year: selectedYear !== 'all' ? selectedYear : undefined
-        })
+        }),
+        getRemittancesWithMembers(currentClub.clubId, { status: 'pending' })
       ]);
 
       setOutstanding(outstandingData);
       setRemittances(remittancesData);
-      setSelectedIds(new Set()); // Clear selection on data reload
+      setOverdueCount(allPendingData.filter(r => isRemittanceOverdue(r)).length);
+      setSelectedIds(new Set());
     } catch (error) {
       console.error('Error loading remittance data:', error);
     } finally {
@@ -479,6 +484,33 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
         </div>
       </div>
 
+      {/* Overdue Warning Banner */}
+      {overdueCount > 0 && (
+        <div className="bg-red-500/10 backdrop-blur-sm rounded-xl border border-red-500/30 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <p className="font-medium text-red-300">
+                  {overdueCount} overdue remittance{overdueCount !== 1 ? 's' : ''}
+                </p>
+                <p className="text-sm text-red-400/70">
+                  Association fees unpaid for 4+ weeks from membership start date
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedStatus('overdue')}
+              className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-medium transition-colors text-sm"
+            >
+              View Overdue
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filters with Export Button - Slate Styling */}
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
         <div className="flex flex-wrap items-end gap-4">
@@ -616,21 +648,37 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                   </td>
                 </tr>
               ) : (
-                remittances.map((remittance) => (
+                remittances.map((remittance) => {
+                  const overdue = isRemittanceOverdue(remittance);
+                  const overdueDays = overdue ? getOverdueDays(remittance) : 0;
+                  const overdueWeeks = Math.floor(overdueDays / 7);
+
+                  return (
                   <tr
                     key={remittance.id}
                     className={`hover:bg-slate-700/30 transition-colors ${
-                      selectedIds.has(remittance.id) ? 'bg-blue-500/10' : ''
+                      selectedIds.has(remittance.id)
+                        ? 'bg-blue-500/10'
+                        : overdue
+                        ? 'bg-red-500/5 border-l-2 border-l-red-500'
+                        : ''
                     }`}
                   >
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
-                        <Avatar
-                          imageUrl={remittance.member?.avatar_url}
-                          firstName={remittance.member?.first_name || ''}
-                          lastName={remittance.member?.last_name || ''}
-                          size="sm"
-                        />
+                        <div className="relative">
+                          <Avatar
+                            imageUrl={remittance.member?.avatar_url}
+                            firstName={remittance.member?.first_name || ''}
+                            lastName={remittance.member?.last_name || ''}
+                            size="sm"
+                          />
+                          {overdue && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                              <AlertTriangle className="w-2.5 h-2.5 text-white" />
+                            </div>
+                          )}
+                        </div>
                         <div>
                           <div className="font-medium text-white">
                             {remittance.member ? `${remittance.member.first_name} ${remittance.member.last_name}` : 'Unknown'}
@@ -644,25 +692,37 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                     <td className="px-4 py-4 text-slate-300">
                       {remittance.membership_year}
                     </td>
-                    <td className="px-4 py-4 font-medium text-blue-400">
+                    <td className={`px-4 py-4 font-medium ${overdue ? 'text-red-400' : 'text-blue-400'}`}>
                       ${remittance.state_contribution_amount.toFixed(2)}
                     </td>
                     <td className="px-4 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        remittance.club_to_state_status === 'paid'
-                          ? 'bg-green-900/30 text-green-400'
-                          : remittance.club_to_state_status === 'overdue'
-                          ? 'bg-red-900/30 text-red-400'
-                          : remittance.club_to_state_status === 'waived'
-                          ? 'bg-slate-700/50 text-slate-400'
-                          : 'bg-orange-900/30 text-orange-400'
-                      }`}>
-                        {remittance.club_to_state_status}
-                      </span>
+                      {overdue ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-500/30">
+                            <AlertTriangle className="w-3 h-3" />
+                            Overdue
+                          </span>
+                          <span className="text-[10px] text-red-400/70">
+                            {overdueWeeks} week{overdueWeeks !== 1 ? 's' : ''} overdue
+                          </span>
+                        </div>
+                      ) : (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          remittance.club_to_state_status === 'paid'
+                            ? 'bg-green-900/30 text-green-400'
+                            : remittance.club_to_state_status === 'waived'
+                            ? 'bg-slate-700/50 text-slate-400'
+                            : 'bg-orange-900/30 text-orange-400'
+                        }`}>
+                          {remittance.club_to_state_status}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-sm text-slate-400">
                       {remittance.club_to_state_paid_date
                         ? new Date(remittance.club_to_state_paid_date).toLocaleDateString()
+                        : overdue
+                        ? <span className="text-red-400">Overdue</span>
                         : 'Pending'}
                     </td>
                     <td className="px-4 py-4">
@@ -701,7 +761,8 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
