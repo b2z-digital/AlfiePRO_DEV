@@ -88,7 +88,7 @@ export const ClubContactStep: React.FC<ClubContactStepProps> = ({
             type="tel"
             value={data.phone || ''}
             onChange={(e) => onUpdate({ phone: e.target.value })}
-            placeholder="+61 2 1234 5678"
+            placeholder="0409 xxx xxx"
             className="w-full px-4 py-3 bg-slate-800 text-white border border-slate-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
           />
         </div>

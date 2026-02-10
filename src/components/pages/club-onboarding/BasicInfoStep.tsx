@@ -205,7 +205,7 @@ export const BasicInfoStep: React.FC<StepProps & { stateAssociationId: string }>
                 value={formData.phone}
                 onChange={(e) => updateFormData({ phone: e.target.value })}
                 className={`${inputClass} pl-10`}
-                placeholder="(02) 1234 5678"
+                placeholder="0409 xxx xxx"
               />
             </div>
           </div>

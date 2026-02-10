@@ -1,7 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Navigation, FileText } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { MapPin, Navigation, FileText, Loader2 } from 'lucide-react';
 import { loadGoogleMaps } from '../../../utils/googleMaps';
 import { StepProps } from './types';
+
+const toTitleCase = (str: string): string => {
+  return str.replace(/\b\w+/g, (word) => {
+    const lowerWords = ['of', 'the', 'and', 'in', 'on', 'at', 'to', 'for', 'a', 'an'];
+    if (lowerWords.includes(word.toLowerCase()) && str.indexOf(word) !== 0) {
+      return word.toLowerCase();
+    }
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+};
 
 export const VenueStep: React.FC<StepProps> = ({
   formData,
@@ -9,10 +19,12 @@ export const VenueStep: React.FC<StepProps> = ({
   darkMode
 }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadGoogleMaps(() => {
@@ -95,6 +107,50 @@ export const VenueStep: React.FC<StepProps> = ({
     markerRef.current = marker;
   };
 
+  const lookupAddressFromName = useCallback((name: string) => {
+    if (!name.trim() || !window.google || !mapRef.current) return;
+    setLookingUp(true);
+    const service = new google.maps.places.PlacesService(mapRef.current);
+    service.findPlaceFromQuery(
+      { query: name, fields: ['formatted_address', 'geometry', 'name'] },
+      (results, status) => {
+        setLookingUp(false);
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+          const place = results[0];
+          const updates: any = {};
+          if (place.formatted_address) {
+            updates.venueAddress = place.formatted_address;
+          }
+          if (place.geometry?.location) {
+            updates.venueLatitude = place.geometry.location.lat();
+            updates.venueLongitude = place.geometry.location.lng();
+            if (mapRef.current && markerRef.current) {
+              mapRef.current.setCenter(place.geometry.location);
+              markerRef.current.setPosition(place.geometry.location);
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            updateFormData(updates);
+          }
+        }
+      }
+    );
+  }, [updateFormData]);
+
+  const handleVenueNameChange = (value: string) => {
+    const titleCased = toTitleCase(value);
+    updateFormData({ venueName: titleCased });
+
+    if (lookupTimerRef.current) {
+      clearTimeout(lookupTimerRef.current);
+    }
+    if (titleCased.trim().length >= 5) {
+      lookupTimerRef.current = setTimeout(() => {
+        lookupAddressFromName(titleCased);
+      }, 1000);
+    }
+  };
+
   const inputClass = `w-full px-4 py-3 rounded-xl border transition-all duration-200 ${
     darkMode
       ? 'bg-slate-700/50 border-slate-600 text-white placeholder-slate-500 focus:bg-slate-700 focus:border-emerald-500'
@@ -130,13 +186,21 @@ export const VenueStep: React.FC<StepProps> = ({
         <div className="space-y-5">
           <div>
             <label className={labelClass}>Venue Name</label>
-            <input
-              type="text"
-              value={formData.venueName}
-              onChange={(e) => updateFormData({ venueName: e.target.value })}
-              className={inputClass}
-              placeholder="e.g., Teralba Sailing Club"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.venueName}
+                onChange={(e) => handleVenueNameChange(e.target.value)}
+                className={inputClass}
+                placeholder="e.g., Teralba Sailing Club"
+              />
+              {lookingUp && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-emerald-500" size={18} />
+              )}
+            </div>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              Address will auto-detect after you type the venue name
+            </p>
           </div>
 
           <div>

@@ -1,6 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, ArrowLeft, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowRight, ArrowLeft, Upload, Loader2 } from 'lucide-react';
 import { loadGoogleMaps } from '../../../utils/googleMaps';
+
+const toTitleCase = (str: string): string => {
+  return str.replace(/\b\w+/g, (word) => {
+    const lowerWords = ['of', 'the', 'and', 'in', 'on', 'at', 'to', 'for', 'a', 'an'];
+    if (lowerWords.includes(word.toLowerCase()) && str.indexOf(word) !== 0) {
+      return word.toLowerCase();
+    }
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+};
 
 interface ClubVenueStepProps {
   data: {
@@ -24,10 +34,12 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
 }) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Set default coordinates if not set
   useEffect(() => {
@@ -142,6 +154,50 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
     autoResizeTextarea();
   }, [data.description]);
 
+  const lookupAddressFromName = useCallback((name: string) => {
+    if (!name.trim() || !window.google || !mapRef.current) return;
+    setLookingUp(true);
+    const service = new google.maps.places.PlacesService(mapRef.current);
+    service.findPlaceFromQuery(
+      { query: name, fields: ['formatted_address', 'geometry', 'name'] },
+      (results, status) => {
+        setLookingUp(false);
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+          const place = results[0];
+          const updates: any = {};
+          if (place.formatted_address) {
+            updates.address = place.formatted_address;
+          }
+          if (place.geometry?.location) {
+            updates.latitude = place.geometry.location.lat();
+            updates.longitude = place.geometry.location.lng();
+            if (mapRef.current && markerRef.current) {
+              mapRef.current.setCenter(place.geometry.location);
+              markerRef.current.setPosition(place.geometry.location);
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            onUpdate(updates);
+          }
+        }
+      }
+    );
+  }, [onUpdate]);
+
+  const handleVenueNameChange = (value: string) => {
+    const titleCased = toTitleCase(value);
+    onUpdate({ name: titleCased });
+
+    if (lookupTimerRef.current) {
+      clearTimeout(lookupTimerRef.current);
+    }
+    if (titleCased.trim().length >= 5) {
+      lookupTimerRef.current = setTimeout(() => {
+        lookupAddressFromName(titleCased);
+      }, 1000);
+    }
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -191,15 +247,23 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
           <label className="block text-sm font-medium text-slate-200 mb-2">
             Venue Name <span className="text-red-500">*</span>
           </label>
-          <input
-            type="text"
-            value={data.name}
-            onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Enter venue name"
-            className={`w-full px-4 py-3 bg-slate-800 text-white border ${
-              errors.name ? 'border-red-500' : 'border-slate-700'
-            } rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent`}
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={data.name}
+              onChange={(e) => handleVenueNameChange(e.target.value)}
+              placeholder="Enter venue name"
+              className={`w-full px-4 py-3 bg-slate-800 text-white border ${
+                errors.name ? 'border-red-500' : 'border-slate-700'
+              } rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent`}
+            />
+            {lookingUp && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-green-500" size={18} />
+            )}
+          </div>
+          <p className="text-xs mt-1 text-slate-500">
+            Address will auto-detect after you type the venue name
+          </p>
           {errors.name && (
             <p className="text-red-500 text-sm mt-1">{errors.name}</p>
           )}
