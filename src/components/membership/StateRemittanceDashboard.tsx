@@ -62,7 +62,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const [remittances, setRemittances] = useState<MembershipRemittance[]>([]);
   const [paymentBatches, setPaymentBatches] = useState<PaymentBatch[]>([]);
   const [selectedTab, setSelectedTab] = useState<'clubs' | 'club-payments' | 'national-remittance' | 'payments'>('clubs');
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [selectedClubFilter, setSelectedClubFilter] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -102,7 +102,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   };
 
   const loadClubSummaries = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('membership_remittances')
       .select(`
         club_id,
@@ -110,8 +110,13 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         club_to_state_status,
         clubs!inner(name)
       `)
-      .eq('state_association_id', stateAssociationId)
-      .eq('membership_year', selectedYear);
+      .eq('state_association_id', stateAssociationId);
+
+    if (selectedYear !== 'all') {
+      query = query.eq('membership_year', selectedYear);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error loading club summaries:', error);
@@ -167,8 +172,11 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         clubs!inner(id, name)
       `)
       .eq('state_association_id', stateAssociationId)
-      .eq('membership_year', selectedYear)
       .order('membership_start_date', { ascending: false });
+
+    if (selectedYear !== 'all') {
+      query = query.eq('membership_year', selectedYear);
+    }
 
     if (selectedClubFilter !== 'all') {
       query = query.eq('club_id', selectedClubFilter);
@@ -202,7 +210,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   };
 
   const loadPaymentBatches = async () => {
-    const { data, error} = await supabase
+    let query = supabase
       .from('remittance_payments')
       .select(`
         *,
@@ -210,8 +218,13 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
       `)
       .eq('to_state_id', stateAssociationId)
       .eq('to_type', 'state')
-      .eq('membership_year', selectedYear)
       .order('payment_date', { ascending: false });
+
+    if (selectedYear !== 'all') {
+      query = query.eq('membership_year', selectedYear);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error loading payment batches:', error);
@@ -641,9 +654,10 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                 </label>
                 <select
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                   className="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="all">All Years</option>
                   {availableYears.map(year => (
                     <option key={year} value={year}>{year}</option>
                   ))}
@@ -655,7 +669,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   <div className="text-center py-12">
                     <Building2 className="mx-auto mb-4 text-slate-600" size={48} />
                     <p className="text-lg text-slate-400">
-                      No club data for {selectedYear}
+                      No club data found
                     </p>
                   </div>
                 ) : (
@@ -754,9 +768,10 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   </label>
                   <select
                     value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                     className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="all">All Years</option>
                     {availableYears.map(year => (
                       <option key={year} value={year}>{year}</option>
                     ))}
@@ -893,9 +908,10 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                 </label>
                 <select
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                   className="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="all">All Years</option>
                   {availableYears.map(year => (
                     <option key={year} value={year}>{year}</option>
                   ))}
@@ -906,7 +922,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                 <div className="text-center py-12">
                   <Receipt className="mx-auto mb-4 text-slate-600" size={48} />
                   <p className="text-lg text-slate-400 mb-2">
-                    No payments recorded for {selectedYear}
+                    No payments recorded
                   </p>
                   <p className="text-sm text-slate-500">
                     Payments are created automatically when reconciling members in the "Payments & Reconciliation" tab
@@ -917,7 +933,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-blue-300">Total Paid to National in {selectedYear}</p>
+                        <p className="text-sm text-blue-300">Total Paid to National{selectedYear !== 'all' ? ` in ${selectedYear}` : ''}</p>
                         <p className="text-2xl font-bold text-white mt-1">
                           ${totalPaidToNational.toFixed(2)}
                         </p>

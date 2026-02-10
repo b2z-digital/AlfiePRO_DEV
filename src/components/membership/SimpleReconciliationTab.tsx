@@ -45,7 +45,7 @@ interface ClubGroup {
 interface SimpleReconciliationTabProps {
   darkMode: boolean;
   stateAssociationId: string;
-  selectedYear: number;
+  selectedYear: number | 'all';
   selectedClubFilter?: string;
 }
 

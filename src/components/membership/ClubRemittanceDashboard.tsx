@@ -26,7 +26,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
   const [loading, setLoading] = useState(true);
   const [outstanding, setOutstanding] = useState<ClubOutstandingTotal | null>(null);
   const [remittances, setRemittances] = useState<MembershipRemittance[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('pending');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -54,7 +54,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
         getClubOutstandingTotal(currentClub.clubId),
         getRemittancesWithMembers(currentClub.clubId, {
           status: selectedStatus,
-          year: selectedYear
+          year: selectedYear !== 'all' ? selectedYear : undefined
         })
       ]);
 
@@ -77,7 +77,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
   const handleExport = () => {
     exportRemittancesToCSV(
       remittances,
-      `${currentClub?.name}-remittances-${selectedYear}.csv`
+      `${currentClub?.name}-remittances-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`
     );
   };
 
@@ -488,9 +488,10 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
             </label>
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
             >
+              <option value="all">All Years</option>
               {availableYears.map(year => (
                 <option key={year} value={year}>{year}</option>
               ))}

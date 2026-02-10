@@ -35,7 +35,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
   const [remittances, setRemittances] = useState<MembershipRemittance[]>([]);
   const [payments, setPayments] = useState<AssociationPayment[]>([]);
   const [stateStats, setStateStats] = useState<StateStats[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [selectedTab, setSelectedTab] = useState<'overview' | 'remittances' | 'payments'>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -53,7 +53,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
     setLoading(true);
     try {
       const [remittancesData, paymentsData] = await Promise.all([
-        getNationalRemittances(nationalAssociationId, { year: selectedYear }),
+        getNationalRemittances(nationalAssociationId, { year: selectedYear !== 'all' ? selectedYear : undefined }),
         getPaymentsForEntity('national_association', nationalAssociationId)
       ]);
 
@@ -362,20 +362,21 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
               <div className="flex justify-between items-center mb-4">
                 <select
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                   className={`px-3 py-2 rounded-lg border ${
                     darkMode
                       ? 'bg-gray-700 border-gray-600 text-white'
                       : 'bg-white border-gray-300 text-gray-900'
                   }`}
                 >
+                  <option value="all">All Years</option>
                   {availableYears.map(year => (
                     <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
 
                 <button
-                  onClick={() => exportRemittancesToCSV(remittances, `national-remittances-${selectedYear}.csv`)}
+                  onClick={() => exportRemittancesToCSV(remittances, `national-remittances-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`)}
                   disabled={remittances.length === 0}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     darkMode
@@ -528,9 +529,10 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
                   </label>
                   <select
                     value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
                     className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                    <option value="all">All Years</option>
                     {availableYears.map(year => (
                       <option key={year} value={year}>{year}</option>
                     ))}
@@ -636,7 +638,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
             <div>
               <div className="mb-4 flex justify-end">
                 <button
-                  onClick={() => exportPaymentsToCSV(payments, `national-payments-${selectedYear}.csv`)}
+                  onClick={() => exportPaymentsToCSV(payments, `national-payments-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`)}
                   disabled={payments.length === 0}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     darkMode
