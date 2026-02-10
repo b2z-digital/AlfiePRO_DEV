@@ -19,6 +19,8 @@ import { useNotifications } from './contexts/NotificationContext';
 import { InvitationSignup } from './pages/InvitationSignup';
 import { OnboardingRouter } from './components/onboarding/OnboardingRouter';
 import { ApplicationPendingScreen } from './components/onboarding/ApplicationPendingScreen';
+import { ClubSelfRegistration } from './components/auth/ClubSelfRegistration';
+import { ClubApplicationPendingScreen } from './components/auth/ClubApplicationPendingScreen';
 import { PublicClubHomepageNew } from './components/public/PublicClubHomepageNew';
 import { PublicStateAssociationHomepage } from './components/public/PublicStateAssociationHomepage';
 import { PublicNationalAssociationHomepage } from './components/public/PublicNationalAssociationHomepage';
@@ -71,7 +73,7 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, userClubs } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
   useDataPreloader();
@@ -246,6 +248,12 @@ function App() {
 
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <Login />} />
         <Route path="/register" element={isAuthenticated ? <Navigate to="/" /> : <Register />} />
+        <Route path="/register-club" element={
+          isAuthenticated ? <ClubSelfRegistration darkMode={darkMode} /> : <Navigate to="/login" />
+        } />
+        <Route path="/club-application-pending" element={
+          isAuthenticated ? <ClubApplicationPendingScreen darkMode={darkMode} /> : <Navigate to="/login" />
+        } />
         <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/" /> : <ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/invite/:token" element={<InvitationSignup />} />
@@ -294,6 +302,8 @@ function App() {
               <Navigate to="/login" />
             ) : hasPendingApplication ? (
               <Navigate to="/application-pending" />
+            ) : hasPendingClubApplication ? (
+              <Navigate to="/club-application-pending" />
             ) : clubsLoaded && userClubs.length === 0 && !onboardingCompleted ? (
               <Navigate to="/onboarding" />
             ) : (

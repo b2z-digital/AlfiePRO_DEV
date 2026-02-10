@@ -38,6 +38,7 @@ interface AuthContextType {
   userSubscription: UserSubscription | null;
   onboardingCompleted: boolean;
   hasPendingApplication: boolean;
+  hasPendingClubApplication: boolean;
   signOut: () => Promise<void>;
   refreshUserClubs: () => Promise<UserClub[]>;
   setCurrentClub: (club: UserClub | null) => void;
@@ -66,6 +67,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
+  const [hasPendingClubApplication, setHasPendingClubApplication] = useState(false);
   const [isStateOrgAdmin, setIsStateOrgAdmin] = useState(false);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -437,6 +439,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           setHasPendingApplication(!!pendingApp);
 
+          // Check for pending club registration
+          const { data: pendingClub } = await supabase
+            .from('clubs')
+            .select('id')
+            .eq('registered_by_user_id', session.user.id)
+            .eq('approval_status', 'pending_approval')
+            .limit(1)
+            .maybeSingle();
+
+          setHasPendingClubApplication(!!pendingClub);
+
           // CRITICAL: Load user clubs on initial auth (pass user ID explicitly)
           await refreshUserClubs(session.user.id);
 
@@ -489,6 +502,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUserSubscription(null);
                 setOnboardingCompleted(false);
                 setHasPendingApplication(false);
+                setHasPendingClubApplication(false);
               }
               return;
             }
@@ -537,6 +551,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
               setHasPendingApplication(!!pendingApp);
 
+              // Check for pending club registration
+              const { data: pendingClub } = await supabase
+                .from('clubs')
+                .select('id')
+                .eq('registered_by_user_id', session.user.id)
+                .eq('approval_status', 'pending_approval')
+                .limit(1)
+                .maybeSingle();
+
+              setHasPendingClubApplication(!!pendingClub);
+
               // Refresh clubs with explicit user ID
               await refreshUserClubs(session.user.id);
             } else if (mounted) {
@@ -550,6 +575,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setUserSubscription(null);
               setOnboardingCompleted(false);
               setHasPendingApplication(false);
+              setHasPendingClubApplication(false);
               localStorage.removeItem('currentClubId');
             }
           }
@@ -612,6 +638,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     userSubscription,
     onboardingCompleted,
     hasPendingApplication,
+    hasPendingClubApplication,
     signOut,
     refreshUserClubs,
     setCurrentClub: handleSetCurrentClub,
