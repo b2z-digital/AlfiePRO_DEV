@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 import { getMeetings } from '../../../utils/meetingStorage';
 import { Meeting } from '../../../types/meeting';
 import { useNavigate } from 'react-router-dom';
@@ -23,21 +24,29 @@ export const UpcomingMeetingsWidget: React.FC<UpcomingMeetingsWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadMeetings();
-    }
-  }, [currentClub]);
+    loadMeetings();
+  }, [currentClub, orgContext.currentOrganization]);
 
   const loadMeetings = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
-      const allMeetings = await getMeetings(currentClub.clubId);
+      let allMeetings: Meeting[] = [];
+
+      if (orgContext.type === 'state' && orgContext.stateAssociationId) {
+        allMeetings = await getMeetings(undefined, orgContext.stateAssociationId, 'state');
+      } else if (orgContext.type === 'national' && orgContext.nationalAssociationId) {
+        allMeetings = await getMeetings(undefined, orgContext.nationalAssociationId, 'national');
+      } else if (currentClub?.clubId) {
+        allMeetings = await getMeetings(currentClub.clubId);
+      } else {
+        setLoading(false);
+        return;
+      }
 
       const now = new Date();
       const upcomingMeetings = allMeetings

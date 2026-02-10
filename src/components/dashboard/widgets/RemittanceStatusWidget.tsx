@@ -263,7 +263,7 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
   const hasIssues = stats.overdue > 0 || stats.dueThisMonth > 0;
 
   return (
-    <div className="h-full rounded-xl border backdrop-blur-sm p-6 bg-slate-800/30 border-slate-700/50 relative flex flex-col">
+    <div className="h-full min-h-[32rem] rounded-xl border backdrop-blur-sm p-6 bg-slate-800/30 border-slate-700/50 relative flex flex-col">
       {isEditMode && (
         <button
           onClick={onRemove}
