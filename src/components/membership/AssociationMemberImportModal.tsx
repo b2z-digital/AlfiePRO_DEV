@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, Download, Users, CheckCircle, AlertCircle, Info, FileSpreadsheet, ArrowRight, ChevronDown, Zap, RotateCcw } from 'lucide-react';
 import Papa from 'papaparse';
 import { importAssociationMembersExtended, getUnclaimedMembers } from '../../utils/multiClubMembershipStorage';
+import { COUNTRY_NAMES } from '../../utils/countryFlags';
 
 interface Props {
   isOpen: boolean;
@@ -77,21 +78,45 @@ const ALFIE_FIELDS: Array<{ key: string; label: string; required: boolean; alias
   },
   {
     key: 'membership_level',
-    label: 'Membership Level',
+    label: 'Membership Level / Type',
     required: false,
     aliases: ['membership level', 'membership_level', 'membership type', 'membership_type', 'member type', 'level', 'type']
   },
   {
-    key: 'date_joined',
-    label: 'Date Joined',
+    key: 'club_name',
+    label: 'Club Name / Reference',
     required: false,
-    aliases: ['date joined', 'date_joined', 'join date', 'start date', 'start_date', 'registered', 'registration date']
+    aliases: ['club', 'club name', 'club_name', 'organisation', 'organization']
+  },
+  {
+    key: 'start_date',
+    label: 'Membership Start Date',
+    required: false,
+    aliases: ['start date', 'start_date', 'membership start', 'membership_start', 'from date', 'from_date', 'commencement date']
+  },
+  {
+    key: 'end_date',
+    label: 'Membership End Date',
+    required: false,
+    aliases: ['end date', 'end_date', 'membership end', 'membership_end', 'expiry date', 'expiry_date', 'to date', 'to_date', 'renewal date', 'renewal_date']
+  },
+  {
+    key: 'date_joined',
+    label: 'Date Joined / Registered',
+    required: false,
+    aliases: ['date joined', 'date_joined', 'join date', 'registered', 'registration date', 'registration_date', 'joined']
+  },
+  {
+    key: 'membership_status',
+    label: 'Membership Status',
+    required: false,
+    aliases: ['status', 'membership status', 'membership_status', 'member status', 'member_status', 'active']
   },
   {
     key: 'member_number',
-    label: 'Member Number',
+    label: 'Member Number / ID',
     required: false,
-    aliases: ['member number', 'member_number', 'membership number', 'membership_number', 'member id', 'member_id', 'contact id', 'contact_id']
+    aliases: ['member number', 'member_number', 'membership number', 'membership_number', 'member id', 'member_id', 'contact id', 'contact_id', '#']
   },
   {
     key: 'nickname',
@@ -101,13 +126,82 @@ const ALFIE_FIELDS: Array<{ key: string; label: string; required: boolean; alias
   }
 ];
 
+const REVERSE_COUNTRY_LOOKUP: Record<string, string> = {};
+Object.entries(COUNTRY_NAMES).forEach(([code, name]) => {
+  REVERSE_COUNTRY_LOOKUP[code.toLowerCase()] = name;
+  REVERSE_COUNTRY_LOOKUP[name.toLowerCase()] = name;
+});
+REVERSE_COUNTRY_LOOKUP['aus'] = 'Australia';
+REVERSE_COUNTRY_LOOKUP['nzl'] = 'New Zealand';
+REVERSE_COUNTRY_LOOKUP['gbr'] = 'Great Britain';
+REVERSE_COUNTRY_LOOKUP['usa'] = 'United States';
+REVERSE_COUNTRY_LOOKUP['can'] = 'Canada';
+REVERSE_COUNTRY_LOOKUP['ger'] = 'Germany';
+REVERSE_COUNTRY_LOOKUP['fra'] = 'France';
+REVERSE_COUNTRY_LOOKUP['ita'] = 'Italy';
+REVERSE_COUNTRY_LOOKUP['esp'] = 'Spain';
+
+function normalizeCountry(raw: string): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  const lookup = REVERSE_COUNTRY_LOOKUP[trimmed.toLowerCase()];
+  if (lookup) return lookup;
+  if (trimmed.length <= 3) {
+    const upperLookup = REVERSE_COUNTRY_LOOKUP[trimmed.toLowerCase()];
+    if (upperLookup) return upperLookup;
+  }
+  return trimmed;
+}
+
+function parseTidyClubsMembershipLevel(raw: string): { club: string; level: string } {
+  if (!raw) return { club: '', level: '' };
+
+  const match = raw.match(/^(?:\d{4}(?:\/\d{2,4})?\s+)?([A-Z0-9_]+)[-_](.+)$/i);
+  if (match) {
+    const clubRef = match[1].replace(/_/g, ' ').trim();
+    const levelPart = match[2].replace(/_/g, ' ').trim();
+    return { club: clubRef, level: levelPart };
+  }
+
+  return { club: '', level: raw.trim() };
+}
+
+function normalizeDate(raw: string): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const ddmmyyyy = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (ddmmyyyy) {
+    const d = ddmmyyyy[1].padStart(2, '0');
+    const m = ddmmyyyy[2].padStart(2, '0');
+    return `${ddmmyyyy[3]}-${m}-${d}`;
+  }
+
+  const withTime = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})\s+\d{1,2}:\d{2}/);
+  if (withTime) {
+    const d = withTime[1].padStart(2, '0');
+    const m = withTime[2].padStart(2, '0');
+    return `${withTime[3]}-${m}-${d}`;
+  }
+
+  return trimmed;
+}
+
 function autoDetectMapping(csvHeaders: string[]): FieldMapping[] {
+  const usedColumns = new Set<string>();
+
   return ALFIE_FIELDS.map(field => {
     const normalizedAliases = field.aliases.map(a => a.toLowerCase().trim());
     const matchedColumn = csvHeaders.find(header => {
+      if (usedColumns.has(header)) return false;
       const normalizedHeader = header.toLowerCase().trim();
       return normalizedAliases.includes(normalizedHeader);
     });
+
+    if (matchedColumn) usedColumns.add(matchedColumn);
 
     return {
       alfieField: field.key,
@@ -134,6 +228,7 @@ export default function AssociationMemberImportModal({
   const [importResult, setImportResult] = useState<{ created: number; existing: number; errors: number } | null>(null);
   const [unclaimedCount, setUnclaimedCount] = useState<number>(0);
   const [fileName, setFileName] = useState('');
+  const [detectedPlatform, setDetectedPlatform] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,6 +244,12 @@ export default function AssociationMemberImportModal({
         const headers = results.meta.fields || [];
         setRawData(data);
         setCsvHeaders(headers);
+
+        const lowerHeaders = headers.map(h => h.toLowerCase());
+        const isTidyClubs = lowerHeaders.includes('contact email') && lowerHeaders.includes('membership level') && lowerHeaders.includes('contact id');
+        if (isTidyClubs) setDetectedPlatform('TidyClubs / TidyHQ');
+        else setDetectedPlatform(null);
+
         const mappings = autoDetectMapping(headers);
         setFieldMappings(mappings);
         setStep('mapping');
@@ -161,7 +262,7 @@ export default function AssociationMemberImportModal({
   };
 
   const downloadTemplate = () => {
-    const template = 'email,first_name,last_name,phone,street,city,state,postcode,country,membership_level,member_number\njohn@example.com,John,Smith,0412345678,45 Main St,Sydney,NSW,2000,AU,Senior,AUS-00001\n';
+    const template = 'email,first_name,last_name,phone,street,city,state,postcode,country,membership_level,start_date,end_date,member_number\njohn@example.com,John,Smith,0412345678,45 Main St,Sydney,NSW,2000,Australia,Senior,2025-01-01,2025-12-31,AUS-00001\n';
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -188,12 +289,40 @@ export default function AssociationMemberImportModal({
       });
 
       if (!member.first_name && !member.last_name) {
-        const contactCol = csvHeaders.find(h => h.toLowerCase() === 'contact' || h.toLowerCase() === 'full_name' || h.toLowerCase() === 'name');
+        const contactCol = csvHeaders.find(h =>
+          h.toLowerCase() === 'contact' || h.toLowerCase() === 'full_name' || h.toLowerCase() === 'name'
+        );
         if (contactCol && row[contactCol]) {
           const parts = row[contactCol].trim().split(/\s+/);
           member.first_name = parts[0] || '';
           member.last_name = parts.slice(1).join(' ') || '';
         }
+      }
+
+      if (member.membership_level) {
+        const parsed = parseTidyClubsMembershipLevel(member.membership_level);
+        if (parsed.club && !member.club_name) {
+          member.club_name = parsed.club;
+        }
+        if (parsed.level) {
+          member.membership_level = parsed.level;
+        }
+      }
+
+      if (member.country) {
+        member.country = normalizeCountry(member.country);
+      }
+
+      if (member.start_date) member.start_date = normalizeDate(member.start_date);
+      if (member.end_date) member.end_date = normalizeDate(member.end_date);
+      if (member.date_joined) member.date_joined = normalizeDate(member.date_joined);
+
+      if (member.membership_status) {
+        const raw = member.membership_status.toLowerCase().trim();
+        if (raw === 'active' || raw === 'current') member.membership_status = 'active';
+        else if (raw === 'expired' || raw === 'lapsed') member.membership_status = 'expired';
+        else if (raw === 'pending') member.membership_status = 'pending';
+        else if (raw === 'cancelled' || raw === 'canceled') member.membership_status = 'cancelled';
       }
 
       return member;
@@ -231,6 +360,7 @@ export default function AssociationMemberImportModal({
     setFieldMappings([]);
     setImportResult(null);
     setFileName('');
+    setDetectedPlatform(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -297,7 +427,7 @@ export default function AssociationMemberImportModal({
                   <div className="text-sm">
                     <p className="font-semibold mb-1.5 text-blue-300">Smart Import</p>
                     <p className="text-blue-200/80">
-                      Upload a CSV from any platform (TidyClubs, TidyHQ, spreadsheets, etc.) and we will automatically detect and map the columns to AlfiePro fields.
+                      Upload a CSV from any platform (TidyClubs, TidyHQ, spreadsheets, etc.) and we will automatically detect and map the columns to AlfiePro fields. Country codes (AU, NZ, GB, etc.) are automatically converted to full names.
                     </p>
                   </div>
                 </div>
@@ -348,7 +478,12 @@ export default function AssociationMemberImportModal({
                     {rawData.length} rows detected from <span className="text-slate-300">{fileName}</span>
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  {detectedPlatform && (
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/20 font-medium">
+                      {detectedPlatform}
+                    </span>
+                  )}
                   <div className="flex items-center gap-1.5 text-sm">
                     <Zap size={14} className="text-emerald-400" />
                     <span className="text-emerald-400 font-medium">
@@ -365,7 +500,7 @@ export default function AssociationMemberImportModal({
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Your CSV Column</span>
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">Status</span>
                 </div>
-                <div className="divide-y divide-slate-700/30">
+                <div className="divide-y divide-slate-700/30 max-h-[380px] overflow-y-auto">
                   {fieldMappings.map((mapping) => (
                     <div
                       key={mapping.alfieField}
@@ -417,6 +552,17 @@ export default function AssociationMemberImportModal({
                   ))}
                 </div>
               </div>
+
+              {detectedPlatform && (
+                <div className="bg-blue-500/8 border border-blue-500/15 rounded-xl p-3.5">
+                  <div className="flex items-start gap-2.5 text-sm text-blue-200/80">
+                    <Info size={15} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-blue-300">TidyClubs detected:</strong> Membership Level values like "2025/26 LMRYC_Members" will be automatically parsed to extract the club reference and membership type separately. Country codes (AU) are converted to full names (Australia). Dates are normalised to standard format.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
                 <div className="flex items-center justify-between">
@@ -496,30 +642,34 @@ export default function AssociationMemberImportModal({
                   <table className="min-w-full divide-y divide-slate-700/50">
                     <thead className="bg-slate-800/80 sticky top-0">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Email</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Phone</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Location</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Level</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Email</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Club</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Level</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Start</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Country</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
                       {mappedMembers.slice(0, 50).map((member, index) => (
                         <tr key={index} className="hover:bg-slate-800/30 transition-colors">
-                          <td className="px-4 py-2.5 text-sm text-slate-200 whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-sm text-slate-200 whitespace-nowrap">
                             {member.first_name} {member.last_name}
                           </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-400 whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap max-w-[160px] truncate">
                             {member.email || '-'}
                           </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-400 whitespace-nowrap">
-                            {member.phone || '-'}
+                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
+                            {member.club_name || '-'}
                           </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-400 whitespace-nowrap">
-                            {[member.city, member.state].filter(Boolean).join(', ') || '-'}
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-400 whitespace-nowrap">
+                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
                             {member.membership_level || '-'}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
+                            {member.start_date || member.date_joined || '-'}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
+                            {member.country || '-'}
                           </td>
                         </tr>
                       ))}
@@ -534,7 +684,7 @@ export default function AssociationMemberImportModal({
               </div>
 
               <div className="flex items-center gap-3 bg-slate-800/40 rounded-xl p-4 border border-slate-700/30">
-                <div className="flex flex-wrap gap-3 text-sm">
+                <div className="flex flex-wrap gap-2 text-sm">
                   {fieldMappings.filter(m => m.csvColumn).map(m => (
                     <span key={m.alfieField} className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
                       {m.label}

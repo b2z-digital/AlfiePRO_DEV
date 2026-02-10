@@ -278,8 +278,14 @@ export async function importAssociationMembersExtended(
         if (member.postcode) memberData.postcode = member.postcode;
         if (member.country) memberData.country = member.country;
         if (member.membership_level) memberData.membership_level = member.membership_level;
-        if (member.date_joined) memberData.date_joined = member.date_joined;
+        if (member.club_name) memberData.club = member.club_name;
         if (member.nickname) memberData.club = member.nickname;
+        if (member.membership_status) memberData.membership_status = member.membership_status;
+
+        if (member.start_date) memberData.date_joined = member.start_date;
+        else if (member.date_joined) memberData.date_joined = member.date_joined;
+
+        if (member.end_date) memberData.renewal_date = member.end_date;
 
         if (existingMember) {
           await supabase
@@ -287,7 +293,7 @@ export async function importAssociationMembersExtended(
             .update(memberData)
             .eq('id', existingMember.id);
         } else {
-          memberData.membership_status = 'active';
+          if (!memberData.membership_status) memberData.membership_status = 'active';
           await supabase
             .from('members')
             .insert([memberData]);
