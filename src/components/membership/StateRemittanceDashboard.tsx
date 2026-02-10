@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt } from 'lucide-react';
+import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { ConfirmationModal } from '../ConfirmationModal';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import { SimpleReconciliationTab } from './SimpleReconciliationTab';
 import { Avatar } from '../ui/Avatar';
@@ -57,6 +59,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   darkMode,
   stateAssociationId
 }) => {
+  const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [clubSummaries, setClubSummaries] = useState<ClubSummary[]>([]);
   const [remittances, setRemittances] = useState<MembershipRemittance[]>([]);
@@ -72,6 +75,10 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const [selectedPayment, setSelectedPayment] = useState<PaymentBatch | null>(null);
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
   const [paymentMembers, setPaymentMembers] = useState<MembershipRemittance[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (stateAssociationId) {
@@ -400,6 +407,61 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
     loadData();
   };
 
+  const handleDeletePayment = async () => {
+    if (!deleteTargetId) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('remittance_payments')
+        .delete()
+        .eq('id', deleteTargetId);
+
+      if (error) throw error;
+
+      addNotification('success', 'Payment record deleted successfully');
+      setShowDeleteConfirm(false);
+      setDeleteTargetId(null);
+      if (expandedPaymentId === deleteTargetId) {
+        setExpandedPaymentId(null);
+        setPaymentMembers([]);
+      }
+      await loadData();
+    } catch (error: any) {
+      addNotification('error', `Failed to delete payment: ${error.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleClearAllPayments = async () => {
+    setDeleting(true);
+    try {
+      let query = supabase
+        .from('remittance_payments')
+        .delete()
+        .eq('to_state_id', stateAssociationId)
+        .eq('to_type', 'state');
+
+      if (selectedYear !== 'all') {
+        query = query.eq('membership_year', selectedYear);
+      }
+
+      const { error } = await query;
+
+      if (error) throw error;
+
+      addNotification('success', `All payment records cleared successfully`);
+      setShowClearAllConfirm(false);
+      setExpandedPaymentId(null);
+      setPaymentMembers([]);
+      await loadData();
+    } catch (error: any) {
+      addNotification('error', `Failed to clear payments: ${error.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleToggleClubStatus = async (remittanceId: string, currentStatus: string) => {
     try{
       const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
@@ -471,7 +533,15 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
     return (
       <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+          <div className="text-center">
+            <div className="relative w-16 h-16 mx-auto mb-4">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-700" />
+              <div className="absolute inset-0 rounded-full border-4 border-green-500 border-t-transparent animate-spin" />
+              <DollarSign className="absolute inset-0 m-auto w-6 h-6 text-green-400" />
+            </div>
+            <p className="text-white font-medium mb-1">Loading Remittances</p>
+            <p className="text-sm text-slate-400">Gathering club data, payments, and reconciliation status...</p>
+          </div>
         </div>
       </div>
     );
@@ -895,11 +965,22 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           {/* Payment History Tab */}
           {selectedTab === 'payments' && (
             <div>
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-white mb-2">Payment Transaction History</h3>
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Payment Transaction History</h3>
                 <p className="text-sm text-slate-400">
                   View all remittance payments from clubs to the association
                 </p>
+                </div>
+                {paymentBatches.length > 0 && (
+                  <button
+                    onClick={() => setShowClearAllConfirm(true)}
+                    className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-all flex items-center gap-2 text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Clear All
+                  </button>
+                )}
               </div>
 
               <div className="mb-4">
@@ -1063,6 +1144,16 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                 Reconcile
                               </button>
                             )}
+                            <button
+                              onClick={() => {
+                                setDeleteTargetId(batch.id);
+                                setShowDeleteConfirm(true);
+                              }}
+                              className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
+                              title="Delete payment"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
 
@@ -1136,6 +1227,31 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           onComplete={handleReconciliationComplete}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setDeleteTargetId(null);
+        }}
+        onConfirm={handleDeletePayment}
+        title="Delete Payment Record"
+        message="Are you sure you want to delete this payment record? This action cannot be undone. The associated remittance statuses will not be affected."
+        confirmText={deleting ? 'Deleting...' : 'Delete Payment'}
+        darkMode={darkMode}
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showClearAllConfirm}
+        onClose={() => setShowClearAllConfirm(false)}
+        onConfirm={handleClearAllPayments}
+        title="Clear All Payment Records"
+        message={`Are you sure you want to delete all ${paymentBatches.length} payment record${paymentBatches.length !== 1 ? 's' : ''}${selectedYear !== 'all' ? ` for ${selectedYear}` : ''}? This action cannot be undone. The associated remittance statuses will not be affected.`}
+        confirmText={deleting ? 'Clearing...' : `Clear All (${paymentBatches.length})`}
+        darkMode={darkMode}
+        variant="danger"
+      />
     </div>
   );
 };

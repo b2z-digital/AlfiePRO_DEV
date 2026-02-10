@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   DollarSign, Users, CheckCircle, Plus, LogOut, Calendar,
   Building2, AlertCircle, Check, ChevronDown, ChevronRight, Edit, Trash2
@@ -55,6 +56,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
   selectedYear,
   selectedClubFilter
 }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -572,7 +574,15 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+        <div className="text-center">
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-4 border-slate-700" />
+            <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
+            <DollarSign className="absolute inset-0 m-auto w-6 h-6 text-blue-400" />
+          </div>
+          <p className="text-white font-medium mb-1">Loading Club Payments</p>
+          <p className="text-sm text-slate-400">Fetching payment records and member data...</p>
+        </div>
       </div>
     );
   }
@@ -700,10 +710,10 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
               <p className="mb-2 font-medium">No payments recorded</p>
               <p className="text-sm mb-4">Record a payment in the finance system with "Club Membership Remittances" category</p>
               <button
-                onClick={() => window.location.href = '#/finances'}
+                onClick={() => navigate('/finances/invoices?action=create&type=deposit')}
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
               >
-                Go to Finances
+                Create a Deposit
               </button>
             </div>
           ) : (
