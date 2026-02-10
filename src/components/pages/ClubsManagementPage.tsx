@@ -1172,35 +1172,17 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                     </div>
                   </div>
 
-                  {/* Alert Stats */}
-                  {((club.pending_applications || 0) > 0 || (club.pending_payments || 0) > 0) && (
-                    <div className="space-y-2">
-                      {(club.pending_applications || 0) > 0 && (
-                        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
-                          darkMode ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'
-                        }`}>
-                          <span className={`flex items-center gap-1.5 ${darkMode ? 'text-orange-300' : 'text-orange-700'}`}>
-                            <UserPlus size={14} />
-                            Pending Applications
-                          </span>
-                          <span className={`font-bold ${darkMode ? 'text-orange-200' : 'text-orange-800'}`}>
-                            {club.pending_applications}
-                          </span>
-                        </div>
-                      )}
-                      {(club.pending_payments || 0) > 0 && (
-                        <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
-                          darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
-                        }`}>
-                          <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
-                            <DollarSign size={14} />
-                            Pending Payments
-                          </span>
-                          <span className={`font-bold ${darkMode ? 'text-red-200' : 'text-red-800'}`}>
-                            ${(club.pending_payments || 0).toFixed(2)}
-                          </span>
-                        </div>
-                      )}
+                  {(club.pending_payments || 0) > 0 && (
+                    <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
+                      darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                        <DollarSign size={14} />
+                        Pending Payments
+                      </span>
+                      <span className={`font-bold ${darkMode ? 'text-red-200' : 'text-red-800'}`}>
+                        ${(club.pending_payments || 0).toFixed(2)}
+                      </span>
                     </div>
                   )}
 
