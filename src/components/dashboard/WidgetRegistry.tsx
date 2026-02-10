@@ -412,7 +412,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     name: 'Association Remittances',
     description: 'Monitor association fees owed and payment status',
     icon: DollarSign,
-    defaultSize: '1x2',
+    defaultSize: '1x3',
     component: RemittanceStatusWidget,
     category: 'membership',
     requiredPermissions: ['admin', 'treasurer', 'membership']
