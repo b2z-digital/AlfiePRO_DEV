@@ -110,9 +110,9 @@ export const UpcomingMeetingsWidget: React.FC<UpcomingMeetingsWidgetProps> = ({
       isEditMode={isEditMode}
       onRemove={onRemove}
     >
-      <div className="min-h-[16rem]">
+      <div>
         {loading ? (
-          <div className="flex items-center justify-center h-64">
+          <div className="flex items-center justify-center h-40">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
           </div>
         ) : meetings.length > 0 ? (
@@ -167,7 +167,7 @@ export const UpcomingMeetingsWidget: React.FC<UpcomingMeetingsWidgetProps> = ({
             </button>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
+          <div className="flex flex-col items-center justify-center h-40 text-center">
             <Calendar size={40} className="text-slate-600 mb-3" />
             <p className="text-sm text-slate-400 mb-3">No upcoming meetings</p>
             <button

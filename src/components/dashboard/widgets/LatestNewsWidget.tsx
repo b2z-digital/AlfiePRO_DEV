@@ -112,7 +112,7 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto space-y-2 min-h-[16rem]">
+      <div className="flex-1 overflow-auto space-y-2">
         {loading ? (
           <div className="text-center py-8 text-slate-400">Loading...</div>
         ) : articles.length === 0 ? (
