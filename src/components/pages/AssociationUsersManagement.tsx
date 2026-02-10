@@ -117,15 +117,31 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
     }
   };
 
+  const getAdminCount = () => {
+    return users.filter(u =>
+      u.role === 'state_admin' || u.role === 'national_admin' || u.role === 'admin'
+    ).length;
+  };
+
+  const isUserAdmin = (role: string) => {
+    return role === 'state_admin' || role === 'national_admin' || role === 'admin';
+  };
+
   const handleUpdateRole = async (assocUser: AssociationUser, newRoleValue: string) => {
-    if (assocUser.user_id === user?.id) {
-      addNotification('error', 'You cannot change your own role');
+    const mappedRole = newRoleValue === 'admin' ? adminRole : newRoleValue;
+
+    if (isUserAdmin(assocUser.role) && !isUserAdmin(mappedRole) && getAdminCount() <= 1) {
+      addNotification('error', 'Cannot change role. Every association must have at least one admin.');
       return;
     }
 
-    try {
-      const mappedRole = newRoleValue === 'admin' ? adminRole : newRoleValue;
+    if (assocUser.user_id === user?.id) {
+      const name = getNormalizedRole(mappedRole);
+      const label = ROLE_OPTIONS.find(r => r.value === name)?.label || name;
+      if (!confirm(`Change your own role to ${label}? ${!isUserAdmin(mappedRole) ? 'You will lose admin access to this association.' : ''}`)) return;
+    }
 
+    try {
       const { error } = await supabase
         .from(tableName)
         .update({ role: mappedRole })
@@ -145,13 +161,17 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
   };
 
   const handleRemoveUser = async (assocUser: AssociationUser) => {
-    if (assocUser.user_id === user?.id) {
-      addNotification('error', 'You cannot remove yourself');
+    if (isUserAdmin(assocUser.role) && getAdminCount() <= 1) {
+      addNotification('error', 'Cannot remove the last admin. Every association must have at least one admin.');
       return;
     }
 
     const name = `${assocUser.first_name} ${assocUser.last_name}`.trim() || 'this user';
-    if (!confirm(`Remove ${name} from this association?`)) return;
+    const isSelf = assocUser.user_id === user?.id;
+    const confirmMsg = isSelf
+      ? 'Remove yourself from this association? You will lose all access to this dashboard.'
+      : `Remove ${name} from this association?`;
+    if (!confirm(confirmMsg)) return;
 
     try {
       const { error } = await supabase
@@ -162,7 +182,7 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
       if (error) throw error;
 
       setUsers(prev => prev.filter(u => u.id !== assocUser.id));
-      addNotification('success', 'User removed from association');
+      addNotification('success', isSelf ? 'You have been removed from this association' : 'User removed from association');
     } catch (error) {
       console.error('Error removing user:', error);
       addNotification('error', 'Failed to remove user');
@@ -273,24 +293,22 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
               <div className="flex items-center gap-3 flex-shrink-0">
                 {getRoleBadge(assocUser.role)}
 
-                {assocUser.user_id !== user?.id && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setEditingUser(assocUser)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-600/50 transition-colors"
-                      title="Edit role"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleRemoveUser(assocUser)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                      title="Remove user"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setEditingUser(assocUser)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-600/50 transition-colors"
+                    title="Edit role"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleRemoveUser(assocUser)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Remove user"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
