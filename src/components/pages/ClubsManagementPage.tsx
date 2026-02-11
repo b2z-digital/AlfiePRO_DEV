@@ -5,7 +5,7 @@ import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
 import { useNavigate } from 'react-router-dom';
 import { loadGoogleMaps } from '../../utils/googleMaps';
-import { ClubEditModal } from '../../components/ClubEditModal';
+
 import { useNotification } from '../../contexts/NotificationContext';
 
 interface Club {
@@ -1365,10 +1365,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         darkMode={darkMode}
       />
 
-      {/* Edit Club Modal */}
+      {/* Edit Club Wizard */}
       {selectedClubId && (
-        <ClubEditModal
-          clubId={selectedClubId}
+        <ClubOnboardingWizard
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);
@@ -1379,6 +1378,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             setShowEditModal(false);
             setSelectedClubId(null);
           }}
+          stateAssociationId={currentOrganization?.id || ''}
+          darkMode={darkMode}
+          clubId={selectedClubId}
         />
       )}
 

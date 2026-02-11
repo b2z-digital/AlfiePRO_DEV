@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -19,6 +19,7 @@ interface ClubOnboardingWizardProps {
   onSuccess: () => void;
   stateAssociationId: string;
   darkMode: boolean;
+  clubId?: string;
 }
 
 const STEP_ICONS = [Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle];
@@ -59,15 +60,110 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
   onClose,
   onSuccess,
   stateAssociationId,
-  darkMode
+  darkMode,
+  clubId
 }) => {
   const { addNotification } = useNotification();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [formData, setFormData] = useState<ClubOnboardingFormData>(INITIAL_FORM_DATA);
 
+  const isEditMode = !!clubId;
   const totalSteps = STEP_CONFIG.length;
+
+  useEffect(() => {
+    if (isOpen && clubId) {
+      loadClubData(clubId);
+    } else if (isOpen && !clubId) {
+      setFormData(INITIAL_FORM_DATA);
+      setCurrentStep(0);
+    }
+  }, [isOpen, clubId]);
+
+  const loadClubData = async (id: string) => {
+    setInitialLoading(true);
+    try {
+      const { data: club } = await supabase
+        .from('clubs')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!club) return;
+
+      const { data: venues } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('club_id', id)
+        .eq('is_default', true)
+        .limit(1);
+      const venue = venues?.[0];
+
+      const { data: boatClasses } = await supabase
+        .from('club_boat_classes')
+        .select('boat_class_id')
+        .eq('club_id', id);
+
+      const { data: membershipTypes } = await supabase
+        .from('membership_types')
+        .select('*')
+        .eq('club_id', id)
+        .eq('is_active', true);
+
+      const { data: taxRates } = await supabase
+        .from('tax_rates')
+        .select('*')
+        .eq('club_id', id)
+        .eq('is_default', true)
+        .limit(1);
+      const taxRate = taxRates?.[0];
+
+      setFormData({
+        name: club.name || '',
+        abbreviation: club.abbreviation || '',
+        location: club.address || '',
+        country: 'Australia',
+        email: club.contact_email || '',
+        phone: club.contact_phone || '',
+        website: club.subdomain_slug || '',
+        logoFile: null,
+        logoPreview: club.logo || '',
+        clubIntroduction: club.club_introduction || '',
+        featuredImageFile: null,
+        featuredImagePreview: club.featured_image_url || '',
+        venueName: venue?.name || '',
+        venueAddress: venue?.address || '',
+        venueDescription: venue?.description || '',
+        venueLatitude: venue?.latitude || -32.9688,
+        venueLongitude: venue?.longitude || 151.7174,
+        selectedBoatClassIds: (boatClasses || []).map(bc => bc.boat_class_id),
+        membershipTypes: (membershipTypes || []).map(mt => ({
+          id: mt.id,
+          name: mt.name,
+          description: mt.description || '',
+          amount: Number(mt.amount) || 0,
+          currency: mt.currency || 'AUD',
+          renewal_period: mt.renewal_period || 'annual',
+        })),
+        currency: taxRate?.currency || 'AUD',
+        taxName: taxRate?.name || club.tax_name || 'GST',
+        taxRate: taxRate ? Number(taxRate.rate) : (club.tax_rate ? Number(club.tax_rate) : 10),
+        taxEnabled: club.tax_enabled !== false,
+        assignAdmin: false,
+        adminEmail: '',
+        adminFirstName: '',
+        adminLastName: '',
+        sendInvitation: false,
+      });
+    } catch (error) {
+      console.error('Error loading club data:', error);
+      addNotification('error', 'Failed to load club data');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -135,46 +231,77 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
     setLoading(true);
 
     try {
-      const clubInsert: any = {
-        name: formData.name,
-        abbreviation: formData.abbreviation,
-        location: formData.location,
-        email: formData.email,
-        phone: formData.phone,
-        website: formData.website,
-        state_association_id: stateAssociationId || null,
-        assigned_by_user_id: user?.id,
-        onboarding_completed: !formData.assignAdmin,
-        club_introduction: formData.clubIntroduction || null,
-        cover_image_url: '/lmryc_slide.jpeg',
-      };
-
-      const { data: club, error: clubError } = await supabase
-        .from('clubs')
-        .insert(clubInsert)
-        .select()
-        .single();
-
-      if (clubError) throw clubError;
-
-      if (formData.logoFile) {
-        const logoUrl = await uploadImage(club.id, formData.logoFile, 'logo');
-        if (logoUrl) {
-          await supabase.from('clubs').update({ logo: logoUrl }).eq('id', club.id);
-        }
+      if (isEditMode && clubId) {
+        await handleUpdate(clubId);
+      } else {
+        await handleCreate();
       }
 
-      if (formData.featuredImageFile) {
-        const featuredUrl = await uploadImage(club.id, formData.featuredImageFile, 'featured');
-        if (featuredUrl) {
-          await supabase.from('clubs').update({
-            featured_image_url: featuredUrl,
-            cover_image_url: featuredUrl
-          }).eq('id', club.id);
-        }
-      }
+      setFormData(INITIAL_FORM_DATA);
+      setCurrentStep(0);
+      onSuccess();
+    } catch (error) {
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} club:`, error);
+      addNotification('error', `Failed to ${isEditMode ? 'update' : 'create'} club. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (formData.venueName.trim()) {
+  const handleUpdate = async (id: string) => {
+    const clubUpdate: any = {
+      name: formData.name,
+      abbreviation: formData.abbreviation,
+      address: formData.location || null,
+      contact_email: formData.email || null,
+      contact_phone: formData.phone || null,
+      club_introduction: formData.clubIntroduction || null,
+      tax_enabled: formData.taxEnabled,
+      tax_name: formData.taxName || null,
+      tax_rate: formData.taxRate,
+    };
+
+    const { error: clubError } = await supabase
+      .from('clubs')
+      .update(clubUpdate)
+      .eq('id', id);
+
+    if (clubError) throw clubError;
+
+    if (formData.logoFile) {
+      const logoUrl = await uploadImage(id, formData.logoFile, 'logo');
+      if (logoUrl) {
+        await supabase.from('clubs').update({ logo: logoUrl }).eq('id', id);
+      }
+    }
+
+    if (formData.featuredImageFile) {
+      const featuredUrl = await uploadImage(id, formData.featuredImageFile, 'featured');
+      if (featuredUrl) {
+        await supabase.from('clubs').update({
+          featured_image_url: featuredUrl,
+          cover_image_url: featuredUrl
+        }).eq('id', id);
+      }
+    }
+
+    const { data: existingVenue } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('club_id', id)
+      .eq('is_default', true)
+      .maybeSingle();
+
+    if (formData.venueName.trim()) {
+      if (existingVenue) {
+        await supabase.from('venues').update({
+          name: formData.venueName,
+          description: formData.venueDescription || '',
+          address: formData.venueAddress || '',
+          latitude: formData.venueLatitude,
+          longitude: formData.venueLongitude,
+        }).eq('id', existingVenue.id);
+      } else {
         const { data: venue } = await supabase
           .from('venues')
           .insert({
@@ -183,7 +310,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
             address: formData.venueAddress || '',
             latitude: formData.venueLatitude,
             longitude: formData.venueLongitude,
-            club_id: club.id,
+            club_id: id,
             is_default: true,
           })
           .select()
@@ -191,37 +318,79 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
 
         if (venue) {
           await supabase.from('club_venues').insert({
-            club_id: club.id,
+            club_id: id,
             venue_id: venue.id,
             is_primary: true,
           });
         }
       }
+    }
 
-      if (formData.membershipTypes.length > 0) {
-        const typesToInsert = formData.membershipTypes.map(t => ({
-          club_id: club.id,
-          name: t.name,
-          description: t.description || null,
-          amount: t.amount,
+    const newTypeIds = formData.membershipTypes.filter(t => t.id).map(t => t.id);
+
+    const { data: existingTypes } = await supabase
+      .from('membership_types')
+      .select('id')
+      .eq('club_id', id)
+      .eq('is_active', true);
+
+    const existingTypeIds = (existingTypes || []).map(t => t.id);
+    const removedIds = existingTypeIds.filter(eid => !newTypeIds.includes(eid));
+
+    if (removedIds.length > 0) {
+      await supabase.from('membership_types')
+        .update({ is_active: false })
+        .in('id', removedIds);
+    }
+
+    for (const mt of formData.membershipTypes) {
+      if (mt.id && existingTypeIds.includes(mt.id)) {
+        await supabase.from('membership_types').update({
+          name: mt.name,
+          description: mt.description || null,
+          amount: mt.amount,
           currency: formData.currency,
-          renewal_period: t.renewal_period,
+          renewal_period: mt.renewal_period,
+        }).eq('id', mt.id);
+      } else {
+        await supabase.from('membership_types').insert({
+          club_id: id,
+          name: mt.name,
+          description: mt.description || null,
+          amount: mt.amount,
+          currency: formData.currency,
+          renewal_period: mt.renewal_period,
           is_active: true,
-        }));
-        await supabase.from('membership_types').insert(typesToInsert);
+        });
       }
+    }
 
-      if (formData.selectedBoatClassIds.length > 0) {
-        const boatClassRows = formData.selectedBoatClassIds.map(bcId => ({
-          club_id: club.id,
-          boat_class_id: bcId,
-        }));
-        await supabase.from('club_boat_classes').insert(boatClassRows);
-      }
+    await supabase.from('club_boat_classes').delete().eq('club_id', id);
+    if (formData.selectedBoatClassIds.length > 0) {
+      const boatClassRows = formData.selectedBoatClassIds.map(bcId => ({
+        club_id: id,
+        boat_class_id: bcId,
+      }));
+      await supabase.from('club_boat_classes').insert(boatClassRows);
+    }
 
-      if (formData.taxEnabled && formData.taxName) {
+    if (formData.taxEnabled && formData.taxName) {
+      const { data: existingTax } = await supabase
+        .from('tax_rates')
+        .select('id')
+        .eq('club_id', id)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      if (existingTax) {
+        await supabase.from('tax_rates').update({
+          name: formData.taxName,
+          rate: formData.taxRate,
+          currency: formData.currency,
+        }).eq('id', existingTax.id);
+      } else {
         await supabase.from('tax_rates').insert({
-          club_id: club.id,
+          club_id: id,
           name: formData.taxName,
           rate: formData.taxRate,
           currency: formData.currency,
@@ -229,59 +398,196 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           is_active: true,
         });
       }
+    }
 
-      if (formData.assignAdmin && formData.adminEmail) {
-        const { data: existingMember } = await supabase
-          .from('members')
-          .select('id, user_id')
-          .eq('email', formData.adminEmail)
-          .eq('club_id', club.id)
+    if (formData.assignAdmin && formData.adminEmail) {
+      const { data: existingMember } = await supabase
+        .from('members')
+        .select('id, user_id')
+        .eq('email', formData.adminEmail)
+        .eq('club_id', id)
+        .maybeSingle();
+
+      if (existingMember?.user_id) {
+        const { data: existingRole } = await supabase
+          .from('user_clubs')
+          .select('id')
+          .eq('user_id', existingMember.user_id)
+          .eq('club_id', id)
           .maybeSingle();
 
-        if (existingMember?.user_id) {
-          await supabase
-            .from('user_clubs')
-            .insert({
-              user_id: existingMember.user_id,
-              club_id: club.id,
-              role: 'admin'
-            });
-        } else {
-          await supabase
-            .from('members')
-            .insert({
-              club_id: club.id,
-              email: formData.adminEmail,
-              first_name: formData.adminFirstName,
-              last_name: formData.adminLastName,
-              membership_status: 'pending'
-            });
+        if (!existingRole) {
+          await supabase.from('user_clubs').insert({
+            user_id: existingMember.user_id,
+            club_id: id,
+            role: 'admin'
+          });
+        }
+      } else {
+        await supabase.from('members').insert({
+          club_id: id,
+          email: formData.adminEmail,
+          first_name: formData.adminFirstName,
+          last_name: formData.adminLastName,
+          membership_status: 'pending'
+        });
 
-          if (formData.sendInvitation) {
-            await supabase.functions.invoke('send-member-invitation', {
-              body: {
-                email: formData.adminEmail,
-                firstName: formData.adminFirstName,
-                lastName: formData.adminLastName,
-                clubId: club.id,
-                clubName: formData.name,
-                role: 'admin'
-              }
-            });
-          }
+        if (formData.sendInvitation) {
+          await supabase.functions.invoke('send-member-invitation', {
+            body: {
+              email: formData.adminEmail,
+              firstName: formData.adminFirstName,
+              lastName: formData.adminLastName,
+              clubId: id,
+              clubName: formData.name,
+              role: 'admin'
+            }
+          });
         }
       }
-
-      addNotification('success', `${formData.name} has been created successfully!`);
-      setFormData(INITIAL_FORM_DATA);
-      setCurrentStep(0);
-      onSuccess();
-    } catch (error) {
-      console.error('Error creating club:', error);
-      addNotification('error', 'Failed to create club. Please try again.');
-    } finally {
-      setLoading(false);
     }
+
+    addNotification('success', `${formData.name} has been updated successfully!`);
+  };
+
+  const handleCreate = async () => {
+    const clubInsert: any = {
+      name: formData.name,
+      abbreviation: formData.abbreviation,
+      address: formData.location || null,
+      contact_email: formData.email || null,
+      contact_phone: formData.phone || null,
+      state_association_id: stateAssociationId || null,
+      assigned_by_user_id: user?.id,
+      onboarding_completed: !formData.assignAdmin,
+      club_introduction: formData.clubIntroduction || null,
+      cover_image_url: '/lmryc_slide.jpeg',
+    };
+
+    const { data: club, error: clubError } = await supabase
+      .from('clubs')
+      .insert(clubInsert)
+      .select()
+      .single();
+
+    if (clubError) throw clubError;
+
+    if (formData.logoFile) {
+      const logoUrl = await uploadImage(club.id, formData.logoFile, 'logo');
+      if (logoUrl) {
+        await supabase.from('clubs').update({ logo: logoUrl }).eq('id', club.id);
+      }
+    }
+
+    if (formData.featuredImageFile) {
+      const featuredUrl = await uploadImage(club.id, formData.featuredImageFile, 'featured');
+      if (featuredUrl) {
+        await supabase.from('clubs').update({
+          featured_image_url: featuredUrl,
+          cover_image_url: featuredUrl
+        }).eq('id', club.id);
+      }
+    }
+
+    if (formData.venueName.trim()) {
+      const { data: venue } = await supabase
+        .from('venues')
+        .insert({
+          name: formData.venueName,
+          description: formData.venueDescription || '',
+          address: formData.venueAddress || '',
+          latitude: formData.venueLatitude,
+          longitude: formData.venueLongitude,
+          club_id: club.id,
+          is_default: true,
+        })
+        .select()
+        .single();
+
+      if (venue) {
+        await supabase.from('club_venues').insert({
+          club_id: club.id,
+          venue_id: venue.id,
+          is_primary: true,
+        });
+      }
+    }
+
+    if (formData.membershipTypes.length > 0) {
+      const typesToInsert = formData.membershipTypes.map(t => ({
+        club_id: club.id,
+        name: t.name,
+        description: t.description || null,
+        amount: t.amount,
+        currency: formData.currency,
+        renewal_period: t.renewal_period,
+        is_active: true,
+      }));
+      await supabase.from('membership_types').insert(typesToInsert);
+    }
+
+    if (formData.selectedBoatClassIds.length > 0) {
+      const boatClassRows = formData.selectedBoatClassIds.map(bcId => ({
+        club_id: club.id,
+        boat_class_id: bcId,
+      }));
+      await supabase.from('club_boat_classes').insert(boatClassRows);
+    }
+
+    if (formData.taxEnabled && formData.taxName) {
+      await supabase.from('tax_rates').insert({
+        club_id: club.id,
+        name: formData.taxName,
+        rate: formData.taxRate,
+        currency: formData.currency,
+        is_default: true,
+        is_active: true,
+      });
+    }
+
+    if (formData.assignAdmin && formData.adminEmail) {
+      const { data: existingMember } = await supabase
+        .from('members')
+        .select('id, user_id')
+        .eq('email', formData.adminEmail)
+        .eq('club_id', club.id)
+        .maybeSingle();
+
+      if (existingMember?.user_id) {
+        await supabase
+          .from('user_clubs')
+          .insert({
+            user_id: existingMember.user_id,
+            club_id: club.id,
+            role: 'admin'
+          });
+      } else {
+        await supabase
+          .from('members')
+          .insert({
+            club_id: club.id,
+            email: formData.adminEmail,
+            first_name: formData.adminFirstName,
+            last_name: formData.adminLastName,
+            membership_status: 'pending'
+          });
+
+        if (formData.sendInvitation) {
+          await supabase.functions.invoke('send-member-invitation', {
+            body: {
+              email: formData.adminEmail,
+              firstName: formData.adminFirstName,
+              lastName: formData.adminLastName,
+              clubId: club.id,
+              clubName: formData.name,
+              role: 'admin'
+            }
+          });
+        }
+      }
+    }
+
+    addNotification('success', `${formData.name} has been created successfully!`);
   };
 
   const handleClose = () => {
@@ -300,7 +606,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         <div className={`flex-shrink-0 flex items-center justify-between px-8 pt-6 pb-4`}>
           <div>
             <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Add New Club
+              {isEditMode ? 'Edit Club' : 'Add New Club'}
             </h2>
             <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Step {currentStep + 1} of {totalSteps} - {STEP_CONFIG[currentStep].label}
@@ -325,14 +631,14 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
               return (
                 <React.Fragment key={step.key}>
                   <button
-                    onClick={() => index <= currentStep && setCurrentStep(index)}
-                    disabled={index > currentStep}
+                    onClick={() => (isEditMode || index <= currentStep) && setCurrentStep(index)}
+                    disabled={!isEditMode && index > currentStep}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       isActive
                         ? darkMode
                           ? 'bg-emerald-500/20 text-emerald-400'
                           : 'bg-emerald-50 text-emerald-700'
-                        : isCompleted
+                        : (isCompleted || isEditMode)
                           ? darkMode
                             ? 'text-emerald-500 hover:bg-slate-700/50 cursor-pointer'
                             : 'text-emerald-600 hover:bg-slate-50 cursor-pointer'
@@ -346,7 +652,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
                   </button>
                   {index < STEP_CONFIG.length - 1 && (
                     <div className={`flex-1 h-0.5 rounded-full mx-0.5 ${
-                      isCompleted
+                      (isCompleted || isEditMode)
                         ? 'bg-emerald-500'
                         : darkMode
                           ? 'bg-slate-700'
@@ -366,6 +672,12 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 py-4">
+          {initialLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 size={32} className="animate-spin text-emerald-500 mb-4" />
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Loading club details...</p>
+            </div>
+          ) : (<>
           {currentStep === 0 && (
             <BasicInfoStep
               formData={formData}
@@ -395,6 +707,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           {currentStep === 7 && (
             <ReviewStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
+          </>)}
         </div>
 
         <div className={`flex-shrink-0 flex items-center justify-between px-8 py-5 border-t ${
@@ -455,12 +768,12 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
                 {loading ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    Creating Club...
+                    {isEditMode ? 'Saving Changes...' : 'Creating Club...'}
                   </>
                 ) : (
                   <>
                     <CheckCircle size={18} />
-                    Create Club
+                    {isEditMode ? 'Save Changes' : 'Create Club'}
                   </>
                 )}
               </button>
