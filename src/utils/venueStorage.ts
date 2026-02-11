@@ -618,18 +618,15 @@ export const getVenueClubs = async (venueId: string): Promise<Array<{id: string,
   }
 };
 
-// Search for similar venues by name or address
 export const findSimilarVenues = async (name: string, address: string, currentClubId: string): Promise<Venue[]> => {
   try {
     if (!name && !address) return [];
 
-    // Search for venues with similar names or addresses
-    // Use ilike for case-insensitive partial matching
     const { data, error } = await supabase
       .from('venues')
       .select('*, clubs(name, abbreviation)')
       .or(`name.ilike.%${name}%,address.ilike.%${address}%`)
-      .neq('club_id', currentClubId) // Exclude venues already owned by this club
+      .neq('club_id', currentClubId)
       .limit(10);
 
     if (error) {
@@ -637,7 +634,6 @@ export const findSimilarVenues = async (name: string, address: string, currentCl
       return [];
     }
 
-    // Filter out venues this club already has access to
     const { data: clubVenues, error: cvError } = await supabase
       .from('club_venues')
       .select('venue_id')
@@ -655,4 +651,137 @@ export const findSimilarVenues = async (name: string, address: string, currentCl
     console.error('Error finding similar venues:', error);
     return [];
   }
+};
+
+export const getDiscoverableVenues = async (clubId: string, searchQuery?: string): Promise<Venue[]> => {
+  try {
+    const { data: clubVenues, error: cvError } = await supabase
+      .from('club_venues')
+      .select('venue_id')
+      .eq('club_id', clubId);
+
+    if (cvError) {
+      console.error('Error fetching club venues:', cvError);
+      return [];
+    }
+
+    const existingVenueIds = (clubVenues || []).map(cv => cv.venue_id);
+
+    let query = supabase
+      .from('venues')
+      .select('*, clubs(name, abbreviation)')
+      .order('name');
+
+    if (existingVenueIds.length > 0) {
+      query = query.not('id', 'in', `(${existingVenueIds.join(',')})`);
+    }
+
+    if (searchQuery && searchQuery.trim()) {
+      query = query.or(`name.ilike.%${searchQuery.trim()}%,address.ilike.%${searchQuery.trim()}%`);
+    }
+
+    const { data, error } = await query.limit(50);
+
+    if (error) {
+      console.error('Error fetching discoverable venues:', error);
+      return [];
+    }
+
+    return (data as Venue[]) || [];
+  } catch (error) {
+    console.error('Error in getDiscoverableVenues:', error);
+    return [];
+  }
+};
+
+export const linkExistingVenue = async (venueId: string, clubId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('club_venues')
+      .insert({
+        club_id: clubId,
+        venue_id: venueId,
+        is_primary: false
+      });
+
+    if (error) {
+      if (error.code === '23505') return true;
+      console.error('Error linking venue:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error linking venue:', error);
+    return false;
+  }
+};
+
+export const unlinkVenueFromClub = async (venueId: string, clubId: string): Promise<boolean> => {
+  try {
+    const { data: relationship } = await supabase
+      .from('club_venues')
+      .select('is_primary')
+      .eq('club_id', clubId)
+      .eq('venue_id', venueId)
+      .maybeSingle();
+
+    if (relationship?.is_primary) {
+      console.error('Cannot unlink venue from primary owner');
+      return false;
+    }
+
+    const { error } = await supabase
+      .from('club_venues')
+      .delete()
+      .eq('club_id', clubId)
+      .eq('venue_id', venueId);
+
+    if (error) {
+      console.error('Error unlinking venue:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error unlinking venue:', error);
+    return false;
+  }
+};
+
+export const setVenueAsClubDefault = async (venueId: string, clubId: string): Promise<boolean> => {
+  try {
+    await supabase
+      .from('venues')
+      .update({ is_default: false })
+      .eq('club_id', clubId);
+
+    const { data: venue } = await supabase
+      .from('venues')
+      .select('club_id')
+      .eq('id', venueId)
+      .maybeSingle();
+
+    if (venue?.club_id === clubId) {
+      const { error } = await supabase
+        .from('venues')
+        .update({ is_default: true })
+        .eq('id', venueId)
+        .eq('club_id', clubId);
+
+      if (error) {
+        console.error('Error setting venue as default:', error);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error setting venue as default:', error);
+    return false;
+  }
+};
+
+export const isVenueOwnedByClub = (venue: Venue, clubId: string): boolean => {
+  return venue.club_id === clubId;
 };

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Plus, Trash2, Upload, X, Edit2, Map, Eye, Search, Star, ArrowUpDown, LayoutGrid, List, Building, Share2, Users, AlertCircle } from 'lucide-react';
+import { MapPin, Plus, Trash2, Upload, X, Edit2, Map, Eye, Search, Star, ArrowUpDown, LayoutGrid, List, Building, Share2, Users, AlertCircle, Link2, Unlink, ChevronDown } from 'lucide-react';
 import { Venue, VenueFormData } from '../../types/venue';
-import { getStoredVenues, addVenue, updateVenue, deleteVenue, shareVenueWithClub, unshareVenueFromClub, getVenueClubs, findSimilarVenues } from '../../utils/venueStorage';
+import { getStoredVenues, addVenue, updateVenue, deleteVenue, shareVenueWithClub, unshareVenueFromClub, getVenueClubs, findSimilarVenues, unlinkVenueFromClub, setVenueAsClubDefault } from '../../utils/venueStorage';
 import { loadGoogleMaps } from '../../utils/googleMaps';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { VenueDetails } from '../VenueDetails';
+import { AddExistingVenueModal } from './AddExistingVenueModal';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../contexts/AuthContext';
@@ -55,6 +56,11 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
   const [sharingClubs, setSharingClubs] = useState<string[]>([]);
   const [similarVenues, setSimilarVenues] = useState<Venue[]>([]);
   const [showSimilarVenuesModal, setShowSimilarVenuesModal] = useState(false);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
+  const [showAddExistingModal, setShowAddExistingModal] = useState(false);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [venueToUnlink, setVenueToUnlink] = useState<Venue | null>(null);
+  const addDropdownRef = useRef<HTMLDivElement>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -72,10 +78,24 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
     return can('venues.create');
   };
 
-  // Helper to check if we're in association view
   const isAssociationView = (): boolean => {
     return !!currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national');
   };
+
+  const isLinkedVenue = (venue: Venue): boolean => {
+    if (!currentClub || isAssociationView()) return false;
+    return venue.club_id !== currentClub.clubId;
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(e.target as Node)) {
+        setShowAddDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchVenues();
@@ -415,6 +435,36 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
     setSimilarVenues([]);
   };
 
+  const handleUnlinkClick = (venue: Venue) => {
+    setVenueToUnlink(venue);
+    setShowUnlinkConfirm(true);
+  };
+
+  const handleConfirmUnlink = async () => {
+    if (venueToUnlink && currentClub) {
+      const success = await unlinkVenueFromClub(venueToUnlink.id, currentClub.clubId);
+      if (success) {
+        addNotification('success', `${venueToUnlink.name} removed from your venues`);
+        await fetchVenues();
+      } else {
+        addNotification('error', 'Failed to remove venue');
+      }
+    }
+    setShowUnlinkConfirm(false);
+    setVenueToUnlink(null);
+  };
+
+  const handleSetDefault = async (venue: Venue) => {
+    if (!currentClub) return;
+    const success = await setVenueAsClubDefault(venue.id, currentClub.clubId);
+    if (success) {
+      addNotification('success', `${venue.name} set as your main venue`);
+      await fetchVenues();
+    } else {
+      addNotification('error', 'Failed to set main venue');
+    }
+  };
+
   const filteredVenues = venues.filter(venue =>
     venue.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     venue.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -537,25 +587,81 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
             </div>
 
             {can('venues.create') && (
-              <button
-                onClick={() => {
-                  setFormData({
-                    name: '',
-                    description: '',
-                    address: '',
-                    latitude: -32.9688,
-                    longitude: 151.7174,
-                    image: null,
-                    isDefault: false
-                  });
-                  setSelectedClubId('');
-                  setShowForm(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl animate-pulse"
-              >
-                <Plus size={18} />
-                Add Venue
-              </button>
+              <div className="relative" ref={addDropdownRef}>
+                {isAssociationView() ? (
+                  <button
+                    onClick={() => {
+                      setFormData({
+                        name: '',
+                        description: '',
+                        address: '',
+                        latitude: -32.9688,
+                        longitude: 151.7174,
+                        image: null,
+                        isDefault: false
+                      });
+                      setSelectedClubId('');
+                      setShowForm(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl"
+                  >
+                    <Plus size={18} />
+                    Add Venue
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setShowAddDropdown(!showAddDropdown)}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl"
+                    >
+                      <Plus size={18} />
+                      Add Venue
+                      <ChevronDown size={16} className={`transition-transform ${showAddDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showAddDropdown && (
+                      <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-20 overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setShowAddDropdown(false);
+                            setFormData({
+                              name: '',
+                              description: '',
+                              address: '',
+                              latitude: -32.9688,
+                              longitude: 151.7174,
+                              image: null,
+                              isDefault: false
+                            });
+                            setSelectedClubId('');
+                            setShowForm(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-slate-200 hover:bg-slate-700/50 transition-colors"
+                        >
+                          <Plus size={18} className="text-green-400" />
+                          <div>
+                            <div className="font-medium">Create New</div>
+                            <div className="text-xs text-slate-400">Add a brand new venue</div>
+                          </div>
+                        </button>
+                        <div className="border-t border-slate-700/50" />
+                        <button
+                          onClick={() => {
+                            setShowAddDropdown(false);
+                            setShowAddExistingModal(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left text-slate-200 hover:bg-slate-700/50 transition-colors"
+                        >
+                          <Link2 size={18} className="text-blue-400" />
+                          <div>
+                            <div className="font-medium">Add Existing</div>
+                            <div className="text-xs text-slate-400">Browse venues from other clubs</div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -799,7 +905,6 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                           </div>
                         )}
 
-                        {/* Default Badge with Shimmer */}
                         {venue.is_default && (
                           <div className="animate-pulse">
                             <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
@@ -808,11 +913,42 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                             </div>
                           </div>
                         )}
+
+                        {isLinkedVenue(venue) && (
+                          <div className="bg-slate-700/90 backdrop-blur-md text-blue-300 px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg border border-blue-500/20 flex items-center gap-1.5">
+                            <Link2 size={12} />
+                            Linked
+                          </div>
+                        )}
                       </div>
 
-                      {/* Floating Action Buttons */}
                       <div className="absolute top-4 left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform -translate-y-2 group-hover:translate-y-0 z-10">
-                        {canModifyVenue(venue) && (
+                        {isLinkedVenue(venue) ? (
+                          <>
+                            {!venue.is_default && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetDefault(venue);
+                                }}
+                                className="p-2.5 rounded-xl bg-amber-500/20 backdrop-blur-md border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                                title="Set as main venue"
+                              >
+                                <Star size={16} />
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnlinkClick(venue);
+                              }}
+                              className="p-2.5 rounded-xl bg-red-500/20 backdrop-blur-md border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                              title="Remove from my venues"
+                            >
+                              <Unlink size={16} />
+                            </button>
+                          </>
+                        ) : canModifyVenue(venue) && (
                           <>
                             <button
                               onClick={(e) => {
@@ -936,6 +1072,12 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                   ))}
                                 </div>
                               )}
+                              {isLinkedVenue(venue) && (
+                                <div className="bg-slate-700/90 text-blue-300 px-2.5 py-1 rounded-lg text-xs font-medium border border-blue-500/20 flex items-center gap-1.5 flex-shrink-0">
+                                  <Link2 size={12} />
+                                  Linked
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-start gap-2 text-sm text-slate-300 mb-2">
                               <MapPin size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
@@ -950,43 +1092,69 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                             )}
                           </div>
 
-                          {/* Action Buttons */}
-                          {canModifyVenue(venue) && (
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEdit(venue);
-                                }}
-                                className="p-2.5 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-300 hover:scale-110"
-                                title="Edit venue"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              {currentOrganization?.type === 'state' && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isLinkedVenue(venue) ? (
+                              <>
+                                {!venue.is_default && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSetDefault(venue);
+                                    }}
+                                    className="p-2.5 rounded-xl bg-amber-500/10 backdrop-blur-md border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all duration-300 hover:scale-110"
+                                    title="Set as main venue"
+                                  >
+                                    <Star size={16} />
+                                  </button>
+                                )}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleShareVenue(venue);
+                                    handleUnlinkClick(venue);
                                   }}
-                                  className="p-2.5 rounded-xl bg-blue-500/10 backdrop-blur-md border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all duration-300 hover:scale-110"
-                                  title="Share with clubs"
+                                  className="p-2.5 rounded-xl bg-red-500/10 backdrop-blur-md border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-300 hover:scale-110"
+                                  title="Remove from my venues"
                                 >
-                                  <Share2 size={16} />
+                                  <Unlink size={16} />
                                 </button>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteClick(venue);
-                                }}
-                                className="p-2.5 rounded-xl bg-red-500/10 backdrop-blur-md border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-300 hover:scale-110"
-                                title="Delete venue"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          )}
+                              </>
+                            ) : canModifyVenue(venue) && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEdit(venue);
+                                  }}
+                                  className="p-2.5 rounded-xl bg-white/5 backdrop-blur-md border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-300 hover:scale-110"
+                                  title="Edit venue"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                {currentOrganization?.type === 'state' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleShareVenue(venue);
+                                    }}
+                                    className="p-2.5 rounded-xl bg-blue-500/10 backdrop-blur-md border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all duration-300 hover:scale-110"
+                                    title="Share with clubs"
+                                  >
+                                    <Share2 size={16} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteClick(venue);
+                                  }}
+                                  className="p-2.5 rounded-xl bg-red-500/10 backdrop-blur-md border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all duration-300 hover:scale-110"
+                                  title="Delete venue"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1206,6 +1374,32 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
           </div>
         </div>
       )}
+
+      {showAddExistingModal && currentClub && (
+        <AddExistingVenueModal
+          clubId={currentClub.clubId}
+          onClose={() => setShowAddExistingModal(false)}
+          onVenueLinked={async () => {
+            addNotification('success', 'Venue added to your club');
+            setShowAddExistingModal(false);
+            await fetchVenues();
+          }}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={showUnlinkConfirm}
+        onClose={() => {
+          setShowUnlinkConfirm(false);
+          setVenueToUnlink(null);
+        }}
+        onConfirm={handleConfirmUnlink}
+        title="Remove Venue"
+        message={`Remove "${venueToUnlink?.name}" from your venues? This won't delete the venue, just remove it from your club's list.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        darkMode={darkMode}
+      />
   </div>
   );
 };
