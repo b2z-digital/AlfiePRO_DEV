@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History } from 'lucide-react';
+import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History, X } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';
@@ -209,6 +209,12 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const [showDeleteReportConfirm, setShowDeleteReportConfirm] = useState(false);
   const [deleteReportTargetId, setDeleteReportTargetId] = useState<string | null>(null);
   const [deletingReport, setDeletingReport] = useState(false);
+  const [showNationalPaymentModal, setShowNationalPaymentModal] = useState(false);
+  const [showSendReportPrompt, setShowSendReportPrompt] = useState(false);
+  const [lastPaidCount, setLastPaidCount] = useState(0);
+  const [showUnpaidWarning, setShowUnpaidWarning] = useState(false);
+  const [unpaidTargetId, setUnpaidTargetId] = useState<string | null>(null);
+  const [unpaidTargetName, setUnpaidTargetName] = useState('');
 
   useEffect(() => {
     if (stateAssociationId) {
@@ -427,26 +433,69 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
     }
   };
 
-  const handleBulkMarkNationalPaid = async () => {
+  const handleBulkMarkNationalPaid = () => {
+    if (selectedIds.size === 0) return;
+    setShowNationalPaymentModal(true);
+  };
+
+  const processNationalPayment = async (paymentDetails: { reference: string; date: string; payment_method: string; notes: string }) => {
     if (selectedIds.size === 0) return;
 
     setBulkActionInProgress(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const selectedRemittances = remittances.filter(r => selectedIds.has(r.id));
+      const totalAmount = selectedRemittances.reduce((sum, r) => sum + r.national_contribution, 0);
+
       const { error } = await supabase
         .from('membership_remittances')
         .update({
           state_to_national_status: 'paid',
-          state_to_national_paid_date: today
+          state_to_national_paid_date: paymentDetails.date,
+          state_to_national_payment_reference: paymentDetails.reference
         })
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;
 
+      const { data: nationalAssoc } = await supabase
+        .from('state_associations')
+        .select('national_association_id')
+        .eq('id', stateAssociationId)
+        .maybeSingle();
+
+      if (nationalAssoc?.national_association_id) {
+        await supabase
+          .from('remittance_payments')
+          .insert({
+            payment_reference: paymentDetails.reference,
+            payment_date: paymentDetails.date,
+            from_state_id: stateAssociationId,
+            from_type: 'state',
+            to_national_id: nationalAssoc.national_association_id,
+            to_type: 'national',
+            total_amount: totalAmount,
+            allocated_amount: totalAmount,
+            payment_method: paymentDetails.payment_method,
+            notes: paymentDetails.notes || null,
+            reconciliation_status: 'completed',
+            status: 'reconciled',
+            membership_year: selectedYear !== 'all' ? selectedYear : new Date().getFullYear()
+          });
+      }
+
+      const paidCount = selectedIds.size;
+      setLastPaidCount(paidCount);
+
       await loadData();
       setSelectedIds(new Set());
+      setShowNationalPaymentModal(false);
+
+      addNotification('success', `${paidCount} member${paidCount !== 1 ? 's' : ''} marked as paid to National ($${totalAmount.toFixed(2)})`);
+
+      setShowSendReportPrompt(true);
     } catch (error: any) {
-      console.error('Error marking remittances as paid:', error);
+      console.error('Error processing national payment:', error);
+      addNotification('error', `Failed to process payment: ${error.message}`);
     } finally {
       setBulkActionInProgress(false);
     }
@@ -664,23 +713,65 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   };
 
   const handleToggleNationalStatus = async (remittanceId: string, currentStatus: string) => {
-    try {
-      const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
-      const today = new Date().toISOString().split('T')[0];
+    if (currentStatus === 'paid') {
+      const rem = remittances.find(r => r.id === remittanceId);
+      setUnpaidTargetId(remittanceId);
+      setUnpaidTargetName(rem?.member_name || 'this member');
+      setShowUnpaidWarning(true);
+      return;
+    }
 
+    try {
+      const today = new Date().toISOString().split('T')[0];
       const { error } = await supabase
         .from('membership_remittances')
         .update({
-          state_to_national_status: newStatus,
-          state_to_national_paid_date: newStatus === 'paid' ? today : null
+          state_to_national_status: 'paid',
+          state_to_national_paid_date: today
         })
         .eq('id', remittanceId);
 
       if (error) throw error;
 
+      addNotification('success', 'Member marked as paid to National');
       await loadData();
+
+      setLastPaidCount(1);
+      setShowSendReportPrompt(true);
     } catch (error: any) {
       console.error('Error updating national status:', error);
+      addNotification('error', 'Failed to update status');
+    }
+  };
+
+  const confirmUnpaidNational = async () => {
+    if (!unpaidTargetId) return;
+    try {
+      await supabase
+        .from('association_transactions')
+        .delete()
+        .eq('linked_entity_type', 'remittance')
+        .eq('linked_entity_id', unpaidTargetId);
+
+      const { error } = await supabase
+        .from('membership_remittances')
+        .update({
+          state_to_national_status: 'pending',
+          state_to_national_paid_date: null,
+          state_to_national_payment_reference: null
+        })
+        .eq('id', unpaidTargetId);
+
+      if (error) throw error;
+
+      addNotification('success', 'Member reverted to pending and finance entries removed');
+      setShowUnpaidWarning(false);
+      setUnpaidTargetId(null);
+      setUnpaidTargetName('');
+      await loadData();
+    } catch (error: any) {
+      console.error('Error reverting national status:', error);
+      addNotification('error', `Failed to revert: ${error.message}`);
     }
   };
 
@@ -984,28 +1075,30 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
             <div>
               {/* Bulk Actions Toolbar */}
               {selectedIds.size > 0 && (
-                <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl border border-blue-500/30 p-4 mb-4">
+                <div className="bg-green-500/10 backdrop-blur-sm rounded-xl border border-green-500/30 p-4 mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <CheckSquare className="w-5 h-5 text-blue-400" />
+                      <CheckSquare className="w-5 h-5 text-green-400" />
                       <span className="text-white font-medium">
-                        {selectedIds.size} selected
+                        {selectedIds.size} member{selectedIds.size !== 1 ? 's' : ''} selected
+                      </span>
+                      <span className="text-sm text-green-300 font-semibold">
+                        ${remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + r.national_contribution, 0).toFixed(2)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleBulkMarkNationalPaid}
                         disabled={bulkActionInProgress}
-                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-600/20 text-sm"
                       >
-                        <Check size={18} />
-                        Mark National Paid
+                        <DollarSign size={16} />
+                        Process Payment to National
                       </button>
                       <button
                         onClick={() => setSelectedIds(new Set())}
-                        className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors flex items-center gap-2"
+                        className="px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors flex items-center gap-2 text-sm border border-slate-600"
                       >
-                        <LogOut size={18} />
                         Clear
                       </button>
                     </div>
@@ -1063,7 +1156,22 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">State Status</th>
                       <th className="text-right py-3 px-4 text-sm font-medium text-slate-300">National Fee</th>
                       <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">National Status</th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">Select</th>
+                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">
+                        {(() => {
+                          const eligible = remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending');
+                          if (eligible.length === 0) return 'Select';
+                          const allSelected = eligible.length > 0 && eligible.every(r => selectedIds.has(r.id));
+                          return (
+                            <button onClick={toggleSelectAll} className="p-1 mx-auto block" title={allSelected ? 'Deselect All' : 'Select All'}>
+                              {allSelected ? (
+                                <CheckSquare className="w-5 h-5 text-green-400" />
+                              ) : (
+                                <Square className="w-5 h-5 text-slate-500 hover:text-slate-300" />
+                              )}
+                            </button>
+                          );
+                        })()}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1607,6 +1715,68 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           }}
         />
       )}
+
+      {showNationalPaymentModal && (
+        <NationalPaymentModal
+          darkMode={darkMode}
+          selectedCount={selectedIds.size}
+          totalAmount={remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + r.national_contribution, 0)}
+          selectedMembers={remittances.filter(r => selectedIds.has(r.id))}
+          processing={bulkActionInProgress}
+          onClose={() => setShowNationalPaymentModal(false)}
+          onSubmit={processNationalPayment}
+        />
+      )}
+
+      {showSendReportPrompt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#131c31] border border-slate-700/80 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 border border-teal-500/20 flex items-center justify-center mx-auto mb-4">
+                <Send size={28} className="text-teal-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Payment Processed</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                {lastPaidCount} member{lastPaidCount !== 1 ? 's have' : ' has'} been marked as paid to National.
+                Would you like to send a report to the National Association to notify them of this payment?
+              </p>
+            </div>
+            <div className="flex items-center gap-3 px-6 pb-6">
+              <button
+                onClick={() => setShowSendReportPrompt(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-slate-700/60"
+              >
+                Not Now
+              </button>
+              <button
+                onClick={() => {
+                  setShowSendReportPrompt(false);
+                  setShowReportModal(true);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-600/20"
+              >
+                <Send size={16} />
+                Send Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={showUnpaidWarning}
+        onClose={() => {
+          setShowUnpaidWarning(false);
+          setUnpaidTargetId(null);
+          setUnpaidTargetName('');
+        }}
+        onConfirm={confirmUnpaidNational}
+        title="Revert National Payment Status"
+        message={`Are you sure you want to mark ${unpaidTargetName} as unpaid to National?\n\nThis will:\n- Remove the associated expense transaction from State finances\n- Remove the associated income transaction from National finances\n- Set the member's national payment status back to pending\n\nThis action affects your financial records.`}
+        confirmText="Revert to Unpaid"
+        darkMode={darkMode}
+        variant="danger"
+      />
     </div>
   );
 };
@@ -1780,6 +1950,202 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+interface NationalPaymentModalProps {
+  darkMode: boolean;
+  selectedCount: number;
+  totalAmount: number;
+  selectedMembers: MembershipRemittance[];
+  processing: boolean;
+  onClose: () => void;
+  onSubmit: (details: { reference: string; date: string; payment_method: string; notes: string }) => void;
+}
+
+const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
+  selectedCount,
+  totalAmount,
+  selectedMembers,
+  processing,
+  onClose,
+  onSubmit
+}) => {
+  const [formData, setFormData] = useState({
+    reference: `NAT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+    date: new Date().toISOString().split('T')[0],
+    payment_method: 'bank_transfer',
+    notes: ''
+  });
+  const [showMembers, setShowMembers] = useState(false);
+
+  const clubGroups = selectedMembers.reduce<Record<string, MembershipRemittance[]>>((acc, m) => {
+    if (!acc[m.club_name]) acc[m.club_name] = [];
+    acc[m.club_name].push(m);
+    return acc;
+  }, {});
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-[#131c31] border border-slate-700/80 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700/60">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/20">
+              <ArrowUpRight size={20} className="text-green-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Pay National Association</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{selectedCount} member{selectedCount !== 1 ? 's' : ''} selected</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-700/80 transition-colors">
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-center">
+              <p className="text-3xl font-bold text-white">${totalAmount.toFixed(2)}</p>
+              <p className="text-xs text-green-300 mt-1 font-medium">Total Payment Amount</p>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700/50 text-center">
+              <p className="text-3xl font-bold text-white">{selectedCount}</p>
+              <p className="text-xs text-slate-400 mt-1 font-medium">Members across {Object.keys(clubGroups).length} club{Object.keys(clubGroups).length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowMembers(!showMembers)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-800/40 hover:bg-slate-800/60 border border-slate-700/40 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Users size={15} className="text-slate-400" />
+              <span className="text-sm font-medium text-slate-300">View Members</span>
+            </div>
+            <ChevronDown size={14} className={`text-slate-500 transition-transform ${showMembers ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showMembers && (
+            <div className="rounded-xl border border-slate-700/60 overflow-hidden max-h-48 overflow-y-auto">
+              {Object.entries(clubGroups).map(([clubName, members]) => (
+                <div key={clubName}>
+                  <div className="flex items-center justify-between px-4 py-2 bg-slate-800/50 border-b border-slate-700/40">
+                    <div className="flex items-center gap-2">
+                      <Building2 size={13} className="text-slate-500" />
+                      <span className="text-xs font-semibold text-slate-300">{clubName}</span>
+                    </div>
+                    <span className="text-xs text-green-400 font-medium">
+                      ${members.reduce((s, m) => s + m.national_contribution, 0).toFixed(2)}
+                    </span>
+                  </div>
+                  {members.map(m => (
+                    <div key={m.id} className="flex items-center justify-between px-4 py-2 pl-8 border-b border-slate-800/40 last:border-0">
+                      <span className="text-sm text-slate-300">{m.member_name}</span>
+                      <span className="text-xs text-slate-400">${m.national_contribution.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} id="national-payment-form" className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Payment Reference *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.reference}
+                  onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Payment Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Payment Method</label>
+              <select
+                value={formData.payment_method}
+                onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50"
+              >
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Cheque</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Notes (optional)</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={2}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500/50 resize-none"
+                placeholder="Payment notes..."
+              />
+            </div>
+          </form>
+
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300 leading-relaxed">
+                This will mark {selectedCount} member{selectedCount !== 1 ? 's' : ''} as paid to National and create
+                expense/income transactions in your finance records.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between p-6 border-t border-slate-700/60">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-slate-700/60"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="national-payment-form"
+            disabled={processing}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-green-600/20"
+          >
+            {processing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <DollarSign size={16} />
+                Process Payment - ${totalAmount.toFixed(2)}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
