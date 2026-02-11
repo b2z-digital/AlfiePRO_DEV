@@ -179,8 +179,6 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
 
       if (remittances) {
         const now = new Date();
-        const fourWeeksFromNow = new Date(now);
-        fourWeeksFromNow.setDate(fourWeeksFromNow.getDate() + 28); // 4 weeks from now
 
         let totalOwing = 0;
         let overdue = 0;
@@ -230,18 +228,24 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
             }
           }
 
-          // For associations: Calculate "Due Soon" as renewals expected in next 4 weeks
-          // Look at ALL memberships (paid or unpaid) that expire within 4 weeks
+          // For associations: Calculate "Due Soon" as payments due in the next 2 weeks
+          // Based on payment terms (30 days from creation), not membership expiry
           if (currentOrganization?.type === 'state' || currentOrganization?.type === 'national') {
-            if (r.membership_end_date) {
-              const expiryDate = new Date(r.membership_end_date);
-              // If membership expires within the next 4 weeks, count it as renewal expected
-              if (expiryDate >= now && expiryDate <= fourWeeksFromNow) {
+            if (isUnpaid && r.created_at) {
+              const createdDate = new Date(r.created_at);
+              const paymentDueDate = new Date(createdDate);
+              paymentDueDate.setDate(paymentDueDate.getDate() + 30); // 30 days payment terms
+
+              const twoWeeksFromNow = new Date(now);
+              twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
+
+              // If payment is due within next 2 weeks (but not yet overdue)
+              if (paymentDueDate >= now && paymentDueDate <= twoWeeksFromNow) {
                 dueThisMonth += amount;
               }
             }
           } else {
-            // For clubs, keep original logic
+            // For clubs, use membership end date logic
             if (isUnpaid && r.membership_end_date) {
               const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
               const dueDate = new Date(r.membership_end_date);
