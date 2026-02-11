@@ -891,10 +891,10 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
               <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-5 h-5 text-orange-400" />
-                <span className="text-sm font-medium text-orange-300">
+                <TrendingUp className="w-5 h-5 text-red-400" />
+                <span className="text-sm font-medium text-red-300">
                   Outstanding from Clubs
                 </span>
               </div>

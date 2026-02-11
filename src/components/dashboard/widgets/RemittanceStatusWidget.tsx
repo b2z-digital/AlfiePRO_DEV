@@ -179,7 +179,8 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
 
       if (remittances) {
         const now = new Date();
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const fourWeeksFromNow = new Date(now);
+        fourWeeksFromNow.setDate(fourWeeksFromNow.getDate() + 28); // 4 weeks from now
 
         let totalOwing = 0;
         let overdue = 0;
@@ -206,7 +207,7 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
               pending += amount;
             }
 
-            // For state/national associations, calculate due dates based on when remittance was created
+            // For state/national associations, calculate overdue based on when remittance was created
             // Clubs have 30 days from creation to pay
             if (currentOrganization?.type === 'state' || currentOrganization?.type === 'national') {
               if (r.created_at) {
@@ -216,8 +217,6 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
 
                 if (dueDate < now) {
                   overdue += amount;
-                } else if (dueDate <= endOfMonth) {
-                  dueThisMonth += amount;
                 }
               }
             } else {
@@ -226,9 +225,28 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
                 const dueDate = new Date(r.membership_end_date);
                 if (dueDate < now) {
                   overdue += amount;
-                } else if (dueDate <= endOfMonth) {
-                  dueThisMonth += amount;
                 }
+              }
+            }
+          }
+
+          // For associations: Calculate "Due Soon" as renewals expected in next 4 weeks
+          // Look at ALL memberships (paid or unpaid) that expire within 4 weeks
+          if (currentOrganization?.type === 'state' || currentOrganization?.type === 'national') {
+            if (r.membership_end_date) {
+              const expiryDate = new Date(r.membership_end_date);
+              // If membership expires within the next 4 weeks, count it as renewal expected
+              if (expiryDate >= now && expiryDate <= fourWeeksFromNow) {
+                dueThisMonth += amount;
+              }
+            }
+          } else {
+            // For clubs, keep original logic
+            if (isUnpaid && r.membership_end_date) {
+              const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+              const dueDate = new Date(r.membership_end_date);
+              if (dueDate <= endOfMonth && dueDate >= now) {
+                dueThisMonth += amount;
               }
             }
           }
@@ -361,15 +379,15 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
 
             <div className={`p-3 rounded-lg border ${
               stats.dueThisMonth > 0
-                ? 'bg-yellow-500/10 border-yellow-500/30'
+                ? 'bg-blue-500/10 border-blue-500/30'
                 : 'bg-slate-800/50 border-slate-700/30'
             }`}>
               <div className="flex items-center gap-2 mb-2">
-                <Clock className={stats.dueThisMonth > 0 ? 'text-yellow-400' : 'text-slate-500'} size={16} />
+                <Clock className={stats.dueThisMonth > 0 ? 'text-blue-400' : 'text-slate-500'} size={16} />
                 <span className="text-xs text-slate-400">Due Soon</span>
               </div>
               <div className={`text-lg font-bold ${
-                stats.dueThisMonth > 0 ? 'text-yellow-400' : 'text-slate-400'
+                stats.dueThisMonth > 0 ? 'text-blue-400' : 'text-slate-400'
               }`}>
                 ${formatCurrency(stats.dueThisMonth)}
               </div>
