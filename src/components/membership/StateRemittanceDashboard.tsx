@@ -733,6 +733,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
     try {
       const today = new Date().toISOString().split('T')[0];
+      const rem = remittances.find(r => r.id === remittanceId);
+      const nationalAmount = rem?.national_contribution || 0;
+
       const { error } = await supabase
         .from('membership_remittances')
         .update({
@@ -742,6 +745,36 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         .eq('id', remittanceId);
 
       if (error) throw error;
+
+      const { data: nationalAssoc } = await supabase
+        .from('state_associations')
+        .select('national_association_id')
+        .eq('id', stateAssociationId)
+        .maybeSingle();
+
+      if (nationalAssoc?.national_association_id && nationalAmount > 0) {
+        const { error: paymentError } = await supabase
+          .from('remittance_payments')
+          .insert({
+            payment_reference: `NAT-${remittanceId.slice(0, 8)}`,
+            payment_date: today,
+            from_state_id: stateAssociationId,
+            from_type: 'state',
+            to_national_id: nationalAssoc.national_association_id,
+            to_type: 'national',
+            total_amount: nationalAmount,
+            allocated_amount: nationalAmount,
+            payment_method: 'transfer',
+            notes: rem ? `Payment for ${rem.member_name}` : null,
+            reconciliation_status: 'completed',
+            status: 'reconciled',
+            membership_year: selectedYear !== 'all' ? Number(selectedYear) : new Date().getFullYear()
+          });
+
+        if (paymentError) {
+          console.error('Error creating outbound payment record:', paymentError);
+        }
+      }
 
       addNotification('success', 'Member marked as paid to National');
       await loadData();
