@@ -201,10 +201,10 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       )
     : organizations;
 
-  // Group organizations by type
-  const clubs = filteredOrgs.filter(o => o.type === 'club');
-  const stateAssocs = filteredOrgs.filter(o => o.type === 'state');
-  const nationalAssocs = filteredOrgs.filter(o => o.type === 'national');
+  // Group organizations by type and sort alphabetically
+  const clubs = filteredOrgs.filter(o => o.type === 'club').sort((a, b) => a.name.localeCompare(b.name));
+  const stateAssocs = filteredOrgs.filter(o => o.type === 'state').sort((a, b) => a.name.localeCompare(b.name));
+  const nationalAssocs = filteredOrgs.filter(o => o.type === 'national').sort((a, b) => a.name.localeCompare(b.name));
 
   // For collapsed mode, show the logo or initial with click handler if multiple orgs
   if (isCollapsed || className.includes("w-10 h-10")) {
