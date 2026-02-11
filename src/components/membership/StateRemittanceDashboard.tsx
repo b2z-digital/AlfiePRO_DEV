@@ -380,13 +380,19 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   };
 
   const loadOutboundPayments = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('remittance_payments')
       .select('*')
       .eq('from_state_id', stateAssociationId)
       .eq('from_type', 'state')
       .eq('to_type', 'national')
       .order('payment_date', { ascending: false });
+
+    if (selectedYear !== 'all') {
+      query = query.eq('membership_year', selectedYear);
+    }
+
+    const { data, error } = await query;
 
     if (!error) {
       setOutboundPayments((data || []) as PaymentBatch[]);
@@ -464,7 +470,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         .maybeSingle();
 
       if (nationalAssoc?.national_association_id) {
-        await supabase
+        const { error: paymentError } = await supabase
           .from('remittance_payments')
           .insert({
             payment_reference: paymentDetails.reference,
@@ -479,8 +485,12 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
             notes: paymentDetails.notes || null,
             reconciliation_status: 'completed',
             status: 'reconciled',
-            membership_year: selectedYear !== 'all' ? selectedYear : new Date().getFullYear()
+            membership_year: selectedYear !== 'all' ? Number(selectedYear) : new Date().getFullYear()
           });
+
+        if (paymentError) {
+          console.error('Error creating outbound payment record:', paymentError);
+        }
       }
 
       const paidCount = selectedIds.size;
