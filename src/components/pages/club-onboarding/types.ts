@@ -7,6 +7,16 @@ export interface MembershipTypeEntry {
   renewal_period: 'annual' | 'monthly' | 'quarterly' | 'lifetime';
 }
 
+export interface SailingDayEntry {
+  id?: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  boat_class_id: string | null;
+  description: string;
+  is_active: boolean;
+}
+
 export interface ClubOnboardingFormData {
   name: string;
   abbreviation: string;
@@ -29,6 +39,8 @@ export interface ClubOnboardingFormData {
   venueLongitude: number;
 
   selectedBoatClassIds: string[];
+
+  sailingDays: SailingDayEntry[];
 
   membershipTypes: MembershipTypeEntry[];
 
@@ -54,6 +66,7 @@ export const STEP_CONFIG = [
   { key: 'basic', label: 'Club Details', shortLabel: 'Details' },
   { key: 'branding', label: 'Branding', shortLabel: 'Branding' },
   { key: 'yachtClasses', label: 'Yacht Classes', shortLabel: 'Classes' },
+  { key: 'sailingDays', label: 'Sailing Days', shortLabel: 'Sailing' },
   { key: 'venue', label: 'Venue', shortLabel: 'Venue' },
   { key: 'membership', label: 'Memberships', shortLabel: 'Members' },
   { key: 'finance', label: 'Finance', shortLabel: 'Finance' },

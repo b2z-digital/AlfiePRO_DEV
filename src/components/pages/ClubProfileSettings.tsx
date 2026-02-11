@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, X, Image as ImageIcon, AlertCircle, Check } from 'lucide-react';
+import { Save, Upload, X, Image as ImageIcon, AlertCircle, Check, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import imageCompression from 'browser-image-compression';
@@ -14,6 +14,21 @@ interface StateAssociation {
   name: string;
   state: string;
   status: string;
+}
+
+interface BoatClass {
+  id: string;
+  name: string;
+}
+
+interface SailingDay {
+  id?: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  boat_class_id: string | null;
+  description: string;
+  is_active: boolean;
 }
 
 export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMode }) => {
@@ -35,6 +50,8 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
   const [isDraggingFeatured, setIsDraggingFeatured] = useState(false);
   const [showCoverImageModal, setShowCoverImageModal] = useState(false);
   const [coverImagePosition, setCoverImagePosition] = useState({ x: 0, y: 0, scale: 1 });
+  const [sailingDays, setSailingDays] = useState<SailingDay[]>([]);
+  const [boatClasses, setBoatClasses] = useState<BoatClass[]>([]);
 
   const logoInputRef = useRef<HTMLInputElement>(null);
   const featuredInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +60,8 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
     if (currentClub) {
       loadClubData();
       loadStateAssociations();
+      loadSailingDays();
+      loadBoatClasses();
     }
   }, [currentClub?.clubId]);
 
@@ -97,6 +116,85 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
     } catch (err) {
       console.error('Error loading state associations:', err);
     }
+  };
+
+  const loadSailingDays = async () => {
+    if (!currentClub?.clubId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('club_sailing_days')
+        .select('*')
+        .eq('club_id', currentClub.clubId)
+        .order('day_of_week');
+
+      if (error) throw error;
+      setSailingDays(data || []);
+    } catch (err) {
+      console.error('Error loading sailing days:', err);
+    }
+  };
+
+  const loadBoatClasses = async () => {
+    if (!currentClub?.clubId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('club_boat_classes')
+        .select('boat_class_id, boat_classes(id, name)')
+        .eq('club_id', currentClub.clubId);
+
+      if (error) throw error;
+
+      const classes = data?.map((item: any) => ({
+        id: item.boat_classes.id,
+        name: item.boat_classes.name
+      })) || [];
+
+      setBoatClasses(classes);
+    } catch (err) {
+      console.error('Error loading boat classes:', err);
+    }
+  };
+
+  const addSailingDay = () => {
+    setSailingDays([...sailingDays, {
+      day_of_week: 'Saturday',
+      start_time: '12:00',
+      end_time: '16:00',
+      boat_class_id: null,
+      description: '',
+      is_active: true
+    }]);
+  };
+
+  const updateSailingDay = (index: number, field: keyof SailingDay, value: any) => {
+    const updated = [...sailingDays];
+    updated[index] = { ...updated[index], [field]: value };
+    setSailingDays(updated);
+  };
+
+  const removeSailingDay = async (index: number) => {
+    const dayToRemove = sailingDays[index];
+
+    // If it has an ID, delete from database
+    if (dayToRemove.id) {
+      try {
+        const { error } = await supabase
+          .from('club_sailing_days')
+          .delete()
+          .eq('id', dayToRemove.id);
+
+        if (error) throw error;
+      } catch (err) {
+        console.error('Error deleting sailing day:', err);
+        setError('Failed to delete sailing day');
+        return;
+      }
+    }
+
+    // Remove from state
+    setSailingDays(sailingDays.filter((_, i) => i !== index));
   };
 
   const handleImageChange = async (file: File, type: 'logo' | 'featured') => {
@@ -237,9 +335,47 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
 
       if (updateError) throw updateError;
 
+      // Save sailing days
+      for (const day of sailingDays) {
+        if (day.id) {
+          // Update existing sailing day
+          const { error: dayError } = await supabase
+            .from('club_sailing_days')
+            .update({
+              day_of_week: day.day_of_week,
+              start_time: day.start_time,
+              end_time: day.end_time,
+              boat_class_id: day.boat_class_id,
+              description: day.description,
+              is_active: day.is_active
+            })
+            .eq('id', day.id);
+
+          if (dayError) throw dayError;
+        } else {
+          // Insert new sailing day
+          const { error: dayError } = await supabase
+            .from('club_sailing_days')
+            .insert({
+              club_id: currentClub.clubId,
+              day_of_week: day.day_of_week,
+              start_time: day.start_time,
+              end_time: day.end_time,
+              boat_class_id: day.boat_class_id,
+              description: day.description,
+              is_active: day.is_active
+            });
+
+          if (dayError) throw dayError;
+        }
+      }
+
       setSuccess(true);
       setLogoFile(null);
       setFeaturedImageFile(null);
+
+      // Reload sailing days to get IDs for newly added ones
+      await loadSailingDays();
 
       // Refresh club data in auth context
       if (refreshClubData) {
@@ -505,6 +641,131 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
         <p className="mt-3 text-xs text-slate-400">
           This image will be used as the cover image on your club's home page and dashboard header. Recommended: 1920x600px
         </p>
+      </div>
+
+      {/* Sailing Days */}
+      <div className="p-6 rounded-lg border bg-slate-800 border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              Sailing Days
+            </h3>
+            <p className="text-sm text-slate-400 mt-1">
+              Define your regular sailing schedule
+            </p>
+          </div>
+          <button
+            onClick={addSailingDay}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <Plus size={18} />
+            Add Sailing Day
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {sailingDays.length === 0 ? (
+            <p className="text-center text-slate-400 py-8">
+              No sailing days defined yet. Click "Add Sailing Day" to get started.
+            </p>
+          ) : (
+            sailingDays.map((day, index) => (
+              <div key={index} className="p-4 bg-slate-700/50 rounded-lg border border-slate-600">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Day of Week */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-slate-300">
+                      Day
+                    </label>
+                    <select
+                      value={day.day_of_week}
+                      onChange={(e) => updateSailingDay(index, 'day_of_week', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border bg-slate-800 border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Monday">Monday</option>
+                      <option value="Tuesday">Tuesday</option>
+                      <option value="Wednesday">Wednesday</option>
+                      <option value="Thursday">Thursday</option>
+                      <option value="Friday">Friday</option>
+                      <option value="Saturday">Saturday</option>
+                      <option value="Sunday">Sunday</option>
+                    </select>
+                  </div>
+
+                  {/* Start Time */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-slate-300">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={day.start_time}
+                      onChange={(e) => updateSailingDay(index, 'start_time', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border bg-slate-800 border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* End Time */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-slate-300">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={day.end_time}
+                      onChange={(e) => updateSailingDay(index, 'end_time', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border bg-slate-800 border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Boat Class */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-slate-300">
+                      Boat Class
+                    </label>
+                    <select
+                      value={day.boat_class_id || ''}
+                      onChange={(e) => updateSailingDay(index, 'boat_class_id', e.target.value || null)}
+                      className="w-full px-3 py-2 rounded-lg border bg-slate-800 border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Classes</option>
+                      {boatClasses.map((boatClass) => (
+                        <option key={boatClass.id} value={boatClass.id}>
+                          {boatClass.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium mb-2 text-slate-300">
+                    Description (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={day.description || ''}
+                    onChange={(e) => updateSailingDay(index, 'description', e.target.value)}
+                    placeholder="e.g., Club Championship Series"
+                    className="w-full px-3 py-2 rounded-lg border bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Remove Button */}
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={() => removeSailingDay(index)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Trash2 size={16} />
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
       </div>
 

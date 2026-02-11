@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2 } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { BasicInfoStep } from './club-onboarding/BasicInfoStep';
 import { BrandingStep } from './club-onboarding/BrandingStep';
 import { YachtClassesStep } from './club-onboarding/YachtClassesStep';
+import { SailingDaysStep } from './club-onboarding/SailingDaysStep';
 import { VenueStep } from './club-onboarding/VenueStep';
 import { MembershipStep } from './club-onboarding/MembershipStep';
 import { FinanceStep } from './club-onboarding/FinanceStep';
@@ -22,7 +23,7 @@ interface ClubOnboardingWizardProps {
   clubId?: string;
 }
 
-const STEP_ICONS = [Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle];
+const STEP_ICONS = [Building, Palette, Sailboat, Calendar, MapPin, Users, DollarSign, UserPlus, CheckCircle];
 
 const INITIAL_FORM_DATA: ClubOnboardingFormData = {
   name: '',
@@ -43,6 +44,7 @@ const INITIAL_FORM_DATA: ClubOnboardingFormData = {
   venueLatitude: -32.9688,
   venueLongitude: 151.7174,
   selectedBoatClassIds: [],
+  sailingDays: [],
   membershipTypes: [],
   currency: 'AUD',
   taxName: 'GST',
@@ -106,6 +108,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         .select('boat_class_id')
         .eq('club_id', id);
 
+      const { data: sailingDays } = await supabase
+        .from('club_sailing_days')
+        .select('*')
+        .eq('club_id', id);
+
       const { data: membershipTypes } = await supabase
         .from('membership_types')
         .select('*')
@@ -139,6 +146,15 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         venueLatitude: venue?.latitude || -32.9688,
         venueLongitude: venue?.longitude || 151.7174,
         selectedBoatClassIds: (boatClasses || []).map(bc => bc.boat_class_id),
+        sailingDays: (sailingDays || []).map(sd => ({
+          id: sd.id,
+          day_of_week: sd.day_of_week,
+          start_time: sd.start_time,
+          end_time: sd.end_time,
+          boat_class_id: sd.boat_class_id,
+          description: sd.description || '',
+          is_active: sd.is_active,
+        })),
         membershipTypes: (membershipTypes || []).map(mt => ({
           id: mt.id,
           name: mt.name,
@@ -192,18 +208,20 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       case 2:
         return true;
       case 3:
-        return true;
+        return true; // Sailing days step (optional)
       case 4:
-        return formData.membershipTypes.every(t => t.name.trim() !== '');
+        return true; // Venue step
       case 5:
-        return true;
+        return formData.membershipTypes.every(t => t.name.trim() !== '');
       case 6:
+        return true; // Finance step
+      case 7:
         if (!formData.assignAdmin) return true;
         return formData.adminEmail.trim() !== '' &&
                formData.adminFirstName.trim() !== '' &&
                formData.adminLastName.trim() !== '';
-      case 7:
-        return true;
+      case 8:
+        return true; // Review step
       default:
         return false;
     }
@@ -535,6 +553,19 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       await supabase.from('club_boat_classes').insert(boatClassRows);
     }
 
+    if (formData.sailingDays.length > 0) {
+      const sailingDaysToInsert = formData.sailingDays.map(day => ({
+        club_id: club.id,
+        day_of_week: day.day_of_week,
+        start_time: day.start_time,
+        end_time: day.end_time,
+        boat_class_id: day.boat_class_id,
+        description: day.description || null,
+        is_active: day.is_active,
+      }));
+      await supabase.from('club_sailing_days').insert(sailingDaysToInsert);
+    }
+
     if (formData.taxEnabled && formData.taxName) {
       await supabase.from('tax_rates').insert({
         club_id: club.id,
@@ -694,18 +725,21 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
             <YachtClassesStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 3 && (
-            <VenueStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <SailingDaysStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 4 && (
-            <MembershipStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <VenueStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 5 && (
-            <FinanceStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <MembershipStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 6 && (
-            <AdminStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+            <FinanceStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           {currentStep === 7 && (
+            <AdminStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
+          )}
+          {currentStep === 8 && (
             <ReviewStep formData={formData} updateFormData={updateFormData} darkMode={darkMode} />
           )}
           </>)}
