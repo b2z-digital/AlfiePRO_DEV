@@ -971,13 +971,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   return (
     <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
       {/* Loading overlay when switching organizations or clubs */}
-      {(isTransitioning || isSwitchingClub) && (
+      {(isTransitioning || isSwitchingClub || sessionStorage.getItem('switching_club') === 'true') && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
           <div className="bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700">
             <div className="flex flex-col items-center gap-3">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <span className="text-white font-medium">
-                {isSwitchingClub ? 'Switching club...' : 'Switching organization...'}
+                {isSwitchingClub || sessionStorage.getItem('switching_club') === 'true' ? 'Switching club...' : 'Switching organization...'}
               </span>
             </div>
           </div>
@@ -1182,13 +1182,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 try {
                   const club = userClubs.find(c => c.clubId === orgId);
                   if (club) {
+                    // Check if we're actually switching clubs (not just selecting the current one)
+                    const isActualSwitch = currentClub?.clubId !== club.clubId;
+
+                    if (isActualSwitch) {
+                      // Immediately set flags for reload persistence
+                      sessionStorage.setItem('switching_club', 'true');
+                      sessionStorage.setItem('switching_to_club_name', club.club?.name || 'club');
+                    }
+
                     // Switching to a club
                     setCurrentClub(club);
                     setCurrentOrganization(null);
-                    // Force dashboard refresh with new key
-                    setDashboardRefreshKey(prev => prev + 1);
-                    // Always navigate to home when switching contexts
-                    navigate('/');
+
+                    if (!isActualSwitch) {
+                      // Force dashboard refresh with new key
+                      setDashboardRefreshKey(prev => prev + 1);
+                      // Always navigate to home when switching contexts
+                      navigate('/');
+                    }
                   } else {
                     // Only show loader when fetching association data from database
                     setIsTransitioning(true);
