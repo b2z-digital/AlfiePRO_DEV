@@ -1046,102 +1046,131 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
 
             {/* Members List */}
-            <div className="p-6 pt-0">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Pending Members</h3>
-                <button
-                  onClick={() => setReconciliationMembers(new Set())}
-                  className="text-sm text-slate-400 hover:text-white transition-colors"
-                >
-                  Clear All
-                </button>
-              </div>
+            {(() => {
+              const selMembers = unpaidMembers.filter(m => reconciliationMembers.has(m.id));
+              const selTotal = selMembers.reduce((sum, m) => sum + m.state_contribution, 0);
+              const rem = activePayment.unallocated_amount - selTotal;
+              const matched = Math.abs(rem) < 0.01 && reconciliationMembers.size > 0;
 
-              {/* Group by Club */}
-              <div className="space-y-3">
-                {clubGroups.map(group => (
-                  <div key={group.club_id} className="rounded-lg border border-slate-600/50 bg-slate-700/20 overflow-hidden">
-                    <div className="p-3 bg-slate-700/30 border-b border-slate-600/50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-white">{group.club_name}</p>
-                          <p className="text-xs text-slate-400">{group.member_count} members • ${group.total_amount.toFixed(2)}</p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            const clubMemberIds = group.members.map(m => m.id);
-                            const allSelected = clubMemberIds.every(id => reconciliationMembers.has(id));
-                            if (allSelected) {
-                              setReconciliationMembers(prev => {
-                                const newSet = new Set(prev);
-                                clubMemberIds.forEach(id => newSet.delete(id));
-                                return newSet;
-                              });
-                            } else {
-                              setReconciliationMembers(prev => {
-                                const newSet = new Set(prev);
-                                clubMemberIds.forEach(id => newSet.add(id));
-                                return newSet;
-                              });
-                            }
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          {group.members.every(m => reconciliationMembers.has(m.id)) ? 'Deselect All' : 'Select All'}
-                        </button>
-                      </div>
+              return (
+                <>
+                  <div className="p-6 pt-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white">Pending Members</h3>
+                      <button
+                        onClick={() => setReconciliationMembers(new Set())}
+                        className="text-sm text-slate-400 hover:text-white transition-colors"
+                      >
+                        Clear All
+                      </button>
                     </div>
-                    <div className="divide-y divide-slate-600/30">
-                      {group.members.map(member => (
-                        <div
-                          key={member.id}
-                          onClick={() => toggleReconciliationMember(member.id)}
-                          className="p-3 hover:bg-slate-700/30 cursor-pointer transition-colors flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={reconciliationMembers.has(member.id)}
-                              onChange={() => {}}
-                              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600"
-                            />
-                            <Avatar
-                              imageUrl={member.member_avatar}
-                              firstName={member.member_name.split(' ')[0]}
-                              lastName={member.member_name.split(' ').slice(1).join(' ')}
-                              size="sm"
-                            />
-                            <div>
-                              <p className="text-white text-sm font-medium">{member.member_name}</p>
+
+                    <div className="space-y-3">
+                      {clubGroups.map(group => (
+                        <div key={group.club_id} className="rounded-lg border border-slate-600/50 bg-slate-700/20 overflow-hidden">
+                          <div className="p-3 bg-slate-700/30 border-b border-slate-600/50">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-white">{group.club_name}</p>
+                                <p className="text-xs text-slate-400">{group.member_count} members - ${group.total_amount.toFixed(2)}</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const clubMemberIds = group.members.map(m => m.id);
+                                  const allSelected = clubMemberIds.every(id => reconciliationMembers.has(id));
+                                  if (allSelected) {
+                                    setReconciliationMembers(prev => {
+                                      const newSet = new Set(prev);
+                                      clubMemberIds.forEach(id => newSet.delete(id));
+                                      return newSet;
+                                    });
+                                  } else {
+                                    setReconciliationMembers(prev => {
+                                      const newSet = new Set(prev);
+                                      clubMemberIds.forEach(id => newSet.add(id));
+                                      return newSet;
+                                    });
+                                  }
+                                }}
+                                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                              >
+                                {group.members.every(m => reconciliationMembers.has(m.id)) ? 'Deselect All' : 'Select All'}
+                              </button>
                             </div>
                           </div>
-                          <p className="text-white font-semibold">${member.state_contribution.toFixed(2)}</p>
+                          <div className="divide-y divide-slate-600/30">
+                            {group.members.map(member => {
+                              const isSelected = reconciliationMembers.has(member.id);
+                              return (
+                                <div
+                                  key={member.id}
+                                  onClick={() => toggleReconciliationMember(member.id)}
+                                  className={`p-3 cursor-pointer transition-all flex items-center justify-between ${
+                                    isSelected && matched
+                                      ? 'bg-green-600/15 hover:bg-green-600/25 border-l-2 border-green-500'
+                                      : isSelected
+                                      ? 'bg-blue-600/15 hover:bg-blue-600/25 border-l-2 border-blue-500'
+                                      : 'hover:bg-slate-700/30 border-l-2 border-transparent'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                                      isSelected && matched
+                                        ? 'bg-green-500 border-green-500'
+                                        : isSelected
+                                        ? 'bg-blue-500 border-blue-500'
+                                        : 'border-slate-600 bg-slate-700'
+                                    }`}>
+                                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                                    </div>
+                                    <Avatar
+                                      imageUrl={member.member_avatar}
+                                      firstName={member.member_name.split(' ')[0]}
+                                      lastName={member.member_name.split(' ').slice(1).join(' ')}
+                                      size="sm"
+                                    />
+                                    <div>
+                                      <p className={`text-sm font-medium ${isSelected && matched ? 'text-green-200' : isSelected ? 'text-blue-200' : 'text-white'}`}>
+                                        {member.member_name}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <p className={`font-semibold ${isSelected && matched ? 'text-green-300' : isSelected ? 'text-blue-300' : 'text-white'}`}>
+                                    ${member.state_contribution.toFixed(2)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Footer Actions */}
-            <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setActivePayment(null)}
-                  className="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={completePaymentReconciliation}
-                  disabled={processing || reconciliationMembers.size === 0}
-                  className="flex-1 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processing ? 'Processing...' : `Reconcile ${reconciliationMembers.size} Member${reconciliationMembers.size !== 1 ? 's' : ''}`}
-                </button>
-              </div>
-            </div>
+                  <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setActivePayment(null)}
+                        className="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={completePaymentReconciliation}
+                        disabled={processing || reconciliationMembers.size === 0}
+                        className={`flex-1 px-6 py-3 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          matched
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        {processing ? 'Processing...' : `Reconcile ${reconciliationMembers.size} Member${reconciliationMembers.size !== 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>,
         document.body
