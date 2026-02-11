@@ -207,15 +207,14 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               .neq('club_to_state_status', 'paid')
               .eq('membership_year', new Date().getFullYear()),
 
-            // Boat classes sailed at this club (from members' boats via members table)
+            // Boat classes assigned to this club
             supabase
-              .from('member_boats')
+              .from('club_boat_classes')
               .select(`
-                boat_type,
-                members!inner(club_id)
+                boat_class_id,
+                boat_classes(name)
               `)
-              .eq('members.club_id', club.id)
-              .not('boat_type', 'is', null),
+              .eq('club_id', club.id),
 
             // Upcoming single events (future events from quick_races)
             supabase
@@ -257,12 +256,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
           const pendingPaymentAmount = paymentsResult.data?.reduce((sum, payment) =>
             sum + (Number(payment.state_contribution_amount) || 0), 0) || 0;
 
-          // Extract unique boat classes
-          const uniqueBoatClasses = [...new Set(
-            (boatClassesResult.data || [])
-              .map(b => b.boat_type)
-              .filter(Boolean)
-          )];
+          const uniqueBoatClasses = (boatClassesResult.data || [])
+            .map((b: any) => b.boat_classes?.name)
+            .filter(Boolean);
 
           // Log all query results for debugging
           console.log(`[${club.name}] Query results:`, {
