@@ -151,6 +151,7 @@ interface PaymentBatch {
   payment_reference: string;
   notes: string;
   bank_transaction_id: string;
+  member_count?: number;
   from_club_id?: string;
   clubs?: {
     name: string;
@@ -380,19 +381,13 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   };
 
   const loadOutboundPayments = async () => {
-    let query = supabase
-      .from('remittance_payments')
+    const { data, error } = await supabase
+      .from('remittance_payment_batches')
       .select('*')
-      .eq('from_state_id', stateAssociationId)
-      .eq('from_type', 'state')
-      .eq('to_type', 'national')
+      .eq('from_association_id', stateAssociationId)
+      .eq('from_association_type', 'state')
+      .eq('to_association_type', 'national')
       .order('payment_date', { ascending: false });
-
-    if (selectedYear !== 'all') {
-      query = query.eq('membership_year', selectedYear);
-    }
-
-    const { data, error } = await query;
 
     if (!error) {
       setOutboundPayments((data || []) as PaymentBatch[]);
@@ -462,36 +457,6 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         .in('id', Array.from(selectedIds));
 
       if (error) throw error;
-
-      const { data: nationalAssoc } = await supabase
-        .from('state_associations')
-        .select('national_association_id')
-        .eq('id', stateAssociationId)
-        .maybeSingle();
-
-      if (nationalAssoc?.national_association_id) {
-        const { error: paymentError } = await supabase
-          .from('remittance_payments')
-          .insert({
-            payment_reference: paymentDetails.reference,
-            payment_date: paymentDetails.date,
-            from_state_id: stateAssociationId,
-            from_type: 'state',
-            to_national_id: nationalAssoc.national_association_id,
-            to_type: 'national',
-            total_amount: totalAmount,
-            allocated_amount: totalAmount,
-            payment_method: paymentDetails.payment_method,
-            notes: paymentDetails.notes || null,
-            reconciliation_status: 'completed',
-            status: 'reconciled',
-            membership_year: selectedYear !== 'all' ? Number(selectedYear) : new Date().getFullYear()
-          });
-
-        if (paymentError) {
-          console.error('Error creating outbound payment record:', paymentError);
-        }
-      }
 
       const paidCount = selectedIds.size;
       setLastPaidCount(paidCount);
@@ -733,8 +698,6 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
     try {
       const today = new Date().toISOString().split('T')[0];
-      const rem = remittances.find(r => r.id === remittanceId);
-      const nationalAmount = rem?.national_contribution || 0;
 
       const { error } = await supabase
         .from('membership_remittances')
@@ -745,36 +708,6 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         .eq('id', remittanceId);
 
       if (error) throw error;
-
-      const { data: nationalAssoc } = await supabase
-        .from('state_associations')
-        .select('national_association_id')
-        .eq('id', stateAssociationId)
-        .maybeSingle();
-
-      if (nationalAssoc?.national_association_id && nationalAmount > 0) {
-        const { error: paymentError } = await supabase
-          .from('remittance_payments')
-          .insert({
-            payment_reference: `NAT-${remittanceId.slice(0, 8)}`,
-            payment_date: today,
-            from_state_id: stateAssociationId,
-            from_type: 'state',
-            to_national_id: nationalAssoc.national_association_id,
-            to_type: 'national',
-            total_amount: nationalAmount,
-            allocated_amount: nationalAmount,
-            payment_method: 'transfer',
-            notes: rem ? `Payment for ${rem.member_name}` : null,
-            reconciliation_status: 'completed',
-            status: 'reconciled',
-            membership_year: selectedYear !== 'all' ? Number(selectedYear) : new Date().getFullYear()
-          });
-
-        if (paymentError) {
-          console.error('Error creating outbound payment record:', paymentError);
-        }
-      }
 
       addNotification('success', 'Member marked as paid to National');
       await loadData();
@@ -1631,6 +1564,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                               <div className="flex items-center gap-3 text-sm text-slate-400">
                                 <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(batch.payment_date).toLocaleDateString()}</span>
                                 <span className="flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" />{batch.payment_method || 'Transfer'}</span>
+                                {batch.member_count && (
+                                  <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{batch.member_count} member{batch.member_count !== 1 ? 's' : ''}</span>
+                                )}
                               </div>
                             </div>
                             <p className="text-xl font-bold text-green-400">${Number(batch.total_amount).toFixed(2)}</p>
