@@ -810,32 +810,48 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
         </div>
 
         {/* RIGHT: Members Requiring Payment */}
-        <div className="bg-gradient-to-br from-red-900/10 to-transparent border-2 border-red-600/30 rounded-xl p-5">
+        <div className={`bg-gradient-to-br ${
+          clubGroups.length === 0
+            ? 'from-green-900/10 to-transparent border-2 border-green-600/30'
+            : 'from-red-900/10 to-transparent border-2 border-red-600/30'
+        } rounded-xl p-5`}>
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-red-600/20">
-                <AlertCircle size={22} className="text-red-400" />
+              <div className={`p-2 rounded-lg ${
+                clubGroups.length === 0 ? 'bg-green-600/20' : 'bg-red-600/20'
+              }`}>
+                {clubGroups.length === 0 ? (
+                  <CheckCircle size={22} className="text-green-400" />
+                ) : (
+                  <AlertCircle size={22} className="text-red-400" />
+                )}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Members Requiring Payment</h3>
-                <p className="text-sm text-slate-300">Outstanding remittances to be reconciled</p>
+                <p className="text-sm text-slate-300">
+                  {clubGroups.length === 0
+                    ? 'All remittances reconciled'
+                    : 'Outstanding remittances to be reconciled'}
+                </p>
               </div>
             </div>
 
             {/* Info Card */}
-            <div className="mt-4 p-3 rounded-lg bg-red-600/10 border border-red-600/30">
-              <div className="flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-red-600/20 flex-shrink-0">
-                  <Users className="w-4 h-4 text-red-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-red-200 font-medium mb-1">Awaiting Reconciliation</p>
-                  <p className="text-xs text-red-300/80">
-                    These members need payment reconciliation. Click a payment on the left to match with these members.
-                  </p>
+            {clubGroups.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg bg-red-600/10 border border-red-600/30">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-red-600/20 flex-shrink-0">
+                    <Users className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-red-200 font-medium mb-1">Awaiting Reconciliation</p>
+                    <p className="text-xs text-red-300/80">
+                      These members need payment reconciliation. Click a payment on the left to match with these members.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {clubGroups.length === 0 ? (
