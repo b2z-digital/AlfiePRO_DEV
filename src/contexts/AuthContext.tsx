@@ -64,7 +64,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [clubsLoaded, setClubsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isSwitchingClub, setIsSwitchingClub] = useState(false);
+  // Check if we're in the middle of a club switch (persists across reload)
+  const [isSwitchingClub, setIsSwitchingClub] = useState(() => {
+    return sessionStorage.getItem('switching_club') === 'true';
+  });
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
@@ -222,6 +225,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUserClubs(validClubs);
       setClubsLoaded(true);
 
+      // Clear club switching state once clubs are loaded
+      if (sessionStorage.getItem('switching_club') === 'true') {
+        console.log('✅ Club switch completed');
+        sessionStorage.removeItem('switching_club');
+        sessionStorage.removeItem('switching_to_club_name');
+        setIsSwitchingClub(false);
+      }
+
       // Set current club if none is selected or restore from localStorage
       // Get user's default club preference
       let defaultClubId: string | null = null;
@@ -299,17 +310,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (isActualChange) {
         console.log('🔄 Club changed by user - reloading page');
+
+        // Set sessionStorage flag to persist across reload
+        sessionStorage.setItem('switching_club', 'true');
+        sessionStorage.setItem('switching_to_club_name', club.club?.name || 'club');
+
         // Show loading overlay before reload
         setIsSwitchingClub(true);
 
         // Clear any cached data from previous club
         localStorage.removeItem(CURRENT_EVENT_KEY);
 
-        // Small delay to ensure loading overlay renders
+        // Slightly longer delay to ensure loading overlay renders
         setTimeout(() => {
           // Force reload to refresh all data for the new club
           window.location.reload();
-        }, 100);
+        }, 150);
       } else {
         console.log('✅ No reload needed (initial load or same club)');
       }

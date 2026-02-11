@@ -974,7 +974,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       {(isTransitioning || isSwitchingClub) && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
           <div className="bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-3">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
               <span className="text-white font-medium">
                 {isSwitchingClub ? 'Switching club...' : 'Switching organization...'}
