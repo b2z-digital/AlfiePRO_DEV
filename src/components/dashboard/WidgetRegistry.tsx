@@ -23,7 +23,8 @@ import {
   PieChart,
   BarChart3,
   Clock,
-  Building2
+  Building2,
+  ArrowRight
 } from 'lucide-react';
 import { WidgetDefinition } from '../../types/dashboard';
 import { FinancialHealthWidget } from './widgets/FinancialHealthWidget';
