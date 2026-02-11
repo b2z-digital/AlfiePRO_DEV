@@ -652,7 +652,10 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       <AdvancedMemberFilter
         isOpen={showAdvancedFilter}
         onClose={() => setShowAdvancedFilter(false)}
-        onApply={(config) => setAdvancedFilterConfig(config)}
+        onApply={(config) => {
+          const hasConditions = config.groups.some(g => g.conditions.length > 0);
+          setAdvancedFilterConfig(hasConditions ? config : null);
+        }}
         initialConfig={advancedFilterConfig || undefined}
         boatClasses={boatClasses}
         memberCount={filteredMembers.length}
