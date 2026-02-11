@@ -32,6 +32,7 @@ interface AuthContextType {
   loading: boolean;
   clubsLoaded: boolean;
   isLoggingOut: boolean;
+  isSwitchingClub: boolean;
   isSuperAdmin: boolean;
   isNationalOrgAdmin: boolean;
   isStateOrgAdmin: boolean;
@@ -63,6 +64,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [clubsLoaded, setClubsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSwitchingClub, setIsSwitchingClub] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
@@ -297,11 +299,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (isActualChange) {
         console.log('🔄 Club changed by user - reloading page');
+        // Show loading overlay before reload
+        setIsSwitchingClub(true);
+
         // Clear any cached data from previous club
         localStorage.removeItem(CURRENT_EVENT_KEY);
 
-        // Force reload to refresh all data for the new club
-        window.location.reload();
+        // Small delay to ensure loading overlay renders
+        setTimeout(() => {
+          // Force reload to refresh all data for the new club
+          window.location.reload();
+        }, 100);
       } else {
         console.log('✅ No reload needed (initial load or same club)');
       }
@@ -632,6 +640,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading,
     clubsLoaded,
     isLoggingOut,
+    isSwitchingClub,
     isSuperAdmin,
     isNationalOrgAdmin,
     isStateOrgAdmin,
