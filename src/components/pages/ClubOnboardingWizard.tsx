@@ -458,6 +458,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       contact_email: formData.email || null,
       contact_phone: formData.phone || null,
       state_association_id: stateAssociationId || null,
+      created_by_user_id: user?.id,
       assigned_by_user_id: user?.id,
       onboarding_completed: !formData.assignAdmin,
       club_introduction: formData.clubIntroduction || null,
