@@ -747,11 +747,79 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const confirmUnpaidNational = async () => {
     if (!unpaidTargetId) return;
     try {
-      await supabase
-        .from('association_transactions')
-        .delete()
-        .eq('linked_entity_type', 'remittance')
-        .eq('linked_entity_id', unpaidTargetId);
+      const { data: remittance } = await supabase
+        .from('membership_remittances')
+        .select('national_contribution_amount, state_to_national_paid_date, state_to_national_payment_reference, state_association_id, national_association_id')
+        .eq('id', unpaidTargetId)
+        .maybeSingle();
+
+      if (remittance) {
+        let batchQuery = supabase
+          .from('remittance_payment_batches')
+          .select('id, member_count, total_amount')
+          .eq('from_association_id', remittance.state_association_id)
+          .eq('to_association_id', remittance.national_association_id);
+
+        if (remittance.state_to_national_paid_date) {
+          batchQuery = batchQuery.eq('payment_date', remittance.state_to_national_paid_date);
+        }
+        if (remittance.state_to_national_payment_reference) {
+          batchQuery = batchQuery.eq('payment_reference', remittance.state_to_national_payment_reference);
+        } else {
+          batchQuery = batchQuery.is('payment_reference', null);
+        }
+
+        const { data: batch } = await batchQuery
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (batch && batch.member_count > 1) {
+          const newAmount = batch.total_amount - (remittance.national_contribution_amount || 0);
+          const newCount = batch.member_count - 1;
+
+          await supabase
+            .from('remittance_payment_batches')
+            .update({ total_amount: newAmount, member_count: newCount })
+            .eq('id', batch.id);
+
+          await supabase
+            .from('association_transactions')
+            .update({
+              amount: newAmount,
+              description: `Membership Remittance to National Association - ${newCount} member${newCount !== 1 ? 's' : ''}`
+            })
+            .eq('batch_id', batch.id)
+            .eq('association_id', remittance.state_association_id)
+            .eq('type', 'expense');
+
+          await supabase
+            .from('association_transactions')
+            .update({
+              amount: newAmount,
+              description: `Membership Remittance from State Association - ${newCount} member${newCount !== 1 ? 's' : ''}`
+            })
+            .eq('batch_id', batch.id)
+            .eq('association_id', remittance.national_association_id)
+            .eq('type', 'income');
+        } else if (batch) {
+          await supabase
+            .from('association_transactions')
+            .delete()
+            .eq('batch_id', batch.id);
+
+          await supabase
+            .from('remittance_payment_batches')
+            .delete()
+            .eq('id', batch.id);
+        } else {
+          await supabase
+            .from('association_transactions')
+            .delete()
+            .eq('linked_entity_type', 'remittance')
+            .eq('linked_entity_id', unpaidTargetId);
+        }
+      }
 
       const { error } = await supabase
         .from('membership_remittances')
@@ -764,7 +832,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
       if (error) throw error;
 
-      addNotification('success', 'Member reverted to pending and finance entries removed');
+      addNotification('success', 'Member reverted to pending and finance entries adjusted');
       setShowUnpaidWarning(false);
       setUnpaidTargetId(null);
       setUnpaidTargetName('');

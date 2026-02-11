@@ -266,7 +266,11 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      await saveReportRecord('download');
+      try {
+        await saveReportRecord('download');
+      } catch (logError: any) {
+        console.error('Failed to save report log (download completed):', logError);
+      }
       onComplete();
     } catch (error) {
       console.error('Error generating download:', error);
@@ -328,7 +332,11 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
         throw new Error(errData.error || 'Failed to send email');
       }
 
-      await saveReportRecord('email');
+      try {
+        await saveReportRecord('email');
+      } catch (logError: any) {
+        console.error('Failed to save report log (email was sent):', logError);
+      }
       onComplete();
     } catch (error: any) {
       console.error('Error sending email:', error);
@@ -339,57 +347,53 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
   };
 
   const saveReportRecord = async (type: 'email' | 'download') => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const year = selectedYear !== 'all' ? selectedYear : new Date().getFullYear();
+    const { data: { user } } = await supabase.auth.getUser();
+    const year = selectedYear !== 'all' ? selectedYear : new Date().getFullYear();
 
-      const { data: report, error: reportError } = await supabase
-        .from('national_report_submissions')
-        .insert({
-          state_association_id: stateAssociationId,
-          report_type: type,
-          report_scope: reportScope,
-          membership_year: year,
-          member_count: reportMembers.length,
-          total_state_amount: totalState,
-          total_national_amount: totalNational,
-          recipient_email: type === 'email' ? recipientEmail : null,
-          recipient_name: type === 'email' ? recipientName : null,
-          subject: type === 'email' ? subject : null,
-          notes: notes || null,
-          sent_by: user?.id || null
-        })
-        .select('id')
-        .maybeSingle();
+    const { data: report, error: reportError } = await supabase
+      .from('national_report_submissions')
+      .insert({
+        state_association_id: stateAssociationId,
+        report_type: type,
+        report_scope: reportScope,
+        membership_year: year,
+        member_count: reportMembers.length,
+        total_state_amount: totalState,
+        total_national_amount: totalNational,
+        recipient_email: type === 'email' ? recipientEmail : null,
+        recipient_name: type === 'email' ? recipientName : null,
+        subject: type === 'email' ? subject : null,
+        notes: notes || null,
+        sent_by: user?.id || null
+      })
+      .select('id')
+      .maybeSingle();
 
-      if (reportError) {
-        console.error('Error saving report record:', reportError);
-        return;
-      }
+    if (reportError) {
+      console.error('Error saving report record:', reportError);
+      throw reportError;
+    }
 
-      if (report) {
-        const memberRecords = reportMembers.map(m => ({
-          report_id: report.id,
-          remittance_id: m.remittance_id,
-          member_name: m.member_name,
-          club_name: m.club_name,
-          state_fee: m.state_fee,
-          national_fee: m.national_fee,
-          membership_year: m.membership_year,
-          payment_date: m.payment_date
-        }));
+    if (report) {
+      const memberRecords = reportMembers.map(m => ({
+        report_id: report.id,
+        remittance_id: m.remittance_id,
+        member_name: m.member_name,
+        club_name: m.club_name,
+        state_fee: m.state_fee,
+        national_fee: m.national_fee,
+        membership_year: m.membership_year,
+        payment_date: m.payment_date
+      }));
 
-        const batchSize = 50;
-        for (let i = 0; i < memberRecords.length; i += batchSize) {
-          const batch = memberRecords.slice(i, i + batchSize);
-          const { error: batchError } = await supabase.from('national_report_members').insert(batch);
-          if (batchError) {
-            console.error('Error saving report members batch:', batchError);
-          }
+      const batchSize = 50;
+      for (let i = 0; i < memberRecords.length; i += batchSize) {
+        const batch = memberRecords.slice(i, i + batchSize);
+        const { error: batchError } = await supabase.from('national_report_members').insert(batch);
+        if (batchError) {
+          console.error('Error saving report members batch:', batchError);
         }
       }
-    } catch (error) {
-      console.error('Error saving report record:', error);
     }
   };
 
