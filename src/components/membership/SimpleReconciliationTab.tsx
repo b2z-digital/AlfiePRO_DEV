@@ -644,7 +644,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
             <div>
               <p className="text-sm text-slate-400">Payments Received</p>
-              <p className="text-xl font-bold text-white">{payments.length}</p>
+              <p className="text-xl font-bold text-white">{payments.filter(p => p.unallocated_amount > 0).length}</p>
             </div>
           </div>
         </div>
@@ -705,11 +705,11 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
           </div>
 
-          {payments.length === 0 ? (
+          {payments.filter(p => p.unallocated_amount > 0).length === 0 ? (
             <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-600/50 rounded-lg bg-slate-800/20">
               <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="mb-2 font-medium">No payments recorded</p>
-              <p className="text-sm mb-4">Record a payment in the finance system with "Club Membership Remittances" category</p>
+              <p className="mb-2 font-medium">No payments requiring reconciliation</p>
+              <p className="text-sm mb-4">All payments have been fully allocated. Record a new payment in the finance system with "Club Membership Remittances" category</p>
               <button
                 onClick={() => navigate('/finances/invoices?action=create&type=deposit')}
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
@@ -719,7 +719,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
           ) : (
             <div className="space-y-3">
-              {payments.map(payment => (
+              {payments.filter(p => p.unallocated_amount > 0).map(payment => (
                 <div
                   key={payment.id}
                   onClick={() => payment.unallocated_amount > 0 && openPaymentReconciliation(payment)}
