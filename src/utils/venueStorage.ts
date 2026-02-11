@@ -174,10 +174,9 @@ const getAssociationVenues = async (
       clubIds = clubs.map(club => club.id);
     }
 
-    // Fetch venues from all these clubs using the junction table
     const { data: clubVenues, error: venuesError } = await supabase
       .from('club_venues')
-      .select('venue_id, is_primary, venues(*, clubs(name, abbreviation))')
+      .select('venue_id, is_primary, club_id, clubs(name, abbreviation), venues(*, clubs(name, abbreviation))')
       .in('club_id', clubIds)
       .order('is_primary', { ascending: false });
 
@@ -186,20 +185,26 @@ const getAssociationVenues = async (
       return [];
     }
 
-    const allVenues = (clubVenues || [])
-      .map((cv: any) => cv.venues)
-      .filter(Boolean) as Venue[];
+    const venueMap = new Map<string, Venue>();
+    for (const cv of (clubVenues || []) as any[]) {
+      if (!cv.venues) continue;
+      const venue = cv.venues as Venue;
+      const clubInfo = cv.clubs as { name: string; abbreviation: string } | null;
 
-    const seen = new Set<string>();
-    const venues: Venue[] = [];
-    for (const v of allVenues) {
-      if (!seen.has(v.id)) {
-        seen.add(v.id);
-        venues.push(v);
+      if (!venueMap.has(venue.id)) {
+        venueMap.set(venue.id, { ...venue, shared_clubs: clubInfo ? [clubInfo] : [] });
+      } else if (clubInfo) {
+        const existing = venueMap.get(venue.id)!;
+        const alreadyAdded = existing.shared_clubs?.some(
+          c => c.abbreviation === clubInfo.abbreviation && c.name === clubInfo.name
+        );
+        if (!alreadyAdded) {
+          existing.shared_clubs = [...(existing.shared_clubs || []), clubInfo];
+        }
       }
     }
 
-    return venues;
+    return Array.from(venueMap.values());
   } catch (error) {
     console.error('Error in getAssociationVenues:', error);
     return [];

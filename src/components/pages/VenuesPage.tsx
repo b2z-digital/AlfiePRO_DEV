@@ -789,10 +789,13 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
 
                       {/* Badges in Top Right Corner */}
                       <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
-                        {/* Club Label Badge (for association views) */}
-                        {isAssociationView() && venue.clubs && (
-                          <div className="bg-blue-600/90 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg border border-blue-500/30">
-                            {venue.clubs.abbreviation || venue.clubs.name}
+                        {isAssociationView() && (venue.shared_clubs?.length || venue.clubs) && (
+                          <div className="flex flex-wrap justify-end gap-1">
+                            {(venue.shared_clubs && venue.shared_clubs.length > 0 ? venue.shared_clubs : (venue.clubs ? [venue.clubs] : [])).map((club, idx) => (
+                              <div key={idx} className="bg-blue-600/90 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg border border-blue-500/30">
+                                {club.abbreviation || club.name}
+                              </div>
+                            ))}
                           </div>
                         )}
 
@@ -924,9 +927,13 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                   Main Venue
                                 </div>
                               )}
-                              {isAssociationView() && venue.clubs && (
-                                <div className="bg-blue-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-xs font-medium shadow-lg border border-blue-500/30 flex-shrink-0">
-                                  {venue.clubs.abbreviation || venue.clubs.name}
+                              {isAssociationView() && (venue.shared_clubs?.length || venue.clubs) && (
+                                <div className="flex flex-wrap gap-1 flex-shrink-0">
+                                  {(venue.shared_clubs && venue.shared_clubs.length > 0 ? venue.shared_clubs : (venue.clubs ? [venue.clubs] : [])).map((club, idx) => (
+                                    <div key={idx} className="bg-blue-600/90 backdrop-blur-md text-white px-2.5 py-1 rounded-lg text-xs font-medium shadow-lg border border-blue-500/30">
+                                      {club.abbreviation || club.name}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
