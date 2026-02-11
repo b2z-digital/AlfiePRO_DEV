@@ -147,18 +147,19 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
     }));
 
     // Calculate allocated amounts and get linked members
+    // Only count remittances where bulk_payment is false/null (state has reconciled them)
+    // bulk_payment=true means club paid but state hasn't reconciled yet
     const paymentsWithAllocations = await Promise.all(paymentsData.map(async (p) => {
-      // Check how much has been allocated from this payment
       const { data: allocatedRemittances } = await supabase
         .from('membership_remittances')
         .select('id, state_contribution_amount')
         .eq('club_to_state_payment_reference', p.payment_reference)
-        .eq('club_to_state_status', 'paid');
+        .eq('club_to_state_status', 'paid')
+        .or('bulk_payment.is.null,bulk_payment.eq.false');
 
       const allocated = allocatedRemittances?.reduce((sum, r) =>
         sum + parseFloat(r.state_contribution_amount as any || '0'), 0) || 0;
 
-      // Get IDs of members already linked to this payment
       const linkedMemberIds = allocatedRemittances?.map(r => r.id) || [];
 
       return {
