@@ -879,7 +879,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
-                {/* Payment Setup Card */}
+                {/* Association Fees Card */}
                 <button
                   onClick={() => setActiveTab('finance-payment')}
                   className={`
@@ -896,9 +896,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       <DollarSign size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Setup</h3>
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association Fees</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure Stripe integration and payment methods
+                        Set membership fees and payment methods
                       </p>
                     </div>
                   </div>
@@ -1110,32 +1110,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
-                {/* Association Fees Card */}
-                <button
-                  onClick={() => setActiveTab('association-fees')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'association-fees'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
-                      <DollarSign size={20} className="text-green-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
-                        Membership Fees
-                      </h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Set {currentOrganization.type === 'state' ? 'club' : 'state association'} membership fees
-                      </p>
-                    </div>
-                  </div>
-                </button>
 
               </div>
             </div>
@@ -1688,20 +1662,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'association-users' && currentOrganization && (
             <AssociationUsersManagement darkMode={darkMode} />
-          )}
-
-          {activeTab === 'association-fees' && currentOrganization && (
-            currentOrganization.type === 'state' ? (
-              <StateAssociationFeeSettings
-                darkMode={darkMode}
-                stateAssociationId={currentOrganization.id}
-              />
-            ) : (
-              <NationalAssociationFeeSettings
-                darkMode={darkMode}
-                nationalAssociationId={currentOrganization.id}
-              />
-            )
           )}
 
           {activeTab === 'team' && (
