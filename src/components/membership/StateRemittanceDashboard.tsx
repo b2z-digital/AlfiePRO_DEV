@@ -1228,8 +1228,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                     ) : (
                       remittances.map((remittance) => {
                         const isEligible = remittance.club_to_state_status === 'paid' && remittance.state_to_national_status === 'pending';
+                        const isSelected = selectedIds.has(remittance.id);
                         return (
-                          <tr key={remittance.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
+                          <tr key={remittance.id} className={`border-b border-slate-700/50 transition-colors ${isSelected ? 'bg-green-500/10 border-green-500/20' : 'hover:bg-slate-700/20'}`}>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
                                 <Avatar
