@@ -7,7 +7,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 
 interface Transaction {
   id: string;
-  type: 'deposit' | 'expense';
+  type: 'deposit' | 'income' | 'expense';
   description: string;
   amount: number;
   date: string;
@@ -275,11 +275,11 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
           <div className="flex items-center gap-4">
             <span className={`
               px-3 py-1.5 rounded-full text-sm font-medium
-              ${initialTransaction.type === 'deposit'
+              ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income')
                 ? 'bg-green-900/30 text-green-400'
                 : 'bg-red-900/30 text-red-400'}
             `}>
-              {initialTransaction.type === 'deposit' ? 'Income' : 'Expense'}
+              {(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'Income' : 'Expense'}
             </span>
 
             {!isEditing && (
@@ -331,14 +331,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
                     className={`
                       text-2xl font-bold mt-1 px-2 py-1 rounded
-                      ${initialTransaction.type === 'deposit' ? 'text-green-400' : 'text-red-400'}
+                      ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'text-green-400' : 'text-red-400'}
                       ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300'}
                       border
                     `}
                   />
                 ) : (
-                  <p className={`text-2xl font-bold ${initialTransaction.type === 'deposit' ? 'text-green-400' : 'text-red-400'}`}>
-                    {initialTransaction.type === 'deposit' ? '+' : '-'}{formatCurrency(formData.amount)}
+                  <p className={`text-2xl font-bold ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'text-green-400' : 'text-red-400'}`}>
+                    {(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? '+' : '-'}{formatCurrency(formData.amount)}
                   </p>
                 )}
               </div>
