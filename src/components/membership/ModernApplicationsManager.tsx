@@ -17,6 +17,7 @@ import {
   X,
   Check,
   MessageSquare,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -286,6 +287,35 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
     }
   };
 
+  const handleDelete = async (application: Application) => {
+    if (!confirm('Are you sure you want to permanently delete this application? This will remove the application and the associated user account from the system, allowing the email to be reused for testing.')) {
+      return;
+    }
+
+    setProcessing(application.id);
+
+    try {
+      // Call the delete function which handles cleanup
+      const { data, error } = await supabase.rpc('delete_membership_application', {
+        application_id: application.id
+      });
+
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
+
+      addNotification('success', 'Application and user account deleted successfully');
+      fetchApplications();
+      setSelectedApplication(null);
+    } catch (error: any) {
+      console.error('Error deleting application:', error);
+      addNotification('error', `Failed to delete application: ${error.message || 'Unknown error'}`);
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -511,6 +541,16 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
                             >
                               <X size={16} />
                               Reject
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(application)}
+                              disabled={processing === application.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors disabled:opacity-50"
+                              title="Permanently delete application and user account (for testing)"
+                            >
+                              <Trash2 size={16} />
+                              Delete
                             </button>
                           </>
                         )}
