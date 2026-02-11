@@ -311,7 +311,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-[#131c31] border border-slate-700/80 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-slate-700/60">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500/20 to-emerald-500/20 border border-teal-500/20">
