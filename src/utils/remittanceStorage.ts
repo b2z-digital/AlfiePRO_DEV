@@ -1,5 +1,30 @@
 import { supabase } from './supabase';
 
+// State association fee structure (clubs pay to state)
+export interface StateAssociationClubFee {
+  id: string;
+  state_association_id: string;
+  club_fee_amount: number;
+  effective_from: string;
+  effective_to: string | null;
+  notes: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+// National association fee structure (state associations pay to national)
+export interface NationalAssociationStateFee {
+  id: string;
+  national_association_id: string;
+  state_fee_amount: number;
+  effective_from: string;
+  effective_to: string | null;
+  notes: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+// Legacy interface for backward compatibility
 export interface MembershipFeeStructure {
   id: string;
   state_association_id: string;
@@ -114,14 +139,14 @@ export interface StateOutstandingFromClubs {
   oldest_unpaid_date: string;
 }
 
-// Get active fee structure for a state association
+// Get active fee structure for a state association (clubs pay to state)
 export async function getActiveFeeStructure(
   stateAssociationId: string,
   date: string = new Date().toISOString().split('T')[0]
-): Promise<MembershipFeeStructure | null> {
+): Promise<StateAssociationClubFee | null> {
   try {
     const { data, error } = await supabase
-      .from('membership_fee_structures')
+      .from('state_association_club_fees')
       .select('*')
       .eq('state_association_id', stateAssociationId)
       .lte('effective_from', date)
@@ -138,13 +163,37 @@ export async function getActiveFeeStructure(
   }
 }
 
+// Get active fee structure for a national association (state associations pay to national)
+export async function getActiveNationalFeeStructure(
+  nationalAssociationId: string,
+  date: string = new Date().toISOString().split('T')[0]
+): Promise<NationalAssociationStateFee | null> {
+  try {
+    const { data, error } = await supabase
+      .from('national_association_state_fees')
+      .select('*')
+      .eq('national_association_id', nationalAssociationId)
+      .lte('effective_from', date)
+      .or(`effective_to.is.null,effective_to.gte.${date}`)
+      .order('effective_from', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching active national fee structure:', error);
+    return null;
+  }
+}
+
 // Get all fee structures for a state association
 export async function getFeeStructures(
   stateAssociationId: string
-): Promise<MembershipFeeStructure[]> {
+): Promise<StateAssociationClubFee[]> {
   try {
     const { data, error } = await supabase
-      .from('membership_fee_structures')
+      .from('state_association_club_fees')
       .select('*')
       .eq('state_association_id', stateAssociationId)
       .order('effective_from', { ascending: false });
@@ -157,10 +206,29 @@ export async function getFeeStructures(
   }
 }
 
-// Create or update fee structure
-export async function saveFeeStructure(
-  feeStructure: Partial<MembershipFeeStructure>
-): Promise<MembershipFeeStructure | null> {
+// Get all fee structures for a national association
+export async function getNationalFeeStructures(
+  nationalAssociationId: string
+): Promise<NationalAssociationStateFee[]> {
+  try {
+    const { data, error } = await supabase
+      .from('national_association_state_fees')
+      .select('*')
+      .eq('national_association_id', nationalAssociationId)
+      .order('effective_from', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching national fee structures:', error);
+    return [];
+  }
+}
+
+// Create or update state association fee structure (clubs pay to state)
+export async function saveStateFeeStructure(
+  feeStructure: Partial<StateAssociationClubFee>
+): Promise<StateAssociationClubFee | null> {
   try {
     const { data: user } = await supabase.auth.getUser();
 
@@ -171,7 +239,7 @@ export async function saveFeeStructure(
 
     if (feeStructure.id) {
       const { data, error } = await supabase
-        .from('membership_fee_structures')
+        .from('state_association_club_fees')
         .update(structureData)
         .eq('id', feeStructure.id)
         .select()
@@ -181,7 +249,7 @@ export async function saveFeeStructure(
       return data;
     } else {
       const { data, error } = await supabase
-        .from('membership_fee_structures')
+        .from('state_association_club_fees')
         .insert(structureData)
         .select()
         .single();
@@ -190,7 +258,45 @@ export async function saveFeeStructure(
       return data;
     }
   } catch (error) {
-    console.error('Error saving fee structure:', error);
+    console.error('Error saving state fee structure:', error);
+    return null;
+  }
+}
+
+// Create or update national association fee structure (state associations pay to national)
+export async function saveNationalFeeStructure(
+  feeStructure: Partial<NationalAssociationStateFee>
+): Promise<NationalAssociationStateFee | null> {
+  try {
+    const { data: user } = await supabase.auth.getUser();
+
+    const structureData = {
+      ...feeStructure,
+      created_by: user.user?.id,
+    };
+
+    if (feeStructure.id) {
+      const { data, error } = await supabase
+        .from('national_association_state_fees')
+        .update(structureData)
+        .eq('id', feeStructure.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('national_association_state_fees')
+        .insert(structureData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+  } catch (error) {
+    console.error('Error saving national fee structure:', error);
     return null;
   }
 }
