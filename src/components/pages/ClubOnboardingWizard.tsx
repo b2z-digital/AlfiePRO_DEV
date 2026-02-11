@@ -13,6 +13,7 @@ import { FinanceStep } from './club-onboarding/FinanceStep';
 import { AdminStep } from './club-onboarding/AdminStep';
 import { ReviewStep } from './club-onboarding/ReviewStep';
 import { ClubOnboardingFormData, STEP_CONFIG } from './club-onboarding/types';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ClubOnboardingWizardProps {
   isOpen: boolean;
@@ -242,6 +243,94 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
     } catch (error) {
       console.error(`Error uploading ${path}:`, error);
       return null;
+    }
+  };
+
+  const applyDefaultDashboardTemplate = async (clubId: string, userId: string) => {
+    try {
+      const RACE_MANAGEMENT_TEMPLATE_ID = 'a1111111-1111-1111-1111-111111111111';
+
+      // Load the Race Management template from database
+      const { data: template, error: templateError } = await supabase
+        .from('dashboard_templates')
+        .select('*')
+        .eq('id', RACE_MANAGEMENT_TEMPLATE_ID)
+        .single();
+
+      if (templateError || !template) {
+        console.warn('Could not load Race Management template:', templateError);
+        return;
+      }
+
+      // Convert template data to dashboard layout format
+      const templateLayout = template.template_data?.lg || [];
+      const rowConfigs = template.template_data?.row_configs || [];
+
+      const rowMap = new Map();
+      const widgets: any[] = [];
+
+      templateLayout.forEach((widgetConfig: any) => {
+        const rowNum = widgetConfig.row;
+
+        if (!rowMap.has(rowNum)) {
+          const rowWidgets = templateLayout.filter((w: any) => w.row === rowNum);
+          const rowConfig = rowConfigs.find((r: any) => r.row === rowNum);
+          const columns = rowConfig?.columns || rowWidgets.length;
+
+          rowMap.set(rowNum, {
+            id: `row-${uuidv4()}`,
+            columns,
+            widgetIds: [],
+            order: rowNum,
+            height: rowConfig?.height || 'default'
+          });
+        }
+
+        const row = rowMap.get(rowNum);
+        const widgetId = `widget-${uuidv4()}`;
+
+        widgets.push({
+          id: widgetId,
+          type: widgetConfig.type,
+          rowId: row.id,
+          columnIndex: widgetConfig.col,
+          position: {
+            x: widgetConfig.col,
+            y: rowNum,
+            w: widgetConfig.width,
+            h: widgetConfig.height
+          },
+          settings: widgetConfig.settings || {},
+          colorTheme: widgetConfig.colorTheme || 'default'
+        });
+
+        row.widgetIds.push(widgetId);
+      });
+
+      const rows = Array.from(rowMap.values()).sort((a: any, b: any) => a.order - b.order);
+
+      const dashboardLayout = {
+        widgets,
+        rows,
+        version: 1
+      };
+
+      // Save as user's default dashboard for this club
+      await supabase
+        .from('user_dashboard_layouts')
+        .insert({
+          user_id: userId,
+          club_id: clubId,
+          state_association_id: null,
+          national_association_id: null,
+          is_default: true,
+          layout: dashboardLayout
+        });
+
+      console.log('✅ Applied Race Management template as default dashboard');
+    } catch (error) {
+      console.error('Error applying default dashboard template:', error);
+      // Don't throw - dashboard template is nice-to-have, not critical
     }
   };
 
@@ -617,6 +706,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           });
         }
       }
+    }
+
+    // Apply the Race Management dashboard template as the default
+    if (user?.id) {
+      await applyDefaultDashboardTemplate(club.id, user.id);
     }
 
     addNotification('success', `${formData.name} has been created successfully!`);
