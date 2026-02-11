@@ -216,6 +216,8 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const [showUnpaidWarning, setShowUnpaidWarning] = useState(false);
   const [unpaidTargetId, setUnpaidTargetId] = useState<string | null>(null);
   const [unpaidTargetName, setUnpaidTargetName] = useState('');
+  const [showBulkStatusUpdateWarning, setShowBulkStatusUpdateWarning] = useState(false);
+  const [bulkStatusUpdateAction, setBulkStatusUpdateAction] = useState<'mark-paid' | 'mark-unpaid' | null>(null);
 
   useEffect(() => {
     if (stateAssociationId) {
@@ -423,14 +425,11 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   };
 
   const toggleSelectAll = () => {
-    const eligibleRemittances = remittances.filter(
-      r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending'
-    );
-
-    if (selectedIds.size === eligibleRemittances.length) {
+    // Select ALL members, not just pending ones
+    if (selectedIds.size === remittances.length && remittances.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(eligibleRemittances.map(r => r.id)));
+      setSelectedIds(new Set(remittances.map(r => r.id)));
     }
   };
 
@@ -817,6 +816,128 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
     }
   };
 
+  const handleBulkStatusUpdate = (action: 'mark-paid' | 'mark-unpaid') => {
+    if (selectedIds.size === 0) return;
+    setBulkStatusUpdateAction(action);
+    setShowBulkStatusUpdateWarning(true);
+  };
+
+  const confirmBulkStatusUpdate = async () => {
+    if (!bulkStatusUpdateAction || selectedIds.size === 0) return;
+
+    try {
+      setBulkActionInProgress(true);
+      const selectedRemittances = remittances.filter(r => selectedIds.has(r.id));
+
+      if (bulkStatusUpdateAction === 'mark-paid') {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Update all selected remittances to paid
+        const { error } = await supabase
+          .from('membership_remittances')
+          .update({
+            state_to_national_status: 'paid',
+            state_to_national_paid_date: today
+          })
+          .in('id', Array.from(selectedIds));
+
+        if (error) throw error;
+
+        addNotification('success', `${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} marked as paid to National`);
+
+      } else if (bulkStatusUpdateAction === 'mark-unpaid') {
+        // Revert all selected remittances to pending
+        for (const remittance of selectedRemittances) {
+          // Clean up financial transactions for each remittance
+          const { data: remittanceData } = await supabase
+            .from('membership_remittances')
+            .select('national_contribution_amount, state_to_national_paid_date, state_to_national_payment_reference, state_association_id, national_association_id')
+            .eq('id', remittance.id)
+            .maybeSingle();
+
+          if (remittanceData) {
+            let batchQuery = supabase
+              .from('remittance_payment_batches')
+              .select('id, member_count, total_amount')
+              .eq('from_association_id', remittanceData.state_association_id)
+              .eq('to_association_id', remittanceData.national_association_id);
+
+            if (remittanceData.state_to_national_paid_date) {
+              batchQuery = batchQuery.eq('payment_date', remittanceData.state_to_national_paid_date);
+            }
+            if (remittanceData.state_to_national_payment_reference) {
+              batchQuery = batchQuery.eq('payment_reference', remittanceData.state_to_national_payment_reference);
+            } else {
+              batchQuery = batchQuery.is('payment_reference', null);
+            }
+
+            const { data: batch } = await batchQuery
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (batch && batch.member_count > 1) {
+              const newAmount = batch.total_amount - (remittanceData.national_contribution_amount || 0);
+              const newCount = batch.member_count - 1;
+
+              await supabase
+                .from('remittance_payment_batches')
+                .update({ total_amount: newAmount, member_count: newCount })
+                .eq('id', batch.id);
+
+              await supabase
+                .from('association_transactions')
+                .delete()
+                .eq('linked_entity_type', 'remittance')
+                .eq('linked_entity_id', remittance.id);
+            } else if (batch) {
+              await supabase
+                .from('association_transactions')
+                .delete()
+                .eq('batch_id', batch.id);
+
+              await supabase
+                .from('remittance_payment_batches')
+                .delete()
+                .eq('id', batch.id);
+            } else {
+              await supabase
+                .from('association_transactions')
+                .delete()
+                .eq('linked_entity_type', 'remittance')
+                .eq('linked_entity_id', remittance.id);
+            }
+          }
+        }
+
+        // Update all selected remittances to pending
+        const { error } = await supabase
+          .from('membership_remittances')
+          .update({
+            state_to_national_status: 'pending',
+            state_to_national_paid_date: null,
+            state_to_national_payment_reference: null
+          })
+          .in('id', Array.from(selectedIds));
+
+        if (error) throw error;
+
+        addNotification('success', `${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} reverted to pending and finance entries adjusted`);
+      }
+
+      setShowBulkStatusUpdateWarning(false);
+      setBulkStatusUpdateAction(null);
+      setSelectedIds(new Set());
+      await loadData();
+
+    } catch (error: any) {
+      console.error('Error updating bulk status:', error);
+      addNotification('error', `Failed to update status: ${error.message}`);
+    } finally {
+      setBulkActionInProgress(false);
+    }
+  };
+
   const totalFromClubs = clubSummaries.reduce((sum, club) => sum + club.total_paid, 0);
   const totalOutstanding = clubSummaries.reduce((sum, club) => sum + club.total_outstanding, 0);
   const totalPaidMembers = clubSummaries.reduce((sum, club) => sum + club.paid_count, 0);
@@ -1130,12 +1251,28 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => handleBulkStatusUpdate('mark-paid')}
+                        disabled={bulkActionInProgress}
+                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-600/20 text-sm"
+                      >
+                        <CheckCircle size={16} />
+                        Mark as Paid
+                      </button>
+                      <button
+                        onClick={() => handleBulkStatusUpdate('mark-unpaid')}
+                        disabled={bulkActionInProgress}
+                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-600/20 text-sm"
+                      >
+                        <X size={16} />
+                        Mark as Unpaid
+                      </button>
+                      <button
                         onClick={handleBulkMarkNationalPaid}
                         disabled={bulkActionInProgress}
-                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-600/20 text-sm"
+                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 text-sm"
                       >
                         <DollarSign size={16} />
-                        Process Payment to National
+                        Process Payment
                       </button>
                       <button
                         onClick={() => setSelectedIds(new Set())}
@@ -1183,7 +1320,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 hover:border-slate-600 text-sm font-medium transition-all flex items-center gap-2"
                 >
                   <CheckSquare size={15} className="text-slate-400" />
-                  {selectedIds.size === remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length ? 'Deselect All' : 'Select All Ready'}
+                  {selectedIds.size === remittances.length && remittances.length > 0 ? 'Deselect All' : 'Select All'}
                 </button>
               </div>
 
@@ -1200,9 +1337,8 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">National Status</th>
                       <th className="text-center py-3 px-4 text-sm font-medium text-slate-300">
                         {(() => {
-                          const eligible = remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending');
-                          if (eligible.length === 0) return 'Select';
-                          const allSelected = eligible.length > 0 && eligible.every(r => selectedIds.has(r.id));
+                          if (remittances.length === 0) return 'Select';
+                          const allSelected = remittances.length > 0 && remittances.every(r => selectedIds.has(r.id));
                           return (
                             <button onClick={toggleSelectAll} className="p-1 mx-auto block" title={allSelected ? 'Deselect All' : 'Select All'}>
                               {allSelected ? (
@@ -1270,18 +1406,16 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                               </button>
                             </td>
                             <td className="py-3 px-4 text-center">
-                              {isEligible && (
-                                <button
-                                  onClick={() => toggleSelection(remittance.id)}
-                                  className="p-1"
-                                >
-                                  {selectedIds.has(remittance.id) ? (
-                                    <CheckSquare className="w-5 h-5 text-blue-400" />
-                                  ) : (
-                                    <Square className="w-5 h-5 text-slate-500" />
-                                  )}
-                                </button>
-                              )}
+                              <button
+                                onClick={() => toggleSelection(remittance.id)}
+                                className="p-1"
+                              >
+                                {selectedIds.has(remittance.id) ? (
+                                  <CheckSquare className="w-5 h-5 text-blue-400" />
+                                ) : (
+                                  <Square className="w-5 h-5 text-slate-500" />
+                                )}
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1822,6 +1956,24 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         confirmText="Revert to Unpaid"
         darkMode={darkMode}
         variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={showBulkStatusUpdateWarning}
+        onClose={() => {
+          setShowBulkStatusUpdateWarning(false);
+          setBulkStatusUpdateAction(null);
+        }}
+        onConfirm={confirmBulkStatusUpdate}
+        title={bulkStatusUpdateAction === 'mark-paid' ? 'Mark Members as Paid to National' : 'Mark Members as Unpaid to National'}
+        message={
+          bulkStatusUpdateAction === 'mark-paid'
+            ? `Are you sure you want to mark ${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} as paid to National?\n\nThis will:\n- Update the national payment status to "Paid"\n- Set the payment date to today\n\nTotal amount: $${remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + r.national_contribution, 0).toFixed(2)}`
+            : `Are you sure you want to mark ${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} as unpaid to National?\n\nThis will:\n- Remove associated expense transactions from State finances\n- Remove associated income transactions from National finances\n- Set the national payment status back to "Pending"\n\nThis action affects your financial records.\n\nTotal amount: $${remittances.filter(r => selectedIds.has(r.id)).reduce((sum, r) => sum + r.national_contribution, 0).toFixed(2)}`
+        }
+        confirmText={bulkStatusUpdateAction === 'mark-paid' ? `Mark ${selectedIds.size} as Paid` : `Mark ${selectedIds.size} as Unpaid`}
+        darkMode={darkMode}
+        variant={bulkStatusUpdateAction === 'mark-paid' ? 'success' : 'danger'}
       />
     </div>
   );
