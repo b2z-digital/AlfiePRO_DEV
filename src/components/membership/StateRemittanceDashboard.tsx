@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import { SimpleReconciliationTab } from './SimpleReconciliationTab';
 import { Avatar } from '../ui/Avatar';
+import { NationalReportModal } from './NationalReportModal';
 
 interface DropdownOption {
   value: string;
@@ -156,6 +157,20 @@ interface PaymentBatch {
   };
 }
 
+interface ReportSubmission {
+  id: string;
+  report_type: string;
+  report_scope: string;
+  membership_year: number;
+  member_count: number;
+  total_state_amount: number;
+  total_national_amount: number;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  subject: string | null;
+  created_at: string;
+}
+
 interface StateRemittanceDashboardProps {
   darkMode: boolean;
   stateAssociationId: string;
@@ -185,6 +200,10 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [outboundPayments, setOutboundPayments] = useState<PaymentBatch[]>([]);
+  const [reportSubmissions, setReportSubmissions] = useState<ReportSubmission[]>([]);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [paymentHistorySubTab, setPaymentHistorySubTab] = useState<'from-clubs' | 'to-national' | 'reports'>('from-clubs');
 
   useEffect(() => {
     if (stateAssociationId) {
@@ -205,7 +224,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
       await Promise.all([
         loadClubSummaries(),
         loadRemittances(),
-        loadPaymentBatches()
+        loadPaymentBatches(),
+        loadOutboundPayments(),
+        loadReportSubmissions()
       ]);
     } catch (error) {
       console.error('Error loading state remittance data:', error);
@@ -345,6 +366,32 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
     }
 
     setPaymentBatches((data || []) as PaymentBatch[]);
+  };
+
+  const loadOutboundPayments = async () => {
+    const { data, error } = await supabase
+      .from('remittance_payments')
+      .select('*')
+      .eq('from_state_id', stateAssociationId)
+      .eq('from_type', 'state')
+      .eq('to_type', 'national')
+      .order('payment_date', { ascending: false });
+
+    if (!error) {
+      setOutboundPayments((data || []) as PaymentBatch[]);
+    }
+  };
+
+  const loadReportSubmissions = async () => {
+    const { data, error } = await supabase
+      .from('national_report_submissions')
+      .select('*')
+      .eq('state_association_id', stateAssociationId)
+      .order('created_at', { ascending: false });
+
+    if (!error) {
+      setReportSubmissions((data || []) as ReportSubmission[]);
+    }
   };
 
   const handleRefresh = async () => {
@@ -1071,239 +1118,373 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           {/* Payment History Tab */}
           {selectedTab === 'payments' && (
             <div>
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">Payment Transaction History</h3>
-                <p className="text-sm text-slate-400">
-                  View all remittance payments from clubs to the association
-                </p>
-                </div>
-                {paymentBatches.length > 0 && (
-                  <button
-                    onClick={() => setShowClearAllConfirm(true)}
-                    className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-all flex items-center gap-2 text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Clear All
-                  </button>
-                )}
+              {/* Sub-tab navigation */}
+              <div className="flex items-center gap-1 mb-6 p-1 bg-slate-800/60 rounded-xl border border-slate-700/50 w-fit">
+                <button
+                  onClick={() => setPaymentHistorySubTab('from-clubs')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    paymentHistorySubTab === 'from-clubs'
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                >
+                  <ArrowDownLeft size={16} />
+                  Received from Clubs
+                  <span className={`px-1.5 py-0.5 rounded-md text-xs ${paymentHistorySubTab === 'from-clubs' ? 'bg-blue-500/30' : 'bg-slate-700'}`}>
+                    {paymentBatches.length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setPaymentHistorySubTab('to-national')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    paymentHistorySubTab === 'to-national'
+                      ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                >
+                  <ArrowUpRight size={16} />
+                  Paid to National
+                  <span className={`px-1.5 py-0.5 rounded-md text-xs ${paymentHistorySubTab === 'to-national' ? 'bg-green-500/30' : 'bg-slate-700'}`}>
+                    {outboundPayments.length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setPaymentHistorySubTab('reports')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                    paymentHistorySubTab === 'reports'
+                      ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                >
+                  <FileText size={16} />
+                  National Reports
+                  <span className={`px-1.5 py-0.5 rounded-md text-xs ${paymentHistorySubTab === 'reports' ? 'bg-teal-500/30' : 'bg-slate-700'}`}>
+                    {reportSubmissions.length}
+                  </span>
+                </button>
               </div>
 
-              <div className="mb-5">
-                <AppDropdown
-                  value={String(selectedYear)}
-                  onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
-                  icon={<Calendar size={15} />}
-                  options={[
-                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
-                    ...availableYears.map(year => ({
-                      value: String(year),
-                      label: String(year),
-                      icon: <Calendar size={14} className="text-blue-400" />
-                    }))
-                  ]}
-                  minWidth={160}
-                />
+              {/* Filters Row */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <AppDropdown
+                    value={String(selectedYear)}
+                    onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+                    icon={<Calendar size={15} />}
+                    options={[
+                      { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                      ...availableYears.map(year => ({
+                        value: String(year),
+                        label: String(year),
+                        icon: <Calendar size={14} className="text-blue-400" />
+                      }))
+                    ]}
+                    minWidth={160}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {paymentHistorySubTab === 'from-clubs' && paymentBatches.length > 0 && (
+                    <button
+                      onClick={() => setShowClearAllConfirm(true)}
+                      className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 font-medium transition-all flex items-center gap-2 text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Clear All
+                    </button>
+                  )}
+                  {paymentHistorySubTab === 'reports' && (
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-medium transition-all flex items-center gap-2 text-sm shadow-lg shadow-teal-600/20"
+                    >
+                      <Send size={16} />
+                      Generate Report
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {paymentBatches.length === 0 ? (
-                <div className="text-center py-12">
-                  <Receipt className="mx-auto mb-4 text-slate-600" size={48} />
-                  <p className="text-lg text-slate-400 mb-2">
-                    No payments recorded
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    Payments are created automatically when reconciling members in the "Payments & Reconciliation" tab
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-blue-300">Total Paid to National{selectedYear !== 'all' ? ` in ${selectedYear}` : ''}</p>
-                        <p className="text-2xl font-bold text-white mt-1">
-                          ${totalPaidToNational.toFixed(2)}
-                        </p>
+              {/* From Clubs sub-tab */}
+              {paymentHistorySubTab === 'from-clubs' && (
+                <>
+                  {paymentBatches.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="p-4 rounded-2xl bg-slate-700/30 border border-slate-600/30 w-fit mx-auto mb-4">
+                        <ArrowDownLeft className="text-slate-500" size={32} />
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-blue-300">Total Payments</p>
-                        <p className="text-2xl font-bold text-white mt-1">
-                          {paymentBatches.length}
-                        </p>
-                      </div>
+                      <p className="text-lg text-slate-400 mb-1">No payments received from clubs</p>
+                      <p className="text-sm text-slate-500">Payments appear here when reconciling member remittances</p>
                     </div>
-                  </div>
-
-                  {paymentBatches.map((batch) => {
-                    const progressPercent = (batch.allocated_amount / batch.total_amount) * 100;
-                    const isFullyReconciled = batch.reconciliation_status === 'completed';
-                    const isPartial = batch.reconciliation_status === 'partial';
-
-                    return (
-                      <div
-                        key={batch.id}
-                        className={`p-6 rounded-lg border transition-all ${
-                          isFullyReconciled
-                            ? 'bg-green-500/10 border-green-500/30'
-                            : isPartial
-                            ? 'bg-blue-500/10 border-blue-500/30'
-                            : 'bg-slate-700/30 border-slate-600/50'
-                        }`}
-                      >
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Receipt className="w-5 h-5 text-blue-400" />
-                              <span className="text-white font-semibold text-lg">
-                                {batch.payment_reference}
-                              </span>
-                              {isFullyReconciled && (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  Reconciled
-                                </span>
-                              )}
-                              {isPartial && (
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
-                                  Partial
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-400">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4" />
-                                {new Date(batch.payment_date).toLocaleDateString()}
-                              </div>
-                              {batch.clubs?.name && (
-                                <div className="flex items-center gap-2">
-                                  <Building2 className="w-4 h-4" />
-                                  {batch.clubs.name}
-                                </div>
-                              )}
-                            </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <ArrowDownLeft size={16} className="text-blue-400" />
+                            <p className="text-sm text-blue-300 font-medium">Total Received from Clubs</p>
                           </div>
-
-                          <div className="text-right">
-                            <p className="text-2xl font-bold text-white">
-                              ${Number(batch.total_amount).toFixed(2)}
-                            </p>
-                            <p className="text-sm text-slate-400 mt-1">
-                              {batch.payment_method || 'Transfer'}
-                            </p>
-                          </div>
+                          <p className="text-2xl font-bold text-white">
+                            ${paymentBatches.reduce((sum, b) => sum + Number(b.total_amount), 0).toFixed(2)}
+                          </p>
                         </div>
-
-                        {/* Progress Bar */}
-                        {!isFullyReconciled && (
-                          <div className="mb-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-slate-400">Reconciliation Progress</span>
-                              <span className="text-xs font-medium text-white">{progressPercent.toFixed(0)}%</span>
-                            </div>
-                            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-300"
-                                style={{ width: `${progressPercent}%` }}
-                              />
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-green-400">
-                                ${batch.allocated_amount.toFixed(2)} allocated
-                              </span>
-                              <span className="text-xs text-orange-400">
-                                ${batch.unallocated_amount.toFixed(2)} remaining
-                              </span>
-                            </div>
+                        <div className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Receipt size={16} className="text-slate-400" />
+                            <p className="text-sm text-slate-300 font-medium">Total Transactions</p>
                           </div>
-                        )}
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-600">
-                          <div className="flex-1">
-                            {batch.bank_transaction_id && (
-                              <p className="text-xs text-slate-400">
-                                Bank Ref: <span className="text-slate-300">{batch.bank_transaction_id}</span>
-                              </p>
-                            )}
-                            {batch.notes && (
-                              <p className="text-xs text-slate-400 mt-1">{batch.notes}</p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {batch.from_club_id && (
-                              <button
-                                onClick={() => togglePaymentExpansion(batch.id, batch)}
-                                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors flex items-center gap-2"
-                              >
-                                <Eye className="w-4 h-4" />
-                                {expandedPaymentId === batch.id ? 'Hide' : 'View'} Members
-                              </button>
-                            )}
-                            {!isFullyReconciled && (
-                              <button
-                                onClick={() => handleOpenReconciliation(batch)}
-                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center gap-2"
-                              >
-                                <CheckSquare className="w-4 h-4" />
-                                Reconcile
-                              </button>
-                            )}
-                            <button
-                              onClick={() => {
-                                setDeleteTargetId(batch.id);
-                                setShowDeleteConfirm(true);
-                              }}
-                              className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all"
-                              title="Delete payment"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          <p className="text-2xl font-bold text-white">{paymentBatches.length}</p>
                         </div>
-
-                        {/* Expanded Member List */}
-                        {expandedPaymentId === batch.id && (
-                          <div className="mt-4 pt-4 border-t border-slate-600">
-                            <h4 className="text-sm font-medium text-white mb-3">Members in this Payment</h4>
-                            {paymentMembers.length > 0 ? (
-                              <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {paymentMembers.map((member) => (
-                                  <div
-                                    key={member.id}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 border border-slate-700"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <Avatar
-                                        name={member.member_name}
-                                        size="sm"
-                                        imageUrl={member.member_avatar}
-                                      />
-                                      <div>
-                                        <p className="text-sm font-medium text-white">{member.member_name}</p>
-                                        <p className="text-xs text-slate-400">{member.club_name}</p>
-                                      </div>
-                                    </div>
-                                    <span className="text-sm font-medium text-green-400">
-                                      ${member.state_contribution.toFixed(2)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center py-8">
-                                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                <span className="ml-2 text-sm text-slate-400">Loading members...</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {paymentBatches.map((batch) => {
+                        const progressPercent = (batch.allocated_amount / batch.total_amount) * 100;
+                        const isFullyReconciled = batch.reconciliation_status === 'completed';
+                        const isPartial = batch.reconciliation_status === 'partial';
+
+                        return (
+                          <div
+                            key={batch.id}
+                            className={`p-5 rounded-xl border transition-all ${
+                              isFullyReconciled
+                                ? 'bg-green-500/10 border-green-500/30'
+                                : isPartial
+                                ? 'bg-blue-500/10 border-blue-500/30'
+                                : 'bg-slate-700/30 border-slate-600/50'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className={`p-1.5 rounded-lg ${isFullyReconciled ? 'bg-green-500/20' : 'bg-blue-500/20'}`}>
+                                    <Receipt className={`w-4 h-4 ${isFullyReconciled ? 'text-green-400' : 'text-blue-400'}`} />
+                                  </div>
+                                  <span className="text-white font-semibold text-lg">{batch.payment_reference}</span>
+                                  {isFullyReconciled && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 flex items-center gap-1">
+                                      <CheckCircle className="w-3 h-3" /> Reconciled
+                                    </span>
+                                  )}
+                                  {isPartial && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">Partial</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-slate-400">
+                                  <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(batch.payment_date).toLocaleDateString()}</span>
+                                  {batch.clubs?.name && <span className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" />{batch.clubs.name}</span>}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-white">${Number(batch.total_amount).toFixed(2)}</p>
+                                <p className="text-xs text-slate-400 mt-1">{batch.payment_method || 'Transfer'}</p>
+                              </div>
+                            </div>
+
+                            {!isFullyReconciled && (
+                              <div className="mb-3">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-xs text-slate-400">Reconciliation Progress</span>
+                                  <span className="text-xs font-medium text-white">{progressPercent.toFixed(0)}%</span>
+                                </div>
+                                <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                  <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-600/50">
+                              <div className="flex-1 text-xs text-slate-400">
+                                {batch.bank_transaction_id && <span>Ref: {batch.bank_transaction_id}</span>}
+                                {batch.notes && <span className="ml-3">{batch.notes}</span>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {batch.from_club_id && (
+                                  <button onClick={() => togglePaymentExpansion(batch.id, batch)} className="px-3 py-1.5 rounded-lg bg-slate-700/80 hover:bg-slate-600 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                                    <Eye className="w-3.5 h-3.5" />
+                                    {expandedPaymentId === batch.id ? 'Hide' : 'View'} Members
+                                  </button>
+                                )}
+                                {!isFullyReconciled && (
+                                  <button onClick={() => handleOpenReconciliation(batch)} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5">
+                                    <CheckSquare className="w-3.5 h-3.5" /> Reconcile
+                                  </button>
+                                )}
+                                <button onClick={() => { setDeleteTargetId(batch.id); setShowDeleteConfirm(true); }} className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" title="Delete">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {expandedPaymentId === batch.id && (
+                              <div className="mt-4 pt-4 border-t border-slate-600/50">
+                                <h4 className="text-sm font-medium text-white mb-3">Members in this Payment</h4>
+                                {paymentMembers.length > 0 ? (
+                                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    {paymentMembers.map((member) => (
+                                      <div key={member.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-700/30 border border-slate-700">
+                                        <div className="flex items-center gap-3">
+                                          <Avatar name={member.member_name} size="sm" imageUrl={member.member_avatar} />
+                                          <div>
+                                            <p className="text-sm font-medium text-white">{member.member_name}</p>
+                                            <p className="text-xs text-slate-400">{member.club_name}</p>
+                                          </div>
+                                        </div>
+                                        <span className="text-sm font-medium text-green-400">${member.state_contribution.toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center py-8">
+                                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                    <span className="ml-2 text-sm text-slate-400">Loading members...</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* To National sub-tab */}
+              {paymentHistorySubTab === 'to-national' && (
+                <>
+                  {outboundPayments.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="p-4 rounded-2xl bg-slate-700/30 border border-slate-600/30 w-fit mx-auto mb-4">
+                        <ArrowUpRight className="text-slate-500" size={32} />
+                      </div>
+                      <p className="text-lg text-slate-400 mb-1">No payments made to National yet</p>
+                      <p className="text-sm text-slate-500">Payments to National appear here when you mark remittances as paid</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ArrowUpRight size={16} className="text-green-400" />
+                          <p className="text-sm text-green-300 font-medium">Total Paid to National{selectedYear !== 'all' ? ` in ${selectedYear}` : ''}</p>
+                        </div>
+                        <p className="text-2xl font-bold text-white">
+                          ${outboundPayments.reduce((sum, b) => sum + Number(b.total_amount), 0).toFixed(2)}
+                        </p>
+                      </div>
+
+                      {outboundPayments.map((batch) => (
+                        <div key={batch.id} className="p-5 rounded-xl bg-green-500/5 border border-green-500/20 transition-all">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="p-1.5 rounded-lg bg-green-500/20">
+                                  <ArrowUpRight className="w-4 h-4 text-green-400" />
+                                </div>
+                                <span className="text-white font-semibold">{batch.payment_reference}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-sm text-slate-400">
+                                <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{new Date(batch.payment_date).toLocaleDateString()}</span>
+                                <span className="flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" />{batch.payment_method || 'Transfer'}</span>
+                              </div>
+                            </div>
+                            <p className="text-xl font-bold text-green-400">${Number(batch.total_amount).toFixed(2)}</p>
+                          </div>
+                          {batch.notes && <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-600/30">{batch.notes}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* National Reports sub-tab */}
+              {paymentHistorySubTab === 'reports' && (
+                <>
+                  {/* Hero prompt when no reports */}
+                  {reportSubmissions.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-500/10 to-emerald-500/10 border border-teal-500/20 w-fit mx-auto mb-5">
+                        <FileText className="text-teal-400" size={36} />
+                      </div>
+                      <p className="text-lg text-white font-semibold mb-2">National Member Reports</p>
+                      <p className="text-sm text-slate-400 max-w-md mx-auto mb-6">
+                        Generate and send reports of paid members to your National Association. Track which members have been reported to avoid duplicates.
+                      </p>
+                      <button
+                        onClick={() => setShowReportModal(true)}
+                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-medium transition-all flex items-center gap-2 mx-auto shadow-lg shadow-teal-600/20"
+                      >
+                        <Send size={18} />
+                        Generate First Report
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Stats */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText size={16} className="text-teal-400" />
+                            <p className="text-xs text-teal-300 font-medium">Reports Sent</p>
+                          </div>
+                          <p className="text-2xl font-bold text-white">{reportSubmissions.length}</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Users size={16} className="text-slate-400" />
+                            <p className="text-xs text-slate-300 font-medium">Members Reported</p>
+                          </div>
+                          <p className="text-2xl font-bold text-white">{reportSubmissions.reduce((sum, r) => sum + r.member_count, 0)}</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/30">
+                          <div className="flex items-center gap-2 mb-2">
+                            <History size={16} className="text-slate-400" />
+                            <p className="text-xs text-slate-300 font-medium">Last Report</p>
+                          </div>
+                          <p className="text-sm font-semibold text-white mt-1">
+                            {new Date(reportSubmissions[0]?.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Report History */}
+                      {reportSubmissions.map((report) => (
+                        <div key={report.id} className="p-5 rounded-xl bg-slate-700/20 border border-slate-600/40 hover:border-slate-500/50 transition-all">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-xl ${report.report_type === 'email' ? 'bg-blue-500/15' : 'bg-teal-500/15'}`}>
+                                {report.report_type === 'email' ? <Mail size={18} className="text-blue-400" /> : <Download size={18} className="text-teal-400" />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-white font-semibold">
+                                    {report.report_type === 'email' ? 'Emailed to National' : 'Downloaded Report'}
+                                  </p>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    report.report_scope === 'new_since_last' ? 'bg-orange-500/20 text-orange-300' : 'bg-teal-500/20 text-teal-300'
+                                  }`}>
+                                    {report.report_scope === 'new_since_last' ? 'Incremental' : report.report_scope === 'all' ? 'Full List' : 'Custom'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                                  <span className="flex items-center gap-1"><Calendar size={12} />{new Date(report.created_at).toLocaleString()}</span>
+                                  {report.recipient_email && <span className="flex items-center gap-1"><Mail size={12} />{report.recipient_email}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-white">{report.member_count} members</p>
+                              <p className="text-xs text-slate-400">
+                                State: ${Number(report.total_state_amount).toFixed(2)} / National: ${Number(report.total_national_amount).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                          {report.subject && <p className="text-xs text-slate-300 mt-2 px-3 py-2 rounded-lg bg-slate-800/50">{report.subject}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1359,6 +1540,19 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         darkMode={darkMode}
         variant="danger"
       />
+
+      {showReportModal && (
+        <NationalReportModal
+          darkMode={darkMode}
+          stateAssociationId={stateAssociationId}
+          selectedYear={selectedYear}
+          onClose={() => setShowReportModal(false)}
+          onComplete={() => {
+            setShowReportModal(false);
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 };
