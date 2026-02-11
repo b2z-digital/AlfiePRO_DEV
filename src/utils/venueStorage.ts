@@ -240,8 +240,17 @@ export const addVenue = async (formData: VenueFormData, explicitClubId?: string)
     }
 
     try {
+      // Check if this is the first venue for the club
+      const { data: existingVenues, error: checkError } = await supabase
+        .from('club_venues')
+        .select('venue_id')
+        .eq('club_id', clubId);
+
+      // If this is the first venue, automatically set it as default
+      const shouldBeDefault = formData.isDefault || (existingVenues && existingVenues.length === 0);
+
       // If this venue is being set as default, unset any existing default
-      if (formData.isDefault) {
+      if (shouldBeDefault) {
         await supabase
           .from('venues')
           .update({ is_default: false })
@@ -258,7 +267,7 @@ export const addVenue = async (formData: VenueFormData, explicitClubId?: string)
           latitude: formData.latitude,
           longitude: formData.longitude,
           image: formData.image,
-          is_default: formData.isDefault || false
+          is_default: shouldBeDefault
         })
         .select()
         .single();

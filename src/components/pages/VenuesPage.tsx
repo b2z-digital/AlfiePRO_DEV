@@ -870,15 +870,15 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                     <div className="absolute inset-0 bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl group-hover:border-blue-500/30 transition-colors duration-300" />
 
                     {/* Image Container with Parallax Effect */}
-                    <div className="relative h-64 w-full overflow-hidden rounded-t-2xl">
+                    <div className="relative w-full overflow-hidden rounded-t-2xl" style={{ aspectRatio: '16/9' }}>
                       {venue.image ? (
                         <img
                           src={venue.image}
                           alt={venue.name}
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
                           <MapPin size={48} className="text-slate-500" />
                         </div>
                       )}
@@ -1027,15 +1027,15 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
 
                     <div className="relative flex items-center gap-5 p-5">
                       {/* Image Container with Zoom Effect */}
-                      <div className="relative w-36 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+                      <div className="relative w-40 flex-shrink-0 rounded-xl overflow-hidden shadow-lg" style={{ aspectRatio: '16/9' }}>
                         {venue.image ? (
                           <img
                             src={venue.image}
                             alt={venue.name}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                          <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
                             <MapPin size={36} className="text-slate-500" />
                           </div>
                         )}
@@ -1323,11 +1323,13 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                       <div className="flex-1">
                         <div className="flex items-start gap-3">
                           {venue.image && (
-                            <img
-                              src={venue.image}
-                              alt={venue.name}
-                              className="w-20 h-20 rounded-lg object-cover"
-                            />
+                            <div className="relative w-32 rounded-lg overflow-hidden flex-shrink-0" style={{ aspectRatio: '16/9' }}>
+                              <img
+                                src={venue.image}
+                                alt={venue.name}
+                                className="absolute inset-0 w-full h-full object-cover"
+                              />
+                            </div>
                           )}
                           <div className="flex-1">
                             <div className="font-semibold text-slate-100 mb-1">
