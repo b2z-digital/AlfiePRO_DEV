@@ -1195,17 +1195,21 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     setCurrentClub(club);
                     setCurrentOrganization(null);
 
-                    if (isActualSwitch) {
-                      // Clear the switching overlay after a brief delay
-                      setTimeout(() => {
-                        setLocalSwitchingClub(false);
-                      }, 500);
-                    }
-
-                    // Force dashboard refresh with new key
-                    setDashboardRefreshKey(prev => prev + 1);
                     // Always navigate to home when switching contexts
                     navigate('/');
+
+                    if (isActualSwitch) {
+                      // Force dashboard refresh with new key after a brief moment
+                      // This ensures the overlay is visible before the content remounts
+                      setTimeout(() => {
+                        setDashboardRefreshKey(prev => prev + 1);
+                      }, 100);
+
+                      // Clear the switching overlay after content loads
+                      setTimeout(() => {
+                        setLocalSwitchingClub(false);
+                      }, 1500);
+                    }
                   } else {
                     // Only show loader when fetching association data from database
                     setIsTransitioning(true);
