@@ -206,12 +206,29 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
               pending += amount;
             }
 
-            if (r.membership_end_date) {
-              const dueDate = new Date(r.membership_end_date);
-              if (dueDate < now) {
-                overdue += amount;
-              } else if (dueDate <= endOfMonth) {
-                dueThisMonth += amount;
+            // For state/national associations, calculate due dates based on when remittance was created
+            // Clubs have 30 days from creation to pay
+            if (currentOrganization?.type === 'state' || currentOrganization?.type === 'national') {
+              if (r.created_at) {
+                const createdDate = new Date(r.created_at);
+                const dueDate = new Date(createdDate);
+                dueDate.setDate(dueDate.getDate() + 30); // 30 days payment terms
+
+                if (dueDate < now) {
+                  overdue += amount;
+                } else if (dueDate <= endOfMonth) {
+                  dueThisMonth += amount;
+                }
+              }
+            } else {
+              // For clubs, use membership end date
+              if (r.membership_end_date) {
+                const dueDate = new Date(r.membership_end_date);
+                if (dueDate < now) {
+                  overdue += amount;
+                } else if (dueDate <= endOfMonth) {
+                  dueThisMonth += amount;
+                }
               }
             }
           }

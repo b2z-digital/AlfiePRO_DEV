@@ -648,10 +648,10 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
           </div>
         </div>
-        <div className="bg-orange-900/20 border border-orange-600/30 rounded-lg p-4">
+        <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-600/20">
-              <Users size={20} className="text-orange-400" />
+            <div className="p-2 rounded-lg bg-red-600/20">
+              <Users size={20} className="text-red-400" />
             </div>
             <div>
               <p className="text-sm text-slate-400">Members Pending</p>
@@ -739,7 +739,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                           </span>
                         )}
                         {payment.allocated_amount > 0 && payment.allocated_amount < payment.total_amount && (
-                          <span className="px-2 py-0.5 bg-orange-600/20 text-orange-300 text-xs font-medium rounded-full">
+                          <span className="px-2 py-0.5 bg-red-600/20 text-red-300 text-xs font-medium rounded-full">
                             Partially Allocated
                           </span>
                         )}
@@ -810,11 +810,11 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
         </div>
 
         {/* RIGHT: Members Requiring Payment */}
-        <div className="bg-gradient-to-br from-orange-900/10 to-transparent border-2 border-orange-600/30 rounded-xl p-5">
+        <div className="bg-gradient-to-br from-red-900/10 to-transparent border-2 border-red-600/30 rounded-xl p-5">
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-orange-600/20">
-                <AlertCircle size={22} className="text-orange-400" />
+              <div className="p-2 rounded-lg bg-red-600/20">
+                <AlertCircle size={22} className="text-red-400" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Members Requiring Payment</h3>
@@ -823,14 +823,14 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
 
             {/* Info Card */}
-            <div className="mt-4 p-3 rounded-lg bg-orange-600/10 border border-orange-600/30">
+            <div className="mt-4 p-3 rounded-lg bg-red-600/10 border border-red-600/30">
               <div className="flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-orange-600/20 flex-shrink-0">
-                  <Users className="w-4 h-4 text-orange-400" />
+                <div className="p-1.5 rounded-lg bg-red-600/20 flex-shrink-0">
+                  <Users className="w-4 h-4 text-red-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-orange-200 font-medium mb-1">Awaiting Reconciliation</p>
-                  <p className="text-xs text-orange-300/80">
+                  <p className="text-sm text-red-200 font-medium mb-1">Awaiting Reconciliation</p>
+                  <p className="text-xs text-red-300/80">
                     These members need payment reconciliation. Click a payment on the left to match with these members.
                   </p>
                 </div>
@@ -849,7 +849,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
               {clubGroups.map(group => (
                 <div
                   key={group.club_id}
-                  className="rounded-lg border-2 border-slate-600/70 bg-slate-800/40 overflow-hidden hover:border-orange-500/50 transition-all"
+                  className="rounded-lg border-2 border-slate-600/70 bg-slate-800/40 overflow-hidden hover:border-red-500/50 transition-all"
                 >
                   {/* Club Header */}
                   <div
@@ -874,7 +874,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-slate-400 mb-1">Outstanding</p>
-                        <p className="text-lg font-semibold text-orange-400">
+                        <p className="text-lg font-semibold text-red-400">
                           ${group.total_amount.toFixed(2)}
                         </p>
                       </div>
@@ -1219,8 +1219,8 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                   {reconcileOption === 'existing' && (
                     <div className="mt-4">
                       {payments.length === 0 ? (
-                        <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30">
-                          <p className="text-sm text-orange-300">
+                        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                          <p className="text-sm text-red-300">
                             No payments available. Please create a new payment instead.
                           </p>
                         </div>

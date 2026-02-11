@@ -523,7 +523,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
   const loadPaymentMembers = async (payment: PaymentBatch) => {
     try {
-      // Load all remittances that match this payment
+      // Load all remittances that match this payment reference
       const { data, error } = await supabase
         .from('membership_remittances')
         .select(`
@@ -543,10 +543,8 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
             name
           )
         `)
-        .eq('club_id', payment.from_club_id)
-        .eq('club_to_state_paid_date', payment.payment_date)
-        .eq('club_to_state_status', 'paid')
-        .eq('bulk_payment', true);
+        .eq('club_to_state_payment_reference', payment.payment_reference)
+        .eq('club_to_state_status', 'paid');
 
       if (error) throw error;
 
@@ -1086,9 +1084,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <AlertTriangle size={14} className="text-orange-400" />
+                                <AlertTriangle size={14} className="text-red-400" />
                                 <span className="text-slate-400">Outstanding</span>
-                                <span className="text-orange-400 font-semibold">
+                                <span className="text-red-400 font-semibold">
                                   ${club.total_outstanding.toFixed(2)} ({club.outstanding_count})
                                 </span>
                               </div>
