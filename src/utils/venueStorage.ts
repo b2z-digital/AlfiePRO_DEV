@@ -186,10 +186,18 @@ const getAssociationVenues = async (
       return [];
     }
 
-    // Extract venues from the junction table results
-    const venues = (clubVenues || [])
+    const allVenues = (clubVenues || [])
       .map((cv: any) => cv.venues)
       .filter(Boolean) as Venue[];
+
+    const seen = new Set<string>();
+    const venues: Venue[] = [];
+    for (const v of allVenues) {
+      if (!seen.has(v.id)) {
+        seen.add(v.id);
+        venues.push(v);
+      }
+    }
 
     return venues;
   } catch (error) {

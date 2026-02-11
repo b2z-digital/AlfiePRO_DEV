@@ -713,6 +713,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Sailboat,
           description: 'View yacht classes sailed at the club',
           path: '/yacht-classes'
+        },
+        {
+          id: 'venues',
+          label: 'Venues',
+          icon: MapPin,
+          description: 'Manage racing venues',
+          path: '/venues'
         }
       ]
     },
@@ -910,13 +917,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             ? 'Manage documents, files, and links for clubs'
             : 'Manage documents, files, and links',
           path: '/resources'
-        },
-        {
-          id: 'venues',
-          label: 'Venues',
-          icon: MapPin,
-          description: 'Manage racing venues',
-          path: '/venues'
         },
         {
           id: 'my-garage',
