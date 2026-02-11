@@ -31,22 +31,22 @@ interface NationalReportModalProps {
   onComplete: () => void;
 }
 
-const AVAILABLE_MEMBER_FIELDS: { key: string; label: string; default: boolean }[] = [
-  { key: 'member_name', label: 'Member Name', default: true },
-  { key: 'club_name', label: 'Club', default: true },
-  { key: 'national_fee', label: 'National Fee', default: true },
-  { key: 'payment_date', label: 'Payment Date', default: true },
-  { key: 'state_fee', label: 'State Fee', default: false },
-  { key: 'membership_year', label: 'Membership Year', default: false },
-  { key: 'member_email', label: 'Email', default: false },
-  { key: 'member_phone', label: 'Phone', default: false },
-  { key: 'member_city', label: 'City', default: false },
-  { key: 'member_state', label: 'State', default: false },
-  { key: 'member_postcode', label: 'Postcode', default: false },
-  { key: 'member_country', label: 'Country', default: false },
-  { key: 'member_category', label: 'Category', default: false },
-  { key: 'membership_level', label: 'Membership Type', default: false },
-  { key: 'date_joined', label: 'Date Joined', default: false },
+const AVAILABLE_MEMBER_FIELDS: { key: string; label: string }[] = [
+  { key: 'member_name', label: 'Member Name' },
+  { key: 'club_name', label: 'Club' },
+  { key: 'national_fee', label: 'National Fee' },
+  { key: 'payment_date', label: 'Payment Date' },
+  { key: 'state_fee', label: 'State Fee' },
+  { key: 'membership_year', label: 'Membership Year' },
+  { key: 'member_email', label: 'Email' },
+  { key: 'member_phone', label: 'Phone' },
+  { key: 'member_city', label: 'City' },
+  { key: 'member_state', label: 'State' },
+  { key: 'member_postcode', label: 'Postcode' },
+  { key: 'member_country', label: 'Country' },
+  { key: 'member_category', label: 'Category' },
+  { key: 'membership_level', label: 'Membership Type' },
+  { key: 'date_joined', label: 'Date Joined' },
 ];
 
 export const NationalReportModal: React.FC<NationalReportModalProps> = ({
@@ -70,7 +70,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
   const [lastReportDate, setLastReportDate] = useState<string | null>(null);
   const [previouslyReportedIds, setPreviouslyReportedIds] = useState<Set<string>>(new Set());
   const [csvFields, setCsvFields] = useState<Set<string>>(
-    new Set(AVAILABLE_MEMBER_FIELDS.filter(f => f.default).map(f => f.key))
+    new Set(AVAILABLE_MEMBER_FIELDS.map(f => f.key))
   );
   const [showFieldSelector, setShowFieldSelector] = useState(false);
 
@@ -107,14 +107,14 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
           id,
           state_contribution_amount,
           national_contribution_amount,
-          club_to_state_status,
-          club_to_state_paid_date,
+          state_to_national_status,
+          state_to_national_paid_date,
           membership_year,
           members!inner(first_name, last_name, email, phone, city, state, postcode, country, category, membership_level, date_joined),
           clubs!inner(name)
         `)
         .eq('state_association_id', stateAssociationId)
-        .eq('club_to_state_status', 'paid');
+        .eq('state_to_national_status', 'paid');
 
       if (selectedYear !== 'all') {
         query = query.eq('membership_year', selectedYear);
@@ -138,7 +138,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
         state_fee: Number(r.state_contribution_amount) || 0,
         national_fee: Number(r.national_contribution_amount) || 0,
         membership_year: r.membership_year,
-        payment_date: r.club_to_state_paid_date,
+        payment_date: r.state_to_national_paid_date,
         already_reported: reportedIds.has(r.id)
       }));
 
@@ -471,7 +471,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
                     <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/50">
                       <div className="flex items-center gap-2 mb-1">
                         <Users size={14} className="text-slate-400" />
-                        <span className="text-xs text-slate-400 font-medium">Total Paid Members</span>
+                        <span className="text-xs text-slate-400 font-medium">State Paid to National</span>
                       </div>
                       <p className="text-xl font-bold text-white">{members.length}</p>
                     </div>
@@ -525,8 +525,8 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
                             <Users size={16} className={reportScope === 'all' ? 'text-teal-400' : 'text-slate-400'} />
                           </div>
                           <div>
-                            <p className={`font-semibold ${reportScope === 'all' ? 'text-teal-300' : 'text-white'}`}>All Paid Members</p>
-                            <p className="text-xs text-slate-400 mt-0.5">Complete list of all members who have paid{alreadyReportedCount > 0 ? ` (includes ${alreadyReportedCount} previously reported)` : ''}</p>
+                            <p className={`font-semibold ${reportScope === 'all' ? 'text-teal-300' : 'text-white'}`}>All Remitted Members</p>
+                            <p className="text-xs text-slate-400 mt-0.5">All members remitted from State to National{alreadyReportedCount > 0 ? ` (includes ${alreadyReportedCount} previously reported)` : ''}</p>
                           </div>
                         </div>
                         <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
