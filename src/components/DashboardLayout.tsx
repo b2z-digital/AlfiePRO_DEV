@@ -1515,6 +1515,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       <StateRemittanceDashboard
                         darkMode={darkMode}
                         stateAssociationId={currentOrganization.id}
+                        stateAssociationName={currentOrganization.name}
                       />
                     ) : null}
                   </div>

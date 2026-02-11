@@ -174,11 +174,13 @@ interface ReportSubmission {
 interface StateRemittanceDashboardProps {
   darkMode: boolean;
   stateAssociationId: string;
+  stateAssociationName?: string;
 }
 
 export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> = ({
   darkMode,
-  stateAssociationId
+  stateAssociationId,
+  stateAssociationName
 }) => {
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
@@ -204,6 +206,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
   const [reportSubmissions, setReportSubmissions] = useState<ReportSubmission[]>([]);
   const [showReportModal, setShowReportModal] = useState(false);
   const [paymentHistorySubTab, setPaymentHistorySubTab] = useState<'from-clubs' | 'to-national' | 'reports'>('from-clubs');
+  const [showDeleteReportConfirm, setShowDeleteReportConfirm] = useState(false);
+  const [deleteReportTargetId, setDeleteReportTargetId] = useState<string | null>(null);
+  const [deletingReport, setDeletingReport] = useState(false);
 
   useEffect(() => {
     if (stateAssociationId) {
@@ -612,6 +617,28 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
       addNotification('error', `Failed to clear payments: ${error.message}`);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleDeleteReport = async () => {
+    if (!deleteReportTargetId) return;
+    setDeletingReport(true);
+    try {
+      const { error } = await supabase
+        .from('national_report_submissions')
+        .delete()
+        .eq('id', deleteReportTargetId);
+
+      if (error) throw error;
+
+      addNotification('success', 'Report log deleted successfully');
+      setShowDeleteReportConfirm(false);
+      setDeleteReportTargetId(null);
+      await loadReportSubmissions();
+    } catch (error: any) {
+      addNotification('error', `Failed to delete report: ${error.message}`);
+    } finally {
+      setDeletingReport(false);
     }
   };
 
@@ -1472,11 +1499,23 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                 </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-white">{report.member_count} members</p>
-                              <p className="text-xs text-slate-400">
-                                State: ${Number(report.total_state_amount).toFixed(2)} / National: ${Number(report.total_national_amount).toFixed(2)}
-                              </p>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-white">{report.member_count} members</p>
+                                <p className="text-xs text-slate-400">
+                                  State: ${Number(report.total_state_amount).toFixed(2)} / National: ${Number(report.total_national_amount).toFixed(2)}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setDeleteReportTargetId(report.id);
+                                  setShowDeleteReportConfirm(true);
+                                }}
+                                className="p-2 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"
+                                title="Delete report log"
+                              >
+                                <Trash2 size={15} />
+                              </button>
                             </div>
                           </div>
                           {report.subject && <p className="text-xs text-slate-300 mt-2 px-3 py-2 rounded-lg bg-slate-800/50">{report.subject}</p>}
@@ -1541,10 +1580,25 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
         variant="danger"
       />
 
+      <ConfirmationModal
+        isOpen={showDeleteReportConfirm}
+        onClose={() => {
+          setShowDeleteReportConfirm(false);
+          setDeleteReportTargetId(null);
+        }}
+        onConfirm={handleDeleteReport}
+        title="Delete Report Log"
+        message="Are you sure you want to delete this report log entry? This will remove the record from your report history. Members included in this report will be treated as unreported."
+        confirmText={deletingReport ? 'Deleting...' : 'Delete Report'}
+        darkMode={darkMode}
+        variant="danger"
+      />
+
       {showReportModal && (
         <NationalReportModal
           darkMode={darkMode}
           stateAssociationId={stateAssociationId}
+          stateAssociationName={stateAssociationName || ''}
           selectedYear={selectedYear}
           onClose={() => setShowReportModal(false)}
           onComplete={() => {

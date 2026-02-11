@@ -8,12 +8,39 @@ const corsHeaders = {
 
 interface ReportMember {
   member_name: string;
+  member_email?: string;
+  member_phone?: string;
+  member_city?: string;
+  member_state?: string;
+  member_postcode?: string;
+  member_country?: string;
+  member_category?: string;
+  membership_level?: string;
+  date_joined?: string | null;
   club_name: string;
   state_fee: number;
   national_fee: number;
   membership_year: number;
   payment_date: string | null;
 }
+
+const CSV_FIELD_MAP: Record<string, { label: string; getValue: (m: ReportMember) => string }> = {
+  member_name: { label: 'Member Name', getValue: (m) => m.member_name },
+  club_name: { label: 'Club', getValue: (m) => m.club_name },
+  national_fee: { label: 'National Fee', getValue: (m) => Number(m.national_fee).toFixed(2) },
+  payment_date: { label: 'Payment Date', getValue: (m) => m.payment_date ? new Date(m.payment_date).toLocaleDateString() : '' },
+  state_fee: { label: 'State Fee', getValue: (m) => Number(m.state_fee).toFixed(2) },
+  membership_year: { label: 'Membership Year', getValue: (m) => String(m.membership_year) },
+  member_email: { label: 'Email', getValue: (m) => m.member_email || '' },
+  member_phone: { label: 'Phone', getValue: (m) => m.member_phone || '' },
+  member_city: { label: 'City', getValue: (m) => m.member_city || '' },
+  member_state: { label: 'State', getValue: (m) => m.member_state || '' },
+  member_postcode: { label: 'Postcode', getValue: (m) => m.member_postcode || '' },
+  member_country: { label: 'Country', getValue: (m) => m.member_country || '' },
+  member_category: { label: 'Category', getValue: (m) => m.member_category || '' },
+  membership_level: { label: 'Membership Type', getValue: (m) => m.membership_level || '' },
+  date_joined: { label: 'Date Joined', getValue: (m) => m.date_joined ? new Date(m.date_joined).toLocaleDateString() : '' },
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -29,11 +56,13 @@ Deno.serve(async (req: Request) => {
       recipient_name,
       subject,
       notes,
+      state_association_name,
       members,
       total_state,
       total_national,
       state_association_id,
-      is_incremental
+      is_incremental,
+      csv_fields
     } = await req.json();
 
     if (!recipient_email || !subject || !members || members.length === 0) {
@@ -46,6 +75,8 @@ Deno.serve(async (req: Request) => {
     if (!sendGridApiKey || !defaultFromEmail) {
       throw new Error('Email service not configured. Please set SENDGRID_API_KEY and DEFAULT_FROM_EMAIL.');
     }
+
+    const assocName = state_association_name || 'State Association';
 
     const clubGroups: Record<string, ReportMember[]> = {};
     for (const m of members as ReportMember[]) {
@@ -108,6 +139,7 @@ Deno.serve(async (req: Request) => {
             <td style="background:linear-gradient(135deg,#0d9488 0%,#059669 100%);padding:36px 40px;text-align:center">
               <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-.3px">Member Payment Report</h1>
               <p style="margin:8px 0 0;color:rgba(255,255,255,.9);font-size:15px">${reportDate}</p>
+              <p style="margin:6px 0 0;color:rgba(255,255,255,.75);font-size:13px">From: ${assocName}</p>
               <div style="margin:14px 0 0">${reportTypeBadge}</div>
             </td>
           </tr>
@@ -118,7 +150,7 @@ Deno.serve(async (req: Request) => {
                 Dear ${recipient_name || 'National Association'},
               </p>
               <p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#475569">
-                Please find below the ${is_incremental ? 'updated' : 'complete'} list of member payments processed by our State Association.
+                Please find below the ${is_incremental ? 'updated' : 'complete'} list of member payments processed by <strong>${assocName}</strong>.
                 This report includes <strong>${members.length} member${members.length !== 1 ? 's' : ''}</strong> across
                 <strong>${Object.keys(clubGroups).length} club${Object.keys(clubGroups).length !== 1 ? 's' : ''}</strong>.
               </p>
@@ -128,14 +160,15 @@ Deno.serve(async (req: Request) => {
                   <tr>
                     <td width="50%" style="padding-right:8px">
                       <div style="background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-radius:12px;padding:20px;text-align:center;border:1px solid #a7f3d0">
-                        <p style="margin:0;font-size:28px;font-weight:700;color:#065f46">${members.length}</p>
-                        <p style="margin:4px 0 0;font-size:13px;color:#047857;font-weight:500">Total Members</p>
+                        <p style="margin:0;font-size:13px;color:#047857;font-weight:600">${assocName}</p>
+                        <p style="margin:8px 0 0;font-size:28px;font-weight:700;color:#065f46">$${Number(total_national).toFixed(2)}</p>
+                        <p style="margin:4px 0 0;font-size:13px;color:#047857;font-weight:500">Total Payment to National</p>
                       </div>
                     </td>
                     <td width="50%" style="padding-left:8px">
                       <div style="background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border-radius:12px;padding:20px;text-align:center;border:1px solid #a7f3d0">
-                        <p style="margin:0;font-size:28px;font-weight:700;color:#065f46">$${Number(total_national).toFixed(2)}</p>
-                        <p style="margin:4px 0 0;font-size:13px;color:#047857;font-weight:500">National Fees</p>
+                        <p style="margin:0;font-size:28px;font-weight:700;color:#065f46">${members.length}</p>
+                        <p style="margin:4px 0 0;font-size:13px;color:#047857;font-weight:500">Total Members</p>
                       </div>
                     </td>
                   </tr>
@@ -177,7 +210,7 @@ Deno.serve(async (req: Request) => {
 
               <div style="margin:28px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
                 <p style="margin:0;font-size:15px;color:#374151">Kind regards,</p>
-                <p style="margin:6px 0 0;font-size:15px;font-weight:600;color:#1f2937">State Association Administration</p>
+                <p style="margin:6px 0 0;font-size:15px;font-weight:600;color:#1f2937">${assocName}</p>
               </div>
             </td>
           </tr>
@@ -195,21 +228,34 @@ Deno.serve(async (req: Request) => {
 </body>
 </html>`;
 
+    const selectedFields = (csv_fields && Array.isArray(csv_fields) && csv_fields.length > 0)
+      ? csv_fields.filter((f: string) => CSV_FIELD_MAP[f])
+      : ['member_name', 'club_name', 'state_fee', 'national_fee', 'membership_year', 'payment_date'];
+
+    const csvHeaders = selectedFields.map((f: string) => CSV_FIELD_MAP[f].label);
+    const csvDataRows = (members as ReportMember[]).map((m: ReportMember) =>
+      selectedFields.map((f: string) => `"${CSV_FIELD_MAP[f].getValue(m)}"`)
+    );
+
+    const totalRow = selectedFields.map((f: string) => {
+      if (f === 'member_name') return '"TOTALS"';
+      if (f === 'national_fee') return `${Number(total_national).toFixed(2)}`;
+      if (f === 'state_fee') return `${Number(total_state).toFixed(2)}`;
+      return '""';
+    });
+
+    const memberCountRow = selectedFields.map((f: string, i: number) => {
+      if (i === 0) return '"Total Members"';
+      if (i === 1) return `${members.length}`;
+      return '""';
+    });
+
     const csvRows = [
-      ['Member Name', 'Club', 'State Fee', 'National Fee', 'Year', 'Payment Date'].join(','),
-      ...(members as ReportMember[]).map((m: ReportMember) =>
-        [
-          `"${m.member_name}"`,
-          `"${m.club_name}"`,
-          Number(m.state_fee).toFixed(2),
-          Number(m.national_fee).toFixed(2),
-          m.membership_year,
-          m.payment_date ? `"${new Date(m.payment_date).toLocaleDateString()}"` : '""'
-        ].join(',')
-      ),
+      csvHeaders.join(','),
+      ...csvDataRows.map((r: string[]) => r.join(',')),
       '',
-      `"TOTALS","",${Number(total_state).toFixed(2)},${Number(total_national).toFixed(2)},"",""`,
-      `"Total Members",${members.length},"","","",""`
+      totalRow.join(','),
+      memberCountRow.join(',')
     ].join('\n');
 
     const csvBase64 = btoa(unescape(encodeURIComponent(csvRows)));
@@ -220,7 +266,7 @@ Deno.serve(async (req: Request) => {
         to: [{ email: recipient_email, name: recipient_name || 'National Association' }],
         subject: subject
       }],
-      from: { email: defaultFromEmail, name: 'State Association - Alfie PRO' },
+      from: { email: defaultFromEmail, name: `${assocName} - Alfie PRO` },
       content: [{
         type: 'text/html',
         value: htmlContent

@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Download, Mail, Users, FileText, Clock, CheckCircle, AlertTriangle, Building2, Calendar, ChevronRight, Loader2 } from 'lucide-react';
+import { X, Send, Download, Mail, Users, FileText, Clock, CheckCircle, AlertTriangle, Building2, Calendar, ChevronRight, Loader2, Settings2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface MemberForReport {
   remittance_id: string;
   member_name: string;
+  member_email: string;
+  member_phone: string;
+  member_city: string;
+  member_state: string;
+  member_postcode: string;
+  member_country: string;
+  member_category: string;
+  membership_level: string;
+  date_joined: string | null;
   club_name: string;
   state_fee: number;
   national_fee: number;
@@ -16,13 +25,33 @@ interface MemberForReport {
 interface NationalReportModalProps {
   darkMode: boolean;
   stateAssociationId: string;
+  stateAssociationName: string;
   selectedYear: number | 'all';
   onClose: () => void;
   onComplete: () => void;
 }
 
+const AVAILABLE_MEMBER_FIELDS: { key: string; label: string; default: boolean }[] = [
+  { key: 'member_name', label: 'Member Name', default: true },
+  { key: 'club_name', label: 'Club', default: true },
+  { key: 'national_fee', label: 'National Fee', default: true },
+  { key: 'payment_date', label: 'Payment Date', default: true },
+  { key: 'state_fee', label: 'State Fee', default: false },
+  { key: 'membership_year', label: 'Membership Year', default: false },
+  { key: 'member_email', label: 'Email', default: false },
+  { key: 'member_phone', label: 'Phone', default: false },
+  { key: 'member_city', label: 'City', default: false },
+  { key: 'member_state', label: 'State', default: false },
+  { key: 'member_postcode', label: 'Postcode', default: false },
+  { key: 'member_country', label: 'Country', default: false },
+  { key: 'member_category', label: 'Category', default: false },
+  { key: 'membership_level', label: 'Membership Type', default: false },
+  { key: 'date_joined', label: 'Date Joined', default: false },
+];
+
 export const NationalReportModal: React.FC<NationalReportModalProps> = ({
   stateAssociationId,
+  stateAssociationName,
   selectedYear,
   onClose,
   onComplete
@@ -40,6 +69,10 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
   const [notes, setNotes] = useState('');
   const [lastReportDate, setLastReportDate] = useState<string | null>(null);
   const [previouslyReportedIds, setPreviouslyReportedIds] = useState<Set<string>>(new Set());
+  const [csvFields, setCsvFields] = useState<Set<string>>(
+    new Set(AVAILABLE_MEMBER_FIELDS.filter(f => f.default).map(f => f.key))
+  );
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
 
   useEffect(() => {
     loadMembersAndHistory();
@@ -77,7 +110,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
           club_to_state_status,
           club_to_state_paid_date,
           membership_year,
-          members!inner(first_name, last_name),
+          members!inner(first_name, last_name, email, phone, city, state, postcode, country, category, membership_level, date_joined),
           clubs!inner(name)
         `)
         .eq('state_association_id', stateAssociationId)
@@ -92,6 +125,15 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
       const formatted: MemberForReport[] = (remittanceData || []).map((r: any) => ({
         remittance_id: r.id,
         member_name: `${r.members.first_name} ${r.members.last_name}`,
+        member_email: r.members.email || '',
+        member_phone: r.members.phone || '',
+        member_city: r.members.city || '',
+        member_state: r.members.state || '',
+        member_postcode: r.members.postcode || '',
+        member_country: r.members.country || '',
+        member_category: r.members.category || '',
+        membership_level: r.members.membership_level || '',
+        date_joined: r.members.date_joined || null,
         club_name: r.clubs.name,
         state_fee: Number(r.state_contribution_amount) || 0,
         national_fee: Number(r.national_contribution_amount) || 0,
@@ -107,7 +149,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
       setSelectedMembers(new Set(newMembers.map(m => m.remittance_id)));
 
       const currentYear = selectedYear !== 'all' ? selectedYear : new Date().getFullYear();
-      setSubject(`Member Payment Report - ${currentYear}${reportedIds.size > 0 ? ' (Update)' : ''}`);
+      setSubject(`Member Payment Report - ${stateAssociationName || 'State Association'} - ${currentYear}${reportedIds.size > 0 ? ' (Update)' : ''}`);
     } catch (error) {
       console.error('Error loading report data:', error);
     } finally {
@@ -149,6 +191,17 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
     setSelectedMembers(next);
   };
 
+  const toggleCsvField = (key: string) => {
+    const next = new Set(csvFields);
+    if (next.has(key)) {
+      if (key === 'member_name') return;
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    setCsvFields(next);
+  };
+
   const reportMembers = reportScope === 'custom'
     ? members.filter(m => selectedMembers.has(m.remittance_id))
     : getFilteredMembers();
@@ -156,20 +209,43 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
   const totalState = reportMembers.reduce((s, m) => s + m.state_fee, 0);
   const totalNational = reportMembers.reduce((s, m) => s + m.national_fee, 0);
 
+  const getFieldValue = (m: MemberForReport, key: string): string => {
+    switch (key) {
+      case 'member_name': return m.member_name;
+      case 'club_name': return m.club_name;
+      case 'national_fee': return m.national_fee.toFixed(2);
+      case 'state_fee': return m.state_fee.toFixed(2);
+      case 'membership_year': return String(m.membership_year);
+      case 'payment_date': return m.payment_date ? new Date(m.payment_date).toLocaleDateString() : '';
+      case 'member_email': return m.member_email;
+      case 'member_phone': return m.member_phone;
+      case 'member_city': return m.member_city;
+      case 'member_state': return m.member_state;
+      case 'member_postcode': return m.member_postcode;
+      case 'member_country': return m.member_country;
+      case 'member_category': return m.member_category;
+      case 'membership_level': return m.membership_level;
+      case 'date_joined': return m.date_joined ? new Date(m.date_joined).toLocaleDateString() : '';
+      default: return '';
+    }
+  };
+
   const generateCSV = () => {
-    const headers = ['Member Name', 'Club', 'State Fee', 'National Fee', 'Year', 'Payment Date'];
-    const rows = reportMembers.map(m => [
-      m.member_name,
-      m.club_name,
-      m.state_fee.toFixed(2),
-      m.national_fee.toFixed(2),
-      String(m.membership_year),
-      m.payment_date ? new Date(m.payment_date).toLocaleDateString() : ''
-    ]);
+    const selectedFieldDefs = AVAILABLE_MEMBER_FIELDS.filter(f => csvFields.has(f.key));
+    const headers = selectedFieldDefs.map(f => f.label);
+    const rows = reportMembers.map(m =>
+      selectedFieldDefs.map(f => getFieldValue(m, f.key))
+    );
 
     rows.push([]);
-    rows.push(['TOTALS', '', totalState.toFixed(2), totalNational.toFixed(2), '', '']);
-    rows.push(['Total Members', String(reportMembers.length), '', '', '', '']);
+    const totalRow = selectedFieldDefs.map(f => {
+      if (f.key === 'member_name') return 'TOTALS';
+      if (f.key === 'national_fee') return totalNational.toFixed(2);
+      if (f.key === 'state_fee') return totalState.toFixed(2);
+      return '';
+    });
+    rows.push(totalRow);
+    rows.push(selectedFieldDefs.map((f, i) => i === 0 ? 'Total Members' : i === 1 ? String(reportMembers.length) : ''));
 
     const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
     return csv;
@@ -221,8 +297,18 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
           recipient_name: recipientName,
           subject: subject,
           notes: notes,
+          state_association_name: stateAssociationName,
           members: reportMembers.map(m => ({
             member_name: m.member_name,
+            member_email: m.member_email,
+            member_phone: m.member_phone,
+            member_city: m.member_city,
+            member_state: m.member_state,
+            member_postcode: m.member_postcode,
+            member_country: m.member_country,
+            member_category: m.member_category,
+            membership_level: m.membership_level,
+            date_joined: m.date_joined,
             club_name: m.club_name,
             state_fee: m.state_fee,
             national_fee: m.national_fee,
@@ -232,7 +318,8 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
           total_state: totalState,
           total_national: totalNational,
           state_association_id: stateAssociationId,
-          is_incremental: reportScope === 'new_since_last'
+          is_incremental: reportScope === 'new_since_last',
+          csv_fields: Array.from(csvFields)
         })
       });
 
@@ -273,9 +360,12 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
           sent_by: user?.id || null
         })
         .select('id')
-        .single();
+        .maybeSingle();
 
-      if (reportError) throw reportError;
+      if (reportError) {
+        console.error('Error saving report record:', reportError);
+        return;
+      }
 
       if (report) {
         const memberRecords = reportMembers.map(m => ({
@@ -292,7 +382,10 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
         const batchSize = 50;
         for (let i = 0; i < memberRecords.length; i += batchSize) {
           const batch = memberRecords.slice(i, i + batchSize);
-          await supabase.from('national_report_members').insert(batch);
+          const { error: batchError } = await supabase.from('national_report_members').insert(batch);
+          if (batchError) {
+            console.error('Error saving report members batch:', batchError);
+          }
         }
       }
     } catch (error) {
@@ -504,6 +597,13 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
 
               {step === 'preview' && (
                 <div className="space-y-4">
+                  {stateAssociationName && (
+                    <div className="px-4 py-3 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                      <p className="text-xs text-teal-300 font-medium">Reporting from</p>
+                      <p className="text-sm font-semibold text-white mt-0.5">{stateAssociationName}</p>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-3 gap-3">
                     <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 text-center">
                       <p className="text-2xl font-bold text-white">{reportMembers.length}</p>
@@ -657,6 +757,45 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
                     </div>
                   )}
 
+                  {/* CSV Field Selector */}
+                  <div className="rounded-xl border border-slate-700/60 overflow-hidden">
+                    <button
+                      onClick={() => setShowFieldSelector(!showFieldSelector)}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/40 hover:bg-slate-800/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Settings2 size={15} className="text-slate-400" />
+                        <span className="text-sm font-medium text-slate-300">CSV / Attachment Fields</span>
+                        <span className="px-2 py-0.5 rounded-md text-xs bg-slate-700 text-slate-400">{csvFields.size} selected</span>
+                      </div>
+                      <ChevronRight size={14} className={`text-slate-500 transition-transform ${showFieldSelector ? 'rotate-90' : ''}`} />
+                    </button>
+                    {showFieldSelector && (
+                      <div className="px-4 py-3 border-t border-slate-700/40 grid grid-cols-2 gap-2">
+                        {AVAILABLE_MEMBER_FIELDS.map(field => (
+                          <button
+                            key={field.key}
+                            onClick={() => toggleCsvField(field.key)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                              csvFields.has(field.key)
+                                ? 'bg-teal-500/10 border border-teal-500/30 text-teal-300'
+                                : 'bg-slate-800/50 border border-slate-700/40 text-slate-400 hover:border-slate-600'
+                            }`}
+                          >
+                            <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${
+                              csvFields.has(field.key)
+                                ? 'bg-teal-500 border-teal-500'
+                                : 'border-slate-600'
+                            }`}>
+                              {csvFields.has(field.key) && <CheckCircle size={8} className="text-white" />}
+                            </div>
+                            <span className="text-xs font-medium">{field.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40">
                     <div className="flex items-center justify-between">
                       <div>
@@ -664,6 +803,9 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
                         <p className="text-xs text-slate-400 mt-0.5">
                           {reportMembers.length} members across {Object.keys(clubGroups).length} clubs
                         </p>
+                        {stateAssociationName && (
+                          <p className="text-xs text-teal-400 mt-1">From: {stateAssociationName}</p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold text-teal-400">${totalNational.toFixed(2)}</p>
