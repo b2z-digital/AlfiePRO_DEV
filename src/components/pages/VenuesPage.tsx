@@ -256,7 +256,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
 
     try {
       if (selectedVenue) {
-        const updatedVenue = await updateVenue(selectedVenue.id, formData);
+        const updatedVenue = await updateVenue(selectedVenue.id, formData, selectedVenue.club_id);
         if (!updatedVenue) {
           throw new Error('Failed to update venue');
         }

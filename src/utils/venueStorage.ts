@@ -317,9 +317,9 @@ export const addVenue = async (formData: VenueFormData, explicitClubId?: string)
   }
 };
 
-export const updateVenue = async (id: string, formData: VenueFormData): Promise<Venue | null> => {
+export const updateVenue = async (id: string, formData: VenueFormData, venueClubId?: string): Promise<Venue | null> => {
   try {
-    const clubId = getCurrentClubId();
+    const clubId = venueClubId || getCurrentClubId();
     if (!clubId) throw new Error('No club selected');
     
     // Test connection first
