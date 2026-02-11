@@ -54,6 +54,7 @@ import { FinancialPositionWidget } from './widgets/FinancialPositionWidget';
 import { MembershipOverviewWidget } from './widgets/MembershipOverviewWidget';
 import { ApplicationsRenewalsWidget } from './widgets/ApplicationsRenewalsWidget';
 import { RemittanceStatusWidget } from './widgets/RemittanceStatusWidget';
+import { RemittancePaymentFlowWidget } from './widgets/RemittancePaymentFlowWidget';
 import { ActiveMembersWidget } from './widgets/ActiveMembersWidget';
 import { PendingRenewalsWidget } from './widgets/PendingRenewalsWidget';
 import { NewMembersWidget } from './widgets/NewMembersWidget';
@@ -416,6 +417,18 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     component: RemittanceStatusWidget,
     category: 'membership',
     requiredPermissions: ['admin', 'treasurer', 'membership']
+  },
+  {
+    id: 'remittance-payment-flow',
+    type: 'remittance-payment-flow',
+    name: 'Payment Flow',
+    description: 'Visual pipeline of payments from clubs through state to national association',
+    icon: ArrowRight,
+    defaultSize: '1x3',
+    component: RemittancePaymentFlowWidget,
+    category: 'finance',
+    requiredPermissions: ['admin', 'treasurer', 'membership'],
+    associationOnly: true
   },
   {
     id: 'activity-feed',

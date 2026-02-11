@@ -970,13 +970,13 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
       {/* Quick Action */}
       {nationalOwed > 0 && (
-        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+        <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-blue-300">
+              <p className="font-medium text-emerald-300">
                 Ready to pay ${nationalOwed.toFixed(2)} to National Association
               </p>
-              <p className="text-sm text-blue-400/80 mt-1">
+              <p className="text-sm text-emerald-400/80 mt-1">
                 {remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length} members ready for remittance
               </p>
             </div>
@@ -988,7 +988,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                 setSelectedIds(new Set(readyIds));
                 setSelectedTab('national-remittance');
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
             >
               <ArrowRight size={18} />
               Pay National
