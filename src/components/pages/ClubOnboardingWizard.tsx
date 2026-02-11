@@ -149,7 +149,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         })),
         currency: taxRate?.currency || 'AUD',
         taxName: taxRate?.name || club.tax_name || 'GST',
-        taxRate: taxRate ? Number(taxRate.rate) : (club.tax_rate ? Number(club.tax_rate) : 10),
+        taxRate: taxRate ? Number(taxRate.rate) * 100 : (club.tax_rate ? Number(club.tax_rate) * 100 : 10),
         taxEnabled: club.tax_enabled !== false,
         assignAdmin: false,
         adminEmail: '',
@@ -258,7 +258,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       club_introduction: formData.clubIntroduction || null,
       tax_enabled: formData.taxEnabled,
       tax_name: formData.taxName || null,
-      tax_rate: formData.taxRate,
+      tax_rate: formData.taxRate / 100,
     };
 
     const { error: clubError } = await supabase
@@ -385,14 +385,14 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       if (existingTax) {
         await supabase.from('tax_rates').update({
           name: formData.taxName,
-          rate: formData.taxRate,
+          rate: formData.taxRate / 100,
           currency: formData.currency,
         }).eq('id', existingTax.id);
       } else {
         await supabase.from('tax_rates').insert({
           club_id: id,
           name: formData.taxName,
-          rate: formData.taxRate,
+          rate: formData.taxRate / 100,
           currency: formData.currency,
           is_default: true,
           is_active: true,
