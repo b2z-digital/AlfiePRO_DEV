@@ -943,7 +943,9 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
       addNotification('success', `Membership fee updated to $${membershipFeePerMember}. This rate will apply to all new renewals from today forward.`);
     } catch (err) {
       console.error('Error saving membership fee:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save membership fee');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save membership fee';
+      setError(errorMessage);
+      addNotification('error', `Failed to save: ${errorMessage}`);
     } finally {
       setSavingMembership(false);
     }
