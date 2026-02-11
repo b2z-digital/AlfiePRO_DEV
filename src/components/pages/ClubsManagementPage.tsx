@@ -8,6 +8,14 @@ import { loadGoogleMaps } from '../../utils/googleMaps';
 
 import { useNotification } from '../../contexts/NotificationContext';
 
+interface SailingDay {
+  id: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  boat_class_name?: string;
+}
+
 interface Club {
   id: string;
   name: string;
@@ -19,6 +27,7 @@ interface Club {
   pending_applications?: number;
   pending_payments?: number;
   boat_classes?: string[];
+  sailing_days?: SailingDay[];
   upcoming_events?: number;
   recent_results?: number;
   default_venue?: {
@@ -179,6 +188,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             applicationsResult,
             paymentsResult,
             boatClassesResult,
+            sailingDaysResult,
             upcomingSingleEventsResult,
             upcomingSeriesRoundsResult,
             recentSingleResultsResult,
@@ -215,6 +225,21 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                 boat_classes(name)
               `)
               .eq('club_id', club.id),
+
+            // Sailing days for this club
+            supabase
+              .from('club_sailing_days')
+              .select(`
+                id,
+                day_of_week,
+                start_time,
+                end_time,
+                boat_class_id,
+                boat_classes(name)
+              `)
+              .eq('club_id', club.id)
+              .eq('is_active', true)
+              .order('day_of_week'),
 
             // Upcoming single events (future events from quick_races)
             supabase
@@ -260,6 +285,14 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             .map((b: any) => b.boat_classes?.name)
             .filter(Boolean);
 
+          const sailingDays = (sailingDaysResult.data || []).map((sd: any) => ({
+            id: sd.id,
+            day_of_week: sd.day_of_week,
+            start_time: sd.start_time,
+            end_time: sd.end_time,
+            boat_class_name: sd.boat_classes?.name || null
+          }));
+
           // Log all query results for debugging
           console.log(`[${club.name}] Query results:`, {
             upcomingSingleEvents: upcomingSingleEventsResult.count,
@@ -293,6 +326,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             pending_applications: applicationsResult.count || 0,
             pending_payments: pendingPaymentAmount,
             boat_classes: uniqueBoatClasses,
+            sailing_days: sailingDays,
             upcoming_events: totalUpcomingEvents,
             recent_results: totalRecentResults,
             default_venue: defaultVenue ? {
@@ -1056,16 +1090,43 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                   </div>
                 </div>
 
-                {/* Club Introduction - fixed height area */}
+                {/* Sailing Days - fixed height area */}
                 <div className="mb-3 min-h-[40px]">
-                  {club.club_introduction ? (
-                    <p className={`text-sm line-clamp-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {club.club_introduction}
-                    </p>
+                  {club.sailing_days && club.sailing_days.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Calendar size={14} className="text-blue-400" />
+                        <span className="text-xs font-medium text-blue-400">REGULAR SAILING</span>
+                      </div>
+                      {club.sailing_days.slice(0, 2).map((day) => (
+                        <div key={day.id} className="flex items-center gap-2 text-xs">
+                          <Clock size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                          <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                            {day.day_of_week}
+                          </span>
+                          <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
+                            {day.start_time.substring(0, 5)} - {day.end_time.substring(0, 5)}
+                          </span>
+                          {day.boat_class_name && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs">
+                              {day.boat_class_name}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {club.sailing_days.length > 2 && (
+                        <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                          +{club.sailing_days.length - 2} more
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <p className={`text-sm italic ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                      No description
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className={darkMode ? 'text-slate-600' : 'text-slate-400'} />
+                      <p className={`text-xs italic ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                        No sailing days defined
+                      </p>
+                    </div>
                   )}
                 </div>
 
