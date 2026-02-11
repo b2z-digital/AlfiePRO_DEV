@@ -6,6 +6,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import { AvatarCropModal } from '../../ui/AvatarCropModal';
 import imageCompression from 'browser-image-compression';
+import { loadGoogleMaps } from '../../../utils/googleMaps';
 
 interface ProfileSetupStepProps {
   darkMode: boolean;
@@ -25,6 +26,18 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   const [firstName, setFirstName] = useState(formData.firstName || '');
   const [lastName, setLastName] = useState(formData.lastName || '');
   const [phone, setPhone] = useState(formData.phone || '');
+
+  const formatPhoneNumber = (value: string): string => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 4) return numbers;
+    if (numbers.length <= 7) return `${numbers.slice(0, 4)} ${numbers.slice(4)}`;
+    return `${numbers.slice(0, 4)} ${numbers.slice(4, 7)} ${numbers.slice(7, 10)}`;
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    setPhone(formatted);
+  };
   const [street, setStreet] = useState(formData.street || '');
   const [city, setCity] = useState(formData.city || '');
   const [state, setState] = useState(formData.state || 'NSW');
@@ -34,6 +47,8 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   useEffect(() => {
     const fetchMemberAvatar = async () => {
@@ -63,6 +78,58 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
 
     fetchMemberAvatar();
   }, [user?.email]);
+
+  useEffect(() => {
+    loadGoogleMaps(() => {
+      if (!addressInputRef.current) return;
+
+      const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
+        componentRestrictions: { country: 'au' },
+        fields: ['address_components', 'formatted_address'],
+        types: ['address'],
+      });
+
+      autocompleteRef.current = autocomplete;
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (!place.address_components) return;
+
+        let streetNumber = '';
+        let streetName = '';
+        let suburb = '';
+        let stateValue = '';
+        let postcodeValue = '';
+
+        place.address_components.forEach((component) => {
+          const types = component.types;
+          if (types.includes('street_number')) {
+            streetNumber = component.long_name;
+          } else if (types.includes('route')) {
+            streetName = component.long_name;
+          } else if (types.includes('locality') || types.includes('postal_town')) {
+            suburb = component.long_name;
+          } else if (types.includes('administrative_area_level_1')) {
+            stateValue = component.short_name;
+          } else if (types.includes('postal_code')) {
+            postcodeValue = component.long_name;
+          }
+        });
+
+        const fullStreet = `${streetNumber} ${streetName}`.trim();
+        setStreet(fullStreet);
+        setCity(suburb);
+        setState(stateValue);
+        setPostcode(postcodeValue);
+      });
+    });
+
+    return () => {
+      if (autocompleteRef.current) {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, []);
 
   const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -239,13 +306,14 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => handlePhoneChange(e.target.value)}
               className={`w-full px-4 py-3 rounded-lg ${
                 darkMode
                   ? 'bg-slate-700 text-white border-slate-600'
                   : 'bg-white text-slate-900 border-slate-300'
               } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               placeholder="0412 345 678"
+              maxLength={12}
             />
           </div>
 
@@ -255,6 +323,22 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
             </h3>
 
             <div className="space-y-2 sm:space-y-3">
+              <div>
+                <label className={`block text-xs mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Start typing your address
+                </label>
+                <input
+                  ref={addressInputRef}
+                  type="text"
+                  placeholder="Start typing your address..."
+                  className={`w-full px-4 py-2 rounded-lg ${
+                    darkMode
+                      ? 'bg-slate-700 text-white border-slate-600'
+                      : 'bg-white text-slate-900 border-slate-300'
+                  } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                />
+              </div>
+
               <input
                 type="text"
                 value={street}

@@ -19,6 +19,18 @@ export const EmergencyContactStep: React.FC<EmergencyContactStepProps> = ({
   const [phone, setPhone] = useState(formData.emergencyContactPhone || '');
   const [relationship, setRelationship] = useState(formData.emergencyContactRelationship || '');
 
+  const formatPhoneNumber = (value: string): string => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 4) return numbers;
+    if (numbers.length <= 7) return `${numbers.slice(0, 4)} ${numbers.slice(4)}`;
+    return `${numbers.slice(0, 4)} ${numbers.slice(4, 7)} ${numbers.slice(7, 10)}`;
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhoneNumber(value);
+    setPhone(formatted);
+  };
+
   const handleContinue = () => {
     if (!name || !phone || !relationship) {
       alert('Please fill in all emergency contact fields');
@@ -91,13 +103,14 @@ export const EmergencyContactStep: React.FC<EmergencyContactStepProps> = ({
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => handlePhoneChange(e.target.value)}
               className={`w-full px-4 py-3 rounded-lg ${
                 darkMode
                   ? 'bg-slate-700 text-white border-slate-600'
                   : 'bg-white text-slate-900 border-slate-300'
               } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               placeholder="0412 345 678"
+              maxLength={12}
             />
           </div>
 

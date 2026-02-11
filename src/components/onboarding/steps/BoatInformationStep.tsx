@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowRight, ArrowLeft, Plus, Trash2, Anchor } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowRight, ArrowLeft, Plus, Trash2, Anchor, ChevronDown, Check } from 'lucide-react';
 import { OnboardingData } from '../OnboardingWizard';
 import { supabase } from '../../../utils/supabase';
 
@@ -27,8 +27,30 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
   );
   const [skipBoats, setSkipBoats] = useState(false);
 
-  // Boat types as defined in the system
-  const boatTypes = ['DF65', 'DF95', '10R', 'IOM', 'Marblehead', 'A Class', 'RC Laser'];
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.boat-dropdown')) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Boat types as defined in the system with emojis
+  const boatTypes = [
+    { name: 'DF65', emoji: '⛵' },
+    { name: 'DF95', emoji: '⛵' },
+    { name: '10R', emoji: '🛥️' },
+    { name: 'IOM', emoji: '⛵' },
+    { name: 'Marblehead', emoji: '⛵' },
+    { name: 'A Class', emoji: '🚤' },
+    { name: 'RC Laser', emoji: '⛵' }
+  ];
+
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
 
   const addBoat = () => {
     setBoats([...boats, { type: '', sailNumber: '', hullName: '' }]);
@@ -168,26 +190,71 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                <div>
+                <div className="relative boat-dropdown">
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Boat Type / Class
                   </label>
-                  <select
-                    value={boat.type}
-                    onChange={(e) => updateBoat(index, 'type', e.target.value)}
-                    className={`w-full px-4 py-3 rounded-lg ${
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === index ? null : index)}
+                    className={`w-full px-4 py-3 rounded-lg flex items-center justify-between ${
                       darkMode
                         ? 'bg-slate-700 text-white border-slate-600'
                         : 'bg-white text-slate-900 border-slate-300'
-                    } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    } border hover:border-blue-500 transition-colors`}
                   >
-                    <option value="">Select a boat type...</option>
-                    {boatTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
+                    <span className="flex items-center gap-2">
+                      {boat.type ? (
+                        <>
+                          <span className="text-xl">{boatTypes.find(t => t.name === boat.type)?.emoji}</span>
+                          <span>{boat.type}</span>
+                        </>
+                      ) : (
+                        <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                          Select a boat type...
+                        </span>
+                      )}
+                    </span>
+                    <ChevronDown
+                      className={`w-5 h-5 transition-transform ${openDropdown === index ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {openDropdown === index && (
+                    <div className={`absolute z-50 w-full mt-2 rounded-lg shadow-xl border overflow-hidden ${
+                      darkMode
+                        ? 'bg-slate-700 border-slate-600'
+                        : 'bg-white border-slate-200'
+                    }`}>
+                      <div className="max-h-60 overflow-y-auto">
+                        {boatTypes.map((type) => (
+                          <button
+                            key={type.name}
+                            type="button"
+                            onClick={() => {
+                              updateBoat(index, 'type', type.name);
+                              setOpenDropdown(null);
+                            }}
+                            className={`w-full px-4 py-3 flex items-center gap-3 transition-colors ${
+                              boat.type === type.name
+                                ? darkMode
+                                  ? 'bg-blue-600/20 text-blue-400'
+                                  : 'bg-blue-50 text-blue-600'
+                                : darkMode
+                                  ? 'hover:bg-slate-600 text-white'
+                                  : 'hover:bg-slate-50 text-slate-900'
+                            }`}
+                          >
+                            <span className="text-2xl">{type.emoji}</span>
+                            <span className="flex-1 text-left">{type.name}</span>
+                            {boat.type === type.name && (
+                              <Check className="w-5 h-5" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
