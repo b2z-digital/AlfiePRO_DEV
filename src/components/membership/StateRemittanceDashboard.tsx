@@ -1,11 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import { SimpleReconciliationTab } from './SimpleReconciliationTab';
 import { Avatar } from '../ui/Avatar';
+
+interface DropdownOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
+const AppDropdown: React.FC<{
+  value: string;
+  options: DropdownOption[];
+  onChange: (value: string) => void;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  minWidth?: number;
+}> = ({ value, options, onChange, icon, placeholder = 'Select...', minWidth = 160 }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, minWidth) });
+  }, [minWidth]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onClickOut = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePos();
+    document.addEventListener('mousedown', onClickOut);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onClickOut);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePos]);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          bg-slate-800/80 text-slate-200 border border-slate-700/60
+          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
+          cursor-pointer
+        `}
+        style={{ minWidth }}
+      >
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
+          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+            {selected ? selected.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
+          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+        >
+          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`
+                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
+                `}
+              >
+                <div className="flex items-center gap-2.5">
+                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
+                  <span>{opt.label}</span>
+                </div>
+                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 interface ClubSummary {
   club_id: string;
@@ -718,23 +824,24 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           {/* Clubs Tab */}
           {selectedTab === 'clubs' && (
             <div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Year
-                </label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                  className="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
+              <div className="mb-5">
+                <AppDropdown
+                  value={String(selectedYear)}
+                  onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+                  icon={<Calendar size={15} />}
+                  options={[
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    ...availableYears.map(year => ({
+                      value: String(year),
+                      label: String(year),
+                      icon: <Calendar size={14} className="text-blue-400" />
+                    }))
+                  ]}
+                  minWidth={160}
+                />
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {clubSummaries.length === 0 ? (
                   <div className="text-center py-12">
                     <Building2 className="mx-auto mb-4 text-slate-600" size={48} />
@@ -746,38 +853,40 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   clubSummaries.map((club) => (
                     <div
                       key={club.club_id}
-                      className="p-4 rounded-lg bg-slate-700/30 border border-slate-600/50 hover:border-slate-500/50 transition-colors"
+                      onClick={() => {
+                        setSelectedClubFilter(club.club_id);
+                        setSelectedTab('club-payments');
+                      }}
+                      className="p-4 rounded-xl bg-slate-700/30 border border-slate-600/50 hover:border-blue-500/50 hover:bg-slate-700/50 transition-all cursor-pointer group"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-white mb-2">
-                            {club.club_name}
-                          </h3>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <p className="text-slate-400">Paid</p>
-                              <p className="text-green-400 font-semibold">
-                                ${club.total_paid.toFixed(2)} ({club.paid_count} members)
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-slate-400">Outstanding</p>
-                              <p className="text-orange-400 font-semibold">
-                                ${club.total_outstanding.toFixed(2)} ({club.outstanding_count} members)
-                              </p>
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 group-hover:bg-blue-600/20 transition-colors">
+                            <Building2 size={20} className="text-blue-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white mb-1.5 group-hover:text-blue-300 transition-colors">
+                              {club.club_name}
+                            </h3>
+                            <div className="flex items-center gap-6 text-sm">
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle size={14} className="text-green-400" />
+                                <span className="text-slate-400">Paid</span>
+                                <span className="text-green-400 font-semibold">
+                                  ${club.total_paid.toFixed(2)} ({club.paid_count})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <AlertTriangle size={14} className="text-orange-400" />
+                                <span className="text-slate-400">Outstanding</span>
+                                <span className="text-orange-400 font-semibold">
+                                  ${club.total_outstanding.toFixed(2)} ({club.outstanding_count})
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setSelectedClubFilter(club.club_id);
-                            setSelectedTab('club-payments');
-                          }}
-                          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2"
-                        >
-                          <Eye size={18} />
-                          View Details
-                        </button>
+                        <ChevronRight size={20} className="text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
                     </div>
                   ))
@@ -831,45 +940,42 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
               )}
 
               {/* Filters */}
-              <div className="flex gap-4 mb-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Year
-                  </label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All Years</option>
-                    {availableYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Club
-                  </label>
-                  <select
-                    value={selectedClubFilter}
-                    onChange={(e) => setSelectedClubFilter(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All Clubs</option>
-                    {uniqueClubs.map(club => (
-                      <option key={club.id} value={club.id}>{club.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-                  >
-                    {selectedIds.size === remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length ? 'Deselect All' : 'Select All Ready'}
-                  </button>
-                </div>
+              <div className="flex items-center gap-3 mb-5 flex-wrap">
+                <AppDropdown
+                  value={String(selectedYear)}
+                  onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+                  icon={<Calendar size={15} />}
+                  options={[
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    ...availableYears.map(year => ({
+                      value: String(year),
+                      label: String(year),
+                      icon: <Calendar size={14} className="text-blue-400" />
+                    }))
+                  ]}
+                  minWidth={160}
+                />
+                <AppDropdown
+                  value={selectedClubFilter}
+                  onChange={(v) => setSelectedClubFilter(v)}
+                  icon={<Building2 size={15} />}
+                  options={[
+                    { value: 'all', label: 'All Clubs', icon: <Building2 size={14} className="text-slate-400" /> },
+                    ...uniqueClubs.map(club => ({
+                      value: club.id,
+                      label: club.name,
+                      icon: <Building2 size={14} className="text-blue-400" />
+                    }))
+                  ]}
+                  minWidth={200}
+                />
+                <button
+                  onClick={toggleSelectAll}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 hover:border-slate-600 text-sm font-medium transition-all flex items-center gap-2"
+                >
+                  <CheckSquare size={15} className="text-slate-400" />
+                  {selectedIds.size === remittances.filter(r => r.club_to_state_status === 'paid' && r.state_to_national_status === 'pending').length ? 'Deselect All' : 'Select All Ready'}
+                </button>
               </div>
 
               {/* Members Table */}
@@ -983,20 +1089,21 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                 )}
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Year
-                </label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                  className="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
+              <div className="mb-5">
+                <AppDropdown
+                  value={String(selectedYear)}
+                  onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+                  icon={<Calendar size={15} />}
+                  options={[
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    ...availableYears.map(year => ({
+                      value: String(year),
+                      label: String(year),
+                      icon: <Calendar size={14} className="text-blue-400" />
+                    }))
+                  ]}
+                  minWidth={160}
+                />
               </div>
 
               {paymentBatches.length === 0 ? (

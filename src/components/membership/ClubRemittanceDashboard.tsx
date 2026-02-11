@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet, AlertTriangle, ChevronDown, Calendar, Filter } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -13,6 +14,111 @@ import {
   MembershipRemittance,
   ClubOutstandingTotal
 } from '../../utils/remittanceStorage';
+
+interface ClubDropdownOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
+const ClubAppDropdown: React.FC<{
+  value: string;
+  options: ClubDropdownOption[];
+  onChange: (value: string) => void;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  minWidth?: number;
+}> = ({ value, options, onChange, icon, placeholder = 'Select...', minWidth = 160 }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, minWidth) });
+  }, [minWidth]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onClickOut = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePos();
+    document.addEventListener('mousedown', onClickOut);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onClickOut);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePos]);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          bg-slate-800/80 text-slate-200 border border-slate-700/60
+          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
+          cursor-pointer
+        `}
+        style={{ minWidth }}
+      >
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
+          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+            {selected ? selected.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
+          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+        >
+          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`
+                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
+                `}
+              >
+                <div className="flex items-center gap-2.5">
+                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
+                  <span>{opt.label}</span>
+                </div>
+                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 interface ClubRemittanceDashboardProps {
   darkMode: boolean;
@@ -511,48 +617,44 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
         </div>
       )}
 
-      {/* Filters with Export Button - Slate Styling */}
+      {/* Filters with Export Button */}
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-sm font-medium mb-2 text-slate-300">
-              Year
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
-            >
-              <option value="all">All Years</option>
-              {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <ClubAppDropdown
+            value={String(selectedYear)}
+            onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+            icon={<Calendar size={15} />}
+            options={[
+              { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+              ...availableYears.map(year => ({
+                value: String(year),
+                label: String(year),
+                icon: <Calendar size={14} className="text-blue-400" />
+              }))
+            ]}
+            minWidth={160}
+          />
 
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium mb-2 text-slate-300">
-              Status
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
-            >
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-              <option value="waived">Waived</option>
-            </select>
-          </div>
+          <ClubAppDropdown
+            value={selectedStatus}
+            onChange={(v) => setSelectedStatus(v)}
+            icon={<Filter size={15} />}
+            options={[
+              { value: 'pending', label: 'Pending', icon: <Clock size={14} className="text-orange-400" /> },
+              { value: 'paid', label: 'Paid', icon: <CheckCircle size={14} className="text-green-400" /> },
+              { value: 'overdue', label: 'Overdue', icon: <AlertTriangle size={14} className="text-red-400" /> },
+              { value: 'waived', label: 'Waived', icon: <X size={14} className="text-slate-400" /> }
+            ]}
+            minWidth={160}
+          />
 
           <button
             onClick={handleExport}
             disabled={remittances.length === 0}
-            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2 border ${
               remittances.length === 0
-                ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed'
-                : 'bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white'
+                ? 'bg-slate-800/80 border-slate-700/60 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-800/80 border-slate-700/60 hover:bg-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white'
             }`}
           >
             <Download className="w-4 h-4" />
@@ -850,18 +952,20 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Payment Method
                   </label>
-                  <select
+                  <ClubAppDropdown
                     value={bulkPaymentDetails.paymentMethod}
-                    onChange={(e) => setBulkPaymentDetails({...bulkPaymentDetails, paymentMethod: e.target.value})}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="credit_card">Credit Card</option>
-                    <option value="debit_card">Debit Card</option>
-                    <option value="cash">Cash</option>
-                    <option value="check">Check</option>
-                    <option value="other">Other</option>
-                  </select>
+                    onChange={(v) => setBulkPaymentDetails({...bulkPaymentDetails, paymentMethod: v})}
+                    icon={<Wallet size={15} />}
+                    options={[
+                      { value: 'bank_transfer', label: 'Bank Transfer', icon: <ArrowUpRight size={14} className="text-blue-400" /> },
+                      { value: 'credit_card', label: 'Credit Card', icon: <Wallet size={14} className="text-green-400" /> },
+                      { value: 'debit_card', label: 'Debit Card', icon: <Wallet size={14} className="text-teal-400" /> },
+                      { value: 'cash', label: 'Cash', icon: <DollarSign size={14} className="text-yellow-400" /> },
+                      { value: 'check', label: 'Check', icon: <CheckCircle size={14} className="text-slate-400" /> },
+                      { value: 'other', label: 'Other', icon: <Clock size={14} className="text-slate-400" /> }
+                    ]}
+                    minWidth={220}
+                  />
                 </div>
 
                 <div>
