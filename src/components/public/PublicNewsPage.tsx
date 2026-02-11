@@ -31,6 +31,28 @@ const getClubInitials = (clubName: string): string => {
     .slice(0, 3);
 };
 
+// Helper function to get the full public URL for article images
+const getArticleImageUrl = (coverImage?: string): string => {
+  if (!coverImage) return DEFAULT_COVER_IMAGE;
+
+  // If it's already a full URL (http:// or https://), return as-is
+  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    return coverImage;
+  }
+
+  // If it's a relative path starting with /, it's a local public file
+  if (coverImage.startsWith('/')) {
+    return coverImage;
+  }
+
+  // Otherwise, it's a storage path that needs to be converted to a public URL
+  const { data } = supabase.storage
+    .from('article-images')
+    .getPublicUrl(coverImage);
+
+  return data.publicUrl || DEFAULT_COVER_IMAGE;
+};
+
 export const PublicNewsPage: React.FC = () => {
   const { clubId, buildPublicUrl } = usePublicNavigation();
   const [club, setClub] = useState<Club | null>(null);
@@ -186,7 +208,7 @@ export const PublicNewsPage: React.FC = () => {
             {filteredArticles.map((article) => (
               <article key={article.id} className="bg-white rounded-sm overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
                 <div className="relative h-56 overflow-hidden">
-                  <img src={article.cover_image || DEFAULT_COVER_IMAGE} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={getArticleImageUrl(article.cover_image)} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 </div>
                 <div className="p-6">
                   <div className="flex items-center text-xs text-gray-500 mb-3">

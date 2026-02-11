@@ -11,6 +11,28 @@ import { usePermissions } from '../hooks/usePermissions';
 
 const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
 
+// Helper function to get the full public URL for article images
+const getArticleImageUrl = (coverImage?: string): string => {
+  if (!coverImage) return DEFAULT_COVER_IMAGE;
+
+  // If it's already a full URL (http:// or https://), return as-is
+  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    return coverImage;
+  }
+
+  // If it's a relative path starting with /, it's a local public file
+  if (coverImage.startsWith('/')) {
+    return coverImage;
+  }
+
+  // Otherwise, it's a storage path that needs to be converted to a public URL
+  const { data } = supabase.storage
+    .from('article-images')
+    .getPublicUrl(coverImage);
+
+  return data.publicUrl || DEFAULT_COVER_IMAGE;
+};
+
 const NewsPage: React.FC = () => {
   const { currentClub, currentOrganization, user } = useAuth();
   const { can } = usePermissions();
@@ -361,7 +383,7 @@ const NewsPage: React.FC = () => {
               >
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={article.cover_image || DEFAULT_COVER_IMAGE}
+                    src={getArticleImageUrl(article.cover_image)}
                     alt={article.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
@@ -477,7 +499,7 @@ const NewsPage: React.FC = () => {
                 <div className="flex items-center gap-4 p-4">
                   <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden">
                     <img
-                      src={article.cover_image || DEFAULT_COVER_IMAGE}
+                      src={getArticleImageUrl(article.cover_image)}
                       alt={article.title}
                       className="w-full h-full object-cover"
                     />

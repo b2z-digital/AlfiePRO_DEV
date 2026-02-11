@@ -11,6 +11,28 @@ import { GoogleAnalytics } from '../GoogleAnalytics';
 
 const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
 
+// Helper function to get the full public URL for article images
+const getArticleImageUrl = (coverImage?: string | null): string => {
+  if (!coverImage) return DEFAULT_COVER_IMAGE;
+
+  // If it's already a full URL (http:// or https://), return as-is
+  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    return coverImage;
+  }
+
+  // If it's a relative path starting with /, it's a local public file
+  if (coverImage.startsWith('/')) {
+    return coverImage;
+  }
+
+  // Otherwise, it's a storage path that needs to be converted to a public URL
+  const { data } = supabase.storage
+    .from('article-images')
+    .getPublicUrl(coverImage);
+
+  return data.publicUrl || DEFAULT_COVER_IMAGE;
+};
+
 interface Article {
   id: string;
   title: string;
@@ -175,7 +197,7 @@ export const PublicArticleDetailPage: React.FC = () => {
         {article.cover_image && (
           <div className="w-full">
             <img
-              src={article.cover_image}
+              src={getArticleImageUrl(article.cover_image)}
               alt={article.title}
               className="w-full h-auto max-h-[600px] object-contain bg-gray-100"
             />
