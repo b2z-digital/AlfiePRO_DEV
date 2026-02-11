@@ -228,14 +228,42 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
     }
   };
 
-  const uploadImage = async (clubId: string, file: File, path: string): Promise<string | null> => {
+  const uploadImage = async (clubId: string, file: File | Blob, path: string): Promise<string | null> => {
     try {
-      const ext = file.name.split('.').pop() || 'jpg';
+      // Get file extension from the File name if available, or detect from type
+      let ext = 'jpg';
+      if (file instanceof File && file.name) {
+        const nameParts = file.name.split('.');
+        if (nameParts.length > 1) {
+          ext = nameParts.pop() || 'jpg';
+        }
+      } else if (file.type) {
+        // Extract extension from MIME type (e.g., "image/png" -> "png")
+        const mimeExt = file.type.split('/')[1];
+        if (mimeExt && mimeExt !== 'jpeg') {
+          ext = mimeExt;
+        } else if (mimeExt === 'jpeg') {
+          ext = 'jpg';
+        }
+      }
+
       const filePath = `clubs/${clubId}/${path}.${ext}`;
+
+      // Delete any existing file with different extension to avoid orphans
+      const possibleExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      for (const oldExt of possibleExts) {
+        if (oldExt !== ext) {
+          await supabase.storage
+            .from('media')
+            .remove([`clubs/${clubId}/${path}.${oldExt}`]);
+        }
+      }
+
       const { error } = await supabase.storage
         .from('media')
         .upload(filePath, file, { upsert: true });
       if (error) throw error;
+
       const { data: urlData } = supabase.storage
         .from('media')
         .getPublicUrl(filePath);
@@ -378,6 +406,8 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
     if (formData.logoFile) {
       const logoUrl = await uploadImage(id, formData.logoFile, 'logo');
       if (logoUrl) {
+        // Small delay to ensure storage is consistent
+        await new Promise(resolve => setTimeout(resolve, 100));
         await supabase.from('clubs').update({ logo: logoUrl }).eq('id', id);
       }
     }
@@ -385,6 +415,8 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
     if (formData.featuredImageFile) {
       const featuredUrl = await uploadImage(id, formData.featuredImageFile, 'featured');
       if (featuredUrl) {
+        // Small delay to ensure storage is consistent
+        await new Promise(resolve => setTimeout(resolve, 100));
         await supabase.from('clubs').update({
           featured_image_url: featuredUrl,
           cover_image_url: featuredUrl
@@ -583,6 +615,8 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
     if (formData.logoFile) {
       const logoUrl = await uploadImage(club.id, formData.logoFile, 'logo');
       if (logoUrl) {
+        // Small delay to ensure storage is consistent
+        await new Promise(resolve => setTimeout(resolve, 100));
         await supabase.from('clubs').update({ logo: logoUrl }).eq('id', club.id);
       }
     }
