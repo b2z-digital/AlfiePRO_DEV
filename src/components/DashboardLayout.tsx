@@ -798,6 +798,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/finances',
           permission: 'finance.manage'
         },
+        {
+          id: 'meetings-assoc',
+          label: 'Meetings',
+          icon: Calendar,
+          description: 'Manage association meetings',
+          path: '/meetings'
+        },
         ...(currentOrganization?.type === 'national' ? [{
           id: 'rankings',
           label: 'National Rankings',
