@@ -207,6 +207,7 @@ export const ClubSelfRegistration: React.FC<ClubSelfRegistrationProps> = ({ dark
           currency: formData.currency,
           renewal_period: t.renewal_period,
           is_active: true,
+          requires_association_fees: t.is_primary_type !== false, // Map from form data
         }));
         await supabase.from('membership_types').insert(typesToInsert);
       }

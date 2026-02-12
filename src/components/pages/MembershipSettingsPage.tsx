@@ -234,7 +234,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     description: '',
     amount: '',
     currency: 'AUD',
-    renewal_period: 'annual' as 'annual' | 'monthly' | 'quarterly' | 'lifetime'
+    renewal_period: 'annual' as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
+    requires_association_fees: true // Default to primary/full membership
   });
 
   useEffect(() => {
@@ -476,7 +477,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount,
         currency: typeFormData.currency,
         renewal_period,
-        is_active: true
+        is_active: true,
+        requires_association_fees: typeFormData.requires_association_fees
       };
       
       // Insert new type
@@ -496,7 +498,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         description: '',
         amount: '',
         currency: 'AUD',
-        renewal_period: 'annual'
+        renewal_period: 'annual',
+        requires_association_fees: true
       });
       setSuccess('Membership type added successfully');
       
@@ -511,21 +514,30 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
 
   const handleUpdateType = async () => {
     if (!currentClub?.clubId || !editingType) return;
-    
+
     try {
       setError(null);
-      
+
       // Validate form
       if (!typeFormData.name) {
         setError('Name is required');
         return;
       }
-      
+
       // Allow $0 for lifetime memberships
       const amount = parseFloat(typeFormData.amount);
       if (isNaN(amount) || amount < 0) {
         setError('Amount must be a non-negative number');
         return;
+      }
+
+      // Prevent changing the last primary type to associate
+      if (editingType.requires_association_fees !== false && !typeFormData.requires_association_fees) {
+        const primaryTypes = membershipTypes.filter(t => t.requires_association_fees !== false);
+        if (primaryTypes.length === 1) {
+          setError('Cannot change the last Full/Primary membership to Associate. Please add another Full membership first.');
+          return;
+        }
       }
       
       // If fixed renewal mode is set, force renewal_period to match
@@ -540,7 +552,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         description: typeFormData.description || null,
         amount,
         currency: typeFormData.currency,
-        renewal_period
+        renewal_period,
+        requires_association_fees: typeFormData.requires_association_fees
       };
       
       // Update type
@@ -563,7 +576,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         description: '',
         amount: '',
         currency: 'AUD',
-        renewal_period: 'annual'
+        renewal_period: 'annual',
+        requires_association_fees: true
       });
       setSuccess('Membership type updated successfully');
       
@@ -578,30 +592,41 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
 
   const handleDeleteType = async (typeId: string) => {
     if (!currentClub?.clubId) return;
-    
+
+    // Check if this is the last primary membership type
+    const typeToDelete = membershipTypes.find(t => t.id === typeId);
+    if (typeToDelete?.requires_association_fees !== false) {
+      const primaryTypes = membershipTypes.filter(t => t.requires_association_fees !== false);
+      if (primaryTypes.length === 1) {
+        setError('Cannot delete the last Full/Primary membership type. Please add another Full membership before removing this one.');
+        setTimeout(() => setError(null), 5000);
+        return;
+      }
+    }
+
     if (!confirm('Are you sure you want to delete this membership type?')) {
       return;
     }
-    
+
     try {
       setError(null);
-      
+
       // Delete type
       const { error: deleteError } = await supabase
         .from('membership_types')
         .delete()
         .eq('id', typeId)
         .eq('club_id', currentClub.clubId);
-      
+
       if (deleteError) throw deleteError;
-      
+
       // Update state
       setMembershipTypes(membershipTypes.filter(type => type.id !== typeId));
       setSuccess('Membership type deleted successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
-      
+
     } catch (err) {
       console.error('Error deleting membership type:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -615,7 +640,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       description: type.description || '',
       amount: type.amount.toString(),
       currency: type.currency,
-      renewal_period: type.renewal_period as 'annual' | 'monthly' | 'quarterly' | 'lifetime'
+      renewal_period: type.renewal_period as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
+      requires_association_fees: type.requires_association_fees !== false // Default to true if not set
     });
     setShowForm(true);
   };
@@ -869,7 +895,53 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                     rows={3}
                   />
                 </div>
-                
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Membership Type <span className="text-red-400">*</span>
+                  </label>
+                  <div className="space-y-3">
+                    <label className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                      typeFormData.requires_association_fees
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="membership-type"
+                        checked={typeFormData.requires_association_fees}
+                        onChange={() => setTypeFormData(prev => ({ ...prev, requires_association_fees: true }))}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-200">Full/Primary Membership</div>
+                        <div className="text-sm text-slate-400 mt-1">
+                          Pays club + state + national fees. Recommended for new members.
+                        </div>
+                      </div>
+                    </label>
+                    <label className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                      !typeFormData.requires_association_fees
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="membership-type"
+                        checked={!typeFormData.requires_association_fees}
+                        onChange={() => setTypeFormData(prev => ({ ...prev, requires_association_fees: false }))}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-200">Associate/Secondary Membership</div>
+                        <div className="text-sm text-slate-400 mt-1">
+                          Pays club fee only. For members already in another club in your association.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
