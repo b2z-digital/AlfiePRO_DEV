@@ -150,7 +150,6 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
           first_name: application.first_name,
           last_name: application.last_name,
           full_name: `${application.first_name} ${application.last_name}`,
-          phone: application.phone,
           avatar_url: application.avatar_url,
           primary_club_id: application.club_id,
         })
