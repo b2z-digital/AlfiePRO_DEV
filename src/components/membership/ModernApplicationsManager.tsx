@@ -163,6 +163,31 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
         .eq('id', application.membership_type_id)
         .single();
 
+      // Determine if this member should pay association fees
+      // Check application_data for the recommendation
+      let shouldPayAssociationFees = true; // Default to true
+
+      if (application.application_data && typeof application.application_data === 'object') {
+        const appData = application.application_data as any;
+        if (typeof appData.should_pay_association_fees === 'boolean') {
+          shouldPayAssociationFees = appData.should_pay_association_fees;
+        }
+      }
+
+      // If not in application data, call the smart function to determine
+      if (application.application_data && (application.application_data as any).should_pay_association_fees === undefined) {
+        const { data: feeData, error: feeError } = await supabase
+          .rpc('should_pay_association_fees', {
+            p_member_id: application.user_id,
+            p_club_id: application.club_id,
+            p_relationship_type: 'primary'
+          });
+
+        if (!feeError && typeof feeData === 'boolean') {
+          shouldPayAssociationFees = feeData;
+        }
+      }
+
       // Create or update club membership record (upsert to handle duplicates)
       const expiryDate = new Date();
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
@@ -179,6 +204,7 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
           expiry_date: expiryDate.toISOString(),
           payment_status: paymentStatus,
           annual_fee_amount: parseFloat(application.membership_amount || membershipType?.amount || '0'),
+          pays_association_fees: shouldPayAssociationFees,
         }, {
           onConflict: 'member_id,club_id',
           ignoreDuplicates: false
