@@ -996,6 +996,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       <PaymentReconciliationModal
         isOpen={showPaymentReconciliation}
         onClose={() => setShowPaymentReconciliation(false)}
+        onUpdate={fetchMembers}
         clubId={currentClub?.clubId || ''}
         darkMode={darkMode}
       />
