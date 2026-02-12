@@ -143,13 +143,12 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
       // Determine payment status based on payment method
       const paymentStatus = application.payment_method === 'bank_transfer' ? 'unpaid' : 'paid';
 
-      // Update profile with member details
+      // Update profile with member details (full_name is auto-generated)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           first_name: application.first_name,
           last_name: application.last_name,
-          full_name: `${application.first_name} ${application.last_name}`,
           avatar_url: application.avatar_url,
           primary_club_id: application.club_id,
         })
