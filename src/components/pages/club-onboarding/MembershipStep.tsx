@@ -94,10 +94,10 @@ export const MembershipStep: React.FC<StepProps> = ({
         }`}>
           <Users className={`mx-auto mb-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={36} />
           <h4 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            No membership types yet
+            Add Your First Membership Type
           </h4>
           <p className={`text-sm mb-5 max-w-md mx-auto ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Every club has different membership structures. Add your membership types below, or skip this step and configure them later from the Membership Settings page.
+            <span className="font-semibold text-amber-500">Required:</span> You must add at least one Full/Primary membership type. This will be the default membership for new members joining your club.
           </p>
           <button
             onClick={addType}
@@ -258,10 +258,10 @@ export const MembershipStep: React.FC<StepProps> = ({
       )}
 
       <div className={`p-4 rounded-xl border ${
-        darkMode ? 'bg-slate-700/20 border-slate-600/30' : 'bg-blue-50 border-blue-200'
+        darkMode ? 'bg-amber-500/10 border-amber-500/30' : 'bg-amber-50 border-amber-200'
       }`}>
-        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          This step is optional. You can skip it and configure membership types later once the club admin has set up their account.
+        <p className={`text-sm font-medium ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+          <span className="text-amber-500">✓</span> Required: You must add at least one Full/Primary membership type before proceeding. This ensures new members can join and pay the required association fees.
         </p>
       </div>
     </div>

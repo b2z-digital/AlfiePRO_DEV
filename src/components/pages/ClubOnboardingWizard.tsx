@@ -214,8 +214,8 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       case 4:
         return true; // Venue step
       case 5:
-        // If they add membership types, must have names and at least one primary type
-        if (formData.membershipTypes.length === 0) return true; // Optional step
+        // REQUIRED: Must have at least one primary membership type with a name
+        if (formData.membershipTypes.length === 0) return false; // Must add at least one type
         const allHaveNames = formData.membershipTypes.every(t => t.name.trim() !== '');
         const hasPrimaryType = formData.membershipTypes.some(t => t.is_primary_type !== false);
         return allHaveNames && hasPrimaryType;
