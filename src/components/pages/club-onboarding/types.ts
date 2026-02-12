@@ -5,6 +5,7 @@ export interface MembershipTypeEntry {
   amount: number;
   currency: string;
   renewal_period: 'annual' | 'monthly' | 'quarterly' | 'lifetime';
+  is_primary_type?: boolean; // true = Full/Primary (pays association fees), false = Associate/Secondary
 }
 
 export interface SailingDayEntry {

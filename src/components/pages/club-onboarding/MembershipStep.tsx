@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Plus, Trash2, DollarSign, Calendar } from 'lucide-react';
+import { Users, Plus, Trash2, DollarSign, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { StepProps, MembershipTypeEntry } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,11 +10,19 @@ const RENEWAL_PERIODS = [
   { value: 'lifetime', label: 'Lifetime' },
 ] as const;
 
+const MEMBERSHIP_TYPES = [
+  { value: true, label: 'Full/Primary', description: 'Pays club + state + national fees' },
+  { value: false, label: 'Associate/Secondary', description: 'Pays club fee only (no association fees)' },
+] as const;
+
 export const MembershipStep: React.FC<StepProps> = ({
   formData,
   updateFormData,
   darkMode
 }) => {
+  const hasPrimaryType = formData.membershipTypes.some(t => t.is_primary_type !== false);
+  const hasAtLeastOneType = formData.membershipTypes.length > 0;
+
   const addType = () => {
     const newType: MembershipTypeEntry = {
       id: uuidv4(),
@@ -23,6 +31,7 @@ export const MembershipStep: React.FC<StepProps> = ({
       amount: 0,
       currency: formData.currency || 'AUD',
       renewal_period: 'annual',
+      is_primary_type: true, // Default to primary type
     };
     updateFormData({
       membershipTypes: [...formData.membershipTypes, newType]
@@ -38,8 +47,20 @@ export const MembershipStep: React.FC<StepProps> = ({
   };
 
   const removeType = (id: string) => {
+    const typeToRemove = formData.membershipTypes.find(t => t.id === id);
+    const remainingTypes = formData.membershipTypes.filter(t => t.id !== id);
+
+    // Prevent removing the last primary type
+    if (typeToRemove?.is_primary_type !== false && remainingTypes.length > 0) {
+      const hasOtherPrimaryType = remainingTypes.some(t => t.is_primary_type !== false);
+      if (!hasOtherPrimaryType) {
+        alert('You must have at least one Full/Primary membership type. Please add another Full membership before removing this one.');
+        return;
+      }
+    }
+
     updateFormData({
-      membershipTypes: formData.membershipTypes.filter(t => t.id !== id)
+      membershipTypes: remainingTypes
     });
   };
 
@@ -88,6 +109,36 @@ export const MembershipStep: React.FC<StepProps> = ({
         </div>
       )}
 
+      {/* Warning: No Primary Type */}
+      {hasAtLeastOneType && !hasPrimaryType && (
+        <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+          darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <h4 className="text-red-500 font-semibold text-sm mb-1">Primary Membership Required</h4>
+            <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+              You must have at least one Full/Primary membership type. This ensures new members can join your club and pay the required state/national association fees.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success: Has Primary Type */}
+      {hasAtLeastOneType && hasPrimaryType && (
+        <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+          darkMode ? 'bg-green-500/10 border-green-500/30' : 'bg-green-50 border-green-200'
+        }`}>
+          <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <h4 className="text-green-500 font-semibold text-sm mb-1">All Set!</h4>
+            <p className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
+              You have a Full/Primary membership type configured. New members will be automatically guided to this membership.
+            </p>
+          </div>
+        </div>
+      )}
+
       {formData.membershipTypes.length > 0 && (
         <div className="space-y-4">
           {formData.membershipTypes.map((type, index) => (
@@ -113,6 +164,27 @@ export const MembershipStep: React.FC<StepProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <label className={labelClass}>Membership Type <span className="text-red-500">*</span></label>
+                  <select
+                    value={type.is_primary_type === false ? 'false' : 'true'}
+                    onChange={(e) => updateType(type.id, { is_primary_type: e.target.value === 'true' })}
+                    className={`${inputClass} cursor-pointer`}
+                  >
+                    {MEMBERSHIP_TYPES.map(mt => (
+                      <option key={String(mt.value)} value={String(mt.value)}>
+                        {mt.label} - {mt.description}
+                      </option>
+                    ))}
+                  </select>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                    {type.is_primary_type !== false
+                      ? 'Recommended for new members joining your club'
+                      : 'For members who already belong to another club in your association'
+                    }
+                  </p>
+                </div>
+
                 <div>
                   <label className={labelClass}>Name <span className="text-red-500">*</span></label>
                   <input

@@ -163,6 +163,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           amount: Number(mt.amount) || 0,
           currency: mt.currency || 'AUD',
           renewal_period: mt.renewal_period || 'annual',
+          is_primary_type: mt.requires_association_fees !== false, // Map from database field
         })),
         currency: taxRate?.currency || 'AUD',
         taxName: taxRate?.name || club.tax_name || 'GST',
@@ -213,7 +214,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       case 4:
         return true; // Venue step
       case 5:
-        return formData.membershipTypes.every(t => t.name.trim() !== '');
+        // If they add membership types, must have names and at least one primary type
+        if (formData.membershipTypes.length === 0) return true; // Optional step
+        const allHaveNames = formData.membershipTypes.every(t => t.name.trim() !== '');
+        const hasPrimaryType = formData.membershipTypes.some(t => t.is_primary_type !== false);
+        return allHaveNames && hasPrimaryType;
       case 6:
         return true; // Finance step
       case 7:
@@ -490,6 +495,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           amount: mt.amount,
           currency: formData.currency,
           renewal_period: mt.renewal_period,
+          requires_association_fees: mt.is_primary_type !== false, // true for primary, false for associate
         }).eq('id', mt.id);
       } else {
         await supabase.from('membership_types').insert({
@@ -500,6 +506,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           currency: formData.currency,
           renewal_period: mt.renewal_period,
           is_active: true,
+          requires_association_fees: mt.is_primary_type !== false, // true for primary, false for associate
         });
       }
     }
@@ -664,6 +671,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         currency: formData.currency,
         renewal_period: t.renewal_period,
         is_active: true,
+        requires_association_fees: t.is_primary_type !== false, // true for primary, false for associate
       }));
       await supabase.from('membership_types').insert(typesToInsert);
     }
