@@ -17,6 +17,7 @@ import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
+import { MyClubMembershipsWidget } from '../membership/MyClubMembershipsWidget';
 
 interface MemberData {
   id: string;
@@ -347,6 +348,9 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               </button>
             )}
           </div>
+
+          {/* Multi-Club Memberships Widget */}
+          <MyClubMembershipsWidget darkMode={darkMode} />
 
           {/* Membership Status Card */}
           <div className={`rounded-xl border p-6 ${
