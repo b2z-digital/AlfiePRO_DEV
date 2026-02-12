@@ -218,12 +218,11 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
         console.log('User club link:', linkError);
       }
 
-      // Update application status
+      // Update application status (don't set member_id - it references old members table)
       const { error: updateError } = await supabase
         .from('membership_applications')
         .update({
           status: 'approved',
-          member_id: application.user_id, // Store user_id as member_id
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', application.id);
