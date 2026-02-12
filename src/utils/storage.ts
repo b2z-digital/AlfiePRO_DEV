@@ -3,10 +3,9 @@ import { supabase } from './supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { offlineStorage } from './offlineStorage';
 
-// Test Supabase connection
 const testSupabaseConnection = async (): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('members').select('count').limit(1);
+    const { error } = await supabase.from('members').select('id', { count: 'exact', head: true }).limit(1);
     return !error;
   } catch (error) {
     console.warn('Supabase connection test failed:', error);
