@@ -111,6 +111,12 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
     }
   }, [currentClub, timeRange]);
 
+  useEffect(() => {
+    if (currentClub?.clubId) {
+      fetchActionCounts();
+    }
+  }, [activeTab]);
+
   // Subscribe to realtime changes for action counts
   useEffect(() => {
     if (!currentClub?.clubId) return;
