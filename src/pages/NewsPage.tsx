@@ -9,17 +9,18 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { usePermissions } from '../hooks/usePermissions';
 
-const DEFAULT_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
+const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const FALLBACK_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
 
 const getArticleImageUrl = (coverImage?: string): string => {
-  if (!coverImage || coverImage === '/RC-Yachts-image-custom_crop.jpg') return DEFAULT_COVER_IMAGE;
+  if (!coverImage) return DEFAULT_COVER_IMAGE;
 
   if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
     return coverImage;
   }
 
   if (coverImage.startsWith('/')) {
-    return DEFAULT_COVER_IMAGE;
+    return coverImage;
   }
 
   const { data } = supabase.storage
@@ -382,7 +383,7 @@ const NewsPage: React.FC = () => {
                     src={getArticleImageUrl(article.cover_image)}
                     alt={article.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
+                    onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
 
@@ -499,7 +500,7 @@ const NewsPage: React.FC = () => {
                       src={getArticleImageUrl(article.cover_image)}
                       alt={article.title}
                       className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
                     />
                     {/* Source Label for List View */}
                     {(article.source_type || article.event_name) && (
