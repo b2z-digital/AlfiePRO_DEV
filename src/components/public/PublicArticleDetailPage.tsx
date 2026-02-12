@@ -9,23 +9,19 @@ import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { GoogleAnalytics } from '../GoogleAnalytics';
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
 
-// Helper function to get the full public URL for article images
 const getArticleImageUrl = (coverImage?: string | null): string => {
-  if (!coverImage) return DEFAULT_COVER_IMAGE;
+  if (!coverImage || coverImage === '/RC-Yachts-image-custom_crop.jpg') return DEFAULT_COVER_IMAGE;
 
-  // If it's already a full URL (http:// or https://), return as-is
   if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
     return coverImage;
   }
 
-  // If it's a relative path starting with /, it's a local public file
   if (coverImage.startsWith('/')) {
-    return coverImage;
+    return DEFAULT_COVER_IMAGE;
   }
 
-  // Otherwise, it's a storage path that needs to be converted to a public URL
   const { data } = supabase.storage
     .from('article-images')
     .getPublicUrl(coverImage);
@@ -195,11 +191,12 @@ export const PublicArticleDetailPage: React.FC = () => {
         </div>
 
         {article.cover_image && (
-          <div className="w-full">
+          <div className="w-full bg-gradient-to-br from-slate-700 to-slate-800">
             <img
               src={getArticleImageUrl(article.cover_image)}
               alt={article.title}
               className="w-full h-auto max-h-[600px] object-contain bg-gray-100"
+              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
             />
           </div>
         )}

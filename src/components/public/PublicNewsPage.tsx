@@ -20,7 +20,7 @@ interface NewsArticle {
   tags?: string[];
 }
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
 
 const getClubInitials = (clubName: string): string => {
   return clubName
@@ -31,21 +31,17 @@ const getClubInitials = (clubName: string): string => {
     .slice(0, 3);
 };
 
-// Helper function to get the full public URL for article images
 const getArticleImageUrl = (coverImage?: string): string => {
-  if (!coverImage) return DEFAULT_COVER_IMAGE;
+  if (!coverImage || coverImage === '/RC-Yachts-image-custom_crop.jpg') return DEFAULT_COVER_IMAGE;
 
-  // If it's already a full URL (http:// or https://), return as-is
   if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
     return coverImage;
   }
 
-  // If it's a relative path starting with /, it's a local public file
   if (coverImage.startsWith('/')) {
-    return coverImage;
+    return DEFAULT_COVER_IMAGE;
   }
 
-  // Otherwise, it's a storage path that needs to be converted to a public URL
   const { data } = supabase.storage
     .from('article-images')
     .getPublicUrl(coverImage);
@@ -207,8 +203,8 @@ export const PublicNewsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredArticles.map((article) => (
               <article key={article.id} className="bg-white rounded-sm overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
-                <div className="relative h-56 overflow-hidden">
-                  <img src={getArticleImageUrl(article.cover_image)} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="relative h-56 overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
+                  <img src={getArticleImageUrl(article.cover_image)} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }} />
                 </div>
                 <div className="p-6">
                   <div className="flex items-center text-xs text-gray-500 mb-3">

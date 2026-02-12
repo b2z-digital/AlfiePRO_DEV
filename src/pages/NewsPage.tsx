@@ -9,23 +9,19 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { usePermissions } from '../hooks/usePermissions';
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
 
-// Helper function to get the full public URL for article images
 const getArticleImageUrl = (coverImage?: string): string => {
-  if (!coverImage) return DEFAULT_COVER_IMAGE;
+  if (!coverImage || coverImage === '/RC-Yachts-image-custom_crop.jpg') return DEFAULT_COVER_IMAGE;
 
-  // If it's already a full URL (http:// or https://), return as-is
   if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
     return coverImage;
   }
 
-  // If it's a relative path starting with /, it's a local public file
   if (coverImage.startsWith('/')) {
-    return coverImage;
+    return DEFAULT_COVER_IMAGE;
   }
 
-  // Otherwise, it's a storage path that needs to be converted to a public URL
   const { data } = supabase.storage
     .from('article-images')
     .getPublicUrl(coverImage);
@@ -381,11 +377,12 @@ const NewsPage: React.FC = () => {
                 className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden transition-all hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-900/10 cursor-pointer group h-[500px] flex flex-col"
                 onClick={() => handleReadMore(article.id)}
               >
-                <div className="relative h-48 overflow-hidden">
+                <div className="relative h-48 overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
                   <img
                     src={getArticleImageUrl(article.cover_image)}
                     alt={article.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
 
@@ -497,11 +494,12 @@ const NewsPage: React.FC = () => {
                 onClick={() => handleReadMore(article.id)}
               >
                 <div className="flex items-center gap-4 p-4">
-                  <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden">
+                  <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
                     <img
                       src={getArticleImageUrl(article.cover_image)}
                       alt={article.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
                     />
                     {/* Source Label for List View */}
                     {(article.source_type || article.event_name) && (
