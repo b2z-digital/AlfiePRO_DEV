@@ -213,7 +213,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   ];
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
       <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
         Your Profile
       </h2>
@@ -221,7 +221,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         Tell us a bit about yourself
       </p>
 
-        <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-4 sm:space-y-6">
           <div className="flex justify-center mb-6 sm:mb-8">
             <div className="relative">
               <button

@@ -56,8 +56,8 @@ export const EmergencyContactStep: React.FC<EmergencyContactStepProps> = ({
   ];
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
+      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
             <AlertCircle className="text-red-500 w-5 h-5 sm:w-6 sm:h-6" />
           </div>

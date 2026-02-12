@@ -24,19 +24,18 @@ export const ReviewAndSubmitStep: React.FC<ReviewAndSubmitStepProps> = ({
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
-      <div className="w-full max-w-4xl mx-auto">
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-green-500 to-green-600 mb-3 sm:mb-4">
-            <CheckCircle className="text-white w-6 h-6 sm:w-8 sm:h-8" />
-          </div>
-          <h2 className={`text-2xl sm:text-3xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Review Your Application
-          </h2>
-          <p className={`text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Please review your information before submitting
-          </p>
+    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
+      <div className="text-center mb-6 sm:mb-8">
+        <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-green-500 to-green-600 mb-3 sm:mb-4">
+          <CheckCircle className="text-white w-6 h-6 sm:w-8 sm:h-8" />
         </div>
+        <h2 className={`text-2xl sm:text-3xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          Review Your Application
+        </h2>
+        <p className={`text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          Please review your information before submitting
+        </p>
+      </div>
 
         <ApplicationSummaryView
           darkMode={darkMode}
@@ -130,7 +129,6 @@ export const ReviewAndSubmitStep: React.FC<ReviewAndSubmitStepProps> = ({
             )}
           </button>
         </div>
-      </div>
     </div>
   );
 };

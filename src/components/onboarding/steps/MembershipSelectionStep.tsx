@@ -106,16 +106,15 @@ export const MembershipSelectionStep: React.FC<MembershipSelectionStepProps> = (
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
-      <div className="w-full max-w-5xl mx-auto">
-        <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Choose Your Membership
-        </h2>
-        <p className={`mb-6 sm:mb-8 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Select the membership type that best suits your needs
-        </p>
+    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
+      <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        Choose Your Membership
+      </h2>
+      <p className={`mb-6 sm:mb-8 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+        Select the membership type that best suits your needs
+      </p>
 
-        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {membershipTypes.map((type) => (
             <button
               key={type.id}
@@ -204,7 +203,6 @@ export const MembershipSelectionStep: React.FC<MembershipSelectionStepProps> = (
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
-      </div>
     </div>
   );
 };

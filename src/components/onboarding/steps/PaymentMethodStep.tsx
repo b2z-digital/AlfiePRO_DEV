@@ -62,16 +62,15 @@ export const PaymentMethodStep: React.FC<PaymentMethodStepProps> = ({
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
-      <div className="w-full max-w-3xl mx-auto">
-        <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Payment Method
-        </h2>
-        <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          How would you like to pay your membership fee?
-        </p>
+    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
+      <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        Payment Method
+      </h2>
+      <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+        How would you like to pay your membership fee?
+      </p>
 
-        <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-3 sm:space-y-4">
           {stripeEnabled && (
             <button
               onClick={() => setPaymentMethod('card')}
@@ -207,7 +206,6 @@ export const PaymentMethodStep: React.FC<PaymentMethodStepProps> = ({
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
-      </div>
     </div>
   );
 };
