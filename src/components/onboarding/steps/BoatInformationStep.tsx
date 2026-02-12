@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, Plus, Trash2, Anchor, ChevronDown, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Plus, Trash2, Anchor, ChevronDown, Check, Sailboat } from 'lucide-react';
 import { OnboardingData } from '../OnboardingWizard';
 import { supabase } from '../../../utils/supabase';
+import { BoatClass } from '../../../types/boatClass';
+import { getBoatClasses } from '../../../utils/boatClassStorage';
 
 interface BoatInformationStepProps {
   darkMode: boolean;
@@ -26,6 +28,24 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
     formData.boats.length > 0 ? formData.boats : [{ type: '', sailNumber: '', hullName: '' }]
   );
   const [skipBoats, setSkipBoats] = useState(false);
+  const [boatClasses, setBoatClasses] = useState<BoatClass[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchBoatClasses = async () => {
+      try {
+        const classes = await getBoatClasses();
+        setBoatClasses(classes);
+      } catch (error) {
+        console.error('Error fetching boat classes:', error);
+      } finally {
+        setLoadingClasses(false);
+      }
+    };
+
+    fetchBoatClasses();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -38,19 +58,6 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Boat types as defined in the system with emojis
-  const boatTypes = [
-    { name: 'DF65', emoji: '⛵' },
-    { name: 'DF95', emoji: '⛵' },
-    { name: '10R', emoji: '🛥️' },
-    { name: 'IOM', emoji: '⛵' },
-    { name: 'Marblehead', emoji: '⛵' },
-    { name: 'A Class', emoji: '🚤' },
-    { name: 'RC Laser', emoji: '⛵' }
-  ];
-
-  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
 
   const addBoat = () => {
     setBoats([...boats, { type: '', sailNumber: '', hullName: '' }]);
@@ -149,19 +156,18 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
 
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
-      <div className="w-full max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-            <Anchor className="text-blue-500 w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <h2 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Your Boat(s)
-          </h2>
+    <div className="w-full max-w-3xl mx-auto">
+      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+          <Anchor className="text-blue-500 w-5 h-5 sm:w-6 sm:h-6" />
         </div>
-        <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Tell us about the boat(s) you'll be racing
-        </p>
+        <h2 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          Your Boat(s)
+        </h2>
+      </div>
+      <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+        Tell us about the boat(s) you'll be racing
+      </p>
 
         <div className="space-y-4 sm:space-y-6">
           {boats.map((boat, index) => (
@@ -197,21 +203,30 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
                   <button
                     type="button"
                     onClick={() => setOpenDropdown(openDropdown === index ? null : index)}
+                    disabled={loadingClasses}
                     className={`w-full px-4 py-3 rounded-lg flex items-center justify-between ${
                       darkMode
                         ? 'bg-slate-700 text-white border-slate-600'
                         : 'bg-white text-slate-900 border-slate-300'
                     } border hover:border-blue-500 transition-colors`}
                   >
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-3">
                       {boat.type ? (
                         <>
-                          <span className="text-xl">{boatTypes.find(t => t.name === boat.type)?.emoji}</span>
+                          {boatClasses.find(bc => bc.name === boat.type)?.class_image ? (
+                            <img
+                              src={boatClasses.find(bc => bc.name === boat.type)?.class_image!}
+                              alt={boat.type}
+                              className="w-8 h-8 rounded object-cover"
+                            />
+                          ) : (
+                            <Sailboat className="w-8 h-8 text-blue-500" />
+                          )}
                           <span>{boat.type}</span>
                         </>
                       ) : (
                         <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
-                          Select a boat type...
+                          {loadingClasses ? 'Loading...' : 'Select a boat type...'}
                         </span>
                       )}
                     </span>
@@ -220,23 +235,23 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
                     />
                   </button>
 
-                  {openDropdown === index && (
+                  {openDropdown === index && !loadingClasses && (
                     <div className={`absolute z-50 w-full mt-2 rounded-lg shadow-xl border overflow-hidden ${
                       darkMode
                         ? 'bg-slate-700 border-slate-600'
                         : 'bg-white border-slate-200'
                     }`}>
                       <div className="max-h-60 overflow-y-auto">
-                        {boatTypes.map((type) => (
+                        {boatClasses.map((boatClass) => (
                           <button
-                            key={type.name}
+                            key={boatClass.id}
                             type="button"
                             onClick={() => {
-                              updateBoat(index, 'type', type.name);
+                              updateBoat(index, 'type', boatClass.name);
                               setOpenDropdown(null);
                             }}
                             className={`w-full px-4 py-3 flex items-center gap-3 transition-colors ${
-                              boat.type === type.name
+                              boat.type === boatClass.name
                                 ? darkMode
                                   ? 'bg-blue-600/20 text-blue-400'
                                   : 'bg-blue-50 text-blue-600'
@@ -245,9 +260,17 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
                                   : 'hover:bg-slate-50 text-slate-900'
                             }`}
                           >
-                            <span className="text-2xl">{type.emoji}</span>
-                            <span className="flex-1 text-left">{type.name}</span>
-                            {boat.type === type.name && (
+                            {boatClass.class_image ? (
+                              <img
+                                src={boatClass.class_image}
+                                alt={boatClass.name}
+                                className="w-10 h-10 rounded object-cover"
+                              />
+                            ) : (
+                              <Sailboat className="w-10 h-10 text-blue-500" />
+                            )}
+                            <span className="flex-1 text-left">{boatClass.name}</span>
+                            {boat.type === boatClass.name && (
                               <Check className="w-5 h-5" />
                             )}
                           </button>
@@ -322,27 +345,26 @@ export const BoatInformationStep: React.FC<BoatInformationStepProps> = ({
           </button>
         </div>
 
-        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between">
-          <button
-            onClick={onBack}
-            className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-              darkMode
-                ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
-            Back
-          </button>
+      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between">
+        <button
+          onClick={onBack}
+          className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+            darkMode
+              ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+        >
+          <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+          Back
+        </button>
 
-          <button
-            onClick={handleContinue}
-            className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-green-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-          >
-            Continue
-            <ArrowRight size={18} className="sm:w-5 sm:h-5" />
-          </button>
-        </div>
+        <button
+          onClick={handleContinue}
+          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-green-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+        >
+          Continue
+          <ArrowRight size={18} className="sm:w-5 sm:h-5" />
+        </button>
       </div>
     </div>
   );

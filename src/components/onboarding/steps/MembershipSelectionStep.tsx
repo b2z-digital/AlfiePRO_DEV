@@ -94,7 +94,7 @@ export const MembershipSelectionStep: React.FC<MembershipSelectionStepProps> = (
 
   if (loading) {
     return (
-      <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
+      <div>
         <div className="flex items-center justify-center">
           <Loader className="animate-spin text-blue-500 w-6 h-6 sm:w-8 sm:h-8" />
           <span className={`ml-3 text-sm sm:text-base ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -106,7 +106,7 @@ export const MembershipSelectionStep: React.FC<MembershipSelectionStepProps> = (
   }
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+    <div className="w-full max-w-3xl mx-auto">
       <div className="w-full max-w-5xl mx-auto">
         <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           Choose Your Membership

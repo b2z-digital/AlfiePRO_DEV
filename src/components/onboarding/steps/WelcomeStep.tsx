@@ -12,8 +12,7 @@ interface WelcomeStepProps {
 
 export const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext, onBack }) => {
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 lg:p-12">
-      <div className="text-center max-w-2xl mx-auto">
+    <div className="text-center max-w-2xl mx-auto">
 
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 text-white">
           Welcome to Alfie!
@@ -85,7 +84,6 @@ export const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext, onBack }) => {
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
-      </div>
     </div>
   );
 };

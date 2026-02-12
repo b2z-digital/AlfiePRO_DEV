@@ -236,7 +236,7 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
   };
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8 md:p-12">
+    <div className="w-full max-w-3xl mx-auto">
       <h2 className="text-2xl font-bold text-white mb-2">Primary Venue</h2>
       <p className="text-slate-300 mb-6">
         Where does your club primarily hold races and events? You can add more venues later.

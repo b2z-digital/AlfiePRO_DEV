@@ -367,19 +367,17 @@ export const ClubDiscoveryStep: React.FC<ClubDiscoveryStepProps> = ({
 
   if (loading) {
     return (
-      <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-12">
-        <div className="flex items-center justify-center">
-          <Loader className="animate-spin text-blue-500" size={32} />
-          <span className={`ml-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-            Loading clubs...
-          </span>
-        </div>
+      <div className="flex items-center justify-center">
+        <Loader className="animate-spin text-blue-500" size={32} />
+        <span className={`ml-3 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+          Loading clubs...
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-xl sm:rounded-2xl shadow-xl overflow-hidden">
+    <div className="w-full max-w-5xl mx-auto">
       <div className="p-3 sm:p-4 md:p-6 border-b border-slate-700">
         <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           Find Your Club

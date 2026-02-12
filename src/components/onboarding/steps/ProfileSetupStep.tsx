@@ -49,6 +49,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [addressSelected, setAddressSelected] = useState(false);
 
   useEffect(() => {
     const fetchMemberAvatar = async () => {
@@ -121,6 +122,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         setCity(suburb);
         setState(stateValue);
         setPostcode(postcodeValue);
+        setAddressSelected(true);
       });
     });
 
@@ -211,14 +213,13 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   ];
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
-      <div className="w-full max-w-3xl mx-auto">
-        <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Your Profile
-        </h2>
-        <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Tell us a bit about yourself
-        </p>
+    <div className="w-full max-w-3xl mx-auto">
+      <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+        Your Profile
+      </h2>
+      <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+        Tell us a bit about yourself
+      </p>
 
         <div className="space-y-4 sm:space-y-6">
           <div className="flex justify-center mb-6 sm:mb-8">
@@ -317,8 +318,8 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
             />
           </div>
 
-          <div className={`p-3 sm:p-4 md:p-5 rounded-lg border ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-200'}`}>
-            <h3 className={`font-medium mb-2 sm:mb-3 text-sm sm:text-base ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+          <div>
+            <h3 className={`font-medium mb-2 text-sm sm:text-base ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
               Address <span className="text-red-500">*</span>
             </h3>
 
@@ -331,7 +332,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
                   ref={addressInputRef}
                   type="text"
                   placeholder="Start typing your address..."
-                  className={`w-full px-4 py-2 rounded-lg ${
+                  className={`w-full px-4 py-3 rounded-lg ${
                     darkMode
                       ? 'bg-slate-700 text-white border-slate-600'
                       : 'bg-white text-slate-900 border-slate-300'
@@ -339,60 +340,64 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
                 />
               </div>
 
-              <input
-                type="text"
-                value={street}
-                onChange={(e) => setStreet(e.target.value)}
-                className={`w-full px-4 py-2 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-700 text-white border-slate-600'
-                    : 'bg-white text-slate-900 border-slate-300'
-                } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                placeholder="Street Address"
-              />
+              {addressSelected && (
+                <>
+                  <input
+                    type="text"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-lg ${
+                      darkMode
+                        ? 'bg-slate-700 text-white border-slate-600'
+                        : 'bg-white text-slate-900 border-slate-300'
+                    } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    placeholder="Street Address"
+                  />
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className={`w-full px-4 py-2 rounded-lg ${
-                    darkMode
-                      ? 'bg-slate-700 text-white border-slate-600'
-                      : 'bg-white text-slate-900 border-slate-300'
-                  } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                  placeholder="City"
-                />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-lg ${
+                        darkMode
+                          ? 'bg-slate-700 text-white border-slate-600'
+                          : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      placeholder="City"
+                    />
 
-                <select
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  className={`w-full px-4 py-2 rounded-lg ${
-                    darkMode
-                      ? 'bg-slate-700 text-white border-slate-600'
-                      : 'bg-white text-slate-900 border-slate-300'
-                  } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                >
-                  {australianStates.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                    <select
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-lg ${
+                        darkMode
+                          ? 'bg-slate-700 text-white border-slate-600'
+                          : 'bg-white text-slate-900 border-slate-300'
+                      } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    >
+                      {australianStates.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              <input
-                type="text"
-                value={postcode}
-                onChange={(e) => setPostcode(e.target.value)}
-                className={`w-full px-4 py-2 rounded-lg ${
-                  darkMode
-                    ? 'bg-slate-700 text-white border-slate-600'
-                    : 'bg-white text-slate-900 border-slate-300'
-                } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                placeholder="Postcode"
-                maxLength={4}
-              />
+                  <input
+                    type="text"
+                    value={postcode}
+                    onChange={(e) => setPostcode(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-lg ${
+                      darkMode
+                        ? 'bg-slate-700 text-white border-slate-600'
+                        : 'bg-white text-slate-900 border-slate-300'
+                    } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                    placeholder="Postcode"
+                    maxLength={4}
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -418,7 +423,6 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
-      </div>
 
       {selectedImageFile && (
         <AvatarCropModal

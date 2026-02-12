@@ -8,7 +8,7 @@ interface ClubWelcomeStepProps {
 
 export const ClubWelcomeStep: React.FC<ClubWelcomeStepProps> = ({ onNext, onBack }) => {
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-8 md:p-12">
+    <div className="w-full max-w-3xl mx-auto">
       <div className="text-center">
       <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
         <Building2 className="w-10 h-10 text-blue-400" />

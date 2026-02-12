@@ -24,7 +24,7 @@ export const ReviewAndSubmitStep: React.FC<ReviewAndSubmitStepProps> = ({
   };
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+    <div className="w-full max-w-3xl mx-auto">
       <div className="w-full max-w-4xl mx-auto">
         <div className="text-center mb-6 sm:mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-green-500 to-green-600 mb-3 sm:mb-4">

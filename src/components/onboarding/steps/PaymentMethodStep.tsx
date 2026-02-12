@@ -62,7 +62,7 @@ export const PaymentMethodStep: React.FC<PaymentMethodStepProps> = ({
   };
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+    <div className="w-full max-w-3xl mx-auto">
       <div className="w-full max-w-3xl mx-auto">
         <h2 className={`text-xl sm:text-2xl font-bold mb-1 sm:mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           Payment Method
