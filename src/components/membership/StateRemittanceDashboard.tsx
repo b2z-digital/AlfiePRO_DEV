@@ -845,6 +845,9 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
 
         addNotification('success', `${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} marked as paid to National`);
 
+        setLastPaidCount(selectedIds.size);
+        setShowSendReportPrompt(true);
+
       } else if (bulkStatusUpdateAction === 'mark-unpaid') {
         // Revert all selected remittances to pending
         for (const remittance of selectedRemittances) {
