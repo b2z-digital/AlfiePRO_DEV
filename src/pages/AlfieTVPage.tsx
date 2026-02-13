@@ -249,7 +249,7 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 });
 
 export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
-  const { user, currentClub, isSuperAdmin } = useAuth();
+  const { user, currentClub, currentOrganization, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const { addNotification } = useNotification();
 
@@ -281,6 +281,10 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [showSuggestChannel, setShowSuggestChannel] = useState(false);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
 
+  // Get organization ID for both clubs and associations
+  const organizationId = currentClub?.clubId || currentOrganization?.id;
+  const organizationType = currentOrganization?.type || 'club';
+
   // Stabilize the close handler to prevent unnecessary re-renders
   const handleCloseVideo = useCallback(async () => {
     // Track viewing duration before closing
@@ -300,15 +304,15 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
 
   // Load cached data immediately, then refresh in background
   useEffect(() => {
-    if (currentClub?.clubId) {
+    if (organizationId) {
       loadCachedData();
       loadContent();
     }
-  }, [currentClub?.clubId]);
+  }, [organizationId]);
 
   const loadCachedData = () => {
     try {
-      const cacheKey = `alfietv_cache_${currentClub?.clubId}`;
+      const cacheKey = `alfietv_cache_${organizationId}`;
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const data = JSON.parse(cached);
@@ -324,7 +328,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         }
       }
       // Load saved category preferences
-      const savedCategories = localStorage.getItem(`alfietv_categories_${currentClub?.clubId}`);
+      const savedCategories = localStorage.getItem(`alfietv_categories_${organizationId}`);
       if (savedCategories) {
         setSelectedCategories(JSON.parse(savedCategories));
       }
@@ -335,7 +339,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
 
   const saveCachedData = (data: any) => {
     try {
-      const cacheKey = `alfietv_cache_${currentClub?.clubId}`;
+      const cacheKey = `alfietv_cache_${organizationId}`;
       localStorage.setItem(cacheKey, JSON.stringify({
         ...data,
         timestamp: Date.now()
@@ -357,19 +361,29 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   }, [heroVideos.length]);
 
   const loadContent = async () => {
-    if (!currentClub?.clubId) {
+    if (!organizationId) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
-      // Load channels with visibility (both club-specific and global channels)
-      const { data: channelsData, error: channelsError } = await supabase
+      // Load channels with visibility
+      // For clubs: load club-specific and global channels
+      // For associations: only load global channels
+      let channelsQuery = supabase
         .from('alfie_tv_channels')
         .select('id, channel_name, channel_thumbnail, is_visible, category, is_global')
-        .or(`club_id.eq.${currentClub.clubId},is_global.eq.true`)
         .order('channel_name');
+
+      if (organizationType === 'club' && currentClub?.clubId) {
+        channelsQuery = channelsQuery.or(`club_id.eq.${currentClub.clubId},is_global.eq.true`);
+      } else {
+        // For associations, only show global channels
+        channelsQuery = channelsQuery.eq('is_global', true);
+      }
+
+      const { data: channelsData, error: channelsError } = await channelsQuery;
 
       if (channelsError) {
         console.error('Error loading channels:', channelsError);
@@ -446,7 +460,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       }
 
       // Load hero videos (featured videos for hero carousel)
-      const featured = await alfieTVStorage.getFeaturedVideos(currentClub.clubId);
+      const featured = await alfieTVStorage.getFeaturedVideos(organizationId);
       if (featured.length === 0) {
         // If no featured, get latest videos from visible channels
         const { data: latestHero } = await supabase
@@ -489,7 +503,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       setFeaturedVideos(featuredVids || []);
 
       // Load trending videos from visible channels
-      const trending = await alfieTVStorage.getTrendingVideos(currentClub.clubId, 10);
+      const trending = await alfieTVStorage.getTrendingVideos(organizationId, 10);
       setTrendingVideos(trending.filter(v => visibleChannelIds.includes(v.channel_id)));
 
       // Load personalized videos for authenticated users
