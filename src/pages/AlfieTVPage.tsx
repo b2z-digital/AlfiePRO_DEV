@@ -253,6 +253,13 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const navigate = useNavigate();
   const { addNotification } = useNotification();
 
+  // Check if user can manage AlfieTV (admin, super admin, or association admin)
+  const canManageAlfieTV = isSuperAdmin ||
+    currentClub?.role === 'admin' ||
+    currentOrganization?.role === 'admin' ||
+    currentOrganization?.type === 'state' ||
+    currentOrganization?.type === 'national';
+
   const [heroVideos, setHeroVideos] = useState<AlfieTVVideo[]>([]);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [continueWatching, setContinueWatching] = useState<any[]>([]);
@@ -1011,11 +1018,11 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                 <Search className="w-6 h-6" />
               </button>
             )}
-            {isSuperAdmin && (
+            {canManageAlfieTV && (
               <button
                 onClick={() => setCurrentView('settings')}
                 className="p-2 text-white hover:text-gray-300 transition-colors"
-                title="Channel Management (Admin Only)"
+                title="Channel Management"
               >
                 <Settings className="w-6 h-6" />
               </button>
