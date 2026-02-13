@@ -1548,27 +1548,27 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               {/* Super Admin Routes */}
               <Route path="/usage" element={
-                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                <div className="h-full overflow-y-auto"><div className="p-6 sm:p-8 lg:p-12">
                   <UsageStatisticsTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/billing" element={
-                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                <div className="h-full overflow-y-auto"><div className="p-6 sm:p-8 lg:p-12">
                   <PlatformBillingTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/features" element={
-                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                <div className="h-full overflow-y-auto"><div className="p-6 sm:p-8 lg:p-12">
                   <FeatureAccessTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/backups" element={
-                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                <div className="h-full overflow-y-auto"><div className="p-6 sm:p-8 lg:p-12">
                   <BackupManagementTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/user-management" element={
-                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                <div className="h-full overflow-y-auto"><div className="p-6 sm:p-8 lg:p-12">
                   <UserManagementTab darkMode={true} />
                 </div></div>
               } />
