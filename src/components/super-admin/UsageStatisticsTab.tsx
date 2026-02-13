@@ -243,7 +243,19 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-600">
+            <BarChart3 className="text-white" size={28} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Usage Statistics</h1>
+            <p className="text-sm text-slate-400">Platform analytics and growth metrics</p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button

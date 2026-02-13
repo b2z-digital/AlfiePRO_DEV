@@ -400,6 +400,18 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600">
+            <Users className="text-white" size={28} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">User Management</h1>
+            <p className="text-sm text-slate-400">Manage platform admins, associations and club users</p>
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 flex items-center gap-3">
           <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
@@ -589,8 +601,8 @@ function OrgCard({ org, orgType, users, isExpanded, onToggle, onManage, roleBadg
 function ClubsGroupedView({ clubs, clubsByOrg, expandedOrgs, toggleOrgExpanded, searchTerm, setSearchTerm, clubStats,
   handleOrgClick, roleBadge, editingRole, setEditingRole, updateUserRole, removeUserFromOrg, removeConfirm, getRoleOptions, exportUsers, hasExportData }: any) {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         {[
           { label: 'Total Clubs', value: clubStats.clubs, color: 'from-emerald-500/20 to-emerald-700/20', border: 'border-emerald-500/30', textColor: 'text-emerald-400' },
           { label: 'Unique Users', value: clubStats.users, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },
@@ -651,8 +663,8 @@ function ClubsGroupedView({ clubs, clubsByOrg, expandedOrgs, toggleOrgExpanded, 
 function AssociationsGroupedView({ stateAssociations, nationalAssociations, assocsByOrg, expandedOrgs, toggleOrgExpanded, searchTerm, setSearchTerm, assocStats,
   handleOrgClick, roleBadge, editingRole, setEditingRole, updateUserRole, removeUserFromOrg, removeConfirm, getRoleOptions, orgTypeIcon, exportUsers, hasExportData }: any) {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         {[
           { label: 'Total Associations', value: assocStats.totalOrgs, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },
           { label: 'State Associations', value: assocStats.stateOrgs, color: 'from-amber-500/20 to-amber-700/20', border: 'border-amber-500/30', textColor: 'text-amber-400' },
@@ -753,7 +765,7 @@ function OrgDetailView({ org, users, onBack, onRemoveUser, onUpdateRole, removeC
   const typeLabel = org.type === 'club' ? 'Club' : org.type === 'state' ? 'State Association' : 'National Association';
   const roleOpts = getRoleOptionsForOrg(org);
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 rounded-xl hover:bg-slate-800/50 transition-colors text-slate-400 hover:text-white">
           <ArrowLeft size={20} />
@@ -910,7 +922,7 @@ function OrgDetailView({ org, users, onBack, onRemoveUser, onUpdateRole, removeC
 function PlatformAdminsView({ superAdmins, currentUserId, showAddAdmin, setShowAddAdmin, newAdminEmail, setNewAdminEmail, newAdminName, setNewAdminName,
   newAdminLevel, setNewAdminLevel, saving, addSuperAdmin, toggleAdminActive, removeAdmin, removeConfirm, accessLevelConfig }: any) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-white">Platform Super Admins</h3>

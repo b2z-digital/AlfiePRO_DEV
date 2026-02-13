@@ -287,7 +287,19 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600">
+            <Zap className="text-white" size={28} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Feature Access</h1>
+            <p className="text-sm text-slate-400">Control platform features and overrides</p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           { label: 'Total Features', value: featureStats.total, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },

@@ -65,13 +65,13 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-6 sm:p-8 lg:p-12">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-sky-500/20 to-cyan-500/20 border border-sky-500/30">
-            <Shield className="text-sky-400" size={28} />
+      <div className="p-8 sm:p-10 lg:p-14">
+        <div className="flex items-center gap-4 mb-10">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-600">
+            <Shield className="text-white" size={28} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">
+            <h1 className="text-3xl font-bold text-white">
               AlfiePRO Management
             </h1>
             <p className="text-sm text-slate-400">
@@ -80,7 +80,7 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5 mb-10">
           {statCards.map((card) => (
             <div
               key={card.label}
@@ -101,7 +101,7 @@ export default function SuperAdminDashboard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 backdrop-blur-sm p-6">
             <h3 className="text-lg font-semibold text-slate-200 mb-2">Welcome to AlfiePRO Management</h3>
             <p className="text-sm text-slate-400 leading-relaxed">
