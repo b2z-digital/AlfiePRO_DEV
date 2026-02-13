@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronRight, Building, Check, MapPin, Globe, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building, Check, MapPin, Globe, Search, X, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import type { Organization } from '../types/club';
@@ -53,7 +53,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
   isCollapsed = false,
   darkMode = true
 }) => {
-  const { userClubs, currentClub } = useAuth();
+  const { userClubs, currentClub, isSuperAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showSlideout, setShowSlideout] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -286,6 +286,48 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
               </div>
 
               <div className="overflow-y-auto max-h-[calc(100vh-140px)]">
+                {/* AlfiePRO Management - Super Admin Only */}
+                {isSuperAdmin && (
+                  <>
+                    <button
+                      onClick={() => toggleSection('platform')}
+                      className="w-full px-4 py-2 bg-slate-900/50 flex items-center justify-between hover:bg-slate-900/70 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        {expandedSections.has('platform') ? (
+                          <ChevronDown size={14} className="text-sky-400" />
+                        ) : (
+                          <ChevronRight size={14} className="text-sky-400" />
+                        )}
+                        <h4 className="text-sky-400 text-xs font-semibold uppercase tracking-wider">Platform</h4>
+                      </div>
+                    </button>
+                    {expandedSections.has('platform') && (
+                      <button
+                        onClick={() => {
+                          onClubChange('super-admin-dashboard');
+                          setShowSlideout(false);
+                        }}
+                        className={`
+                          w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700/50
+                          ${currentClubId === 'super-admin-dashboard' ? 'bg-slate-700' : ''}
+                        `}
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                          <Shield size={20} className="text-white" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <div className="text-white font-medium text-sm">AlfiePRO Management</div>
+                          <div className="text-sky-400 text-xs">Platform Administration</div>
+                        </div>
+                        {currentClubId === 'super-admin-dashboard' && (
+                          <Check size={16} className="text-sky-400 flex-shrink-0" />
+                        )}
+                      </button>
+                    )}
+                  </>
+                )}
+
                 {/* National Associations */}
                 {nationalAssocs.length > 0 && (
                   <>
@@ -601,6 +643,36 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
           }`}
           style={calculateDropdownPosition()}
         >
+          {/* AlfiePRO Management - Super Admin Only (Dropdown) */}
+          {isSuperAdmin && (
+            <>
+              <div className="px-4 py-2 bg-slate-900/50 sticky top-0">
+                <h4 className="text-sky-400 text-xs font-semibold uppercase tracking-wider">Platform</h4>
+              </div>
+              <button
+                onClick={() => {
+                  onClubChange('super-admin-dashboard');
+                  setIsOpen(false);
+                }}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors
+                  ${currentClubId === 'super-admin-dashboard' ? 'bg-slate-700' : ''}
+                `}
+              >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-500 flex items-center justify-center">
+                  <Shield size={16} className="text-white" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-white font-medium">AlfiePRO Management</div>
+                  <div className="text-sky-400 text-xs">Platform Administration</div>
+                </div>
+                {currentClubId === 'super-admin-dashboard' && (
+                  <Check size={16} className="text-sky-400" />
+                )}
+              </button>
+            </>
+          )}
+
           {/* National Associations */}
           {nationalAssocs.length > 0 && (
             <>

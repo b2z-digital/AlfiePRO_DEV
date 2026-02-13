@@ -82,6 +82,7 @@ import MarketingTemplateEditorPage from '../pages/MarketingTemplateEditorPage';
 import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage';
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 import LivestreamPage from '../pages/LivestreamPage';
+import SuperAdminDashboard from '../pages/SuperAdminDashboard';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -960,14 +961,18 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }] : [])
   ];
 
+  const isPlatformMode = (currentOrganization as any)?.type === 'platform';
+
   // Filter navigation sections based on permissions
-  const navigationSections = allNavigationSections.map(section => ({
-    ...section,
-    items: section.items.filter(item => {
-      if (!item.permission) return true;
-      return can(item.permission as any);
-    })
-  })).filter(section => section.items.length > 0);
+  const navigationSections = isPlatformMode
+    ? [{ id: 'dashboard', label: null, collapsible: false, items: [{ id: 'home', label: 'Dashboard', icon: Home, description: 'AlfiePRO Management', path: '/' }] }]
+    : allNavigationSections.map(section => ({
+        ...section,
+        items: section.items.filter(item => {
+          if (!item.permission) return true;
+          return can(item.permission as any);
+        })
+      })).filter(section => section.items.length > 0);
 
   return (
     <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
@@ -1181,6 +1186,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               currentClubId={currentOrganization?.id || currentClub?.clubId || null}
               onClubChange={async (orgId) => {
                 try {
+                  if (orgId === 'super-admin-dashboard') {
+                    setCurrentOrganization({
+                      id: 'super-admin-dashboard',
+                      type: 'platform' as any,
+                      name: 'AlfiePRO Management',
+                      role: 'super_admin'
+                    });
+                    setCurrentClub(null);
+                    setIsTransitioning(false);
+                    navigate('/');
+                    return;
+                  }
+
                   const club = userClubs.find(c => c.clubId === orgId);
                   if (club) {
                     // Check if we're actually switching clubs (not just selecting the current one)
@@ -1498,7 +1516,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <Routes>
               <Route path="/" element={
-                currentOrganization?.type === 'national' ? (
+                (currentOrganization as any)?.type === 'platform' ? (
+                  <SuperAdminDashboard key="super-admin" />
+                ) : currentOrganization?.type === 'national' ? (
                   <NationalAssociationDashboard key={currentOrganization.id} darkMode={darkMode} />
                 ) : currentOrganization?.type === 'state' ? (
                   <StateAssociationDashboard key={currentOrganization.id} darkMode={darkMode} />
