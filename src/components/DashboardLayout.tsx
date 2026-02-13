@@ -34,6 +34,7 @@ import { NameMappingManager } from './pages/NameMappingManager';
 import { TasksPage } from './tasks/TasksPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
+import { useFeatureAccess } from '../hooks/useFeatureAccess';
 import { YachtClassesRouter } from '../pages/YachtClassesRouter';
 
 // Import Website section components
@@ -177,6 +178,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   });
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
+  const { isFeatureEnabled } = useFeatureAccess();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -691,42 +693,48 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Flag,
           description: 'Manage races and series',
           path: '/race-management',
-          permission: 'races.manage'
+          permission: 'races.manage',
+          featureKey: 'race_management'
         },
         {
           id: 'race-calendar',
           label: 'Race Calendar',
           icon: Calendar,
           description: 'View upcoming races',
-          path: '/calendar'
+          path: '/calendar',
+          featureKey: 'race_calendar'
         },
         {
           id: 'results',
           label: 'Results',
           icon: Trophy,
           description: 'View race results',
-          path: '/results'
+          path: '/results',
+          featureKey: 'results_display'
         },
         {
           id: 'hms-validator',
           label: 'HMS Validator',
           icon: FileCheck,
           description: 'Validate AlfiePRO results against HMS scoring',
-          path: '/hms-validator'
+          path: '/hms-validator',
+          featureKey: 'hms_validator'
         },
         {
           id: 'yacht-classes',
           label: 'Yacht Classes',
           icon: Sailboat,
           description: 'View yacht classes sailed at the club',
-          path: '/yacht-classes'
+          path: '/yacht-classes',
+          featureKey: 'yacht_classes'
         },
         {
           id: 'venues',
           label: 'Venues',
           icon: MapPin,
           description: 'Manage racing venues',
-          path: '/venues'
+          path: '/venues',
+          featureKey: 'venues'
         }
       ]
     },
@@ -741,28 +749,32 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'News',
           icon: Newspaper,
           description: 'Club news and announcements',
-          path: '/news'
+          path: '/news',
+          featureKey: 'news'
         },
         {
           id: 'media',
           label: 'Media',
           icon: Camera,
           description: 'Manage club media',
-          path: '/media'
+          path: '/media',
+          featureKey: 'media'
         },
         {
           id: 'alfie-tv',
           label: 'AlfieTV',
           icon: Tv,
           description: 'Watch RC yachting videos',
-          path: '/alfie-tv'
+          path: '/alfie-tv',
+          featureKey: 'alfie_tv'
         },
         {
           id: 'livestream',
           label: 'Livestream',
           icon: Video,
           description: 'Broadcast races to YouTube',
-          path: '/livestream'
+          path: '/livestream',
+          featureKey: 'livestream'
         }
       ]
     },
@@ -847,7 +859,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: isMember ? 'My Membership' : 'Club Membership',
           icon: Users,
           description: isMember ? 'Manage your membership' : 'Manage Club Memberships',
-          path: '/membership-dashboard'
+          path: '/membership-dashboard',
+          featureKey: 'membership'
         },
         ...(isMember ? [{
           id: 'my-boats',
@@ -861,14 +874,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'Meetings',
           icon: Calendar,
           description: 'Manage club meetings',
-          path: '/meetings'
+          path: '/meetings',
+          featureKey: 'meetings'
         },
         {
           id: 'tasks',
           label: 'Tasks',
           icon: CheckSquare,
           description: 'Manage club tasks',
-          path: '/tasks'
+          path: '/tasks',
+          featureKey: 'tasks'
         },
         {
           id: 'finances',
@@ -876,7 +891,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: DollarSign,
           description: 'Manage club finances',
           path: '/finances',
-          permission: 'finance.manage'
+          permission: 'finance.manage',
+          featureKey: 'finance'
         }
       ]
     }] : []),
@@ -891,7 +907,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'Inbox & Notifications',
           icon: Mail,
           description: 'Send and manage member communications',
-          path: '/comms'
+          path: '/comms',
+          featureKey: 'notifications'
         },
         {
           id: 'marketing',
@@ -899,14 +916,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Send,
           description: 'Email campaigns and automation flows',
           path: '/marketing',
-          permission: 'membership.manage'
+          permission: 'membership.manage',
+          featureKey: 'marketing'
         },
         {
           id: 'community',
           label: 'Community',
           icon: MessageSquare,
           description: 'Connect with other members',
-          path: '/community'
+          path: '/community',
+          featureKey: 'community'
         }
       ]
     },
@@ -923,28 +942,32 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: currentOrganization
             ? 'Manage documents, files, and links for clubs'
             : 'Manage documents, files, and links',
-          path: '/resources'
+          path: '/resources',
+          featureKey: 'resources'
         },
         {
           id: 'my-garage',
           label: 'Boat Shed',
           icon: Wrench,
           description: 'Manage your boats, maintenance, and rig tuning',
-          path: '/my-garage'
+          path: '/my-garage',
+          featureKey: 'boat_shed'
         },
         {
           id: 'weather',
           label: 'Weather',
           icon: Wind,
           description: 'Live marine weather forecast',
-          path: '/weather'
+          path: '/weather',
+          featureKey: 'weather'
         },
         {
           id: 'classifieds',
           label: 'Classifieds',
           icon: Tag,
           description: 'Buy, sell, and trade sailing gear',
-          path: '/classifieds'
+          path: '/classifieds',
+          featureKey: 'classifieds'
         }
       ]
     },
@@ -960,7 +983,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Monitor,
           description: 'Manage club website',
           path: '/website',
-          permission: 'website.manage'
+          permission: 'website.manage',
+          featureKey: 'website_management'
         }
       ]
     }] : [])
@@ -982,9 +1006,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       ]
     : allNavigationSections.map(section => ({
         ...section,
-        items: section.items.filter(item => {
-          if (!item.permission) return true;
-          return can(item.permission as any);
+        items: section.items.filter((item: any) => {
+          if (item.permission && !can(item.permission as any)) return false;
+          if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+          return true;
         })
       })).filter(section => section.items.length > 0);
 

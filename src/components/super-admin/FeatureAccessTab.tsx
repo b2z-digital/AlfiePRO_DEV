@@ -278,6 +278,13 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
     return true;
   });
 
+  const groupedTargets = useMemo(() => {
+    const clubs = filteredTargets.filter(t => t.type === 'club');
+    const stateAssocs = filteredTargets.filter(t => t.type === 'state_association');
+    const nationalAssocs = filteredTargets.filter(t => t.type === 'national_association');
+    return { clubs, stateAssocs, nationalAssocs };
+  }, [filteredTargets]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -646,47 +653,77 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
               </div>
 
               <div className="max-h-[500px] overflow-y-auto">
-                {filteredTargets.map(target => {
-                  const overrideState = getOverrideState(selectedFeature.id, target.type, target.id);
-                  const effectiveState = overrideState !== null ? overrideState : selectedFeature.is_globally_enabled;
-                  const TypeIcon = target.type === 'club' ? Building : target.type === 'state_association' ? MapPin : Globe;
-
-                  return (
-                    <div
-                      key={`${target.type}-${target.id}`}
-                      className="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <TypeIcon size={14} className="text-slate-500 flex-shrink-0" />
-                        <span className="text-sm truncate text-slate-300">{target.name}</span>
-                        {overrideState !== null && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase flex-shrink-0 ${
-                            overrideState
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            override
-                          </span>
-                        )}
+                {groupedTargets.clubs.length > 0 && (
+                  <div>
+                    <div className="sticky top-0 z-10 px-4 py-2.5 bg-slate-800/90 backdrop-blur-sm border-b border-slate-700/50">
+                      <div className="flex items-center gap-2">
+                        <Building size={13} className="text-emerald-400" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                          Clubs ({groupedTargets.clubs.length})
+                        </span>
                       </div>
-                      <button
-                        onClick={() => toggleOverride(
-                          selectedFeature.id,
-                          target.type,
-                          target.id,
-                          overrideState
-                        )}
-                        className="flex-shrink-0 ml-2"
-                      >
-                        {effectiveState ? (
-                          <ToggleRight size={24} className={overrideState !== null ? 'text-emerald-500' : 'text-emerald-500/50'} />
-                        ) : (
-                          <ToggleLeft size={24} className={overrideState !== null ? 'text-red-500' : 'text-slate-600'} />
-                        )}
-                      </button>
                     </div>
-                  );
-                })}
+                    {groupedTargets.clubs.map(target => (
+                      <OverrideTargetRow
+                        key={`${target.type}-${target.id}`}
+                        target={target}
+                        selectedFeature={selectedFeature}
+                        getOverrideState={getOverrideState}
+                        toggleOverride={toggleOverride}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {groupedTargets.stateAssocs.length > 0 && (
+                  <div>
+                    <div className="sticky top-0 z-10 px-4 py-2.5 bg-slate-800/90 backdrop-blur-sm border-y border-slate-700/50">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-amber-400" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                          State Associations ({groupedTargets.stateAssocs.length})
+                        </span>
+                      </div>
+                    </div>
+                    {groupedTargets.stateAssocs.map(target => (
+                      <OverrideTargetRow
+                        key={`${target.type}-${target.id}`}
+                        target={target}
+                        selectedFeature={selectedFeature}
+                        getOverrideState={getOverrideState}
+                        toggleOverride={toggleOverride}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {groupedTargets.nationalAssocs.length > 0 && (
+                  <div>
+                    <div className="sticky top-0 z-10 px-4 py-2.5 bg-slate-800/90 backdrop-blur-sm border-y border-slate-700/50">
+                      <div className="flex items-center gap-2">
+                        <Globe size={13} className="text-sky-400" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-sky-400">
+                          National Associations ({groupedTargets.nationalAssocs.length})
+                        </span>
+                      </div>
+                    </div>
+                    {groupedTargets.nationalAssocs.map(target => (
+                      <OverrideTargetRow
+                        key={`${target.type}-${target.id}`}
+                        target={target}
+                        selectedFeature={selectedFeature}
+                        getOverrideState={getOverrideState}
+                        toggleOverride={toggleOverride}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {filteredTargets.length === 0 && (
+                  <div className="p-6 text-center text-slate-500 text-sm">
+                    No organizations match your search
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -698,6 +735,44 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function OverrideTargetRow({ target, selectedFeature, getOverrideState, toggleOverride }: {
+  target: OrgTarget;
+  selectedFeature: FeatureControl;
+  getOverrideState: (featureId: string, targetType: string, targetId: string) => boolean | null;
+  toggleOverride: (featureId: string, targetType: string, targetId: string, currentlyEnabled: boolean | null) => void;
+}) {
+  const overrideState = getOverrideState(selectedFeature.id, target.type, target.id);
+  const effectiveState = overrideState !== null ? overrideState : selectedFeature.is_globally_enabled;
+  const TypeIcon = target.type === 'club' ? Building : target.type === 'state_association' ? MapPin : Globe;
+  const iconColor = target.type === 'club' ? 'text-emerald-400/50' : target.type === 'state_association' ? 'text-amber-400/50' : 'text-sky-400/50';
+
+  return (
+    <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-700/20 hover:bg-slate-700/20 transition-colors">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <TypeIcon size={14} className={`${iconColor} flex-shrink-0`} />
+        <span className="text-sm truncate text-slate-300">{target.name}</span>
+        {overrideState !== null && (
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase flex-shrink-0 ${
+            overrideState ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+          }`}>
+            override
+          </span>
+        )}
+      </div>
+      <button
+        onClick={() => toggleOverride(selectedFeature.id, target.type, target.id, overrideState)}
+        className="flex-shrink-0 ml-2"
+      >
+        {effectiveState ? (
+          <ToggleRight size={24} className={overrideState !== null ? 'text-emerald-500' : 'text-emerald-500/50'} />
+        ) : (
+          <ToggleLeft size={24} className={overrideState !== null ? 'text-red-500' : 'text-slate-600'} />
+        )}
+      </button>
     </div>
   );
 }
