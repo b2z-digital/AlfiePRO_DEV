@@ -3,7 +3,7 @@ import {
   Users, Shield, Trash2, Search, Building, MapPin,
   Globe, CheckCircle, XCircle,
   Mail, UserPlus, Eye, Lock, Crown, X, AlertCircle,
-  ArrowUpDown, RefreshCw, Download, ChevronRight, ArrowLeft
+  RefreshCw, Download, ChevronRight, ChevronDown, ArrowLeft
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,9 +61,12 @@ interface OrgDetail {
   type: 'club' | 'state' | 'national';
 }
 
+interface OrgItem {
+  id: string;
+  name: string;
+}
+
 type ViewMode = 'platform_admins' | 'associations' | 'clubs';
-type SortField = 'full_name' | 'email' | 'org_name' | 'role' | 'created_at';
-type SortDir = 'asc' | 'desc';
 
 function UserAvatar({ name, email, avatarUrl, size = 'sm' }: { name: string; email: string; avatarUrl?: string; size?: 'sm' | 'md' | 'lg' }) {
   const dims = size === 'lg' ? 'w-14 h-14 text-lg' : size === 'md' ? 'w-10 h-10 text-sm' : 'w-9 h-9 text-xs';
@@ -86,22 +89,16 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('platform_admins');
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [orgTypeFilter, setOrgTypeFilter] = useState('all');
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminLevel, setNewAdminLevel] = useState('full');
   const [saving, setSaving] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('full_name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [selectedUser, setSelectedUser] = useState<ClubUser | AssociationUser | null>(null);
-  const [editingRole, setEditingRole] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
-  const [clubs, setClubs] = useState<{ id: string; name: string }[]>([]);
-  const [stateAssociations, setStateAssociations] = useState<{ id: string; name: string }[]>([]);
-  const [nationalAssociations, setNationalAssociations] = useState<{ id: string; name: string }[]>([]);
+  const [clubs, setClubs] = useState<OrgItem[]>([]);
+  const [stateAssociations, setStateAssociations] = useState<OrgItem[]>([]);
+  const [nationalAssociations, setNationalAssociations] = useState<OrgItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [orgDetail, setOrgDetail] = useState<OrgDetail | null>(null);
   const [showAddUserToOrg, setShowAddUserToOrg] = useState(false);
@@ -110,11 +107,11 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [selectedPlatformUser, setSelectedPlatformUser] = useState<PlatformUser | null>(null);
   const [addUserRole, setAddUserRole] = useState('member');
+  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setError(null);
@@ -143,11 +140,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
+  const handleRefresh = async () => { setRefreshing(true); await loadData(); setRefreshing(false); };
 
   const addSuperAdmin = async () => {
     if (!newAdminEmail.trim()) return;
@@ -184,20 +177,19 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     const isClub = 'club_id' in u;
     const table = isClub ? 'user_clubs' : (u as AssociationUser).org_type === 'state' ? 'user_state_associations' : 'user_national_associations';
     const { error: err } = await supabase.rpc('update_user_org_role_for_super_admin', {
-      p_target_table: table, p_record_id: isClub ? (u as ClubUser).record_id : (u as AssociationUser).record_id, p_new_role: newRole,
+      p_target_table: table, p_record_id: u.record_id, p_new_role: newRole,
     });
     if (err) alert('Error: ' + err.message);
     else { setEditingRole(null); loadData(); }
   };
 
   const removeUserFromOrg = async (u: ClubUser | AssociationUser) => {
-    const recordId = 'club_id' in u ? (u as ClubUser).record_id : (u as AssociationUser).record_id;
-    if (removeConfirm !== recordId) { setRemoveConfirm(recordId); return; }
+    if (removeConfirm !== u.record_id) { setRemoveConfirm(u.record_id); return; }
     const isClub = 'club_id' in u;
     const table = isClub ? 'user_clubs' : (u as AssociationUser).org_type === 'state' ? 'user_state_associations' : 'user_national_associations';
-    const { error: err } = await supabase.rpc('remove_user_from_org_for_super_admin', { p_target_table: table, p_record_id: recordId });
+    const { error: err } = await supabase.rpc('remove_user_from_org_for_super_admin', { p_target_table: table, p_record_id: u.record_id });
     if (err) alert('Error: ' + err.message);
-    else { setRemoveConfirm(null); setSelectedUser(null); loadData(); }
+    else { setRemoveConfirm(null); loadData(); }
   };
 
   const searchPlatformUsers = useCallback(async (term: string) => {
@@ -229,47 +221,64 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     setSaving(false);
   };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('asc'); }
-  };
-
-  const sortData = <T extends Record<string, any>>(data: T[]): T[] => {
-    return [...data].sort((a, b) => {
-      let aVal = a[sortField] || '';
-      let bVal = b[sortField] || '';
-      if (sortField === 'created_at') { aVal = new Date(aVal).getTime(); bVal = new Date(bVal).getTime(); }
-      else { aVal = String(aVal).toLowerCase(); bVal = String(bVal).toLowerCase(); }
-      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
-      return 0;
+  const toggleOrgExpanded = (orgId: string) => {
+    setExpandedOrgs(prev => {
+      const next = new Set(prev);
+      if (next.has(orgId)) next.delete(orgId);
+      else next.add(orgId);
+      return next;
     });
   };
 
-  const filteredClubUsers = useMemo(() => {
-    let result = clubUsers.filter(u => {
-      if (searchTerm) {
-        const t = searchTerm.toLowerCase();
-        if (!u.full_name.toLowerCase().includes(t) && !u.email.toLowerCase().includes(t) && !u.club_name.toLowerCase().includes(t)) return false;
-      }
-      if (roleFilter !== 'all' && u.role !== roleFilter) return false;
-      return true;
+  const clubsByOrg = useMemo(() => {
+    const map = new Map<string, ClubUser[]>();
+    clubUsers.forEach(u => {
+      const list = map.get(u.club_id) || [];
+      list.push(u);
+      map.set(u.club_id, list);
     });
-    return sortData(result);
-  }, [clubUsers, searchTerm, roleFilter, sortField, sortDir]);
+    return map;
+  }, [clubUsers]);
 
-  const filteredAssocUsers = useMemo(() => {
-    let result = associationUsers.filter(u => {
-      if (searchTerm) {
-        const t = searchTerm.toLowerCase();
-        if (!u.full_name.toLowerCase().includes(t) && !u.email.toLowerCase().includes(t) && !u.org_name.toLowerCase().includes(t)) return false;
-      }
-      if (roleFilter !== 'all' && u.role !== roleFilter) return false;
-      if (orgTypeFilter !== 'all' && u.org_type !== orgTypeFilter) return false;
-      return true;
+  const assocsByOrg = useMemo(() => {
+    const map = new Map<string, AssociationUser[]>();
+    associationUsers.forEach(u => {
+      const list = map.get(u.org_id) || [];
+      list.push(u);
+      map.set(u.org_id, list);
     });
-    return sortData(result);
-  }, [associationUsers, searchTerm, roleFilter, orgTypeFilter, sortField, sortDir]);
+    return map;
+  }, [associationUsers]);
+
+  const filteredClubs = useMemo(() => {
+    if (!searchTerm) return clubs;
+    const t = searchTerm.toLowerCase();
+    return clubs.filter(c => {
+      if (c.name.toLowerCase().includes(t)) return true;
+      const users = clubsByOrg.get(c.id) || [];
+      return users.some(u => u.full_name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t));
+    });
+  }, [clubs, searchTerm, clubsByOrg]);
+
+  const filteredStateAssocs = useMemo(() => {
+    if (!searchTerm) return stateAssociations;
+    const t = searchTerm.toLowerCase();
+    return stateAssociations.filter(a => {
+      if (a.name.toLowerCase().includes(t)) return true;
+      const users = assocsByOrg.get(a.id) || [];
+      return users.some(u => u.full_name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t));
+    });
+  }, [stateAssociations, searchTerm, assocsByOrg]);
+
+  const filteredNationalAssocs = useMemo(() => {
+    if (!searchTerm) return nationalAssociations;
+    const t = searchTerm.toLowerCase();
+    return nationalAssociations.filter(a => {
+      if (a.name.toLowerCase().includes(t)) return true;
+      const users = assocsByOrg.get(a.id) || [];
+      return users.some(u => u.full_name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t));
+    });
+  }, [nationalAssociations, searchTerm, assocsByOrg]);
 
   const orgDetailUsers = useMemo(() => {
     if (!orgDetail) return [];
@@ -277,24 +286,21 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     return associationUsers.filter(u => u.org_id === orgDetail.id);
   }, [orgDetail, clubUsers, associationUsers]);
 
-  const clubRoles = useMemo(() => [...new Set(clubUsers.map(u => u.role))].sort(), [clubUsers]);
-  const assocRoles = useMemo(() => [...new Set(associationUsers.map(u => u.role))].sort(), [associationUsers]);
-
   const clubStats = useMemo(() => {
     const uniqueUsers = new Set(clubUsers.map(u => u.user_id));
-    const uniqueClubs = new Set(clubUsers.map(u => u.club_id));
-    return { users: uniqueUsers.size, assignments: clubUsers.length, clubs: uniqueClubs.size, admins: clubUsers.filter(u => u.role === 'admin').length };
-  }, [clubUsers]);
+    return { users: uniqueUsers.size, assignments: clubUsers.length, clubs: clubs.length, admins: clubUsers.filter(u => u.role === 'admin').length };
+  }, [clubUsers, clubs]);
 
   const assocStats = useMemo(() => {
     const uniqueUsers = new Set(associationUsers.map(u => u.user_id));
     return {
-      users: uniqueUsers.size, assignments: associationUsers.length,
-      state: associationUsers.filter(u => u.org_type === 'state').length,
-      national: associationUsers.filter(u => u.org_type === 'national').length,
+      users: uniqueUsers.size,
+      totalOrgs: stateAssociations.length + nationalAssociations.length,
+      stateOrgs: stateAssociations.length,
+      nationalOrgs: nationalAssociations.length,
       admins: associationUsers.filter(u => u.role.includes('admin')).length,
     };
-  }, [associationUsers]);
+  }, [associationUsers, stateAssociations, nationalAssociations]);
 
   const exportUsers = (data: any[], filename: string) => {
     if (!data.length) return;
@@ -329,9 +335,6 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     return org.type === 'state' ? stateRoleOptions : nationalRoleOptions;
   };
 
-  const getRecordId = (u: ClubUser | AssociationUser) => 'club_id' in u ? (u as ClubUser).record_id : (u as AssociationUser).record_id;
-  const getOrgName = (u: ClubUser | AssociationUser) => 'club_id' in u ? (u as ClubUser).club_name : (u as AssociationUser).org_name;
-
   const orgTypeIcon = (type: string, sz = 14) => {
     if (type === 'club') return <Building size={sz} className="text-emerald-400" />;
     if (type === 'state') return <MapPin size={sz} className="text-amber-400" />;
@@ -347,15 +350,8 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     }`}>{role.replace(/_/g, ' ')}</span>
   );
 
-  const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
-    <th className="px-5 py-4 cursor-pointer select-none hover:text-slate-200 transition-colors" onClick={() => handleSort(field)}>
-      <span className="inline-flex items-center gap-1">{label} <ArrowUpDown size={12} className={sortField === field ? 'text-sky-400' : 'opacity-30'} /></span>
-    </th>
-  );
-
   const handleOrgClick = (orgId: string, orgName: string, orgType: 'club' | 'state' | 'national') => {
     setOrgDetail({ id: orgId, name: orgName, type: orgType });
-    setSelectedUser(null);
   };
 
   if (loading) {
@@ -375,7 +371,6 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
         setEditingRole={setEditingRole}
         roleBadge={roleBadge}
         getRoleOptions={getRoleOptions}
-        getRecordId={getRecordId}
         orgTypeIcon={orgTypeIcon}
         showAddUserToOrg={showAddUserToOrg}
         setShowAddUserToOrg={setShowAddUserToOrg}
@@ -395,10 +390,12 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
     );
   }
 
+  const totalAssocs = stateAssociations.length + nationalAssociations.length;
+
   const tabs: { id: ViewMode; label: string; icon: typeof Shield; count: number }[] = [
     { id: 'platform_admins', label: 'Platform Admins', icon: Shield, count: superAdmins.length },
-    { id: 'associations', label: 'All Associations', icon: Globe, count: assocStats.assignments },
-    { id: 'clubs', label: 'Clubs', icon: Building, count: clubStats.assignments },
+    { id: 'associations', label: 'All Associations', icon: Globe, count: totalAssocs },
+    { id: 'clubs', label: 'Clubs', icon: Building, count: clubs.length },
   ];
 
   return (
@@ -417,7 +414,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
             const Icon = tab.icon;
             return (
               <button key={tab.id}
-                onClick={() => { setViewMode(tab.id); setSelectedUser(null); setSearchTerm(''); setRoleFilter('all'); setOrgTypeFilter('all'); }}
+                onClick={() => { setViewMode(tab.id); setSearchTerm(''); setExpandedOrgs(new Set()); }}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   viewMode === tab.id ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30' : 'text-slate-400 hover:bg-slate-800/50 border border-transparent'
                 }`}>
@@ -440,248 +437,317 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
         />
       )}
 
-      {viewMode === 'associations' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {[
-              { label: 'Unique Users', value: assocStats.users, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },
-              { label: 'Assignments', value: assocStats.assignments, color: 'from-slate-600/20 to-slate-800/20', border: 'border-slate-600/30', textColor: 'text-slate-300' },
-              { label: 'State Users', value: assocStats.state, color: 'from-amber-500/20 to-amber-700/20', border: 'border-amber-500/30', textColor: 'text-amber-400' },
-              { label: 'National Users', value: assocStats.national, color: 'from-emerald-500/20 to-emerald-700/20', border: 'border-emerald-500/30', textColor: 'text-emerald-400' },
-              { label: 'Admin Roles', value: assocStats.admins, color: 'from-cyan-500/20 to-cyan-700/20', border: 'border-cyan-500/30', textColor: 'text-cyan-400' },
-            ].map(stat => (
-              <div key={stat.label} className={`rounded-2xl border p-5 bg-gradient-to-br ${stat.color} ${stat.border} backdrop-blur-sm`}>
-                <p className={`text-2xl font-bold ${stat.textColor}`}>{stat.value}</p>
-                <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search by name, email, or association..."
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
-            </div>
-            <select value={orgTypeFilter} onChange={e => setOrgTypeFilter(e.target.value)} className="px-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white">
-              <option value="all">All Types</option><option value="state">State</option><option value="national">National</option>
-            </select>
-            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="px-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white">
-              <option value="all">All Roles</option>
-              {assocRoles.map(r => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
-            </select>
-            <button onClick={() => exportUsers(filteredAssocUsers, 'association-users')} disabled={!filteredAssocUsers.length}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50">
-              <Download size={14} /> Export
-            </button>
-          </div>
-          <div className="text-sm text-slate-400">Showing {filteredAssocUsers.length} of {associationUsers.length} user assignments</div>
-          <div className={`grid grid-cols-1 ${selectedUser ? 'lg:grid-cols-3' : ''} gap-4`}>
-            <div className={`${selectedUser ? 'lg:col-span-2' : ''} rounded-2xl border overflow-hidden bg-slate-800/30 border-slate-700/50 backdrop-blur-sm`}>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
-                    <SortHeader field="full_name" label="User" />
-                    <SortHeader field="org_name" label="Association" />
-                    <th className="px-5 py-4">Type</th>
-                    <SortHeader field="role" label="Role" />
-                    <SortHeader field="created_at" label="Joined" />
-                  </tr></thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {filteredAssocUsers.slice(0, 200).map((u) => {
-                      const rid = u.record_id;
-                      const selId = selectedUser ? getRecordId(selectedUser) : null;
-                      return (
-                        <tr key={rid} onClick={() => setSelectedUser(selId === rid ? null : u)}
-                          className={`cursor-pointer transition-colors ${selId === rid ? 'bg-sky-500/10' : 'hover:bg-slate-700/20'}`}>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <UserAvatar name={u.full_name} email={u.email} avatarUrl={u.avatar_url} />
-                              <div className="min-w-0">
-                                <p className="font-medium text-sm text-white truncate">{u.full_name || 'Unnamed'}</p>
-                                <p className="text-xs text-slate-500 truncate">{u.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <button onClick={e => { e.stopPropagation(); handleOrgClick(u.org_id, u.org_name, u.org_type as any); }}
-                              className="text-sm text-slate-200 hover:text-sky-400 transition-colors flex items-center gap-1.5 group">
-                              {u.org_name} <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-sky-400" />
-                            </button>
-                          </td>
-                          <td className="px-5 py-4"><span className="inline-flex items-center gap-1.5">{orgTypeIcon(u.org_type)}<span className="text-xs capitalize text-slate-400">{u.org_type}</span></span></td>
-                          <td className="px-5 py-4">{roleBadge(u.role)}</td>
-                          <td className="px-5 py-4 text-right text-xs text-slate-400">{new Date(u.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
-                        </tr>
-                      );
-                    })}
-                    {!filteredAssocUsers.length && (
-                      <tr><td colSpan={5} className="p-16 text-center text-slate-500"><Users size={40} className="mx-auto mb-3 opacity-40" /><p className="font-medium">No users found</p></td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            {selectedUser && <UserDetailPanel u={selectedUser} editingRole={editingRole} setEditingRole={setEditingRole} updateUserRole={updateUserRole}
-              removeUserFromOrg={removeUserFromOrg} removeConfirm={removeConfirm} getRoleOptions={getRoleOptions} getRecordId={getRecordId}
-              getOrgName={getOrgName} orgTypeIcon={orgTypeIcon} roleBadge={roleBadge} setSelectedUser={setSelectedUser}
-              onOrgClick={(id, name, type) => { setSelectedUser(null); handleOrgClick(id, name, type); }} />}
-          </div>
-        </div>
-      )}
-
       {viewMode === 'clubs' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: 'Unique Users', value: clubStats.users, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },
-              { label: 'Assignments', value: clubStats.assignments, color: 'from-slate-600/20 to-slate-800/20', border: 'border-slate-600/30', textColor: 'text-slate-300' },
-              { label: 'Active Clubs', value: clubStats.clubs, color: 'from-emerald-500/20 to-emerald-700/20', border: 'border-emerald-500/30', textColor: 'text-emerald-400' },
-              { label: 'Admin Roles', value: clubStats.admins, color: 'from-amber-500/20 to-amber-700/20', border: 'border-amber-500/30', textColor: 'text-amber-400' },
-            ].map(stat => (
-              <div key={stat.label} className={`rounded-2xl border p-5 bg-gradient-to-br ${stat.color} ${stat.border} backdrop-blur-sm`}>
-                <p className={`text-2xl font-bold ${stat.textColor}`}>{stat.value}</p>
-                <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search by name, email, or club..."
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
+        <ClubsGroupedView
+          clubs={filteredClubs}
+          clubsByOrg={clubsByOrg}
+          expandedOrgs={expandedOrgs}
+          toggleOrgExpanded={toggleOrgExpanded}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          clubStats={clubStats}
+          handleOrgClick={handleOrgClick}
+          roleBadge={roleBadge}
+          editingRole={editingRole}
+          setEditingRole={setEditingRole}
+          updateUserRole={updateUserRole}
+          removeUserFromOrg={removeUserFromOrg}
+          removeConfirm={removeConfirm}
+          getRoleOptions={getRoleOptions}
+          exportUsers={() => exportUsers(clubUsers, 'club-users')}
+          hasExportData={clubUsers.length > 0}
+        />
+      )}
+
+      {viewMode === 'associations' && (
+        <AssociationsGroupedView
+          stateAssociations={filteredStateAssocs}
+          nationalAssociations={filteredNationalAssocs}
+          assocsByOrg={assocsByOrg}
+          expandedOrgs={expandedOrgs}
+          toggleOrgExpanded={toggleOrgExpanded}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          assocStats={assocStats}
+          handleOrgClick={handleOrgClick}
+          roleBadge={roleBadge}
+          editingRole={editingRole}
+          setEditingRole={setEditingRole}
+          updateUserRole={updateUserRole}
+          removeUserFromOrg={removeUserFromOrg}
+          removeConfirm={removeConfirm}
+          getRoleOptions={getRoleOptions}
+          orgTypeIcon={orgTypeIcon}
+          exportUsers={() => exportUsers(associationUsers, 'association-users')}
+          hasExportData={associationUsers.length > 0}
+        />
+      )}
+    </div>
+  );
+}
+
+function OrgCard({ org, orgType, users, isExpanded, onToggle, onManage, roleBadge, editingRole, setEditingRole, updateUserRole, removeUserFromOrg, removeConfirm, getRoleOptions, orgTypeIcon }: {
+  org: OrgItem; orgType: 'club' | 'state' | 'national'; users: (ClubUser | AssociationUser)[]; isExpanded: boolean;
+  onToggle: () => void; onManage: () => void; roleBadge: (role: string) => JSX.Element;
+  editingRole: string | null; setEditingRole: (id: string | null) => void;
+  updateUserRole: (u: any, role: string) => void; removeUserFromOrg: (u: any) => void;
+  removeConfirm: string | null; getRoleOptions: (u: any) => string[];
+  orgTypeIcon?: (type: string, sz?: number) => JSX.Element;
+}) {
+  const userCount = users.length;
+  const adminCount = users.filter(u => u.role.includes('admin')).length;
+
+  return (
+    <div className="rounded-2xl border bg-slate-800/30 border-slate-700/50 backdrop-blur-sm overflow-hidden transition-all">
+      <button onClick={onToggle} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-700/20 transition-colors text-left">
+        <div className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 flex-shrink-0">
+          {orgTypeIcon ? orgTypeIcon(orgType, 18) : <Building size={18} className="text-emerald-400" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-white text-sm truncate">{org.name}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {userCount === 0 ? 'No users assigned' : `${userCount} user${userCount !== 1 ? 's' : ''}`}
+            {adminCount > 0 && ` · ${adminCount} admin${adminCount !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {userCount > 0 && (
+            <div className="flex -space-x-2 mr-2">
+              {users.slice(0, 4).map(u => (
+                <UserAvatar key={u.record_id} name={u.full_name} email={u.email} avatarUrl={u.avatar_url} size="sm" />
+              ))}
+              {userCount > 4 && (
+                <div className="w-9 h-9 rounded-full flex items-center justify-center bg-slate-700/80 text-xs font-medium text-slate-300 border-2 border-slate-800 flex-shrink-0">
+                  +{userCount - 4}
+                </div>
+              )}
             </div>
-            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="px-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white">
-              <option value="all">All Roles</option>
-              {clubRoles.map(r => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
-            </select>
-            <button onClick={() => exportUsers(filteredClubUsers, 'club-users')} disabled={!filteredClubUsers.length}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50">
-              <Download size={14} /> Export
-            </button>
-          </div>
-          <div className="text-sm text-slate-400">Showing {filteredClubUsers.length} of {clubUsers.length} user assignments</div>
-          <div className={`grid grid-cols-1 ${selectedUser ? 'lg:grid-cols-3' : ''} gap-4`}>
-            <div className={`${selectedUser ? 'lg:col-span-2' : ''} rounded-2xl border overflow-hidden bg-slate-800/30 border-slate-700/50 backdrop-blur-sm`}>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
-                    <SortHeader field="full_name" label="User" />
-                    <SortHeader field="org_name" label="Club" />
-                    <SortHeader field="role" label="Role" />
-                    <SortHeader field="created_at" label="Joined" />
-                  </tr></thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {filteredClubUsers.slice(0, 200).map((u) => {
-                      const selId = selectedUser ? getRecordId(selectedUser) : null;
-                      return (
-                        <tr key={u.record_id} onClick={() => setSelectedUser(selId === u.record_id ? null : u)}
-                          className={`cursor-pointer transition-colors ${selId === u.record_id ? 'bg-sky-500/10' : 'hover:bg-slate-700/20'}`}>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <UserAvatar name={u.full_name} email={u.email} avatarUrl={u.avatar_url} />
-                              <div className="min-w-0">
-                                <p className="font-medium text-sm text-white truncate">{u.full_name || 'Unnamed'}</p>
-                                <p className="text-xs text-slate-500 truncate">{u.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <button onClick={e => { e.stopPropagation(); handleOrgClick(u.club_id, u.club_name, 'club'); }}
-                              className="text-sm text-slate-200 hover:text-sky-400 transition-colors flex items-center gap-1.5 group">
-                              {u.club_name} <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-sky-400" />
-                            </button>
-                          </td>
-                          <td className="px-5 py-4">{roleBadge(u.role)}</td>
-                          <td className="px-5 py-4 text-right text-xs text-slate-400">{new Date(u.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}</td>
-                        </tr>
-                      );
-                    })}
-                    {!filteredClubUsers.length && (
-                      <tr><td colSpan={4} className="p-16 text-center text-slate-500"><Users size={40} className="mx-auto mb-3 opacity-40" /><p className="font-medium">No users found</p></td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+          )}
+          <ChevronDown size={16} className={`text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-slate-700/50">
+          {users.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <Users size={28} className="mx-auto mb-2 text-slate-600" />
+              <p className="text-sm text-slate-500">No users assigned yet</p>
+              <button onClick={onManage}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-sky-500 text-white rounded-xl text-xs font-medium hover:bg-sky-600 transition-colors">
+                <UserPlus size={14} /> Add User
+              </button>
             </div>
-            {selectedUser && <UserDetailPanel u={selectedUser} editingRole={editingRole} setEditingRole={setEditingRole} updateUserRole={updateUserRole}
-              removeUserFromOrg={removeUserFromOrg} removeConfirm={removeConfirm} getRoleOptions={getRoleOptions} getRecordId={getRecordId}
-              getOrgName={getOrgName} orgTypeIcon={orgTypeIcon} roleBadge={roleBadge} setSelectedUser={setSelectedUser}
-              onOrgClick={(id, name, type) => { setSelectedUser(null); handleOrgClick(id, name, type); }} />}
-          </div>
+          ) : (
+            <>
+              <div className="divide-y divide-slate-700/30">
+                {users.map(u => (
+                  <div key={u.record_id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-700/15 transition-colors">
+                    <UserAvatar name={u.full_name} email={u.email} avatarUrl={u.avatar_url} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-white truncate">{u.full_name || 'Unnamed'}</p>
+                      <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {editingRole === u.record_id ? (
+                        <div className="flex items-center gap-1.5">
+                          <select defaultValue={u.role} onChange={(e: any) => updateUserRole(u, e.target.value)}
+                            className="px-2 py-1.5 rounded-lg border text-xs bg-slate-800 border-slate-600 text-white focus:border-sky-500 outline-none">
+                            {getRoleOptions(u).map((r: string) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+                          </select>
+                          <button onClick={() => setEditingRole(null)} className="text-slate-400 hover:text-slate-200"><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setEditingRole(u.record_id)} className="hover:opacity-80 transition-opacity">
+                          {roleBadge(u.role)}
+                        </button>
+                      )}
+                      <button onClick={() => removeUserFromOrg(u)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          removeConfirm === u.record_id ? 'bg-red-500/20 text-red-400' : 'text-slate-600 hover:text-red-400 hover:bg-red-500/10'
+                        }`} title={removeConfirm === u.record_id ? 'Click again to confirm' : 'Remove'}>
+                        {removeConfirm === u.record_id ? <XCircle size={15} /> : <Trash2 size={15} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="px-5 py-3 border-t border-slate-700/40 flex justify-end">
+                <button onClick={onManage}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-400 hover:text-sky-300 transition-colors">
+                  Manage <ChevronRight size={14} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function UserDetailPanel({ u, editingRole, setEditingRole, updateUserRole, removeUserFromOrg, removeConfirm, getRoleOptions, getRecordId, getOrgName, orgTypeIcon, roleBadge, setSelectedUser, onOrgClick }: any) {
-  const recordId = getRecordId(u);
-  const isClub = 'club_id' in u;
-  const orgType = isClub ? 'club' : u.org_type;
-  const orgId = isClub ? u.club_id : u.org_id;
-  const orgName = getOrgName(u);
+function ClubsGroupedView({ clubs, clubsByOrg, expandedOrgs, toggleOrgExpanded, searchTerm, setSearchTerm, clubStats,
+  handleOrgClick, roleBadge, editingRole, setEditingRole, updateUserRole, removeUserFromOrg, removeConfirm, getRoleOptions, exportUsers, hasExportData }: any) {
   return (
-    <div className="lg:col-span-1 rounded-2xl border bg-slate-800/30 border-slate-700/50 backdrop-blur-sm h-fit sticky top-28">
-      <div className="p-5 border-b border-slate-700/50">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-white text-sm">User Details</h3>
-          <button onClick={() => setSelectedUser(null)}><X size={16} className="text-slate-400 hover:text-slate-200 transition-colors" /></button>
-        </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Clubs', value: clubStats.clubs, color: 'from-emerald-500/20 to-emerald-700/20', border: 'border-emerald-500/30', textColor: 'text-emerald-400' },
+          { label: 'Unique Users', value: clubStats.users, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },
+          { label: 'Total Assignments', value: clubStats.assignments, color: 'from-slate-600/20 to-slate-800/20', border: 'border-slate-600/30', textColor: 'text-slate-300' },
+          { label: 'Admin Roles', value: clubStats.admins, color: 'from-amber-500/20 to-amber-700/20', border: 'border-amber-500/30', textColor: 'text-amber-400' },
+        ].map(stat => (
+          <div key={stat.label} className={`rounded-2xl border p-5 bg-gradient-to-br ${stat.color} ${stat.border} backdrop-blur-sm`}>
+            <p className={`text-2xl font-bold ${stat.textColor}`}>{stat.value}</p>
+            <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
+          </div>
+        ))}
       </div>
-      <div className="p-5 space-y-5">
-        <div className="flex items-center gap-3">
-          <UserAvatar name={u.full_name} email={u.email} avatarUrl={u.avatar_url} size="lg" />
-          <div className="min-w-0">
-            <p className="font-semibold text-white truncate">{u.full_name || 'Unnamed'}</p>
-            <p className="text-xs text-slate-400 truncate">{u.email}</p>
-          </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input type="text" value={searchTerm} onChange={(e: any) => setSearchTerm(e.target.value)} placeholder="Search clubs or users..."
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
         </div>
-        <div className="space-y-4">
-          <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">{isClub ? 'Club' : 'Association'}</p>
-            <button onClick={() => onOrgClick(orgId, orgName, orgType)}
-              className="flex items-center gap-2 text-sm text-slate-200 hover:text-sky-400 transition-colors group">
-              {orgTypeIcon(orgType)}
-              <span>{orgName}</span>
-              <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-sky-400" />
-            </button>
+        <button onClick={exportUsers} disabled={!hasExportData}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50">
+          <Download size={14} /> Export
+        </button>
+      </div>
+      <div className="space-y-3">
+        {clubs.length === 0 ? (
+          <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-16 text-center">
+            <Building size={40} className="mx-auto mb-3 text-slate-600" />
+            <p className="text-slate-400 font-medium">No clubs found</p>
           </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Role</p>
-            {editingRole === recordId ? (
-              <div className="flex items-center gap-2">
-                <select defaultValue={u.role} onChange={(e: any) => updateUserRole(u, e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-lg border text-xs bg-slate-800 border-slate-600 text-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none">
-                  {getRoleOptions(u).map((r: string) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
-                </select>
-                <button onClick={() => setEditingRole(null)} className="text-slate-400 hover:text-slate-200"><X size={14} /></button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                {roleBadge(u.role)}
-                <button onClick={() => setEditingRole(recordId)} className="text-xs text-sky-400 hover:text-sky-300 font-medium">Change</button>
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5">Joined</p>
-            <p className="text-sm text-slate-300">{new Date(u.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-          </div>
-        </div>
-        <div className="pt-4 border-t border-slate-700/50">
-          <button onClick={() => removeUserFromOrg(u)}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              removeConfirm === recordId ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20'
-            }`}>
-            <Trash2 size={14} /> {removeConfirm === recordId ? 'Click again to confirm' : 'Remove access'}
-          </button>
-        </div>
+        ) : (
+          clubs.map((club: OrgItem) => {
+            const users = clubsByOrg.get(club.id) || [];
+            return (
+              <OrgCard
+                key={club.id}
+                org={club}
+                orgType="club"
+                users={users}
+                isExpanded={expandedOrgs.has(club.id)}
+                onToggle={() => toggleOrgExpanded(club.id)}
+                onManage={() => handleOrgClick(club.id, club.name, 'club')}
+                roleBadge={roleBadge}
+                editingRole={editingRole}
+                setEditingRole={setEditingRole}
+                updateUserRole={updateUserRole}
+                removeUserFromOrg={removeUserFromOrg}
+                removeConfirm={removeConfirm}
+                getRoleOptions={getRoleOptions}
+              />
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
 
-function OrgDetailView({ org, users, onBack, onRemoveUser, onUpdateRole, removeConfirm, editingRole, setEditingRole, roleBadge, getRoleOptions, getRecordId, orgTypeIcon,
+function AssociationsGroupedView({ stateAssociations, nationalAssociations, assocsByOrg, expandedOrgs, toggleOrgExpanded, searchTerm, setSearchTerm, assocStats,
+  handleOrgClick, roleBadge, editingRole, setEditingRole, updateUserRole, removeUserFromOrg, removeConfirm, getRoleOptions, orgTypeIcon, exportUsers, hasExportData }: any) {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Associations', value: assocStats.totalOrgs, color: 'from-sky-500/20 to-sky-700/20', border: 'border-sky-500/30', textColor: 'text-sky-400' },
+          { label: 'State Associations', value: assocStats.stateOrgs, color: 'from-amber-500/20 to-amber-700/20', border: 'border-amber-500/30', textColor: 'text-amber-400' },
+          { label: 'National Associations', value: assocStats.nationalOrgs, color: 'from-emerald-500/20 to-emerald-700/20', border: 'border-emerald-500/30', textColor: 'text-emerald-400' },
+          { label: 'Admin Roles', value: assocStats.admins, color: 'from-cyan-500/20 to-cyan-700/20', border: 'border-cyan-500/30', textColor: 'text-cyan-400' },
+        ].map(stat => (
+          <div key={stat.label} className={`rounded-2xl border p-5 bg-gradient-to-br ${stat.color} ${stat.border} backdrop-blur-sm`}>
+            <p className={`text-2xl font-bold ${stat.textColor}`}>{stat.value}</p>
+            <p className="text-xs text-slate-400 mt-1">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input type="text" value={searchTerm} onChange={(e: any) => setSearchTerm(e.target.value)} placeholder="Search associations or users..."
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border text-sm bg-slate-800 border-slate-600 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none" />
+        </div>
+        <button onClick={exportUsers} disabled={!hasExportData}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50">
+          <Download size={14} /> Export
+        </button>
+      </div>
+
+      {nationalAssociations.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <Globe size={13} className="text-sky-400" /> National Associations ({nationalAssociations.length})
+          </h3>
+          {nationalAssociations.map((assoc: OrgItem) => {
+            const users = assocsByOrg.get(assoc.id) || [];
+            return (
+              <OrgCard
+                key={assoc.id}
+                org={assoc}
+                orgType="national"
+                users={users}
+                isExpanded={expandedOrgs.has(assoc.id)}
+                onToggle={() => toggleOrgExpanded(assoc.id)}
+                onManage={() => handleOrgClick(assoc.id, assoc.name, 'national')}
+                roleBadge={roleBadge}
+                editingRole={editingRole}
+                setEditingRole={setEditingRole}
+                updateUserRole={updateUserRole}
+                removeUserFromOrg={removeUserFromOrg}
+                removeConfirm={removeConfirm}
+                getRoleOptions={getRoleOptions}
+                orgTypeIcon={orgTypeIcon}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {stateAssociations.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <MapPin size={13} className="text-amber-400" /> State Associations ({stateAssociations.length})
+          </h3>
+          {stateAssociations.map((assoc: OrgItem) => {
+            const users = assocsByOrg.get(assoc.id) || [];
+            return (
+              <OrgCard
+                key={assoc.id}
+                org={assoc}
+                orgType="state"
+                users={users}
+                isExpanded={expandedOrgs.has(assoc.id)}
+                onToggle={() => toggleOrgExpanded(assoc.id)}
+                onManage={() => handleOrgClick(assoc.id, assoc.name, 'state')}
+                roleBadge={roleBadge}
+                editingRole={editingRole}
+                setEditingRole={setEditingRole}
+                updateUserRole={updateUserRole}
+                removeUserFromOrg={removeUserFromOrg}
+                removeConfirm={removeConfirm}
+                getRoleOptions={getRoleOptions}
+                orgTypeIcon={orgTypeIcon}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {stateAssociations.length === 0 && nationalAssociations.length === 0 && (
+        <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 p-16 text-center">
+          <Globe size={40} className="mx-auto mb-3 text-slate-600" />
+          <p className="text-slate-400 font-medium">No associations found</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrgDetailView({ org, users, onBack, onRemoveUser, onUpdateRole, removeConfirm, editingRole, setEditingRole, roleBadge, getRoleOptions, orgTypeIcon,
   showAddUserToOrg, setShowAddUserToOrg, userSearchTerm, handleUserSearchChange, userSearchResults, searchingUsers, selectedPlatformUser, setSelectedPlatformUser,
   addUserRole, setAddUserRole, addUserToOrgConfirm, saving, getRoleOptionsForOrg, existingUserIds }: any) {
   const typeLabel = org.type === 'club' ? 'Club' : org.type === 'state' ? 'State Association' : 'National Association';
@@ -804,39 +870,36 @@ function OrgDetailView({ org, users, onBack, onRemoveUser, onUpdateRole, removeC
           </div>
         ) : (
           <div className="divide-y divide-slate-700/30">
-            {users.map((u: any) => {
-              const recordId = getRecordId(u);
-              return (
-                <div key={recordId} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-700/20 transition-colors">
-                  <UserAvatar name={u.full_name} email={u.email} avatarUrl={u.avatar_url} size="md" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-white truncate">{u.full_name || 'Unnamed'}</p>
-                    <p className="text-xs text-slate-500 truncate">{u.email}</p>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {editingRole === recordId ? (
-                      <div className="flex items-center gap-2">
-                        <select defaultValue={u.role} onChange={(e: any) => onUpdateRole(u, e.target.value)}
-                          className="px-3 py-1.5 rounded-lg border text-xs bg-slate-800 border-slate-600 text-white focus:border-sky-500 outline-none">
-                          {getRoleOptions(u).map((r: string) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
-                        </select>
-                        <button onClick={() => setEditingRole(null)} className="text-slate-400 hover:text-slate-200"><X size={14} /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditingRole(recordId)} className="group flex items-center gap-1.5">
-                        {roleBadge(u.role)}
-                      </button>
-                    )}
-                    <button onClick={() => onRemoveUser(u)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        removeConfirm === recordId ? 'bg-red-500/20 text-red-400' : 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
-                      }`} title={removeConfirm === recordId ? 'Click again to confirm' : 'Remove access'}>
-                      {removeConfirm === recordId ? <XCircle size={16} /> : <Trash2 size={16} />}
-                    </button>
-                  </div>
+            {users.map((u: any) => (
+              <div key={u.record_id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-700/20 transition-colors">
+                <UserAvatar name={u.full_name} email={u.email} avatarUrl={u.avatar_url} size="md" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm text-white truncate">{u.full_name || 'Unnamed'}</p>
+                  <p className="text-xs text-slate-500 truncate">{u.email}</p>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  {editingRole === u.record_id ? (
+                    <div className="flex items-center gap-2">
+                      <select defaultValue={u.role} onChange={(e: any) => onUpdateRole(u, e.target.value)}
+                        className="px-3 py-1.5 rounded-lg border text-xs bg-slate-800 border-slate-600 text-white focus:border-sky-500 outline-none">
+                        {getRoleOptions(u).map((r: string) => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
+                      </select>
+                      <button onClick={() => setEditingRole(null)} className="text-slate-400 hover:text-slate-200"><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setEditingRole(u.record_id)} className="group flex items-center gap-1.5">
+                      {roleBadge(u.role)}
+                    </button>
+                  )}
+                  <button onClick={() => onRemoveUser(u)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      removeConfirm === u.record_id ? 'bg-red-500/20 text-red-400' : 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+                    }`} title={removeConfirm === u.record_id ? 'Click again to confirm' : 'Remove access'}>
+                    {removeConfirm === u.record_id ? <XCircle size={16} /> : <Trash2 size={16} />}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
