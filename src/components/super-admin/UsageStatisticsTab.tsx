@@ -11,7 +11,7 @@ ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEle
 
 interface UsageStatisticsTabProps {
   darkMode: boolean;
-  stats: {
+  stats?: {
     totalClubs: number;
     totalMembers: number;
     totalStateAssociations: number;
@@ -19,7 +19,7 @@ interface UsageStatisticsTabProps {
     totalEvents: number;
     totalRaces: number;
   };
-  loading: boolean;
+  loading?: boolean;
 }
 
 interface ClubDetail {
@@ -274,7 +274,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
       {viewMode === 'overview' ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className={`rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <TrendingUp size={18} className="inline mr-2 text-sky-500" />
                 Platform Growth (12 Months)
@@ -290,7 +290,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
               </div>
             </div>
 
-            <div className={`rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <MapPin size={18} className="inline mr-2 text-emerald-500" />
                 Clubs & Members by State
@@ -308,7 +308,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className={`rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <Globe size={18} className="inline mr-2 text-amber-500" />
                 Members by Region
@@ -335,7 +335,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
               </div>
             </div>
 
-            <div className={`lg:col-span-2 rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className={`lg:col-span-2 rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <Activity size={18} className="inline mr-2 text-cyan-500" />
                 State/Region Breakdown
@@ -380,7 +380,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
           </div>
         </div>
       ) : (
-        <div className={`rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

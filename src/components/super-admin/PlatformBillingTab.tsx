@@ -231,7 +231,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
         ].map((card) => (
           <div
             key={card.label}
-            className={`rounded-xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}
+            className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}
           >
             <div className="flex items-center justify-between mb-3">
               <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -265,7 +265,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
 
       {viewMode === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className={`rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Payment Status</h3>
             <div className="h-[250px]">
               <Doughnut
@@ -283,7 +283,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
             </div>
           </div>
 
-          <div className={`lg:col-span-2 rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className={`lg:col-span-2 rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Active Fee Rates</h3>
             <div className="space-y-3">
               {rates.filter(r => r.is_active).length === 0 && (
@@ -301,12 +301,12 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
               {rates.filter(r => r.is_active).map(rate => (
                 <div
                   key={rate.id}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                     darkMode ? 'bg-slate-700/20 border-slate-600/30 hover:border-sky-500/30' : 'bg-slate-50 border-slate-200 hover:border-sky-300'
                   }`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${darkMode ? 'bg-sky-500/20' : 'bg-sky-100'}`}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${darkMode ? 'bg-sky-500/20' : 'bg-sky-100'}`}>
                       <DollarSign size={20} className="text-sky-500" />
                     </div>
                     <div>
@@ -330,7 +330,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
       )}
 
       {viewMode === 'rates' && (
-        <div className={`rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-6">
             <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Fee Rate Configuration</h3>
             <button
@@ -347,7 +347,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
           </div>
 
           {showRateForm && (
-            <div className={`mb-6 p-5 rounded-xl border ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`mb-6 p-5 rounded-2xl border ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-200'}`}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Rate Name</label>
@@ -435,7 +435,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
             {rates.map(rate => (
               <div
                 key={rate.id}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                   rate.is_active
                     ? darkMode ? 'bg-slate-700/20 border-emerald-500/30' : 'bg-emerald-50/50 border-emerald-200'
                     : darkMode ? 'bg-slate-800/30 border-slate-700/30 opacity-60' : 'bg-slate-50 border-slate-200 opacity-60'
@@ -507,7 +507,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
       )}
 
       {viewMode === 'records' && (
-        <div className={`rounded-xl border ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

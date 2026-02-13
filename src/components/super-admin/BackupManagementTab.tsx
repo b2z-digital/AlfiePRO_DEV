@@ -143,7 +143,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className={`rounded-xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-3">
             <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Database Size</span>
             <HardDrive size={16} className="text-sky-500" />
@@ -152,7 +152,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
           <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{tableInfo.length} tables, {totalRows.toLocaleString()} rows</p>
         </div>
 
-        <div className={`rounded-xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-3">
             <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Backups</span>
             <Archive size={16} className="text-emerald-500" />
@@ -163,7 +163,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
           </p>
         </div>
 
-        <div className={`rounded-xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-3">
             <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Last Backup</span>
             <Clock size={16} className="text-amber-500" />
@@ -199,7 +199,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
           return (
             <div
               key={backup.id}
-              className={`rounded-xl border overflow-hidden transition-all ${
+              className={`rounded-2xl border overflow-hidden transition-all ${
                 darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
               } ${isExpanded ? darkMode ? 'border-sky-500/30' : 'border-sky-300' : ''}`}
             >
@@ -295,7 +295,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
         })}
 
         {backups.length === 0 && !loading && (
-          <div className={`rounded-xl border p-12 text-center ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className={`rounded-2xl border p-12 text-center ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <Database size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
             <p className={`text-lg font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No Backups Yet</p>
             <p className={`text-sm mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -313,7 +313,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
       </div>
 
       {tableInfo.length > 0 && (
-        <div className={`rounded-xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
             <Server size={18} className="inline mr-2 text-sky-500" />
             Current Database Tables

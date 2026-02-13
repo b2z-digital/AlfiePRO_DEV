@@ -266,7 +266,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
           </div>
 
           {showAddAdmin && (
-            <div className={`rounded-xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h4 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Add Super Admin</h4>
                 <button onClick={() => setShowAddAdmin(false)}>
@@ -332,7 +332,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
               return (
                 <div
                   key={admin.id}
-                  className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                     admin.is_active
                       ? darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'
                       : darkMode ? 'bg-slate-800/20 border-slate-700/30 opacity-60' : 'bg-slate-50 border-slate-200 opacity-60'
@@ -430,7 +430,7 @@ export function UserManagementTab({ darkMode }: UserManagementTabProps) {
             Showing {filteredUsers.length} of {orgUsers.length} user assignments
           </div>
 
-          <div className={`rounded-xl border overflow-hidden ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+          <div className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>

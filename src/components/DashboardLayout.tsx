@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -83,6 +83,11 @@ import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage'
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 import LivestreamPage from '../pages/LivestreamPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
+import { UsageStatisticsTab } from './super-admin/UsageStatisticsTab';
+import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
+import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
+import { BackupManagementTab } from './super-admin/BackupManagementTab';
+import { UserManagementTab } from './super-admin/UserManagementTab';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -965,7 +970,18 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   // Filter navigation sections based on permissions
   const navigationSections = isPlatformMode
-    ? [{ id: 'dashboard', label: null, collapsible: false, items: [{ id: 'home', label: 'Dashboard', icon: Home, description: 'AlfiePRO Management', path: '/' }] }]
+    ? [
+        { id: 'dashboard', label: null, collapsible: false, items: [
+          { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' }
+        ]},
+        { id: 'platform-management', label: 'Platform', collapsible: true, icon: Shield, items: [
+          { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
+          { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
+          { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
+          { id: 'backups', label: 'Backup Management', icon: Database, description: 'Database backups', path: '/backups' },
+          { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
+        ]}
+      ]
     : allNavigationSections.map(section => ({
         ...section,
         items: section.items.filter(item => {
@@ -1531,6 +1547,32 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     onEventSelect={handleEventSelect}
                   />
                 )
+              } />
+              {/* Super Admin Routes */}
+              <Route path="/usage" element={
+                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                  <UsageStatisticsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/billing" element={
+                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                  <PlatformBillingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/features" element={
+                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                  <FeatureAccessTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/backups" element={
+                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                  <BackupManagementTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/user-management" element={
+                <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:p-8">
+                  <UserManagementTab darkMode={true} />
+                </div></div>
               } />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />

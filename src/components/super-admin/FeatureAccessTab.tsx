@@ -178,7 +178,7 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className={`rounded-xl border p-4 ${darkMode ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+      <div className={`rounded-2xl border p-4 ${darkMode ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
         <div className="flex items-start gap-3">
           <AlertTriangle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
           <div>
@@ -198,7 +198,7 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
             return (
               <div
                 key={group}
-                className={`rounded-xl border overflow-hidden ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}
+                className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}
               >
                 <button
                   onClick={() => toggleGroup(group)}
@@ -271,7 +271,7 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
           })}
         </div>
 
-        <div className={`lg:col-span-2 rounded-xl border sticky top-28 h-fit ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className={`lg:col-span-2 rounded-2xl border sticky top-28 h-fit ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           {selectedFeature ? (
             <div>
               <div className={`p-4 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
