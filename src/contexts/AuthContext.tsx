@@ -94,6 +94,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
+      // Check user metadata for super admin status first (this is the primary way)
+      const { data: { user: userData } } = await supabase.auth.getUser();
+      const isSuperAdminFromMetadata = userData?.user_metadata?.is_super_admin === true;
+
       // Execute all role checks and subscription fetch in parallel for better performance
       const [superAdminResult, nationalAdminResult, stateAdminResult, subscriptionResult] = await Promise.all([
         supabase
@@ -127,7 +131,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .maybeSingle()
       ]);
 
-      const userIsSuperAdmin = superAdminResult.data?.role === 'super_admin';
+      // Check both user metadata AND user_clubs table for super admin
+      const userIsSuperAdmin = isSuperAdminFromMetadata || superAdminResult.data?.role === 'super_admin';
       setIsSuperAdmin(userIsSuperAdmin);
 
       const userIsNationalAdmin = nationalAdminResult.data?.role === 'national_admin';
