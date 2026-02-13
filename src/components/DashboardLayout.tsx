@@ -972,9 +972,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const navigationSections = isPlatformMode
     ? [
         { id: 'dashboard', label: null, collapsible: false, items: [
-          { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' }
-        ]},
-        { id: 'platform-management', label: 'Platform', collapsible: true, icon: Shield, items: [
+          { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' },
           { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
