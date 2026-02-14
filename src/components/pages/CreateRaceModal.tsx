@@ -640,7 +640,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
       }
 
       if (eventDate) {
-        const clashes = await checkEventDateClashes(eventDate, eventEndDate);
+        const clashes = await checkEventDateClashes(eventDate, eventEndDate, undefined, formData.clubId || currentClub?.clubId);
         if (clashes.length > 0) {
           setClashingEvents(clashes);
           setShowClashWarning(true);

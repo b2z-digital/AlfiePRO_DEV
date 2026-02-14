@@ -50,6 +50,13 @@ export const EventClashWarningModal: React.FC<EventClashWarningModalProps> = ({
         </span>
       );
     }
+    if (level === 'club') {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+          Club
+        </span>
+      );
+    }
     return (
       <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
         State
