@@ -269,7 +269,6 @@ export const checkEventDateClashes = async (
       .from('public_events')
       .select('id, event_name, date, end_date, event_level, venue, race_class')
       .in('event_level', ['state', 'national'])
-      .not('cancelled', 'eq', true)
       .lte('date', effectiveEnd);
 
     if (excludeEventId) {
