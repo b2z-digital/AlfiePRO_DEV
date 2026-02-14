@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Plus, Edit2, Check,
   X, Clock, AlertCircle, CheckCircle, Receipt, Coins,
-  Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe2, Target
+  Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe2, Target,
+  Mail, Send, Loader2
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -97,6 +98,12 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
   const [forecast, setForecast] = useState<ForecastEntity[]>([]);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [invoiceModal, setInvoiceModal] = useState<{ record: BillingRecord } | null>(null);
+  const [invoiceEmail, setInvoiceEmail] = useState('');
+  const [invoiceName, setInvoiceName] = useState('');
+  const [invoiceMessage, setInvoiceMessage] = useState('');
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [invoiceSent, setInvoiceSent] = useState<string | null>(null);
 
   const defaultRateForm = {
     name: '',
@@ -363,6 +370,50 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
       })
       .eq('id', recordId);
     loadBillingData();
+  };
+
+  const openInvoiceModal = (record: BillingRecord) => {
+    setInvoiceModal({ record });
+    setInvoiceEmail('');
+    setInvoiceName(record.target_name);
+    setInvoiceMessage('');
+    setInvoiceSent(null);
+  };
+
+  const sendInvoiceEmail = async () => {
+    if (!invoiceModal || !invoiceEmail) return;
+    setSendingInvoice(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-platform-billing-invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            record_id: invoiceModal.record.id,
+            recipient_email: invoiceEmail,
+            recipient_name: invoiceName,
+            message: invoiceMessage,
+          }),
+        }
+      );
+      if (res.ok) {
+        setInvoiceSent(invoiceEmail);
+        loadBillingData();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to send invoice');
+      }
+    } catch (err) {
+      console.error('Error sending invoice:', err);
+      alert('Failed to send invoice email');
+    } finally {
+      setSendingInvoice(false);
+    }
   };
 
   const totalBilled = records.reduce((sum, r) => sum + r.total_amount, 0);
@@ -1086,17 +1137,26 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                                     </span>
                                   </td>
                                   <td className="p-3 text-right">
-                                    <select
-                                      value={record.payment_status}
-                                      onChange={e => updateRecordStatus(record.id, e.target.value)}
-                                      className={`text-xs rounded-lg px-2 py-1 border ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                                    >
-                                      <option value="pending">Pending</option>
-                                      <option value="invoiced">Invoiced</option>
-                                      <option value="paid">Paid</option>
-                                      <option value="overdue">Overdue</option>
-                                      <option value="waived">Waived</option>
-                                    </select>
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); openInvoiceModal(record); }}
+                                        className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300' : 'hover:bg-slate-100 text-sky-500 hover:text-sky-600'}`}
+                                        title="Send invoice email"
+                                      >
+                                        <Mail size={14} />
+                                      </button>
+                                      <select
+                                        value={record.payment_status}
+                                        onChange={e => updateRecordStatus(record.id, e.target.value)}
+                                        className={`text-xs rounded-lg px-2 py-1 border ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                                      >
+                                        <option value="pending">Pending</option>
+                                        <option value="invoiced">Invoiced</option>
+                                        <option value="paid">Paid</option>
+                                        <option value="overdue">Overdue</option>
+                                        <option value="waived">Waived</option>
+                                      </select>
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -1172,17 +1232,26 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         {record.due_date ? new Date(record.due_date).toLocaleDateString('en-AU') : '-'}
                       </td>
                       <td className="p-4 text-right">
-                        <select
-                          value={record.payment_status}
-                          onChange={e => updateRecordStatus(record.id, e.target.value)}
-                          className={`text-xs rounded-lg px-2 py-1 border ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="invoiced">Invoiced</option>
-                          <option value="paid">Paid</option>
-                          <option value="overdue">Overdue</option>
-                          <option value="waived">Waived</option>
-                        </select>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openInvoiceModal(record)}
+                            className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300' : 'hover:bg-slate-100 text-sky-500 hover:text-sky-600'}`}
+                            title="Send invoice email"
+                          >
+                            <Mail size={14} />
+                          </button>
+                          <select
+                            value={record.payment_status}
+                            onChange={e => updateRecordStatus(record.id, e.target.value)}
+                            className={`text-xs rounded-lg px-2 py-1 border ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="invoiced">Invoiced</option>
+                            <option value="paid">Paid</option>
+                            <option value="overdue">Overdue</option>
+                            <option value="waived">Waived</option>
+                          </select>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1198,6 +1267,110 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {invoiceModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setInvoiceModal(null)}>
+          <div
+            className={`w-full max-w-md rounded-2xl border shadow-2xl ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-sky-500/15">
+                  <Mail size={18} className="text-sky-400" />
+                </div>
+                <div>
+                  <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Send Invoice Email</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {invoiceModal.record.target_name} - {new Date(invoiceModal.record.billing_period_start).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setInvoiceModal(null)} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}>
+                <X size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+              </button>
+            </div>
+
+            {invoiceSent ? (
+              <div className="p-8 text-center">
+                <div className="p-3 rounded-full bg-emerald-500/15 inline-flex mb-4">
+                  <CheckCircle size={28} className="text-emerald-400" />
+                </div>
+                <p className={`font-semibold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Invoice Sent</p>
+                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Invoice emailed to {invoiceSent}
+                </p>
+                <button
+                  onClick={() => setInvoiceModal(null)}
+                  className="mt-4 px-4 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 space-y-4">
+                <div className={`p-3 rounded-xl text-sm ${darkMode ? 'bg-slate-700/30 text-slate-300' : 'bg-slate-50 text-slate-600'}`}>
+                  Amount: <span className="font-bold text-sky-400">${invoiceModal.record.total_amount.toFixed(2)}</span>
+                  <span className="mx-2">|</span>
+                  Members: {invoiceModal.record.member_count}
+                  <span className="mx-2">|</span>
+                  Status: {invoiceModal.record.payment_status}
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Recipient Email *</label>
+                  <input
+                    type="email"
+                    value={invoiceEmail}
+                    onChange={e => setInvoiceEmail(e.target.value)}
+                    placeholder="treasurer@association.org"
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Recipient Name</label>
+                  <input
+                    type="text"
+                    value={invoiceName}
+                    onChange={e => setInvoiceName(e.target.value)}
+                    placeholder="Treasurer Name"
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Message (optional)</label>
+                  <textarea
+                    value={invoiceMessage}
+                    onChange={e => setInvoiceMessage(e.target.value)}
+                    rows={3}
+                    placeholder="Additional message to include in the invoice email..."
+                    className={`w-full px-3 py-2 rounded-lg border text-sm resize-none ${darkMode ? 'bg-slate-900 border-slate-600 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}`}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setInvoiceModal(null)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={sendInvoiceEmail}
+                    disabled={!invoiceEmail || sendingInvoice}
+                    className="flex items-center gap-2 px-5 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors disabled:opacity-50"
+                  >
+                    {sendingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    {sendingInvoice ? 'Sending...' : 'Send Invoice'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

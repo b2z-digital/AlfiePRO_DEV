@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Users, Calendar, CheckCircle, Clock,
   AlertCircle, TrendingUp, ChevronDown, ChevronUp,
-  Receipt, CreditCard, FileText
+  Receipt, CreditCard, FileText, Mail, Send, Loader2, X
 } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
@@ -70,6 +70,12 @@ export function PlatformSubscriptionTab({
   const [currentRate, setCurrentRate] = useState<BillingRate | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [invoiceModal, setInvoiceModal] = useState<{ record: BillingRecord } | null>(null);
+  const [invoiceEmail, setInvoiceEmail] = useState('');
+  const [invoiceName, setInvoiceName] = useState('');
+  const [invoiceMessage, setInvoiceMessage] = useState('');
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [invoiceSent, setInvoiceSent] = useState<string | null>(null);
 
   const targetType = associationType === 'state' ? 'state_association' : 'national_association';
 
@@ -111,6 +117,50 @@ export function PlatformSubscriptionTab({
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const openInvoiceModal = (record: BillingRecord) => {
+    setInvoiceModal({ record });
+    setInvoiceEmail('');
+    setInvoiceName(associationName);
+    setInvoiceMessage('');
+    setInvoiceSent(null);
+  };
+
+  const sendInvoiceEmail = async () => {
+    if (!invoiceModal || !invoiceEmail) return;
+    setSendingInvoice(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-platform-billing-invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            record_id: invoiceModal.record.id,
+            recipient_email: invoiceEmail,
+            recipient_name: invoiceName,
+            message: invoiceMessage,
+          }),
+        }
+      );
+      if (res.ok) {
+        setInvoiceSent(invoiceEmail);
+        loadData();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to send invoice');
+      }
+    } catch (err) {
+      console.error('Error sending invoice:', err);
+      alert('Failed to send invoice email');
+    } finally {
+      setSendingInvoice(false);
+    }
+  };
 
   const totalOwed = records
     .filter(r => r.payment_status === 'pending' || r.payment_status === 'invoiced' || r.payment_status === 'overdue')
@@ -322,6 +372,7 @@ export function PlatformSubscriptionTab({
                   <th className="text-right p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Total</th>
                   <th className="text-center p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
                   <th className="text-left p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Due Date</th>
+                  <th className="text-center p-4 text-xs font-medium text-slate-400 uppercase tracking-wider">Invoice</th>
                   <th className="p-4 text-xs font-medium text-slate-400 uppercase tracking-wider"></th>
                 </tr>
               </thead>
@@ -373,6 +424,15 @@ export function PlatformSubscriptionTab({
                             : '-'}
                         </span>
                       </td>
+                      <td className="p-4 text-center">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openInvoiceModal(record); }}
+                          className="p-1.5 rounded-lg hover:bg-slate-700/50 text-sky-400 hover:text-sky-300 transition-colors"
+                          title="Email invoice"
+                        >
+                          <Mail size={15} />
+                        </button>
+                      </td>
                       <td className="p-4">
                         {isExpanded
                           ? <ChevronUp size={16} className="text-slate-400" />
@@ -382,7 +442,7 @@ export function PlatformSubscriptionTab({
                     </tr>
                     {isExpanded && (
                       <tr className="bg-slate-700/10">
-                        <td colSpan={8} className="p-4">
+                        <td colSpan={9} className="p-4">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
                               <span className="text-slate-500 block mb-1">Period</span>
@@ -435,6 +495,108 @@ export function PlatformSubscriptionTab({
           </div>
         )}
       </div>
+
+      {invoiceModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setInvoiceModal(null)}>
+          <div
+            className="w-full max-w-md rounded-2xl border bg-slate-800 border-slate-700 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-sky-500/15">
+                  <Mail size={18} className="text-sky-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white">Email Invoice</h3>
+                  <p className="text-xs text-slate-400">
+                    {new Date(invoiceModal.record.billing_period_start).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })} - ${invoiceModal.record.total_amount.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setInvoiceModal(null)} className="p-1.5 rounded-lg hover:bg-slate-700">
+                <X size={16} className="text-slate-400" />
+              </button>
+            </div>
+
+            {invoiceSent ? (
+              <div className="p-8 text-center">
+                <div className="p-3 rounded-full bg-emerald-500/15 inline-flex mb-4">
+                  <CheckCircle size={28} className="text-emerald-400" />
+                </div>
+                <p className="font-semibold text-white mb-1">Invoice Sent</p>
+                <p className="text-sm text-slate-400">Invoice emailed to {invoiceSent}</p>
+                <button
+                  onClick={() => setInvoiceModal(null)}
+                  className="mt-4 px-4 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 space-y-4">
+                <div className="p-3 rounded-xl text-sm bg-slate-700/30 text-slate-300">
+                  Amount: <span className="font-bold text-sky-400">${invoiceModal.record.total_amount.toFixed(2)}</span>
+                  <span className="mx-2">|</span>
+                  Members: {invoiceModal.record.member_count}
+                  <span className="mx-2">|</span>
+                  Rate: ${invoiceModal.record.rate_per_member.toFixed(2)}/mo
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Recipient Email *</label>
+                  <input
+                    type="email"
+                    value={invoiceEmail}
+                    onChange={e => setInvoiceEmail(e.target.value)}
+                    placeholder="treasurer@association.org"
+                    className="w-full px-3 py-2 rounded-lg border text-sm bg-slate-900 border-slate-600 text-white placeholder-slate-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Recipient Name</label>
+                  <input
+                    type="text"
+                    value={invoiceName}
+                    onChange={e => setInvoiceName(e.target.value)}
+                    placeholder="Name"
+                    className="w-full px-3 py-2 rounded-lg border text-sm bg-slate-900 border-slate-600 text-white placeholder-slate-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-slate-300">Message (optional)</label>
+                  <textarea
+                    value={invoiceMessage}
+                    onChange={e => setInvoiceMessage(e.target.value)}
+                    rows={3}
+                    placeholder="Additional message to include..."
+                    className="w-full px-3 py-2 rounded-lg border text-sm resize-none bg-slate-900 border-slate-600 text-white placeholder-slate-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setInvoiceModal(null)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={sendInvoiceEmail}
+                    disabled={!invoiceEmail || sendingInvoice}
+                    className="flex items-center gap-2 px-5 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors disabled:opacity-50"
+                  >
+                    {sendingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    {sendingInvoice ? 'Sending...' : 'Send Invoice'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
