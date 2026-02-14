@@ -72,6 +72,7 @@ import { RecentApplicationsWidget } from './widgets/RecentApplicationsWidget';
 import { MembershipRenewalsWidget } from './widgets/MembershipRenewalsWidget';
 import { MembershipTypesLargeWidget } from './widgets/MembershipTypesLargeWidget';
 import { MembersByClassLargeWidget } from './widgets/MembersByClassLargeWidget';
+import { PlatformBillingWidget } from './widgets/PlatformBillingWidget';
 
 export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
@@ -429,6 +430,18 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     component: RemittancePaymentFlowWidget,
     category: 'finance',
     requiredPermissions: ['admin', 'treasurer', 'membership'],
+    associationOnly: true
+  },
+  {
+    id: 'platform-billing',
+    type: 'platform-billing',
+    name: 'Platform Fees',
+    description: 'View AlfiePRO subscription fees, outstanding amounts, and payment history',
+    icon: Receipt,
+    defaultSize: '1x3',
+    component: PlatformBillingWidget,
+    category: 'finance',
+    requiredPermissions: ['admin', 'treasurer'],
     associationOnly: true
   },
   {
