@@ -54,7 +54,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
     try {
       const { data: clubsData } = await supabase
         .from('clubs')
-        .select('id, name, abbreviation, state, country, created_at');
+        .select('id, name, abbreviation, created_at, state_association_id, address, state_associations(state, country)');
 
       const { data: membersData } = await supabase
         .from('members')
@@ -71,19 +71,24 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
         membersByClub[m.club_id] = (membersByClub[m.club_id] || 0) + 1;
       });
       (racesData || []).forEach(r => {
-        racesByClub[r.club_id] = (racesByClub[r.club_id] || 0) + 1;
+        if (r.club_id) {
+          racesByClub[r.club_id] = (racesByClub[r.club_id] || 0) + 1;
+        }
       });
 
-      const clubDetails: ClubDetail[] = (clubsData || []).map(c => ({
-        id: c.id,
-        name: c.name,
-        abbreviation: c.abbreviation || '',
-        state: c.state || 'Unknown',
-        country: c.country || 'Australia',
-        memberCount: membersByClub[c.id] || 0,
-        raceCount: racesByClub[c.id] || 0,
-        createdAt: c.created_at,
-      }));
+      const clubDetails: ClubDetail[] = (clubsData || []).map(c => {
+        const sa = c.state_associations as any;
+        return {
+          id: c.id,
+          name: c.name,
+          abbreviation: c.abbreviation || '',
+          state: sa?.state || 'Unknown',
+          country: sa?.country || 'Australia',
+          memberCount: membersByClub[c.id] || 0,
+          raceCount: racesByClub[c.id] || 0,
+          createdAt: c.created_at,
+        };
+      });
 
       setClubs(clubDetails);
 
@@ -101,30 +106,44 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
           .sort((a, b) => b.members - a.members)
       );
 
+      const monthKeys: string[] = [];
       const monthMap: Record<string, { clubs: number; members: number }> = {};
       const now = new Date();
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthKeys.push(key);
         monthMap[key] = { clubs: 0, members: 0 };
       }
+
+      const firstMonth = monthKeys[0];
+      let baselineClubs = 0;
+      let baselineMembers = 0;
 
       (clubsData || []).forEach(c => {
         const d = new Date(c.created_at);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        if (monthMap[key] !== undefined) monthMap[key].clubs++;
+        if (key < firstMonth) {
+          baselineClubs++;
+        } else if (monthMap[key] !== undefined) {
+          monthMap[key].clubs++;
+        }
       });
       (membersData || []).forEach(m => {
         const d = new Date(m.created_at);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        if (monthMap[key] !== undefined) monthMap[key].members++;
+        if (key < firstMonth) {
+          baselineMembers++;
+        } else if (monthMap[key] !== undefined) {
+          monthMap[key].members++;
+        }
       });
 
-      let cumulativeClubs = 0;
-      let cumulativeMembers = 0;
-      const growth = Object.entries(monthMap).map(([month, data]) => {
-        cumulativeClubs += data.clubs;
-        cumulativeMembers += data.members;
+      let cumulativeClubs = baselineClubs;
+      let cumulativeMembers = baselineMembers;
+      const growth = monthKeys.map(month => {
+        cumulativeClubs += monthMap[month].clubs;
+        cumulativeMembers += monthMap[month].members;
         return { month, clubs: cumulativeClubs, members: cumulativeMembers };
       });
 
