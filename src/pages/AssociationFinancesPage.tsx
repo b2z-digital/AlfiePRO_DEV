@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { DollarSign, TrendingUp, Receipt, FileText, Settings as SettingsIcon, BarChart3 } from 'lucide-react';
+import { DollarSign, TrendingUp, Receipt, FileText, Settings as SettingsIcon, BarChart3, CreditCard } from 'lucide-react';
 import { FinancesOverview } from '../components/finances/FinancesOverview';
 import { FinancesTransactions } from '../components/finances/FinancesTransactions';
 import { FinancesInvoices } from '../components/finances/FinancesInvoices';
@@ -8,6 +8,7 @@ import { FinancesBudget } from '../components/finances/FinancesBudget';
 import { FinancesReports } from '../components/finances/FinancesReports';
 import { NewTransactionModal } from '../components/finances/NewTransactionModal';
 import { FinanceSettingsPage } from '../components/pages/FinanceSettingsPage';
+import { PlatformSubscriptionTab } from '../components/finances/PlatformSubscriptionTab';
 
 interface AssociationFinancesPageProps {
   darkMode: boolean;
@@ -32,6 +33,7 @@ export const AssociationFinancesPage: React.FC<AssociationFinancesPageProps> = (
     { id: 'invoices', label: 'Invoices', icon: Receipt, path: '/finances/invoices' },
     { id: 'budget', label: 'Budget', icon: BarChart3, path: '/finances/budget' },
     { id: 'reports', label: 'Reports', icon: FileText, path: '/finances/reports' },
+    { id: 'subscription', label: 'AlfiePRO Subscription', icon: CreditCard, path: '/finances/subscription' },
     { id: 'settings', label: 'Settings', icon: SettingsIcon, path: '/finances/settings' }
   ];
 
@@ -42,6 +44,7 @@ export const AssociationFinancesPage: React.FC<AssociationFinancesPageProps> = (
     if (path.includes('/invoices')) return 'invoices';
     if (path.includes('/budget')) return 'budget';
     if (path.includes('/reports')) return 'reports';
+    if (path.includes('/subscription')) return 'subscription';
     if (path.includes('/settings')) return 'settings';
     return 'overview';
   };
@@ -105,6 +108,7 @@ export const AssociationFinancesPage: React.FC<AssociationFinancesPageProps> = (
             <Route path="/invoices/*" element={<FinancesInvoices darkMode={darkMode} associationId={associationId} associationType={associationType} />} />
             <Route path="/budget" element={<FinancesBudget darkMode={darkMode} associationId={associationId} associationType={associationType} />} />
             <Route path="/reports" element={<FinancesReports darkMode={darkMode} associationId={associationId} associationType={associationType} />} />
+            <Route path="/subscription" element={<PlatformSubscriptionTab darkMode={darkMode} associationId={associationId} associationType={associationType} associationName={associationName} />} />
             <Route path="/settings" element={<FinanceSettingsPage darkMode={darkMode} associationId={associationId} associationType={associationType} />} />
           </Routes>
         </div>
