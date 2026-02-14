@@ -128,31 +128,47 @@ export function FeatureAccessTab({ darkMode }: FeatureAccessTabProps) {
     setFeatures(prev => prev.map(f => f.id === featureId ? { ...f, is_globally_enabled: !currentState } : f));
   };
 
-  const toggleOverride = async (featureId: string, targetType: string, targetId: string, currentlyEnabled: boolean | null) => {
+  const toggleOverride = async (featureId: string, targetType: string, targetId: string) => {
     const existing = overrides.find(
       o => o.feature_control_id === featureId && o.target_type === targetType && o.target_id === targetId
     );
+    const feature = features.find(f => f.id === featureId);
+    if (!feature) return;
 
     if (existing) {
-      if (currentlyEnabled !== null) {
-        await supabase.from('platform_feature_overrides').delete().eq('id', existing.id);
+      const newEnabled = !existing.is_enabled;
+      if (newEnabled === feature.is_globally_enabled) {
         setOverrides(prev => prev.filter(o => o.id !== existing.id));
+        await supabase.from('platform_feature_overrides').delete().eq('id', existing.id);
       } else {
+        setOverrides(prev => prev.map(o => o.id === existing.id ? { ...o, is_enabled: newEnabled } : o));
         await supabase
           .from('platform_feature_overrides')
-          .update({ is_enabled: !existing.is_enabled, updated_at: new Date().toISOString() })
+          .update({ is_enabled: newEnabled, updated_at: new Date().toISOString() })
           .eq('id', existing.id);
-        setOverrides(prev => prev.map(o => o.id === existing.id ? { ...o, is_enabled: !o.is_enabled } : o));
       }
     } else {
-      const { data } = await supabase.from('platform_feature_overrides').insert({
+      const newOverride: FeatureOverride = {
+        id: crypto.randomUUID(),
         feature_control_id: featureId,
         target_type: targetType,
         target_id: targetId,
-        is_enabled: false,
-      }).select().maybeSingle();
+        is_enabled: !feature.is_globally_enabled,
+      };
+      setOverrides(prev => [...prev, newOverride]);
 
-      if (data) setOverrides(prev => [...prev, data]);
+      const { data, error } = await supabase.from('platform_feature_overrides').insert({
+        feature_control_id: featureId,
+        target_type: targetType,
+        target_id: targetId,
+        is_enabled: !feature.is_globally_enabled,
+      }).select('*').maybeSingle();
+
+      if (error || !data) {
+        setOverrides(prev => prev.filter(o => o.id !== newOverride.id));
+      } else {
+        setOverrides(prev => prev.map(o => o.id === newOverride.id ? data : o));
+      }
     }
   };
 
@@ -743,7 +759,7 @@ function OverrideTargetRow({ target, selectedFeature, getOverrideState, toggleOv
   target: OrgTarget;
   selectedFeature: FeatureControl;
   getOverrideState: (featureId: string, targetType: string, targetId: string) => boolean | null;
-  toggleOverride: (featureId: string, targetType: string, targetId: string, currentlyEnabled: boolean | null) => void;
+  toggleOverride: (featureId: string, targetType: string, targetId: string) => void;
 }) {
   const overrideState = getOverrideState(selectedFeature.id, target.type, target.id);
   const effectiveState = overrideState !== null ? overrideState : selectedFeature.is_globally_enabled;
@@ -764,7 +780,7 @@ function OverrideTargetRow({ target, selectedFeature, getOverrideState, toggleOv
         )}
       </div>
       <button
-        onClick={() => toggleOverride(selectedFeature.id, target.type, target.id, overrideState)}
+        onClick={() => toggleOverride(selectedFeature.id, target.type, target.id)}
         className="flex-shrink-0 ml-2"
       >
         {effectiveState ? (

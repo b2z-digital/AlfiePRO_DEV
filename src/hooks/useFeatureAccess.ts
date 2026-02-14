@@ -18,7 +18,7 @@ interface FeatureAccessResult {
 }
 
 const featureCache = new Map<string, { flags: FeatureFlag[]; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 30 * 1000;
 
 function getOrgTypeForDb(type: string): string {
   if (type === 'state') return 'state_association';
@@ -30,7 +30,7 @@ export function useFeatureAccess(): FeatureAccessResult {
   const { currentClub, currentOrganization } = useAuth();
   const [features, setFeatures] = useState<FeatureFlag[]>([]);
   const [loading, setLoading] = useState(true);
-  const loadedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const orgId = currentOrganization?.type === 'club' || !currentOrganization
     ? currentClub?.clubId
@@ -61,28 +61,61 @@ export function useFeatureAccess(): FeatureAccessResult {
         p_org_type: dbOrgType,
       });
 
+      if (!mountedRef.current) return;
+
       if (error) {
-        console.error('Error loading feature flags:', error);
         setFeatures([]);
       } else {
         const flags = (data || []) as FeatureFlag[];
         setFeatures(flags);
         featureCache.set(cacheKey, { flags, timestamp: Date.now() });
       }
-    } catch (err) {
-      console.error('Error loading feature flags:', err);
-      setFeatures([]);
+    } catch {
+      if (mountedRef.current) setFeatures([]);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [orgId, dbOrgType]);
 
   useEffect(() => {
-    loadedRef.current = false;
+    mountedRef.current = true;
     setLoading(true);
     loadFeatures();
-    loadedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, [loadFeatures]);
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const cacheKey = `${orgId}-${dbOrgType}`;
+        featureCache.delete(cacheKey);
+        loadFeatures(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [orgId, dbOrgType, loadFeatures]);
+
+  useEffect(() => {
+    if (!orgId) return;
+
+    const channel = supabase
+      .channel('feature-flag-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_feature_controls' }, () => {
+        featureCache.clear();
+        loadFeatures(true);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_feature_overrides' }, () => {
+        featureCache.clear();
+        loadFeatures(true);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [orgId, loadFeatures]);
 
   const isFeatureEnabled = useCallback((featureKey: string): boolean => {
     const flag = features.find(f => f.feature_key === featureKey);
