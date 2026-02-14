@@ -247,6 +247,48 @@ export const createLocalCopyOfPublicEvent = async (publicEvent: PublicEvent, clu
   }
 };
 
+export interface ClashingEvent {
+  id: string;
+  event_name: string;
+  date: string;
+  end_date?: string;
+  event_level: string;
+  venue?: string;
+  race_class?: string;
+}
+
+export const checkEventDateClashes = async (
+  startDate: string,
+  endDate: string | null,
+  excludeEventId?: string
+): Promise<ClashingEvent[]> => {
+  try {
+    const effectiveEnd = endDate || startDate;
+
+    let query = supabase
+      .from('public_events')
+      .select('id, event_name, date, end_date, event_level, venue, race_class')
+      .in('event_level', ['state', 'national'])
+      .not('cancelled', 'eq', true)
+      .lte('date', effectiveEnd);
+
+    if (excludeEventId) {
+      query = query.neq('id', excludeEventId);
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data) return [];
+
+    return data.filter(evt => {
+      const evtEnd = evt.end_date || evt.date;
+      return evtEnd >= startDate;
+    });
+  } catch {
+    return [];
+  }
+};
+
 // Add a new public event
 export const addPublicEvent = async (eventData: Omit<PublicEvent, 'id' | 'created_at' | 'updated_at'>): Promise<PublicEvent | null> => {
   try {
