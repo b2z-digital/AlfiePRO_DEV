@@ -73,7 +73,8 @@ Deno.serve(async (req: Request) => {
     if (existingPeriod?.status === "finalized") {
       return jsonResponse(
         {
-          error: "This billing period has been finalized and cannot be regenerated",
+          error:
+            "This billing period has been finalized and cannot be regenerated",
         },
         400
       );
@@ -199,7 +200,7 @@ Deno.serve(async (req: Request) => {
             .from("clubs")
             .select("id")
             .eq("state_association_id", entity.id);
-          const clubIds = (clubs || []).map((c) => c.id);
+          const clubIds = (clubs || []).map((c: { id: string }) => c.id);
 
           if (clubIds.length > 0) {
             const { count } = await adminClient
@@ -223,14 +224,14 @@ Deno.serve(async (req: Request) => {
             .from("state_associations")
             .select("id")
             .eq("national_association_id", entity.id);
-          const stateIds = (states || []).map((s) => s.id);
+          const stateIds = (states || []).map((s: { id: string }) => s.id);
 
           if (stateIds.length > 0) {
             const { data: clubs } = await adminClient
               .from("clubs")
               .select("id")
               .in("state_association_id", stateIds);
-            const clubIds = (clubs || []).map((c) => c.id);
+            const clubIds = (clubs || []).map((c: { id: string }) => c.id);
 
             if (clubIds.length > 0) {
               const { count } = await adminClient
@@ -251,8 +252,6 @@ Deno.serve(async (req: Request) => {
             }
           }
         }
-
-        if (memberCount === 0) continue;
 
         const annualRate =
           applicableRate.annual_rate || applicableRate.rate_per_member * 12;

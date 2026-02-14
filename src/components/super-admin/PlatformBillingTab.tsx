@@ -68,6 +68,15 @@ interface EntityOption {
   name: string;
 }
 
+interface ForecastEntity {
+  id: string;
+  name: string;
+  type: string;
+  memberCount: number;
+  annualRate: number;
+  monthlyCharge: number;
+}
+
 export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
   const [rates, setRates] = useState<BillingRate[]>([]);
   const [records, setRecords] = useState<BillingRecord[]>([]);
@@ -85,6 +94,8 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
   const [periodRecords, setPeriodRecords] = useState<Record<string, BillingRecord[]>>({});
   const [targetMode, setTargetMode] = useState<'all' | 'specific'>('all');
   const [entityOptions, setEntityOptions] = useState<EntityOption[]>([]);
+  const [forecast, setForecast] = useState<ForecastEntity[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
 
   const defaultRateForm = {
     name: '',
@@ -135,6 +146,104 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
       loadEntityOptions(rateForm.billing_target);
     }
   }, [rateForm.billing_target, targetMode, showRateForm, loadEntityOptions]);
+
+  const loadForecast = useCallback(async (activeRates: BillingRate[]) => {
+    if (activeRates.length === 0) return;
+    setForecastLoading(true);
+    try {
+      const entities: ForecastEntity[] = [];
+
+      for (const targetType of ['club', 'state_association', 'national_association']) {
+        const typeRates = activeRates.filter(r => r.billing_target === targetType);
+        if (typeRates.length === 0) continue;
+
+        const table = targetType === 'club' ? 'clubs'
+          : targetType === 'state_association' ? 'state_associations'
+          : 'national_associations';
+
+        const { data: allEntities } = await supabase.from(table).select('id, name').order('name');
+        if (!allEntities) continue;
+
+        for (const entity of allEntities) {
+          const specificRate = typeRates.find(r => r.target_entity_id === entity.id);
+          const genericRate = typeRates.find(r => r.target_entity_id === null);
+          const applicableRate = specificRate || genericRate;
+          if (!applicableRate) continue;
+
+          let memberCount = 0;
+
+          if (targetType === 'club') {
+            const { count } = await supabase
+              .from('members')
+              .select('id', { count: 'exact', head: true })
+              .eq('club_id', entity.id)
+              .eq('membership_status', 'active');
+            memberCount = count || 0;
+          } else if (targetType === 'state_association') {
+            const { data: clubs } = await supabase
+              .from('clubs')
+              .select('id')
+              .eq('state_association_id', entity.id);
+            const clubIds = (clubs || []).map(c => c.id);
+            if (clubIds.length > 0) {
+              const { count } = await supabase
+                .from('members')
+                .select('id', { count: 'exact', head: true })
+                .in('club_id', clubIds)
+                .eq('membership_status', 'active');
+              memberCount = count || 0;
+            }
+          } else {
+            const { data: states } = await supabase
+              .from('state_associations')
+              .select('id')
+              .eq('national_association_id', entity.id);
+            const stateIds = (states || []).map(s => s.id);
+            if (stateIds.length > 0) {
+              const { data: clubs } = await supabase
+                .from('clubs')
+                .select('id')
+                .in('state_association_id', stateIds);
+              const clubIds = (clubs || []).map(c => c.id);
+              if (clubIds.length > 0) {
+                const { count } = await supabase
+                  .from('members')
+                  .select('id', { count: 'exact', head: true })
+                  .in('club_id', clubIds)
+                  .eq('membership_status', 'active');
+                memberCount = count || 0;
+              }
+            }
+          }
+
+          const annualRate = applicableRate.annual_rate || applicableRate.rate_per_member * 12;
+          const monthlyCharge = parseFloat((memberCount * (annualRate / 12)).toFixed(2));
+
+          entities.push({
+            id: entity.id,
+            name: entity.name,
+            type: targetType,
+            memberCount,
+            annualRate,
+            monthlyCharge,
+          });
+        }
+      }
+
+      setForecast(entities);
+    } catch (err) {
+      console.error('Error loading forecast:', err);
+    } finally {
+      setForecastLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const activeRates = rates.filter(r => r.is_active);
+    if (activeRates.length > 0 && viewMode === 'overview') {
+      loadForecast(activeRates);
+    }
+  }, [rates, viewMode, loadForecast]);
 
   const saveRate = async () => {
     try {
@@ -374,93 +483,191 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
 
       {/* Overview */}
       {viewMode === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6">
+          {/* Forecast Section */}
           <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Payment Status</h3>
-            <div className="h-[250px]">
-              <Doughnut
-                data={paymentStatusData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  cutout: '65%',
-                  plugins: {
-                    legend: { display: true, position: 'bottom', labels: { color: chartColors.text, padding: 12, usePointStyle: true, font: { size: 11 } } },
-                    tooltip: { backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText, borderColor: chartColors.tooltipBorder, borderWidth: 1, padding: 12, cornerRadius: 8 },
-                  },
-                }}
-              />
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Current Month Forecast</h3>
+                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Projected billing based on active member counts and configured rates
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`text-2xl font-bold ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                  {formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0))}
+                </p>
+                <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  projected this month ({forecast.reduce((s, f) => s + f.memberCount, 0)} total members)
+                </p>
+              </div>
             </div>
+
+            {forecastLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw size={20} className="animate-spin text-slate-400" />
+              </div>
+            ) : forecast.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className={`text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400 border-b border-slate-700/50' : 'text-slate-500 border-b border-slate-200'}`}>
+                      <th className="p-3">Organization</th>
+                      <th className="p-3 text-right">Active Members</th>
+                      <th className="p-3 text-right">Annual Rate</th>
+                      <th className="p-3 text-right">Monthly Rate</th>
+                      <th className="p-3 text-right">Monthly Charge</th>
+                      <th className="p-3 text-right">Annual Projection</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
+                    {forecast.filter(f => f.memberCount > 0 || f.monthlyCharge > 0).map(f => (
+                      <tr key={`${f.type}-${f.id}`} className={`${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'} transition-colors`}>
+                        <td className={`p-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          <p className="font-medium text-sm">{f.name}</p>
+                          <p className={`text-xs capitalize ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{f.type.replace(/_/g, ' ')}</p>
+                        </td>
+                        <td className={`p-3 text-right text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <div className="flex items-center justify-end gap-1">
+                            <Users size={12} className="text-slate-400" />
+                            {f.memberCount}
+                          </div>
+                        </td>
+                        <td className={`p-3 text-right text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {formatCurrency(f.annualRate)}/yr
+                        </td>
+                        <td className={`p-3 text-right text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {formatCurrency(f.annualRate / 12)}/mo
+                        </td>
+                        <td className={`p-3 text-right font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          {formatCurrency(f.monthlyCharge)}
+                        </td>
+                        <td className={`p-3 text-right text-sm ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                          {formatCurrency(f.monthlyCharge * 12)}
+                        </td>
+                      </tr>
+                    ))}
+                    {forecast.filter(f => f.memberCount > 0).length === 0 && (
+                      <tr>
+                        <td colSpan={6} className={`p-6 text-center text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                          No entities with active members found for the configured rates.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {forecast.filter(f => f.memberCount > 0).length > 0 && (
+                    <tfoot>
+                      <tr className={`font-semibold ${darkMode ? 'border-t border-slate-600/50 text-white' : 'border-t-2 border-slate-300 text-slate-900'}`}>
+                        <td className="p-3">Total</td>
+                        <td className="p-3 text-right">{forecast.reduce((s, f) => s + f.memberCount, 0)}</td>
+                        <td className="p-3"></td>
+                        <td className="p-3"></td>
+                        <td className="p-3 text-right">{formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0))}</td>
+                        <td className={`p-3 text-right ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                          {formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0) * 12)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            ) : (
+              <div className={`text-center py-8 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                <Coins size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No active rates configured. Create a rate to see billing forecasts.</p>
+              </div>
+            )}
           </div>
 
-          <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Monthly Trend</h3>
-            <div className="h-[250px]">
-              {periods.length > 0 ? (
-                <Bar
-                  data={monthlyTrendData}
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Payment Status</h3>
+              <div className="h-[250px]">
+                <Doughnut
+                  data={paymentStatusData}
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
+                    cutout: '65%',
                     plugins: {
-                      legend: { display: false },
-                      tooltip: { backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText, borderColor: chartColors.tooltipBorder, borderWidth: 1, padding: 12, cornerRadius: 8,
-                        callbacks: { label: (ctx) => formatCurrency(ctx.parsed.y) }
-                      },
-                    },
-                    scales: {
-                      x: { grid: { display: false }, ticks: { color: chartColors.text, font: { size: 11 } } },
-                      y: { grid: { color: darkMode ? 'rgba(51,65,85,0.3)' : 'rgba(203,213,225,0.5)' }, ticks: { color: chartColors.text, font: { size: 11 }, callback: (v) => `$${v}` } },
+                      legend: { display: true, position: 'bottom', labels: { color: chartColors.text, padding: 12, usePointStyle: true, font: { size: 11 } } },
+                      tooltip: { backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText, borderColor: chartColors.tooltipBorder, borderWidth: 1, padding: 12, cornerRadius: 8 },
                     },
                   }}
                 />
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-500">
-                  <p className="text-sm">No billing periods yet</p>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
 
-          <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Active Rates</h3>
-            <div className="space-y-3">
-              {rates.filter(r => r.is_active).length === 0 && (
-                <div className={`text-center py-8 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  <Coins size={32} className="mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No active rates</p>
-                  <button
-                    onClick={() => { setShowRateForm(true); setViewMode('rates'); }}
-                    className="mt-3 px-4 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors"
-                  >
-                    Create First Rate
-                  </button>
-                </div>
-              )}
-              {rates.filter(r => r.is_active).map(rate => {
-                const Icon = targetIcon(rate.billing_target);
-                return (
-                  <div
-                    key={rate.id}
-                    className={`flex items-center justify-between p-3 rounded-xl border ${darkMode ? 'bg-slate-700/20 border-slate-600/30' : 'bg-slate-50 border-slate-200'}`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-sky-500/20' : 'bg-sky-100'}`}>
-                        <Icon size={16} className="text-sky-500" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{rate.name}</p>
-                        <p className={`text-xs truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {rate.target_entity_name || targetLabel(rate.billing_target)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className={`text-sm font-bold flex-shrink-0 ml-2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                      {formatCurrency(rate.annual_rate || rate.rate_per_member)}/yr
-                    </p>
+            <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Monthly Trend</h3>
+              <div className="h-[250px]">
+                {periods.length > 0 ? (
+                  <Bar
+                    data={monthlyTrendData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: { backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText, borderColor: chartColors.tooltipBorder, borderWidth: 1, padding: 12, cornerRadius: 8,
+                          callbacks: { label: (ctx) => formatCurrency(ctx.parsed.y) }
+                        },
+                      },
+                      scales: {
+                        x: { grid: { display: false }, ticks: { color: chartColors.text, font: { size: 11 } } },
+                        y: { grid: { color: darkMode ? 'rgba(51,65,85,0.3)' : 'rgba(203,213,225,0.5)' }, ticks: { color: chartColors.text, font: { size: 11 }, callback: (v) => `$${v}` } },
+                      },
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-500">
+                    <p className="text-sm">No billing periods yet</p>
                   </div>
-                );
-              })}
+                )}
+              </div>
+            </div>
+
+            <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Active Rates</h3>
+              <div className="space-y-3">
+                {rates.filter(r => r.is_active).length === 0 && (
+                  <div className={`text-center py-8 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <Coins size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No active rates</p>
+                    <button
+                      onClick={() => { setShowRateForm(true); setViewMode('rates'); }}
+                      className="mt-3 px-4 py-2 bg-sky-500 text-white rounded-lg text-sm font-medium hover:bg-sky-600 transition-colors"
+                    >
+                      Create First Rate
+                    </button>
+                  </div>
+                )}
+                {rates.filter(r => r.is_active).map(rate => {
+                  const Icon = targetIcon(rate.billing_target);
+                  return (
+                    <div
+                      key={rate.id}
+                      className={`flex items-center justify-between p-3 rounded-xl border ${darkMode ? 'bg-slate-700/20 border-slate-600/30' : 'bg-slate-50 border-slate-200'}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-sky-500/20' : 'bg-sky-100'}`}>
+                          <Icon size={16} className="text-sky-500" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`font-medium text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{rate.name}</p>
+                          <p className={`text-xs truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {rate.target_entity_name || targetLabel(rate.billing_target)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className={`text-sm font-bold flex-shrink-0 ml-2 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                        {formatCurrency(rate.annual_rate || rate.rate_per_member)}/yr
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -760,7 +967,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
               </button>
             </div>
             <p className={`text-xs mt-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-              This will count all active members per entity and create billing records based on configured rates.
+              Billing is automatically generated on the 1st of each month. Use this to manually generate or re-generate a specific month.
               Formula: active members x (annual rate / 12) = monthly charge.
             </p>
           </div>
@@ -871,7 +1078,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                             {pRecords.length === 0 && (
                               <tr>
                                 <td colSpan={6} className={`p-6 text-center text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  Loading records...
+                                  No billing records for this period.
                                 </td>
                               </tr>
                             )}
