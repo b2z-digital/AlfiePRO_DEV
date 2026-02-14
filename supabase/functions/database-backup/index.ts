@@ -39,18 +39,22 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: roleCheck } = await adminClient
-      .from("user_clubs")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "super_admin")
-      .maybeSingle();
+    const isSuperAdmin = user.user_metadata?.is_super_admin === true;
 
-    if (!roleCheck) {
-      return new Response(JSON.stringify({ error: "Forbidden - super admin only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!isSuperAdmin) {
+      const { data: platformAdmin } = await adminClient
+        .from("platform_super_admins")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!platformAdmin) {
+        return new Response(JSON.stringify({ error: "Forbidden - super admin only" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const url = new URL(req.url);

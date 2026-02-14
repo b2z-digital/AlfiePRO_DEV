@@ -26,14 +26,20 @@ async function verifySuperdmin(authHeader: string) {
   if (error || !user) return null;
 
   const adminClient = createClient(supabaseUrl, serviceKey);
-  const { data: roleCheck } = await adminClient
-    .from("user_clubs")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("role", "super_admin")
-    .maybeSingle();
 
-  if (!roleCheck) return null;
+  const isSuperAdmin = user.user_metadata?.is_super_admin === true;
+
+  if (!isSuperAdmin) {
+    const { data: platformAdmin } = await adminClient
+      .from("platform_super_admins")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (!platformAdmin) return null;
+  }
+
   return { user, adminClient };
 }
 
