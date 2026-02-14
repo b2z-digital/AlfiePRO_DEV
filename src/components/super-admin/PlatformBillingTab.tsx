@@ -96,6 +96,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
   const [entityOptions, setEntityOptions] = useState<EntityOption[]>([]);
   const [forecast, setForecast] = useState<ForecastEntity[]>([]);
   const [forecastLoading, setForecastLoading] = useState(false);
+  const [generateMessage, setGenerateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const defaultRateForm = {
     name: '',
@@ -291,6 +292,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
   const generateBillingRecords = async () => {
     try {
       setGenerating(true);
+      setGenerateMessage(null);
       const { data: session } = await supabase.auth.getSession();
 
       const response = await fetch(
@@ -306,11 +308,24 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
       );
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
+      if (!response.ok) throw new Error(result.error || 'Failed to generate billing');
 
-      loadBillingData();
+      if (result.total_records === 0) {
+        setGenerateMessage({
+          type: 'error',
+          text: `No billing records generated for this period. Ensure you have active rates with an effective date on or before the billing month, and that the target entities have active members.`,
+        });
+      } else {
+        setGenerateMessage({
+          type: 'success',
+          text: `Generated ${result.total_records} billing record(s) totalling $${result.total_amount.toFixed(2)} for ${new Date(generateMonth + '-01').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}.`,
+        });
+      }
+
+      await loadBillingData();
     } catch (err) {
-      console.error('Error generating billing:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error generating billing';
+      setGenerateMessage({ type: 'error', text: message });
     } finally {
       setGenerating(false);
     }
@@ -970,6 +985,17 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
               Billing is automatically generated on the 1st of each month. Use this to manually generate or re-generate a specific month.
               Formula: active members x (annual rate / 12) = monthly charge.
             </p>
+
+            {generateMessage && (
+              <div className={`mt-4 p-3 rounded-xl text-sm flex items-start gap-2 ${
+                generateMessage.type === 'success'
+                  ? darkMode ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : darkMode ? 'bg-red-500/10 border border-red-500/20 text-red-300' : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {generateMessage.type === 'success' ? <CheckCircle size={16} className="flex-shrink-0 mt-0.5" /> : <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />}
+                <span>{generateMessage.text}</span>
+              </div>
+            )}
           </div>
 
           <div className={`rounded-2xl border ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>

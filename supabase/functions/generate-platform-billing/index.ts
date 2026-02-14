@@ -70,7 +70,10 @@ Deno.serve(async (req: Request) => {
       .eq("period_end", periodEndStr)
       .maybeSingle();
 
-    if (existingPeriod?.status === "finalized") {
+    if (
+      existingPeriod?.status === "finalized" &&
+      existingPeriod.total_records > 0
+    ) {
       return jsonResponse(
         {
           error:
