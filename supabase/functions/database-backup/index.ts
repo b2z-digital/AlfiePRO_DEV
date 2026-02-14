@@ -68,7 +68,13 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "create") {
-      const { data: tables } = await adminClient.rpc("get_public_table_stats");
+      const { data: tables, error: rpcError } = await adminClient.rpc("get_public_table_stats");
+      if (rpcError) {
+        return new Response(JSON.stringify({ error: "Failed to query tables", details: rpcError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       if (!tables || tables.length === 0) {
         return new Response(JSON.stringify({ error: "No tables found" }), {
           status: 400,
