@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Code2 } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -89,7 +89,6 @@ import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
 import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
 import { BackupManagementTab } from './super-admin/BackupManagementTab';
 import { UserManagementTab } from './super-admin/UserManagementTab';
-import { GitHubManagementTab } from './super-admin/GitHubManagementTab';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -1001,9 +1000,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
-          { id: 'backups', label: 'Backup Management', icon: Database, description: 'Database backups', path: '/backups' },
+          { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
-          { id: 'github', label: 'GitHub Repository', icon: Code2, description: 'Source control', path: '/github' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1599,11 +1597,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <UserManagementTab darkMode={true} />
                 </div></div>
               } />
-              <Route path="/github" element={
-                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
-                  <GitHubManagementTab darkMode={true} />
-                </div></div>
-              } />
+              <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
               <Route path="/association-members" element={

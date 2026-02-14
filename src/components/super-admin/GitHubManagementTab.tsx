@@ -10,6 +10,7 @@ import { supabase } from '../../utils/supabase';
 
 interface GitHubManagementTabProps {
   darkMode: boolean;
+  embedded?: boolean;
 }
 
 interface RepoInfo {
@@ -70,7 +71,7 @@ interface CompareResult {
   files: { filename: string; status: string; additions: number; deletions: number; changes: number }[];
 }
 
-export function GitHubManagementTab({ darkMode }: GitHubManagementTabProps) {
+export function GitHubManagementTab({ darkMode, embedded = false }: GitHubManagementTabProps) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [repoName, setRepoName] = useState('');
   const [hasToken, setHasToken] = useState(false);
@@ -359,46 +360,79 @@ export function GitHubManagementTab({ darkMode }: GitHubManagementTabProps) {
   ] as const;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900">
-            <Code2 className="text-white" size={28} />
+    <div className={embedded ? "space-y-6" : "space-y-8"}>
+      {!embedded && (
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900">
+              <Code2 className="text-white" size={28} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-white">GitHub Repository</h1>
+              <p className="text-sm text-slate-400">{repoName}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white">GitHub Repository</h1>
-            <p className="text-sm text-slate-400">{repoName}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => loadAllData()}
-            disabled={refreshing}
-            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
-          >
-            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          </button>
-          <button
-            onClick={() => setShowSettings(true)}
-            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
-          >
-            <Settings size={16} />
-          </button>
-          {repo && (
-            <a
-              href={`https://github.com/${repoName}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadAllData()}
+              disabled={refreshing}
+              className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
             >
-              <ExternalLink size={14} />
-              Open in GitHub
-            </a>
-          )}
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
+            >
+              <Settings size={16} />
+            </button>
+            {repo && (
+              <a
+                href={`https://github.com/${repoName}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <ExternalLink size={14} />
+                Open in GitHub
+              </a>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-slate-400">{repoName || 'Not configured'}</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadAllData()}
+              disabled={refreshing}
+              className="p-2 rounded-lg text-slate-400 hover:bg-slate-800/50 transition-colors"
+            >
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-lg text-slate-400 hover:bg-slate-800/50 transition-colors"
+            >
+              <Settings size={16} />
+            </button>
+            {repo && (
+              <a
+                href={`https://github.com/${repoName}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+              >
+                <ExternalLink size={14} />
+                Open in GitHub
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {tabs.map(tab => (
