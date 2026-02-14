@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateUserProfile } from '../../utils/auth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -20,6 +20,7 @@ import { FormBuilderPage } from './FormBuilderPage';
 import { DocumentTemplateBuilder } from './DocumentTemplateBuilder';
 import { BackupRestoreSection } from './BackupRestoreSection';
 import { AdvertisingManagement } from '../advertising/AdvertisingManagement';
+import { ClubFeaturesAccess } from './ClubFeaturesAccess';
 import { ClubYachtClassesSelector } from '../ClubYachtClassesSelector';
 import { formatDate } from '../../utils/date';
 import { supabase } from '../../utils/supabase';
@@ -32,7 +33,7 @@ interface SettingsPageProps {
   darkMode: boolean;
 }
 
-type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'team' | 'subscriptions' | 'integrations' |
+type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising';
@@ -580,6 +581,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Users</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                         Manage admin and editor access to this association
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* Club Features Access Card - only for state/national association admins */}
+              {currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national') && can('users.manage') && (
+                <button
+                  onClick={() => setActiveTab('club-features')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'club-features'
+                      ? lightMode
+                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
+                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
+                      <Zap size={20} className="text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Club Features Access</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Control which features are available for your clubs
                       </p>
                     </div>
                   </div>
@@ -1662,6 +1692,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'association-users' && currentOrganization && (
             <AssociationUsersManagement darkMode={darkMode} />
+          )}
+
+          {activeTab === 'club-features' && currentOrganization && (
+            <ClubFeaturesAccess darkMode={darkMode} />
           )}
 
           {activeTab === 'team' && (
