@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { ConfirmationModal } from '../ConfirmationModal';
 import { GitHubManagementTab } from './GitHubManagementTab';
 
 interface BackupManagementTabProps {
@@ -47,6 +49,7 @@ interface SchemaStats {
 
 export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
   const { user } = useAuth();
+  const { addNotification } = useNotifications();
   const [backups, setBackups] = useState<Backup[]>([]);
   const [tableStats, setTableStats] = useState<TableStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
   const [createProgress, setCreateProgress] = useState('');
   const [lastSchemaStats, setLastSchemaStats] = useState<SchemaStats | null>(null);
   const [topSection, setTopSection] = useState<'database' | 'repository'>('database');
+  const [deleteConfirmBackup, setDeleteConfirmBackup] = useState<Backup | null>(null);
 
   useEffect(() => {
     loadData();
@@ -102,6 +106,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
   const createBackup = async () => {
     setCreating(true);
     setCreateProgress('Exporting database schema, policies, and data...');
+    addNotification('info', 'Creating full database backup...');
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`${getBackupApiUrl()}?action=create`, {
@@ -122,9 +127,11 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
       if (result.schemaStats) {
         setLastSchemaStats(result.schemaStats);
       }
+      addNotification('success', 'Database backup created successfully');
     } catch (err: any) {
       console.error('Backup error:', err);
       setCreateProgress(`Error: ${err.message}`);
+      addNotification('error', `Backup failed: ${err.message}`);
     } finally {
       setCreating(false);
       setTimeout(() => setCreateProgress(''), 4000);
@@ -150,26 +157,43 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (err) {
+      addNotification('success', 'Backup download started');
+    } catch (err: any) {
       console.error('Download error:', err);
+      addNotification('error', `Download failed: ${err.message}`);
     } finally {
       setDownloading(null);
     }
   };
 
-  const deleteBackup = async (backup: Backup) => {
-    if (!confirm('Are you sure you want to delete this backup? This cannot be undone.')) return;
+  const handleDeleteClick = (backup: Backup) => {
+    setDeleteConfirmBackup(backup);
+  };
+
+  const confirmDeleteBackup = async () => {
+    const backup = deleteConfirmBackup;
+    if (!backup) return;
+    setDeleteConfirmBackup(null);
     setDeleting(backup.id);
     try {
       const headers = await getAuthHeaders();
-      await fetch(`${getBackupApiUrl()}?action=delete`, {
+      const res = await fetch(`${getBackupApiUrl()}?action=delete`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ backupId: backup.id, storagePath: backup.storage_path }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+        throw new Error(err.error || 'Delete failed');
+      }
+
       setBackups(prev => prev.filter(b => b.id !== backup.id));
-    } catch (err) {
+      setExpandedBackup(null);
+      addNotification('success', 'Backup deleted successfully');
+    } catch (err: any) {
       console.error('Delete error:', err);
+      addNotification('error', `Failed to delete backup: ${err.message}`);
     } finally {
       setDeleting(null);
     }
@@ -266,7 +290,7 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
           statusConfig={statusConfig}
           onCreateBackup={createBackup}
           onDownloadBackup={downloadBackup}
-          onDeleteBackup={deleteBackup}
+          onDeleteBackup={handleDeleteClick}
           onExpandBackup={(id) => setExpandedBackup(expandedBackup === id ? null : id)}
           onSetActiveView={setActiveView}
           onRefresh={loadData}
@@ -278,6 +302,18 @@ export function BackupManagementTab({ darkMode }: BackupManagementTabProps) {
       {topSection === 'repository' && (
         <GitHubManagementTab darkMode={darkMode} embedded />
       )}
+
+      <ConfirmationModal
+        isOpen={!!deleteConfirmBackup}
+        onClose={() => setDeleteConfirmBackup(null)}
+        onConfirm={confirmDeleteBackup}
+        title="Delete Backup"
+        message="Are you sure you want to delete this backup? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        darkMode={darkMode}
+        variant="danger"
+      />
     </div>
   );
 }

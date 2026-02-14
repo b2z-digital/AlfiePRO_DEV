@@ -39,7 +39,8 @@ export function useFeatureAccess(): FeatureAccessResult {
   const dbOrgType = getOrgTypeForDb(orgType);
 
   const loadFeatures = useCallback(async (force = false) => {
-    if (!orgId) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!orgId || !uuidRegex.test(orgId)) {
       setFeatures([]);
       setLoading(false);
       return;
