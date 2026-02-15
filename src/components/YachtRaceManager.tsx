@@ -2640,7 +2640,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     !skippers.some(s => s.startHcap > 0);
 
   // Get the current event to check if it's multi-day
-  const currentEvent = getCurrentEvent();
+  // Use selectedEvent state to ensure component re-renders when event is updated
+  const currentEvent = selectedEvent || getCurrentEvent();
   const isMultiDayEvent = currentEvent?.multiDay || false;
   const totalDays = currentEvent?.numberOfDays || 1;
 

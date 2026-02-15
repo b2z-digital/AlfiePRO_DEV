@@ -950,9 +950,10 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
       return null;
     }
 
-    const currentClubId = await getCurrentClubId();
+    // Use the club_id from the current event
+    const currentClubId = currentEvent.clubId || currentEvent.club_id;
     if (!currentClubId) {
-      console.error('❌ No club selected');
+      console.error('❌ No club ID found in current event');
       return null;
     }
 
@@ -1009,7 +1010,10 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
     console.log('✅ Event reloaded successfully:', {
       eventName: reloadedEvent.eventName,
       enable_observers: reloadedEvent.enable_observers,
-      observers_per_heat: reloadedEvent.observers_per_heat
+      observers_per_heat: reloadedEvent.observers_per_heat,
+      heatManagement: reloadedEvent.heatManagement,
+      scoringSystem: reloadedEvent.heatManagement?.configuration?.scoringSystem,
+      dropRules: reloadedEvent.dropRules
     });
 
     // Update localStorage with fresh data
