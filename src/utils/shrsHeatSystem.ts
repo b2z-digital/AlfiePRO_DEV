@@ -1,11 +1,13 @@
 /**
  * Simple Heat Racing System (SHRS) Implementation
- * Version 2023-2, 5th September 2023
+ * Version 2026-1, 5th February 2026
  *
  * This module implements the SHRS rules for heat racing including:
- * - Heat movement tables (Table 1 and Table 2)
+ * - Heat movement tables (Table 1 and Table 2) for 2-5 heats
  * - Qualifying series and final series logic
- * - SHRS-specific scoring rules
+ * - SHRS-specific scoring rules (Rule 5.2: scores based on largest heat size)
+ * - Progressive and pre-assignment methods
+ * - Finals fleet assignments (Gold, Silver, Bronze, Copper)
  */
 
 import { Skipper } from '../types';
@@ -31,7 +33,11 @@ const HEAT_MOVEMENT_TABLE_1: Record<number, number[][]> = {
   4: [[1, 2, 3, 4], [4, 1, 2, 3], [3, 4, 1, 2], [2, 3, 4, 1], [1, 2, 3, 4], [4, 1, 2, 3],
       [3, 4, 1, 2], [2, 3, 4, 1], [1, 2, 3, 4], [4, 1, 2, 3], [3, 4, 1, 2], [2, 3, 4, 1],
       [1, 2, 3, 4], [4, 1, 2, 3], [3, 4, 1, 2], [2, 3, 4, 1], [1, 2, 3, 4], [4, 1, 2, 3],
-      [3, 4, 1, 2], [2, 3, 4, 1]]
+      [3, 4, 1, 2], [2, 3, 4, 1]],
+  5: [[1, 2, 3, 4, 5], [5, 1, 2, 3, 4], [4, 5, 1, 2, 3], [3, 4, 5, 1, 2], [2, 3, 4, 5, 1],
+      [1, 2, 3, 4, 5], [5, 1, 2, 3, 4], [4, 5, 1, 2, 3], [3, 4, 5, 1, 2], [2, 3, 4, 5, 1],
+      [1, 2, 3, 4, 5], [5, 1, 2, 3, 4], [4, 5, 1, 2, 3], [3, 4, 5, 1, 2], [2, 3, 4, 5, 1],
+      [1, 2, 3, 4, 5], [5, 1, 2, 3, 4], [4, 5, 1, 2, 3], [3, 4, 5, 1, 2], [2, 3, 4, 5, 1]]
 };
 
 /**
@@ -50,17 +56,23 @@ const HEAT_MOVEMENT_TABLE_2: Record<number, string[][]> = {
       ['A', 'B', 'C', 'D'], ['D', 'A', 'B', 'C'], ['C', 'D', 'A', 'B'], ['B', 'C', 'D', 'A'],
       ['A', 'B', 'C', 'D'], ['D', 'A', 'B', 'C'], ['C', 'D', 'A', 'B'], ['B', 'C', 'D', 'A'],
       ['A', 'B', 'C', 'D'], ['D', 'A', 'B', 'C'], ['C', 'D', 'A', 'B'], ['B', 'C', 'D', 'A'],
-      ['A', 'B', 'C', 'D'], ['D', 'A', 'B', 'C'], ['C', 'D', 'A', 'B'], ['B', 'C', 'D', 'A']]
+      ['A', 'B', 'C', 'D'], ['D', 'A', 'B', 'C'], ['C', 'D', 'A', 'B'], ['B', 'C', 'D', 'A']],
+  5: [['A', 'B', 'C', 'D', 'E'], ['E', 'A', 'B', 'C', 'D'], ['D', 'E', 'A', 'B', 'C'], ['C', 'D', 'E', 'A', 'B'], ['B', 'C', 'D', 'E', 'A'],
+      ['A', 'B', 'C', 'D', 'E'], ['E', 'A', 'B', 'C', 'D'], ['D', 'E', 'A', 'B', 'C'], ['C', 'D', 'E', 'A', 'B'], ['B', 'C', 'D', 'E', 'A'],
+      ['A', 'B', 'C', 'D', 'E'], ['E', 'A', 'B', 'C', 'D'], ['D', 'E', 'A', 'B', 'C'], ['C', 'D', 'E', 'A', 'B'], ['B', 'C', 'D', 'E', 'A'],
+      ['A', 'B', 'C', 'D', 'E'], ['E', 'A', 'B', 'C', 'D'], ['D', 'E', 'A', 'B', 'C'], ['C', 'D', 'E', 'A', 'B'], ['B', 'C', 'D', 'E', 'A']]
 };
 
 /**
  * Calculate optimal number of heats for SHRS
  * SHRS Rule 2.1: The number of heats shall be as few as possible
+ * SHRS Rule 2.3: The maximum number of boats in a heat shall be 20
  */
 export function calculateOptimalHeats(totalSkippers: number): number {
-  if (totalSkippers <= 10) return 2;
-  if (totalSkippers <= 20) return 3;
-  return 4; // Maximum 4 heats for SHRS
+  if (totalSkippers <= 20) return 2;
+  if (totalSkippers <= 40) return 3;
+  if (totalSkippers <= 60) return 4;
+  return 5;
 }
 
 /**
@@ -151,7 +163,7 @@ export function getNextHeat(
   if (useTable2) {
     // Table 2: Alpha labeling
     const heatLabel = lastRaceHeat as string;
-    const heatIndex = ['A', 'B', 'C', 'D'].indexOf(heatLabel);
+    const heatIndex = ['A', 'B', 'C', 'D', 'E'].indexOf(heatLabel);
     if (heatIndex === -1 || !HEAT_MOVEMENT_TABLE_2[numberOfHeats]) {
       return heatLabel; // Return same heat if not found
     }
@@ -248,8 +260,8 @@ export function validateSHRSConfig(config: SHRSConfig, skipperCount: number): {
 } {
   const errors: string[] = [];
 
-  if (config.numberOfHeats < 2 || config.numberOfHeats > 4) {
-    errors.push('SHRS requires between 2 and 4 heats.');
+  if (config.numberOfHeats < 2 || config.numberOfHeats > 5) {
+    errors.push('SHRS requires between 2 and 5 heats.');
   }
 
   if (skipperCount < config.numberOfHeats * 2) {

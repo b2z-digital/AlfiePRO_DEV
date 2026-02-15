@@ -93,6 +93,31 @@ const calculateTotals = (event: RaceEvent, allResults: any[]) => {
   const skippers = event.skippers;
   const skipperGroups: Record<number, any[]> = {};
 
+  // SHRS Rule 5.2: For SHRS, use the number of boats in the largest heat instead of total skippers
+  const isSHRS = event.scoringSystem === 'shrs' || event.heatManagement?.configuration?.scoringSystem === 'shrs';
+  let largestHeatSize = skippers.length;
+
+  if (isSHRS && event.heatManagement?.rounds && event.heatManagement.rounds.length > 0) {
+    // Find the largest heat size across all rounds
+    largestHeatSize = 0;
+    event.heatManagement.rounds.forEach(round => {
+      if (round.heats) {
+        round.heats.forEach(heat => {
+          const heatSize = heat.skippers?.length || 0;
+          if (heatSize > largestHeatSize) {
+            largestHeatSize = heatSize;
+          }
+        });
+      }
+    });
+    // Fallback to total skippers if no heats found
+    if (largestHeatSize === 0) {
+      largestHeatSize = skippers.length;
+    }
+  }
+
+  const totalCompetitorsForScoring = isSHRS ? largestHeatSize : skippers.length;
+
   allResults.forEach(result => {
     if (!skipperGroups[result.skipperIndex]) {
       skipperGroups[result.skipperIndex] = [];
@@ -118,12 +143,12 @@ const calculateTotals = (event: RaceEvent, allResults: any[]) => {
 
         return {
           race: r.race,
-          score: getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, skippers.length),
+          score: getLetterScoreValue(r.letterScore as LetterScore, raceFinishers, totalCompetitorsForScoring),
           isLetterScore: true
         };
       }
 
-      return { race: r.race, score: skippers.length + 1 };
+      return { race: r.race, score: totalCompetitorsForScoring + 1 };
     });
 
     const gross = scores.reduce((sum, r) => sum + r.score, 0);
