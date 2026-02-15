@@ -1156,17 +1156,20 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 )}
 
                 {/* Automatic Heat Configuration */}
-                <div className={`p-4 rounded-lg ${
+                <div className={`p-5 rounded-xl border-2 ${
                   hasHeatScores
-                    ? darkMode ? 'bg-slate-800/50 opacity-60' : 'bg-slate-100 opacity-60'
-                    : darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                    ? darkMode ? 'bg-slate-800/50 border-slate-700 opacity-60' : 'bg-slate-100 border-slate-300 opacity-60'
+                    : darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600' : 'bg-gradient-to-br from-blue-50 to-slate-50 border-blue-200'
                 }`}>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Heat Configuration
+                      <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <div className="flex items-center gap-2">
+                          <Trophy size={18} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
+                          Heat Configuration
+                        </div>
                       </label>
-                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
                         Auto-calculated
                       </span>
                     </div>
@@ -1174,8 +1177,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     {numHeats > 0 ? (
                       <>
                         <div className="grid grid-cols-2 gap-4">
-                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-white'} relative`}>
-                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1`}>
+                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
+                            <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
                               Number of Heats
                             </div>
                             {isEditingHeats && !hasHeatScores ? (
@@ -1223,7 +1226,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             ) : (
                               <div className="flex items-center justify-between">
-                                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {numHeats}
                                 </div>
                                 {!hasHeatScores && (
@@ -1247,8 +1250,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             )}
                           </div>
-                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-white'} relative`}>
-                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1`}>
+                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
+                            <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
                               Promotion/Relegation
                             </div>
                             {isEditingPromotion && !hasHeatScores ? (
@@ -1296,7 +1299,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             ) : (
                               <div className="flex items-center justify-between">
-                                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {promotionCount}
                                 </div>
                                 {!hasHeatScores && (
@@ -1447,31 +1450,31 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 </div>
 
                 {/* Observer Settings */}
-                <div className={`p-4 rounded-lg space-y-4 ${
-                  darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                <div className={`p-5 rounded-xl border-2 space-y-4 ${
+                  darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600' : 'bg-gradient-to-br from-purple-50 to-slate-50 border-purple-200'
                 }`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Eye size={18} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
-                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <Eye size={20} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
+                      <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         Observer System
                       </label>
                     </div>
                     <button
                       onClick={() => setEnableObservers(!enableObservers)}
                       type="button"
-                      className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${
-                        enableObservers ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-200'
+                      className={`relative w-14 h-7 rounded-full transition-colors duration-200 shadow-sm ${
+                        enableObservers ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                      <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
                         enableObservers ? 'translate-x-8' : 'translate-x-1'
                       } mt-1`} />
                     </button>
                   </div>
 
-                  <div className={`text-xs p-3 rounded-lg ${
-                    darkMode ? 'bg-slate-800/50 text-slate-400' : 'bg-purple-50 text-purple-800'
+                  <div className={`text-xs p-3 rounded-lg border ${
+                    darkMode ? 'bg-slate-800/50 text-slate-400 border-slate-700' : 'bg-purple-50 text-purple-800 border-purple-100'
                   }`}>
                     {enableObservers ? (
                       <p>
@@ -1485,47 +1488,47 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   </div>
 
                   {enableObservers && (
-                    <div className="space-y-2">
-                      <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <div className="space-y-3">
+                      <label className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         Observers Per Heat
                       </label>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => setObserversPerHeat(Math.max(2, observersPerHeat - 1))}
                           type="button"
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-colors border-2 ${
                             observersPerHeat <= 2
-                              ? darkMode ? 'bg-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                              : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              ? darkMode ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : darkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
                           }`}
                           disabled={observersPerHeat <= 2}
                         >
                           -
                         </button>
-                        <div className={`flex-1 text-center px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-800' : 'bg-white'
+                        <div className={`flex-1 text-center px-4 py-3 rounded-xl border-2 ${
+                          darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
                         }`}>
-                          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             {observersPerHeat}
                           </div>
-                          <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <div className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                             observers
                           </div>
                         </div>
                         <button
                           onClick={() => setObserversPerHeat(Math.min(10, observersPerHeat + 1))}
                           type="button"
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-colors border-2 ${
                             observersPerHeat >= 10
-                              ? darkMode ? 'bg-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                              : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              ? darkMode ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : darkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
                           }`}
                           disabled={observersPerHeat >= 10}
                         >
                           +
                         </button>
                       </div>
-                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} text-center`}>
+                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'} text-center`}>
                         Recommended: 2-4 observers for effective monitoring
                       </p>
                     </div>

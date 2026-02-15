@@ -457,6 +457,16 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const getScoringSystemName = () => {
     const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
 
+    // Check if heat management has a scoring system specified
+    if (event.heatManagement?.configuration?.scoringSystem) {
+      const heatScoringSystem = event.heatManagement.configuration.scoringSystem;
+      if (heatScoringSystem === 'hms') {
+        return 'HMS Heat System';
+      } else if (heatScoringSystem === 'shrs') {
+        return 'SHRS - Simple Heat Racing System';
+      }
+    }
+
     // Handle heat racing scoring systems (strings)
     if (typeof dropRules === 'string') {
       if (dropRules === 'hms') {
