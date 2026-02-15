@@ -1092,6 +1092,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             onConfirmResults={() => {
               console.log('✅ Touch mode results confirmed for heat', selectedHeat);
               setTouchModeResultsConfirmed(true);
+
+              // If this is the last heat being scored, complete it now
+              if (selectedHeat && isScoringLastHeat()) {
+                console.log('🏁 Last heat confirmed - completing heat', selectedHeat);
+                onCompleteHeat(selectedHeat);
+              }
             }}
             darkMode={darkMode}
             dropRules={[4, 8, 16, 24, 32, 40]}
