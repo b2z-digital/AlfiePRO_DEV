@@ -1170,7 +1170,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (heatManagement.roundJustCompleted) {
             delete heatManagement.roundJustCompleted;
           }
-          if (onGoToRound) {
+          // Call the actual advance handler with the last heat to trigger round creation
+          if (onAdvanceToNextRound) {
+            const lastHeat = availableHeats[availableHeats.length - 1];
+            console.log('📍 Calling onAdvanceToNextRound with last heat:', lastHeat);
+            onAdvanceToNextRound(lastHeat);
+          } else if (onGoToRound) {
+            // Fallback to just navigating if advance handler not available
             onGoToRound(nextRoundNumber);
           }
         }}
