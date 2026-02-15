@@ -537,12 +537,22 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
       if (currentDropRules === 'shrs') {
         // SHRS validation - no promotion/relegation
+        // SHRS typically uses about 1/3 of races for qualifying, minimum 2 races
+        const qualifyingRaces = Math.max(2, Math.floor(currentNumRaces / 3));
+
         const shrsConfig: SHRSConfig = {
           numberOfHeats: numHeats,
-          seedingMethod,
-          autoAssign: initialAssignment === 'random'
+          numberOfRaces: currentNumRaces,
+          qualifyingRaces: qualifyingRaces,
+          useTable2: true // Use alphabetic labeling (A, B, C, D)
         };
-        validation = validateSHRSConfig(shrsConfig, skippers.length);
+        const shrsValidation = validateSHRSConfig(shrsConfig, skippers.length);
+        // Adapt SHRS validation result to match HMS format
+        validation = {
+          valid: shrsValidation.isValid,
+          errors: shrsValidation.errors,
+          warnings: [] // SHRS doesn't have warnings
+        };
       } else {
         // HMS validation - with promotion/relegation
         const hmsConfig: HMSConfig = {
