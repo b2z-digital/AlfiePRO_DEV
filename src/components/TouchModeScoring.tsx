@@ -739,12 +739,24 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   // Get scoring system display name
   const getScoringSystemName = () => {
+    // Check if heat management has a scoring system specified (most reliable for heat racing)
+    if (currentEvent?.heatManagement?.configuration?.scoringSystem) {
+      const heatScoringSystem = currentEvent.heatManagement.configuration.scoringSystem;
+      if (heatScoringSystem === 'hms') {
+        return 'HMS Heat System';
+      } else if (heatScoringSystem === 'shrs') {
+        return 'SHRS - Simple Heat Racing System';
+      }
+    }
+
+    // Check dropRules string values
     if (typeof dropRules === 'string') {
       if (dropRules === 'shrs') return 'SHRS - Simple Heat Racing System';
-      if (dropRules === 'hms') return 'HMS - Hawkesbury Memorial Series';
+      if (dropRules === 'hms') return 'HMS Heat System';
       return dropRules;
     }
 
+    // Check array-based scoring systems
     if (!Array.isArray(dropRules) || dropRules.length === 0) {
       return 'No Discards';
     }

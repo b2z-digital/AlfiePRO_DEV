@@ -281,12 +281,22 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
 
   // Get scoring system name based on drop rules
   const getScoringSystemName = () => {
+    // Check if heat management has a scoring system specified (most reliable for heat racing)
+    if (currentEvent?.heatManagement?.configuration?.scoringSystem) {
+      const heatScoringSystem = currentEvent.heatManagement.configuration.scoringSystem;
+      if (heatScoringSystem === 'hms') {
+        return 'HMS Heat System';
+      } else if (heatScoringSystem === 'shrs') {
+        return 'SHRS - Simple Heat Racing System';
+      }
+    }
+
     // Check if it's a string (HMS or SHRS)
     if (typeof dropRules === 'string') {
       if (dropRules === 'shrs') {
         return 'SHRS - Simple Heat Racing System';
       } else if (dropRules === 'hms') {
-        return 'HMS - Hawkesbury Memorial Series';
+        return 'HMS Heat System';
       }
       return dropRules;
     }
