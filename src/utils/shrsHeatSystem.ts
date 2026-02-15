@@ -112,16 +112,24 @@ export function seedInitialHeatsForSHRS(
   let sortedSkippers = [...skippers];
   if (seedingList && seedingList.length > 0) {
     sortedSkippers.sort((a, b) => {
-      const aIndex = seedingList.indexOf(a.sailNumber);
-      const bIndex = seedingList.indexOf(b.sailNumber);
-      if (aIndex === -1 && bIndex === -1) return a.sailNumber.localeCompare(b.sailNumber);
+      const aSail = a.sailNumber || '';
+      const bSail = b.sailNumber || '';
+      const aIndex = seedingList.indexOf(aSail);
+      const bIndex = seedingList.indexOf(bSail);
+      if (aIndex === -1 && bIndex === -1) {
+        return aSail.localeCompare(bSail);
+      }
       if (aIndex === -1) return 1;
       if (bIndex === -1) return -1;
       return aIndex - bIndex;
     });
   } else {
     // Default: alphabetical by national letter, then numerical by sail number
-    sortedSkippers.sort((a, b) => a.sailNumber.localeCompare(b.sailNumber));
+    sortedSkippers.sort((a, b) => {
+      const aSail = a.sailNumber || '';
+      const bSail = b.sailNumber || '';
+      return aSail.localeCompare(bSail);
+    });
   }
 
   // Assign using the zigzag pattern: 1, 2, 3, 4, 5, 5, 4, 3, 2, 1...
@@ -220,8 +228,8 @@ export function assignToFinalFleets(
 
   // Sort skippers by qualifying score (lowest score = best)
   const sortedSkippers = [...skippers].sort((a, b) => {
-    const scoreA = qualifyingScores.get(a.sailNumber) || 999999;
-    const scoreB = qualifyingScores.get(b.sailNumber) || 999999;
+    const scoreA = qualifyingScores.get(a.sailNumber || '') || 999999;
+    const scoreB = qualifyingScores.get(b.sailNumber || '') || 999999;
     return scoreA - scoreB;
   });
 
@@ -309,7 +317,7 @@ export function createSHRSHeatManagement(
       heats: Array.from(initialHeats.entries()).map(([heatId, skippers]) => ({
         heatId: config.useTable2 ? String.fromCharCode(64 + Number(heatId)) : heatId,
         heatName: config.useTable2 ? `Heat ${String.fromCharCode(64 + Number(heatId))}` : `Heat ${heatId}`,
-        skippers: skippers.map(s => s.sailNumber)
+        skippers: skippers.map(s => s.sailNumber || '')
       })),
       results: [],
       completed: false,
