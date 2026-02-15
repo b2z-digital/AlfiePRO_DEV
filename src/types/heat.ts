@@ -1,6 +1,7 @@
 import { Skipper } from './index';
 import { LetterScore } from './letterScores';
 import { generateHeatAssignmentsForNextRace, HMSConfig } from '../utils/hmsHeatSystem';
+import { getNextHeat } from '../utils/shrsHeatSystem';
 
 export type HeatDesignation = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -297,9 +298,6 @@ export const generateNextRoundAssignments = (
   if (scoringSystem === 'shrs') {
     // SHRS uses heat movement tables instead of promotion/relegation
     console.log('SHRS: Using heat movement tables');
-
-    // Import SHRS function dynamically
-    const { getNextHeat } = require('../utils/shrsHeatSystem');
 
     // For SHRS, each skipper's next heat is determined by their position and current heat
     // using the heat movement tables
