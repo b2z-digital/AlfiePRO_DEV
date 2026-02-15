@@ -516,12 +516,20 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   // Find the next round (if current round is complete)
   const nextRound = completed ? rounds.find(r => r.round === round + 1) : null;
 
+  // For SHRS, check if we should allow progression even if next round doesn't exist yet
+  const isSHRS = heatManagement.configuration.scoringSystem === 'shrs';
+  const expectedRounds = heatManagement.configuration.numberOfRounds || 6; // Default SHRS rounds
+  const shouldAllowProgression = completed && round < expectedRounds;
+
   console.log('HeatAssignmentModal Debug:', {
     round,
     completed,
     roundJustCompleted,
     nextRound: nextRound ? `Round ${nextRound.round}` : 'null',
     totalRounds: rounds.length,
+    isSHRS,
+    expectedRounds,
+    shouldAllowProgression,
     allRounds: rounds.map(r => ({ round: r.round, completed: r.completed }))
   });
 
@@ -1531,17 +1539,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           <button
             onClick={() => {
               if (!isInitialAllocation) {
-                if (completed && nextRound) {
+                if (completed && (nextRound || shouldAllowProgression)) {
                   // Advancing to next round after completing current round
-                  // Use onAdvanceToNextRound if available - this keeps modal open to show new round allocations
-                  console.log('Advancing to next round:', nextRound.round);
+                  const targetRound = nextRound ? nextRound.round : round + 1;
+                  console.log('Advancing to next round:', targetRound);
                   if (onAdvanceToNextRound) {
-                    onAdvanceToNextRound(nextRound.round);
+                    onAdvanceToNextRound(targetRound);
                     // Don't close - modal will update to show new round allocations
                     return;
                   } else if (onStartRound) {
                     // Fallback to old behavior
-                    onStartRound(nextRound.round);
+                    onStartRound(targetRound);
                   }
                 } else if (!completed && roundToDisplay && onStartRound) {
                   // Start scoring the current round
@@ -1567,7 +1575,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 Setting up observers...
               </span>
             ) : (
-              completed && nextRound ? `Next Round (Round ${nextRound.round})` : completed ? 'Close' : isInitialAllocation ? 'Accept & Start Scoring' : 'Start Scoring'
+              completed && shouldAllowProgression
+                ? `Progress to Round ${round + 1}`
+                : completed && nextRound
+                ? `Next Round (Round ${nextRound.round})`
+                : completed
+                ? 'Close'
+                : isInitialAllocation
+                ? 'Accept & Start Scoring'
+                : 'Start Scoring'
             )}
           </button>
         </div>

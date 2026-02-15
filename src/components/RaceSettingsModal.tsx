@@ -692,18 +692,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
           const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-          console.log('🎯 SHRS heats generated:', shrsHeats);
-          console.log('🎯 Total skippers in event:', skippers.length);
-
           heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
             const heatIndex = Number(heatNum) - 1;
             const indices = heatSkippers.map(s => {
               // Use object identity for exact matching
               const index = skippers.indexOf(s);
-              console.log(`🔍 Skipper ${s.name} (${s.sailNumber}) -> index ${index}`);
               return index;
             });
-            console.log(`🎯 Heat ${heatLabels[heatIndex]} skipper indices:`, indices);
             return {
               heatDesignation: heatLabels[heatIndex] as any,
               skipperIndices: indices
