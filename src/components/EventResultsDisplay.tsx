@@ -979,7 +979,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 >
                 <td
                   className={`sticky left-0 z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-medium`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                 >
                   <div className="flex items-center gap-2">
                     {!isExportMode && (
@@ -1001,13 +1001,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 </td>
                 <td
                   className={`sticky left-[60px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                 >
                   {showCountry && skipper.country ? `${abbreviateCountry(skipper.country)} ` : ''}{skipper.sailNo}
                 </td>
                 <td
                   className={`sticky left-[120px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} text-left`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                 >
                   <div className="flex items-center gap-2">
                     {showFlag && skipper.countryCode && (
@@ -1032,7 +1032,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 {showClub && (
                   <td
                     className={`sticky left-[255px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                   >
                     {getClubAbbreviation(skipper)}
                   </td>
@@ -1040,21 +1040,21 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 {showClubState && (
                   <td
                     className={`px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                   >
                     {skipper.clubState || ''}
                   </td>
                 )}
                 <td
                   className={`sticky left-[330px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', boxShadow: '2px 0 4px rgba(0,0,0,0.1)' } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', height: '44px', verticalAlign: 'middle' } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
                 >
                   {getHullDesign(skipper)}
                 </td>
                 {showCategory && (
                   <td
                     className={`px-3 py-3 text-center ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                   >
                     {abbreviateCategory(skipper.category)}
                   </td>
@@ -1131,9 +1131,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             >
                               <line
                                 x1="0"
-                                y1="100"
+                                y1="0"
                                 x2="100"
-                                y2="0"
+                                y2="100"
                                 stroke={isDropped ? '#ffffff' : '#888888'}
                                 strokeWidth="1"
                                 vectorEffect="non-scaling-stroke"
@@ -1155,7 +1155,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Position at bottom-left */}
                             <span style={{
                               position: 'absolute',
-                              bottom: '4px',
+                              bottom: '12px',
                               left: '6px',
                               fontSize: '18px',
                               fontWeight: 'bold',
@@ -1199,13 +1199,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 })}
                 <td
                   className={`px-3 py-3 text-center ${isExportMode ? 'text-black' : 'text-slate-300'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                 >
                   {totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}
                 </td>
                 <td
                   className={`px-3 py-3 text-center font-medium ${isExportMode ? 'net-total' : 'text-blue-400'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', fontWeight: 'bold' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', fontWeight: 'bold', height: '44px', verticalAlign: 'middle' } : undefined}
                 >
                   {totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}
                 </td>
