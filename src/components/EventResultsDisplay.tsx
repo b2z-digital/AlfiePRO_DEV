@@ -979,7 +979,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 >
                 <td
                   className={`sticky left-0 z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-medium`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle', fontSize: '13px' } : undefined}
                 >
                   <div className="flex items-center gap-2">
                     {!isExportMode && (
@@ -1001,13 +1001,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 </td>
                 <td
                   className={`sticky left-[60px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle', fontSize: '13px' } : undefined}
                 >
                   {showCountry && skipper.country ? `${abbreviateCountry(skipper.country)} ` : ''}{skipper.sailNo}
                 </td>
                 <td
                   className={`sticky left-[120px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} text-left`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : undefined}
                 >
                   <div className="flex items-center gap-2">
                     {showFlag && skipper.countryCode && (
@@ -1026,13 +1026,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                         </div>
                       )
                     )}
-                    <span className="text-sm">{skipper.name}</span>
+                    <span className={isExportMode ? 'text-xs' : 'text-sm'}>{skipper.name}</span>
                   </div>
                 </td>
                 {showClub && (
                   <td
                     className={`sticky left-[255px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
+                    style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' } : undefined}
                   >
                     {getClubAbbreviation(skipper)}
                   </td>
@@ -1047,7 +1047,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 )}
                 <td
                   className={`sticky left-[330px] z-10 px-3 py-3 ${isExportMode ? 'text-black bg-white' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', height: '44px', verticalAlign: 'middle' } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', height: '44px', verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
                 >
                   {getHullDesign(skipper)}
                 </td>
@@ -1199,13 +1199,13 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 })}
                 <td
                   className={`px-3 py-3 text-center ${isExportMode ? 'text-black' : 'text-slate-300'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle', fontSize: '13px' } : undefined}
                 >
                   {totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}
                 </td>
                 <td
                   className={`px-3 py-3 text-center font-medium ${isExportMode ? 'net-total' : 'text-blue-400'}`}
-                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', fontWeight: 'bold', height: '44px', verticalAlign: 'middle' } : undefined}
+                  style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', fontWeight: 'bold', height: '44px', verticalAlign: 'middle', fontSize: '13px' } : undefined}
                 >
                   {totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}
                 </td>
