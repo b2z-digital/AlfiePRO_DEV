@@ -535,6 +535,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
   // Get vibrant gradient colors for each heat
   const getHeatGradient = (heat: HeatDesignation): string => {
+    if (isSHRS) {
+      const shrsGradients: Record<HeatDesignation, string> = {
+        'A': 'bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-700',
+        'B': 'bg-gradient-to-br from-slate-300 to-slate-400 border-slate-500',
+        'C': 'bg-gradient-to-br from-amber-600 to-amber-700 border-amber-800',
+        'D': 'bg-gradient-to-br from-orange-600 to-orange-700 border-orange-800',
+        'E': 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-700',
+        'F': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700'
+      };
+      return shrsGradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
+    }
     const gradients: Record<HeatDesignation, string> = {
       'A': 'bg-gradient-to-br from-yellow-500 to-amber-600 border-amber-700',
       'B': 'bg-gradient-to-br from-orange-500 to-orange-600 border-orange-700',
@@ -768,7 +779,14 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <h3 className={`${
                         heatAssignments.length >= 3 ? 'text-base' : 'text-lg'
                       } font-bold text-white`}>
-                        Heat {heatDesignation}
+                        {isSHRS ? ({
+                          'A': 'Gold Fleet',
+                          'B': 'Silver Fleet',
+                          'C': 'Bronze Fleet',
+                          'D': 'Copper Fleet',
+                          'E': 'Fleet E',
+                          'F': 'Fleet F'
+                        } as Record<string, string>)[heatDesignation] || `Fleet ${heatDesignation}` : `Heat ${heatDesignation}`}
                       </h3>
                       {heatCompleted ? (
                         <span className="text-xs font-semibold px-2 py-1 rounded bg-green-500 text-white">
@@ -782,8 +800,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     </div>
                     <p className="text-xs mt-1 text-white opacity-90">
                       {skippersToDisplay.length} skippers
-                      {/* Round 2+: Show P slots if this heat hasn't been scored yet (and not bottom heat) */}
-                      {!completed && round >= 2 && !isBottomHeat && !heatCompleted && (
+                      {!isSHRS && !completed && round >= 2 && !isBottomHeat && !heatCompleted && (
                         <span className="ml-1 opacity-75">+ {promotionCount} P slots</span>
                       )}
                     </p>
