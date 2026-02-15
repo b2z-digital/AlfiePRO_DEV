@@ -770,6 +770,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
   const containerClass = isExportMode ? 'results-export-container' : '';
   const tableClass = isExportMode ? 'export-table' : '';
+  const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white' } : {};
+  const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa', height: '28px', lineHeight: '28px' } : {};
 
   return (
     <div className={`${isExportMode ? 'bg-white text-black' : 'bg-slate-800'} p-6 rounded-lg ${containerClass}`}>
@@ -873,35 +875,35 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         <table className={`text-left ${tableClass}`} style={{ minWidth: '100%', width: 'max-content' }}>
           <thead>
             <tr className={isExportMode ? '' : 'bg-gradient-to-r from-slate-700 to-slate-800 border-b-2 border-blue-500/30'}>
-              <th className={`sticky left-0 z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px' }}>Pos</th>
-              <th className={`sticky left-[60px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px' }}>Sail</th>
-              <th className={`sticky left-[120px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '135px' }}>Skipper</th>
+              <th className={`sticky left-0 z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px', ...exportThStyle }}>Pos</th>
+              <th className={`sticky left-[60px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px', ...exportThStyle }}>Sail</th>
+              <th className={`sticky left-[120px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '135px', ...exportThStyle }}>Skipper</th>
               {showClub && (
-                <th className={`sticky left-[255px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '75px' }}>Club</th>
+                <th className={`sticky left-[255px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '75px', ...exportThStyle }}>Club</th>
               )}
               {showClubState && (
-                <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200'}`} style={{ minWidth: '75px' }}>State</th>
+                <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '75px', ...exportThStyle }}>State</th>
               )}
-              <th className={`sticky left-[330px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '90px', boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}>Design</th>
+              <th className={`sticky left-[330px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '90px', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', ...exportThStyle }}>Design</th>
               {showCategory && (
-                <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? 'text-slate-700 bg-white' : 'text-blue-200'}`} style={{ minWidth: '60px' }}>Category</th>
+                <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>Category</th>
               )}
               {raceNumbers.map(raceNum => (
-                <th key={raceNum} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? 'text-slate-700' : 'text-blue-200'}`} style={{ minWidth: '60px' }}>R{raceNum}</th>
+                <th key={raceNum} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>R{raceNum}</th>
               ))}
-              <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? 'text-slate-700' : 'text-blue-200'}`} style={{ minWidth: '60px' }}>Gross</th>
-              <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? 'text-slate-700' : 'text-blue-200'}`} style={{ minWidth: '60px' }}>Net</th>
+              <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>Gross</th>
+              <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>Net</th>
             </tr>
             {/* Scratch bonus row - shows handicap seconds carried over when scratch boats finish in top 3 */}
             {event.raceFormat === 'handicap' && (
               <tr>
-                <th className={`sticky left-0 z-20 ${isExportMode ? 'bg-white' : 'bg-slate-800'}`}></th>
-                <th className={`sticky left-[60px] z-20 ${isExportMode ? 'bg-white' : 'bg-slate-800'}`}></th>
-                <th className={`sticky left-[120px] z-20 ${isExportMode ? 'bg-white' : 'bg-slate-800'}`}></th>
-                {showClub && <th className={`sticky left-[255px] z-20 ${isExportMode ? 'bg-white' : 'bg-slate-800'}`}></th>}
-                {showClubState && <th className={`${isExportMode ? 'bg-white' : 'bg-slate-800'}`}></th>}
-                <th className={`sticky left-[330px] z-20 ${isExportMode ? 'bg-white' : 'bg-slate-800'}`} style={{ boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}></th>
-                {showCategory && <th className={`${isExportMode ? 'bg-white' : 'bg-slate-800'}`}></th>}
+                <th className={`sticky left-0 z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>
+                <th className={`sticky left-[60px] z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>
+                <th className={`sticky left-[120px] z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>
+                {showClub && <th className={`sticky left-[255px] z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>}
+                {showClubState && <th className={`${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>}
+                <th className={`sticky left-[330px] z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={{ boxShadow: '2px 0 4px rgba(0,0,0,0.1)', ...exportSubThStyle }}></th>
+                {showCategory && <th className={`${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>}
                 {raceNumbers.map(raceNum => {
                   // Get all results for this race
                   const raceData = resultsByRace[raceNum] || [];
@@ -946,11 +948,11 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   }
 
                   return (
-                    <th key={raceNum} className={`text-center px-2 py-1 ${isExportMode ? 'text-slate-400' : 'text-slate-400'}`}>
+                    <th key={raceNum} className={`text-center px-2 py-1 ${isExportMode ? '' : 'text-slate-400'}`} style={exportSubThStyle}>
                       {scratchBoatBonus > 0 && bestScratchInTop3 && bestScratchInTop3.position && (
                         <div
                           className="text-[10px]"
-                          style={{ fontStyle: 'italic !important', fontWeight: 'normal' }}
+                          style={{ fontStyle: 'italic', fontWeight: 'normal', color: isExportMode ? '#aaa' : undefined }}
                           title={`${bestScratchInTop3.skipperName} finished ${bestScratchInTop3.position}${bestScratchInTop3.position === 1 ? 'st' : bestScratchInTop3.position === 2 ? 'nd' : 'rd'} on scratch`}
                         >
                           <i>+{scratchBoatBonus}s</i>
@@ -959,7 +961,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     </th>
                   );
                 })}
-                <th colSpan={2}></th>
+                <th colSpan={2} style={exportSubThStyle}></th>
               </tr>
             )}
           </thead>
@@ -1092,10 +1094,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           : isExportMode ? '' : 'text-slate-300'
                       } ${event.raceFormat === 'handicap' && !letterScore ? 'split-cell' : ''}`}
                       style={isExportMode ? {
-                        backgroundColor: '#ffffff',
-                        color: '#000',
+                        backgroundColor: isDropped ? '#848484' : '#ffffff',
+                        color: isDropped ? '#ffffff' : '#000',
                         padding: '4px 8px',
-                        height: '48px',
+                        height: '44px',
                         verticalAlign: 'middle'
                       } : undefined}
                     >
@@ -1109,7 +1111,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           <div style={{
                             position: 'relative',
                             width: '100%',
-                            height: '48px',
+                            height: '44px',
                             margin: '0',
                             padding: '0'
                           }}>
@@ -1129,9 +1131,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             >
                               <line
                                 x1="0"
-                                y1="0"
+                                y1="100"
                                 x2="100"
-                                y2="100"
+                                y2="0"
                                 stroke={isDropped ? '#ffffff' : '#888888'}
                                 strokeWidth="1"
                                 vectorEffect="non-scaling-stroke"
@@ -1140,11 +1142,11 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Handicap at top-right */}
                             <span style={{
                               position: 'absolute',
-                              top: '3px',
-                              right: '4px',
-                              fontSize: '11px',
+                              top: '4px',
+                              right: '6px',
+                              fontSize: '10px',
                               fontWeight: '600',
-                              color: isDropped ? '#ffffff' : '#555555',
+                              color: isDropped ? '#ffffff' : '#333333',
                               lineHeight: '1',
                               zIndex: 3
                             }}>
@@ -1153,8 +1155,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                             {/* Position at bottom-left */}
                             <span style={{
                               position: 'absolute',
-                              bottom: '10px',
-                              left: '4px',
+                              bottom: '4px',
+                              left: '6px',
                               fontSize: '18px',
                               fontWeight: 'bold',
                               color: isDropped ? '#ffffff' : '#000000',
