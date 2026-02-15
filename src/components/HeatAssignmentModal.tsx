@@ -597,7 +597,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
         {/* Heat Grid */}
         <div className="p-6 overflow-y-auto flex-1">
-          <div className="flex gap-4 overflow-x-auto pb-2" style={{
+          <div className={`gap-4 pb-2 ${
+            heatAssignments.length >= 3
+              ? 'grid grid-cols-1' // Stack vertically for 3+ heats
+              : 'flex overflow-x-auto' // Horizontal for 1-2 heats
+          }`} style={{
             scrollBehavior: 'smooth'
           }}>
             {/* Find the last completed heat (for edit mode) */}
@@ -738,18 +742,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               return (
                 <div
                   key={heatDesignation}
-                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-shrink-0 ${
+                  className={`rounded-lg border-2 overflow-hidden flex flex-col ${
+                    heatAssignments.length >= 3 ? 'flex-auto' : 'flex-shrink-0'
+                  } ${
                     darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
                   style={{
-                    minWidth: '380px',  // Ensure enough space for 2 columns of skipper cards
-                    width: heatAssignments.length <= 2 ? 'calc((100% - 1rem) / 2)' : '380px'  // Full width for 1-2 heats, fixed for 3+
+                    minWidth: heatAssignments.length >= 3 ? 'auto' : '380px',
+                    width: heatAssignments.length === 1 ? '100%' : heatAssignments.length === 2 ? 'calc((100% - 1rem) / 2)' : 'auto'
                   }}
                 >
                   {/* Heat Header */}
-                  <div className={`p-3 ${getHeatGradient(heatDesignation)} border-b-2`}>
+                  <div className={`${
+                    heatAssignments.length >= 3 ? 'p-2' : 'p-3'
+                  } ${getHeatGradient(heatDesignation)} border-b-2`}>
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-white">
+                      <h3 className={`${
+                        heatAssignments.length >= 3 ? 'text-base' : 'text-lg'
+                      } font-bold text-white`}>
                         Heat {heatDesignation}
                       </h3>
                       {heatCompleted ? (
@@ -771,8 +781,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Skipper List - 2 Column Grid - Flex-1 to push observers to bottom */}
-                  <div className="flex-1 p-3 grid grid-cols-2 gap-2 content-start">
+                  {/* Skipper List - Responsive Grid - Flex-1 to push observers to bottom */}
+                  <div className={`flex-1 ${
+                    heatAssignments.length >= 3 ? 'p-2' : 'p-3'
+                  } grid ${
+                    heatAssignments.length >= 3 ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5' : 'grid-cols-2 gap-2'
+                  } content-start`}>
                     {sortedSkippers.map((skipperIndex, idx) => {
                       const skipper = skippers[skipperIndex];
                       const result = heatResults.find(r => r.skipperIndex === skipperIndex);
@@ -999,7 +1013,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               });
                             }
                           }}
-                          className={`p-2 rounded border-2 transition-all ${
+                          className={`${
+                            heatAssignments.length >= 3 ? 'p-1.5' : 'p-2'
+                          } rounded border-2 transition-all ${
                             isClickableInEditMode ? 'cursor-pointer hover:shadow-lg hover:scale-105' : ''
                           } ${
                             isPromoted
@@ -1009,10 +1025,14 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               : darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                           }`}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className={`flex items-center ${
+                            heatAssignments.length >= 3 ? 'gap-1' : 'gap-2'
+                          }`}>
                             {result && result.position !== null && (
                               <span className={`
-                                flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                                flex-shrink-0 ${heatAssignments.length >= 3 ? 'w-5 h-5' : 'w-6 h-6'} rounded-full flex items-center justify-center ${
+                                  heatAssignments.length >= 3 ? 'text-[10px]' : 'text-xs'
+                                } font-bold
                                 ${result.position === 1 ? 'bg-yellow-500 text-yellow-900' :
                                   result.position === 2 ? 'bg-slate-300 text-slate-900' :
                                   result.position === 3 ? 'bg-amber-600 text-white' :
@@ -1023,7 +1043,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             )}
 
                             {/* Sail Number - Prominent Display */}
-                            <div className={`flex-shrink-0 px-2 py-1 rounded font-bold text-sm ${
+                            <div className={`flex-shrink-0 ${
+                              heatAssignments.length >= 3 ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-sm'
+                            } rounded font-bold ${
                               darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'
                             }`}>
                               {currentEvent?.show_country && skipper.country_code && (
@@ -1043,7 +1065,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`font-medium truncate text-sm ${
+                                className={`font-medium truncate ${
+                                  heatAssignments.length >= 3 ? 'text-xs' : 'text-sm'
+                                } ${
                                   darkMode ? 'text-white' : 'text-slate-900'
                                 }`}
                                 title={skipper.name}  // Show full name on hover
@@ -1064,7 +1088,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
                             {/* Avatar moved to the right */}
                             {skipper.avatarUrl ? (
-                              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                              <div className={`${
+                                heatAssignments.length >= 3 ? 'w-6 h-6' : 'w-8 h-8'
+                              } rounded-full overflow-hidden flex-shrink-0`}>
                                 <img
                                   src={skipper.avatarUrl}
                                   alt={skipper.name}
@@ -1072,7 +1098,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 />
                               </div>
                             ) : (
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                              <div className={`${
+                                heatAssignments.length >= 3 ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'
+                              } rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
                                 darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
                               }`}>
                                 {skipper.name.split(' ').map(n => n[0]).join('')}
@@ -1143,13 +1171,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <div className={`mt-auto border-t ${
                         darkMode ? 'border-slate-600' : 'border-slate-200'
                       }`}>
-                        <div className={`p-3 ${
+                        <div className={`${
+                          heatAssignments.length >= 3 ? 'p-2' : 'p-3'
+                        } ${
                           darkMode ? 'bg-slate-700' : 'bg-slate-50'
                         }`}>
-                          <div className="flex items-center justify-between mb-2">
+                          <div className={`flex items-center justify-between ${
+                            heatAssignments.length >= 3 ? 'mb-1' : 'mb-2'
+                          }`}>
                             <div className="flex items-center gap-2">
-                              <Eye size={16} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
-                              <h5 className={`text-sm font-semibold ${
+                              <Eye size={heatAssignments.length >= 3 ? 14 : 16} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
+                              <h5 className={`${
+                                heatAssignments.length >= 3 ? 'text-xs' : 'text-sm'
+                              } font-semibold ${
                                 isPreviousHeatObservers
                                   ? (darkMode ? 'text-slate-300' : 'text-slate-700')
                                   : (darkMode ? 'text-purple-300' : 'text-purple-700')
@@ -1175,7 +1209,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               </button>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className={`grid ${
+                            heatAssignments.length >= 3 ? 'grid-cols-1 sm:grid-cols-2 gap-1.5' : 'grid-cols-2 gap-2'
+                          }`}>
                             {heatObservers.map((observer, idx) => {
                               const observerSkipper = skippers[observer.skipper_index];
                               if (!observerSkipper) return null;
@@ -1186,13 +1222,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 return (
                                   <div
                                     key={observer.skipper_index}
-                                    className={`flex items-center gap-2 p-2 rounded border-2 ${
+                                    className={`flex items-center ${
+                                      heatAssignments.length >= 3 ? 'gap-1 p-1.5' : 'gap-2 p-2'
+                                    } rounded border-2 ${
                                       darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                                     }`}
                                   >
-                                    <Eye size={14} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
+                                    <Eye size={heatAssignments.length >= 3 ? 12 : 14} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
                                     {observerSkipper.avatarUrl ? (
-                                      <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+                                      <div className={`${
+                                        heatAssignments.length >= 3 ? 'w-5 h-5' : 'w-6 h-6'
+                                      } rounded-full overflow-hidden flex-shrink-0`}>
                                         <img
                                           src={observerSkipper.avatarUrl}
                                           alt={observerSkipper.name}
@@ -1200,16 +1240,22 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                         />
                                       </div>
                                     ) : (
-                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                                      <div className={`${
+                                        heatAssignments.length >= 3 ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-xs'
+                                      } rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
                                         darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
                                       }`}>
                                         {observerSkipper.name.split(' ').map(n => n[0]).join('')}
                                       </div>
                                     )}
-                                    <span className={`font-medium truncate flex-1 text-xs ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    <span className={`font-medium truncate flex-1 ${
+                                      heatAssignments.length >= 3 ? 'text-[11px]' : 'text-xs'
+                                    } ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                       {observerSkipper.name}
                                     </span>
-                                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    <span className={`${
+                                      heatAssignments.length >= 3 ? 'text-[10px]' : 'text-xs'
+                                    } ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                       #{observerSkipper.sailNo}
                                     </span>
                                   </div>
@@ -1251,17 +1297,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     }
                                   }}
                                   title="Click to remove this observer"
-                                  className={`flex items-center gap-2 p-2 rounded text-xs transition-all hover:scale-[1.02] cursor-pointer ${
+                                  className={`flex items-center ${
+                                    heatAssignments.length >= 3 ? 'gap-1 p-1.5 text-[11px]' : 'gap-2 p-2 text-xs'
+                                  } rounded transition-all hover:scale-[1.02] cursor-pointer ${
                                     darkMode
                                       ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50 hover:bg-purple-900/50 hover:border-purple-600'
                                       : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100 hover:border-purple-300'
                                   }`}
                                 >
-                                  <Eye size={14} className="text-purple-400 flex-shrink-0" />
+                                  <Eye size={heatAssignments.length >= 3 ? 12 : 14} className="text-purple-400 flex-shrink-0" />
                                   <span className="font-medium truncate flex-1 text-left">
                                     {observerSkipper.name}
                                   </span>
-                                  <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  <span className={`${
+                                    heatAssignments.length >= 3 ? 'text-[10px]' : 'text-xs'
+                                  } ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     #{observerSkipper.sailNo}
                                   </span>
                                 </button>
