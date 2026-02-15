@@ -256,7 +256,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     return { isValid: true };
   };
 
-  const configValidation = validatePromotionRelegationPractical(skippers.length, numHeats, promotionCount);
+  // SHRS doesn't use promotion/relegation, so skip that validation for SHRS
+  const isSHRS = currentDropRules === 'shrs';
+  const configValidation = isSHRS
+    ? { isValid: true } // SHRS is always valid (no promotion/relegation)
+    : validatePromotionRelegationPractical(skippers.length, numHeats, promotionCount);
 
   // Calculate heat sizes based on actual heat count (manual or auto)
   const calculateHeatSizes = (totalSkippers: number, heats: number): number[] => {
@@ -1125,8 +1129,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               }`}>
                 {isHeatRacingEnabled ? (
                   <p>
-                    <span className="font-semibold">{currentDropRules === 'shrs' ? 'SHRS' : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats with promotion/relegation between races.
-                    Heats are scored from lowest to highest (F → A). Configure your settings below.
+                    <span className="font-semibold">{currentDropRules === 'shrs' ? 'SHRS' : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats{currentDropRules === 'shrs' ? '' : ' with promotion/relegation between races'}.
+                    {currentDropRules === 'shrs' ? ' Heats use progressive or pre-assignment methods.' : ' Heats are scored from lowest to highest (F → A).'} Configure your settings below.
                   </p>
                 ) : (
                   <p>
@@ -1176,7 +1180,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
                     {numHeats > 0 ? (
                       <>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className={`grid gap-4 ${isSHRS ? 'grid-cols-1' : 'grid-cols-2'}`}>
                           <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
                             <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
                               Number of Heats
@@ -1250,10 +1254,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             )}
                           </div>
-                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
-                            <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
-                              Promotion/Relegation
-                            </div>
+                          {/* Hide promotion/relegation for SHRS as it doesn't use that system */}
+                          {!isSHRS && (
+                            <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
+                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
+                                Promotion/Relegation
+                              </div>
                             {isEditingPromotion && !hasHeatScores ? (
                               <div className="flex items-center gap-2">
                                 <input
@@ -1327,7 +1333,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 Default: 4
                               </div>
                             )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
@@ -1342,10 +1349,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         </div>
 
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                          {manualHeatCount !== null || manualPromotionCount !== null ? (
+                          {isSHRS ? (
+                            <>
+                              <strong>SHRS Configuration:</strong> {numHeats} heats with sizes of {heatSizes.join(', ')} boats. No promotion/relegation.
+                            </>
+                          ) : manualHeatCount !== null || manualPromotionCount !== null ? (
                             <>
                               <strong>Configuration:</strong> {numHeats} heats with sizes of {heatSizes.join(', ')} boats.
-                              {promotionCount} boats promotion/relegation{manualPromotionCount !== null ? ' (custom)' : ''}.
+                              {' '}{promotionCount} boats promotion/relegation{manualPromotionCount !== null ? ' (custom)' : ''}.
                             </>
                           ) : (
                             <>
