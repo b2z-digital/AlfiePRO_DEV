@@ -1130,8 +1130,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         2. This specific heat is not completed
                         3. The lower heat is not completed yet
                         4. No manual changes have been applied (which would already show promoted skippers)
+                        5. NOT using SHRS (SHRS doesn't use promotion/relegation)
                         Once lower heat is completed OR changes are applied, promoted skippers are shown in their positions above with green borders */}
-                    {!completed && !heatCompleted && round >= 2 && !isBottomHeat && !lowerHeatCompleted && !hasAppliedChanges && (
+                    {!completed && !heatCompleted && round >= 2 && !isBottomHeat && !lowerHeatCompleted && !hasAppliedChanges && !isSHRS && (
                       <>
                         {Array.from({ length: promotionCount }).map((_, idx) => (
                           <div
