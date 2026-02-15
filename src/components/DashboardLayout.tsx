@@ -89,6 +89,7 @@ import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
 import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
 import { BackupManagementTab } from './super-admin/BackupManagementTab';
 import { UserManagementTab } from './super-admin/UserManagementTab';
+import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -999,6 +1000,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' },
           { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
+          { id: 'integrations', label: 'Platform Integrations', icon: Link, description: 'Manage integrations', path: '/integrations' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
@@ -1580,6 +1582,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/billing" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <PlatformBillingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/integrations" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <PlatformIntegrationsTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/features" element={
