@@ -1,6 +1,6 @@
 import { HeatManagement, HeatDesignation, HeatResult, HeatRound, generateNextRoundAssignments } from '../types/heat';
 import { Skipper } from '../types';
-import { getNextHeat } from './shrsHeatSystem';
+import { getNextHeat, getLargestHeatSize, calculateNonFinisherScore } from './shrsHeatSystem';
 
 // Function to update a heat result in the heat management object
 export const updateHeatResult = (
@@ -280,36 +280,6 @@ export const completeHeat = (
     }
   }
 
-  // SHRS LOGIC: Use movement tables to assign skippers to next round heats based on finishing position
-  // Unlike HMS (which moves within the same round), SHRS moves between rounds
-  if (isShrs && currentRound >= 2) {
-    console.log(`\n🎯 SHRS: Processing heat movements for next round based on positions`);
-
-    // Get results from the just-completed heat
-    const completedHeatResults = round.results
-      .filter(r => r.heatDesignation === heat && r.position !== null && !r.letterScore)
-      .sort((a, b) => (a.position || 999) - (b.position || 999));
-
-    // For each skipper, determine their next heat assignment using SHRS movement table
-    completedHeatResults.forEach(result => {
-      if (result.position) {
-        // SHRS uses alpha heat labels (A, B, C, D) with Table 2
-        const nextHeatDesignation = getNextHeat(
-          result.position,
-          heat, // Current heat (e.g., 'A', 'B')
-          availableHeats.length,
-          true // Use Table 2 (alpha labeling)
-        );
-
-        console.log(`  Skipper ${result.skipperIndex}: Position ${result.position} in Heat ${heat} → Heat ${nextHeatDesignation} (next round)`);
-
-        // Store the next heat assignment for when we generate the next round
-        // This will be used by generateNextRoundAssignments
-        result.nextHeatAssignment = nextHeatDesignation;
-      }
-    });
-  }
-
   // Check if all heats are complete
   // Note: After mid-round movements, a skipper might be in a different heat than where they scored
   // So we check if each skipper has a result from ANY heat in this round
@@ -440,58 +410,59 @@ export const convertHeatResultsToRaceResults = (
       return acc;
     }, {} as Record<HeatDesignation, HeatResult[]>);
 
-    // ROUND 1 (SEEDED): Use within-heat positions
-    if (round.round === 1) {
-      // Each skipper gets their finishing position within their heat
+    const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
+
+    if (isShrs) {
+      const heatSizes = round.heatAssignments.map(a => a.skipperIndices.length);
+      const largestHeatSize = getLargestHeatSize(heatSizes);
+
+      round.results.forEach(result => {
+        if (result.position !== null && !result.letterScore) {
+          overallPositions.set(result.skipperIndex, result.position);
+        } else if (result.letterScore) {
+          if ((result.letterScore === 'RDG' || result.letterScore === 'DPI') && result.customPoints !== undefined) {
+            overallPositions.set(result.skipperIndex, result.customPoints);
+          } else {
+            overallPositions.set(result.skipperIndex, calculateNonFinisherScore(largestHeatSize));
+          }
+        }
+      });
+    }
+    else if (round.round === 1) {
       round.results.forEach(result => {
         if (result.position !== null) {
           overallPositions.set(result.skipperIndex, result.position);
         } else if (result.letterScore) {
-          // For letter scores in seeded round, use total competitors in round + 1
-          // This matches standard yacht racing scoring rules
           const totalCompetitorsInRound = round.results.length;
           overallPositions.set(result.skipperIndex, totalCompetitorsInRound + 1);
         }
       });
     }
-    // ROUND 2+: Use overall positions based on heat hierarchy
     else {
-      // HMS CRITICAL: A skipper may have competed in multiple heats in the same round
-      // (e.g., Heat B then promoted to Heat A). We only count their HIGHEST heat result.
-      // Highest heat = lowest letter (A > B > C)
-
-      // First, determine each skipper's final (highest) heat for this round
       const skipperFinalHeat = new Map<number, HeatDesignation>();
       round.results.forEach(result => {
         const existingHeat = skipperFinalHeat.get(result.skipperIndex);
         if (!existingHeat || result.heatDesignation < existingHeat) {
-          // This heat is higher (A < B < C in string comparison)
           skipperFinalHeat.set(result.skipperIndex, result.heatDesignation);
         }
       });
 
-      // Process heats in order (A, B, C, etc.)
       let currentPosition = 1;
       const heats: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
 
       heats.forEach(heat => {
         if (resultsByHeat[heat]) {
-          // Only include skippers whose FINAL heat is this heat
           const sortedResults = [...resultsByHeat[heat]]
             .filter(r => r.position !== null && skipperFinalHeat.get(r.skipperIndex) === heat)
             .sort((a, b) => (a.position || 999) - (b.position || 999));
 
-          // Assign overall positions
           sortedResults.forEach(result => {
             overallPositions.set(result.skipperIndex, currentPosition++);
           });
 
-          // Add letter scores at the end (only if this was their final heat)
-          // Letter scores should get points based on total competitors in the round
           const letterScoreResults = resultsByHeat[heat]
             .filter(r => r.letterScore && skipperFinalHeat.get(r.skipperIndex) === heat);
           letterScoreResults.forEach(result => {
-            // Calculate letter score points: total competitors in round + 1
             const totalCompetitorsInRound = round.results.length;
             overallPositions.set(result.skipperIndex, totalCompetitorsInRound + 1);
           });
