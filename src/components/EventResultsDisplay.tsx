@@ -456,6 +456,17 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   // Get scoring system name based on drop rules
   const getScoringSystemName = () => {
     const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+
+    // Handle heat racing scoring systems (strings)
+    if (typeof dropRules === 'string') {
+      if (dropRules === 'hms') {
+        return 'HMS Heat System';
+      } else if (dropRules === 'shrs') {
+        return 'SHRS - Simple Heat Racing System';
+      }
+    }
+
+    // Handle array-based scoring systems
     const rulesString = JSON.stringify(dropRules);
 
     if (rulesString === '[]') {
@@ -464,8 +475,10 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
       return 'RRS - Appendix A Scoring System';
     } else if (rulesString === '[4,8,12,16,20,24,28,32,36,40]') {
       return 'Low Point System';
-    } else {
+    } else if (Array.isArray(dropRules)) {
       return `Custom - ${dropRules.join(', ')}`;
+    } else {
+      return 'RRS - Appendix A Scoring System';
     }
   };
 

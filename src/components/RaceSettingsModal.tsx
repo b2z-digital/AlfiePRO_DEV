@@ -1029,65 +1029,60 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </div>
             </div>
 
-            {/* Scoring System */}
-            <div className="space-y-3">
-              <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Award size={16} />
-                  Scoring System
-                </div>
-              </label>
-              <div className="space-y-2">
-                {DROP_RULE_OPTIONS
-                  .filter(option => {
-                    // Show heat-specific options only when heat racing is enabled
-                    if (option.forHeatRacing) {
-                      return isHeatRacingEnabled;
-                    }
-                    // Show non-heat options when heat racing is disabled
-                    return !isHeatRacingEnabled;
-                  })
-                  .map((option, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => handleDropRuleChange(option.value)}
-                      className={`
-                        w-full text-left px-4 py-3 rounded-lg text-sm transition-all
-                        ${(Array.isArray(option.value) && JSON.stringify(option.value) === JSON.stringify(currentDropRules)) ||
-                          (typeof option.value === 'string' && option.value !== 'custom' && option.value === currentDropRules) ||
-                          (option.value === 'custom' && isCustomDropRules)
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : darkMode
-                            ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }
-                      `}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                {isCustomDropRules && (
-                  <div className="mt-2">
-                    <input
-                      type="text"
-                      value={customDropRules}
-                      onChange={(e) => handleCustomDropRulesChange(e.target.value)}
-                      placeholder="e.g., 4, 8, 12"
-                      className={`
-                        w-full px-3 py-2 rounded-lg text-sm border
-                        ${darkMode
-                          ? 'bg-slate-700 border-slate-600 text-white placeholder:text-slate-500'
-                          : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'}
-                      `}
-                    />
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Enter race numbers separated by commas (e.g., 4, 8, 12)
-                    </p>
+            {/* Scoring System - Only show when heat racing is disabled */}
+            {!isHeatRacingEnabled && (
+              <div className="space-y-3">
+                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Award size={16} />
+                    Scoring System
                   </div>
-                )}
+                </label>
+                <div className="space-y-2">
+                  {DROP_RULE_OPTIONS
+                    .filter(option => !option.forHeatRacing)
+                    .map((option, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleDropRuleChange(option.value)}
+                        className={`
+                          w-full text-left px-4 py-3 rounded-lg text-sm transition-all
+                          ${(Array.isArray(option.value) && JSON.stringify(option.value) === JSON.stringify(currentDropRules)) ||
+                            (typeof option.value === 'string' && option.value !== 'custom' && option.value === currentDropRules) ||
+                            (option.value === 'custom' && isCustomDropRules)
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : darkMode
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }
+                        `}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  {isCustomDropRules && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={customDropRules}
+                        onChange={(e) => handleCustomDropRulesChange(e.target.value)}
+                        placeholder="e.g., 4, 8, 12"
+                        className={`
+                          w-full px-3 py-2 rounded-lg text-sm border
+                          ${darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white placeholder:text-slate-500'
+                            : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'}
+                        `}
+                      />
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Enter race numbers separated by commas (e.g., 4, 8, 12)
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Heat Racing Settings */}
@@ -1374,6 +1369,80 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         Need at least 12 skippers to enable heat racing. Currently: {skippers.length}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Heat Racing Scoring System */}
+                <div className="space-y-3">
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award size={16} />
+                      Scoring System
+                    </div>
+                  </label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {DROP_RULE_OPTIONS
+                      .filter(option => option.forHeatRacing)
+                      .map((option, index) => {
+                        const isHMS = option.value === 'hms';
+                        const isSHRS = option.value === 'shrs';
+                        const isSelected = option.value === currentDropRules;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleDropRuleChange(option.value)}
+                            className={`
+                              group relative w-full text-left p-4 rounded-xl transition-all border-2
+                              ${isSelected
+                                ? isHMS
+                                  ? 'bg-gradient-to-br from-purple-600 to-purple-700 border-purple-400 text-white shadow-lg'
+                                  : 'bg-gradient-to-br from-blue-600 to-blue-700 border-blue-400 text-white shadow-lg'
+                                : darkMode
+                                  ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:border-slate-500 hover:bg-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md'
+                              }
+                            `}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                                isSelected
+                                  ? 'bg-white/20'
+                                  : darkMode
+                                    ? 'bg-slate-800'
+                                    : 'bg-slate-100'
+                              }`}>
+                                <Trophy className={isSelected ? 'text-white' : darkMode ? 'text-purple-400' : 'text-purple-600'} size={24} />
+                              </div>
+                              <div className="flex-1">
+                                <div className={`text-2xl font-black mb-1 tracking-tight ${
+                                  isSelected ? 'text-white' : darkMode ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {isHMS ? 'HMS' : 'SHRS'}
+                                </div>
+                                <div className={`text-sm font-medium ${
+                                  isSelected ? 'text-white/90' : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                }`}>
+                                  {isHMS ? 'Heat Management System' : 'Simple Heat Racing System'}
+                                </div>
+                                <div className={`text-xs mt-2 ${
+                                  isSelected ? 'text-white/75' : darkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                  {isSHRS ? '1 after 4, 2 after 8, +1 per 8 races' : 'Dynamic heat management with promotion/relegation'}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <div className="flex-shrink-0">
+                                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
+                                    <Check size={16} className={isHMS ? 'text-purple-600' : 'text-blue-600'} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
 
