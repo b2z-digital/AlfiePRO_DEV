@@ -3,7 +3,7 @@ import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, Edit2, Che
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
-import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS } from '../utils/shrsHeatSystem';
+import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -530,15 +530,30 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : 'manual';
       console.log('🎯 numHeats being used:', numHeats, '(manualHeatCount:', manualHeatCount, ', recommended:', optimalHeats.numberOfHeats, ')');
       console.log('🎯 promotionCount being used:', promotionCount, '(manualPromotionCount:', manualPromotionCount, ')');
+      console.log('🎯 Scoring system:', currentDropRules);
 
-      const config: HMSConfig = {
-        numberOfHeats: numHeats,
-        promotionCount: promotionCount,
-        seedingMethod,
-        maxHeatSize: 12
-      };
+      // Use appropriate validation based on scoring system
+      let validation: { valid: boolean; errors: string[]; warnings: string[] };
 
-      const validation = validateHeatConfig(config, skippers.length);
+      if (currentDropRules === 'shrs') {
+        // SHRS validation - no promotion/relegation
+        const shrsConfig: SHRSConfig = {
+          numberOfHeats: numHeats,
+          seedingMethod,
+          autoAssign: initialAssignment === 'random'
+        };
+        validation = validateSHRSConfig(shrsConfig, skippers.length);
+      } else {
+        // HMS validation - with promotion/relegation
+        const hmsConfig: HMSConfig = {
+          numberOfHeats: numHeats,
+          promotionCount: promotionCount,
+          seedingMethod,
+          maxHeatSize: 12
+        };
+        validation = validateHeatConfig(hmsConfig, skippers.length);
+      }
+
       if (!validation.valid) {
         if (addNotification) {
           addNotification('error', `Cannot save heat racing settings: ${validation.errors.join(', ')}`);
@@ -548,7 +563,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         return;
       }
 
-      // Show HMS recommendations as info notification
+      // Show recommendations as info notification
       if (validation.warnings.length > 0 && addNotification) {
         validation.warnings.forEach(warning => {
           addNotification('info', warning);
