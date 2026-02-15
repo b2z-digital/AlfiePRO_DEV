@@ -3,7 +3,7 @@ import {
   DollarSign, Plus, Edit2, Check,
   X, Clock, AlertCircle, CheckCircle, Receipt, Coins,
   Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe2, Target,
-  Mail, Send, Loader2
+  Mail, Send, Loader2, MailCheck
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
@@ -48,6 +48,8 @@ interface BillingRecord {
   payment_reference: string | null;
   due_date: string | null;
   notes: string | null;
+  invoice_sent_at: string | null;
+  invoice_sent_to: string | null;
   created_at: string;
 }
 
@@ -1140,10 +1142,10 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                                     <div className="flex items-center justify-end gap-2">
                                       <button
                                         onClick={(e) => { e.stopPropagation(); openInvoiceModal(record); }}
-                                        className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300' : 'hover:bg-slate-100 text-sky-500 hover:text-sky-600'}`}
-                                        title="Send invoice email"
+                                        className={`relative p-1.5 rounded-lg transition-colors ${record.invoice_sent_at ? (darkMode ? 'hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300' : 'hover:bg-emerald-50 text-emerald-500 hover:text-emerald-600') : (darkMode ? 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300' : 'hover:bg-slate-100 text-sky-500 hover:text-sky-600')}`}
+                                        title={record.invoice_sent_at ? `Sent to ${record.invoice_sent_to} on ${new Date(record.invoice_sent_at).toLocaleDateString('en-AU')}` : 'Send invoice email'}
                                       >
-                                        <Mail size={14} />
+                                        {record.invoice_sent_at ? <MailCheck size={14} /> : <Mail size={14} />}
                                       </button>
                                       <select
                                         value={record.payment_status}
@@ -1235,10 +1237,10 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => openInvoiceModal(record)}
-                            className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300' : 'hover:bg-slate-100 text-sky-500 hover:text-sky-600'}`}
-                            title="Send invoice email"
+                            className={`relative p-1.5 rounded-lg transition-colors ${record.invoice_sent_at ? (darkMode ? 'hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300' : 'hover:bg-emerald-50 text-emerald-500 hover:text-emerald-600') : (darkMode ? 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300' : 'hover:bg-slate-100 text-sky-500 hover:text-sky-600')}`}
+                            title={record.invoice_sent_at ? `Sent to ${record.invoice_sent_to} on ${new Date(record.invoice_sent_at).toLocaleDateString('en-AU')}` : 'Send invoice email'}
                           >
-                            <Mail size={14} />
+                            {record.invoice_sent_at ? <MailCheck size={14} /> : <Mail size={14} />}
                           </button>
                           <select
                             value={record.payment_status}

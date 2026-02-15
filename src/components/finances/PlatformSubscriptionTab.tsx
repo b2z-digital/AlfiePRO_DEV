@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DollarSign, Users, Calendar, CheckCircle, Clock,
   AlertCircle, TrendingUp, ChevronDown, ChevronUp,
-  Receipt, CreditCard, FileText, Mail, Send, Loader2, X
+  Receipt, CreditCard, FileText, Mail, Send, Loader2, X, MailCheck
 } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
@@ -35,6 +35,8 @@ interface BillingRecord {
   payment_reference: string | null;
   due_date: string | null;
   notes: string | null;
+  invoice_sent_at: string | null;
+  invoice_sent_to: string | null;
   created_at: string;
 }
 
@@ -427,10 +429,10 @@ export function PlatformSubscriptionTab({
                       <td className="p-4 text-center">
                         <button
                           onClick={(e) => { e.stopPropagation(); openInvoiceModal(record); }}
-                          className="p-1.5 rounded-lg hover:bg-slate-700/50 text-sky-400 hover:text-sky-300 transition-colors"
-                          title="Email invoice"
+                          className={`p-1.5 rounded-lg transition-colors ${record.invoice_sent_at ? 'hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300' : 'hover:bg-slate-700/50 text-sky-400 hover:text-sky-300'}`}
+                          title={record.invoice_sent_at ? `Sent to ${record.invoice_sent_to} on ${new Date(record.invoice_sent_at).toLocaleDateString('en-AU')}` : 'Email invoice'}
                         >
-                          <Mail size={15} />
+                          {record.invoice_sent_at ? <MailCheck size={15} /> : <Mail size={15} />}
                         </button>
                       </td>
                       <td className="p-4">
@@ -476,6 +478,14 @@ export function PlatformSubscriptionTab({
                               <div>
                                 <span className="text-slate-500 block mb-1">Reference</span>
                                 <span className="text-slate-300">{record.payment_reference}</span>
+                              </div>
+                            )}
+                            {record.invoice_sent_at && (
+                              <div>
+                                <span className="text-slate-500 block mb-1">Invoice Sent</span>
+                                <span className="text-emerald-400">
+                                  {new Date(record.invoice_sent_at).toLocaleDateString('en-AU')} to {record.invoice_sent_to}
+                                </span>
                               </div>
                             )}
                             {record.notes && (

@@ -327,12 +327,18 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Failed to send email" }, 500);
     }
 
+    const updatePayload: Record<string, unknown> = {
+      invoice_sent_at: new Date().toISOString(),
+      invoice_sent_to: recipient_email,
+      updated_at: new Date().toISOString(),
+    };
     if (record.payment_status === "pending") {
-      await adminClient
-        .from("platform_billing_records")
-        .update({ payment_status: "invoiced", updated_at: new Date().toISOString() })
-        .eq("id", record_id);
+      updatePayload.payment_status = "invoiced";
     }
+    await adminClient
+      .from("platform_billing_records")
+      .update(updatePayload)
+      .eq("id", record_id);
 
     return jsonResponse({ success: true, message: "Invoice email sent successfully" });
   } catch (err) {
