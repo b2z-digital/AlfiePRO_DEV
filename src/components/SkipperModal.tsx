@@ -74,6 +74,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [skipperToRemove, setSkipperToRemove] = useState<number | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [selectedSkippers, setSelectedSkippers] = useState<Set<number>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [editingBoat, setEditingBoat] = useState<EditableBoatData | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -889,11 +891,42 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   
   const confirmRemoveSkipper = () => {
     if (skipperToRemove === null) return;
-    
+
     const updatedSkippers = skippers.filter((_, i) => i !== skipperToRemove);
     onUpdateSkippers(updatedSkippers);
     setShowRemoveConfirm(false);
     setSkipperToRemove(null);
+  };
+
+  const toggleSelectSkipper = (index: number) => {
+    setSelectedSkippers(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedSkippers.size === skippers.length) {
+      setSelectedSkippers(new Set());
+    } else {
+      setSelectedSkippers(new Set(skippers.map((_, i) => i)));
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    const hasResultsBlocking = Array.from(selectedSkippers).some(i => skipperHasResults(i));
+    if (hasResultsBlocking) {
+      setError("Some selected skippers have race results. Remove race results before deleting them.");
+      setTimeout(() => setError(null), 5000);
+      setShowBulkDeleteConfirm(false);
+      return;
+    }
+    const updatedSkippers = skippers.filter((_, i) => !selectedSkippers.has(i));
+    onUpdateSkippers(updatedSkippers);
+    setSelectedSkippers(new Set());
+    setShowBulkDeleteConfirm(false);
   };
 
   const cancelEditingBoat = () => {
@@ -1115,18 +1148,50 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             
             {skippers.length > 0 ? (
               <div className="mb-6">
-                <h3 className="text-sm font-medium mb-3 text-slate-300">
-                  Current Skippers
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-slate-300">
+                    Current Skippers ({skippers.length})
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleSelectAll}
+                      className="text-xs px-2.5 py-1 rounded-md bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
+                    >
+                      {selectedSkippers.size === skippers.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    {selectedSkippers.size > 0 && (
+                      <button
+                        onClick={() => setShowBulkDeleteConfirm(true)}
+                        className="text-xs px-2.5 py-1 rounded-md bg-red-600/80 text-white hover:bg-red-600 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 size={12} />
+                        Delete ({selectedSkippers.size})
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                   {skippers.map((skipper, index) => (
-                    <div 
+                    <div
                       key={index}
-                      className="flex items-center justify-between p-3 rounded-lg bg-slate-700 text-slate-200"
+                      className={`flex items-center justify-between p-3 rounded-lg text-slate-200 transition-colors ${
+                        selectedSkippers.has(index)
+                          ? 'bg-blue-900/40 ring-1 ring-blue-500/50'
+                          : 'bg-slate-700'
+                      }`}
                     >
                       <div className="flex items-center gap-3 flex-1">
+                        <button
+                          onClick={() => toggleSelectSkipper(index)}
+                          className={`w-5 h-5 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
+                            selectedSkippers.has(index)
+                              ? 'bg-blue-600 border-blue-500'
+                              : 'border-slate-500 hover:border-slate-400'
+                          }`}
+                        >
+                          {selectedSkippers.has(index) && <Check size={12} className="text-white" />}
+                        </button>
                         <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center">
-                          {/* Try to find a matching member with this name who has an avatar */}
                           {(() => {
                             const matchingMember = members.find(m =>
                               `${m.first_name} ${m.last_name}`.toLowerCase() === skipper.name.toLowerCase()
@@ -1277,6 +1342,37 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
                 >
                   Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showBulkDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
+              <div className="p-6 border-b border-slate-700">
+                <h3 className="text-lg font-medium text-slate-100">
+                  Delete {selectedSkippers.size} Skipper{selectedSkippers.size !== 1 ? 's' : ''}
+                </h3>
+              </div>
+              <div className="p-6">
+                <p className="text-slate-300">
+                  Are you sure you want to remove {selectedSkippers.size} selected skipper{selectedSkippers.size !== 1 ? 's' : ''}? This cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-end gap-3 p-6 border-t border-slate-700">
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmBulkDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
+                >
+                  Delete {selectedSkippers.size} Skipper{selectedSkippers.size !== 1 ? 's' : ''}
                 </button>
               </div>
             </div>
