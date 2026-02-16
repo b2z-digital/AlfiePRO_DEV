@@ -376,10 +376,11 @@ export function generateAllSHRSQualifyingRoundAssignments(
 }
 
 /**
- * SHRS Snake Seeding - Index Based
+ * SHRS Initial Seeding - Index Based
  * Returns heat assignments as arrays of skipper indices (positions in the original skippers array).
- * Sorts skippers by sail number, then assigns via snake pattern: 1,2,3,3,2,1,1,2,3,...
- * This avoids reference-equality issues with indexOf.
+ * Sorts skippers by sail number, then distributes evenly via round-robin.
+ * Extra skippers go to earlier heats (A, B, C...) per SHRS rules.
+ * Example: 50 skippers, 4 heats -> [13, 13, 12, 12]
  */
 export function seedSHRSHeatsByIndex(
   skippers: Skipper[],
@@ -387,6 +388,7 @@ export function seedSHRSHeatsByIndex(
 ): { heatDesignation: string; skipperIndices: number[] }[] {
   const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
 
+  // Sort skippers by sail number
   const sortedIndices = skippers
     .map((_, i) => i)
     .sort((a, b) => compareSailNumbers(
@@ -394,26 +396,17 @@ export function seedSHRSHeatsByIndex(
       skippers[b].sailNo || skippers[b].sailNumber || ''
     ));
 
+  // Calculate base size and number of heats that need +1
+  const baseSize = Math.floor(sortedIndices.length / numberOfHeats);
+  const extraSkippers = sortedIndices.length % numberOfHeats;
+
   const heatBuckets: number[][] = Array.from({ length: numberOfHeats }, () => []);
 
+  // Distribute via simple round-robin
   let currentHeat = 0;
-  let direction = 1;
-
   for (const idx of sortedIndices) {
     heatBuckets[currentHeat].push(idx);
-    if (direction === 1) {
-      currentHeat++;
-      if (currentHeat >= numberOfHeats) {
-        currentHeat = numberOfHeats - 1;
-        direction = -1;
-      }
-    } else {
-      currentHeat--;
-      if (currentHeat < 0) {
-        currentHeat = 0;
-        direction = 1;
-      }
-    }
+    currentHeat = (currentHeat + 1) % numberOfHeats;
   }
 
   return heatBuckets.map((indices, i) => ({
