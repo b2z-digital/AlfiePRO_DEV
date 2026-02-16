@@ -16,7 +16,7 @@ interface HeatAssignment {
 interface HMSSeedingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (assignments: HeatAssignment[]) => void;
+  onConfirm: (assignments: HeatAssignment[], rankedSkipperIndices?: number[]) => void;
   skippers: Skipper[];
   numHeats: number;
   darkMode: boolean;
@@ -230,8 +230,16 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
       };
     });
 
+    const rankedIndices = preview.heats.flatMap(heat =>
+      heat.skippers
+        .filter(s => s.rank)
+        .map(s => s.originalIndex !== undefined ? s.originalIndex : skippers.findIndex(sk => sk.id === s.id))
+        .filter(i => i !== -1)
+    );
+
     console.log('\n🟢 Final assignments:', JSON.stringify(assignments, null, 2));
-    onConfirm(assignments);
+    console.log('🟢 Ranked skipper indices:', rankedIndices);
+    onConfirm(assignments, rankedIndices);
     onClose();
   }
 

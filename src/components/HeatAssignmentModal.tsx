@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle } from 'lucide-react';
+import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -43,6 +43,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
 
+  const [initialEditMode, setInitialEditMode] = useState(false);
+  const [selectedSkipperToMove, setSelectedSkipperToMove] = useState<number | null>(null);
+  const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
+
+  const rankedSkipperIndices = useMemo(() => {
+    const indices = (heatManagement.configuration as any)?.rankedSkipperIndices;
+    return new Set<number>(Array.isArray(indices) ? indices : []);
+  }, [heatManagement.configuration]);
+
   // Observer state - store per heat
   const [observersByHeat, setObserversByHeat] = useState<Map<number, ObserverAssignment[]>>(new Map());
   const [loadingObservers, setLoadingObservers] = useState(false);
@@ -61,6 +70,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setAppliedRelegations(new Set());
       setHasAppliedChanges(false);
       setIsApplyingChanges(false);
+      setInitialEditMode(false);
+      setSelectedSkipperToMove(null);
+      setLocalAssignments(null);
     }
   }, [isOpen]);
 
@@ -513,6 +525,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     a.heatDesignation.localeCompare(b.heatDesignation)
   );
 
+  if (initialEditMode && localAssignments) {
+    heatAssignments = localAssignments;
+  }
+
   // Find the next round (if current round is complete)
   const nextRound = completed ? rounds.find(r => r.round === round + 1) : null;
 
@@ -778,13 +794,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 }
               }
 
+              const isDropTarget = initialEditMode && selectedSkipperToMove !== null && !skipperIndices.includes(selectedSkipperToMove);
+
               return (
                 <div
                   key={heatDesignation}
                   className={`rounded-lg border-2 overflow-hidden flex flex-col ${
                     heatAssignments.length >= 3 ? 'flex-auto' : 'flex-shrink-0'
                   } ${
-                    darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
+                    isDropTarget
+                      ? 'border-amber-400 ring-2 ring-amber-400/50'
+                      : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
                   style={{
                     minWidth: heatAssignments.length >= 3 ? 'auto' : '380px',
@@ -792,9 +812,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   }}
                 >
                   {/* Heat Header */}
-                  <div className={`${
-                    heatAssignments.length >= 3 ? 'p-2' : 'p-3'
-                  } ${getHeatGradient(heatDesignation)} border-b-2`}>
+                  <div
+                    className={`${
+                      heatAssignments.length >= 3 ? 'p-2' : 'p-3'
+                    } ${getHeatGradient(heatDesignation)} border-b-2 ${
+                      isDropTarget ? 'cursor-pointer' : ''
+                    }`}
+                    onClick={() => {
+                      if (!isDropTarget || selectedSkipperToMove === null || !localAssignments) return;
+                      const updated = localAssignments.map(a => ({
+                        ...a,
+                        skipperIndices: a.heatDesignation === heatDesignation
+                          ? [...a.skipperIndices, selectedSkipperToMove]
+                          : a.skipperIndices.filter(i => i !== selectedSkipperToMove)
+                      }));
+                      setLocalAssignments(updated);
+                      setSelectedSkipperToMove(null);
+                    }}
+                  >
                     <div className="flex items-center justify-between">
                       <h3 className={`${
                         heatAssignments.length >= 3 ? 'text-base' : 'text-lg'
@@ -817,6 +852,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         <span className="ml-1 opacity-75">+ {promotionCount} P slots</span>
                       )}
                     </p>
+                    {isDropTarget && (
+                      <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-amber-200">
+                        <ArrowRight size={12} />
+                        Move skipper here
+                      </div>
+                    )}
                   </div>
 
                   {/* Skipper List - Responsive Grid - Flex-1 to push observers to bottom */}
@@ -961,10 +1002,23 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         (!isBottomHeat)  // Can modify if not bottom heat (for promotions)
                       );
 
+                      const isRanked = rankedSkipperIndices.has(skipperIndex);
+                      const isSelectedForMove = initialEditMode && selectedSkipperToMove === skipperIndex;
+                      const isMovable = initialEditMode && !isRanked;
+
                       return (
                         <div
                           key={skipperIndex}
                           onClick={() => {
+                            if (initialEditMode) {
+                              if (isRanked) return;
+                              if (selectedSkipperToMove === skipperIndex) {
+                                setSelectedSkipperToMove(null);
+                              } else {
+                                setSelectedSkipperToMove(skipperIndex);
+                              }
+                              return;
+                            }
                             // Only allow editing if:
                             // 1. Edit mode is active
                             // 2. Skipper has a position
@@ -1054,9 +1108,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           className={`${
                             heatAssignments.length >= 3 ? 'p-1.5' : 'p-2'
                           } rounded border-2 transition-all ${
+                            isSelectedForMove
+                              ? 'ring-2 ring-amber-400 cursor-pointer'
+                              : isMovable
+                                ? 'cursor-pointer hover:shadow-lg hover:scale-105'
+                                : initialEditMode && isRanked
+                                  ? 'opacity-70'
+                                  : ''
+                          } ${
                             isClickableInEditMode ? 'cursor-pointer hover:shadow-lg hover:scale-105' : ''
                           } ${
-                            isPromoted
+                            isSelectedForMove
+                              ? 'bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-500'
+                              : initialEditMode && isRanked
+                              ? darkMode ? 'bg-slate-800 border-green-700' : 'bg-green-50 border-green-300'
+                              : isPromoted
                               ? 'bg-green-50 border-green-400 dark:bg-green-900/20 dark:border-green-500'
                               : isRelegated
                               ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500'
@@ -1120,6 +1186,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               {isRelegated && (
                                 <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
                                   ↓ Relegate
+                                </p>
+                              )}
+                              {initialEditMode && isRanked && (
+                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5 flex items-center gap-0.5">
+                                  <Lock size={10} /> Ranked
+                                </p>
+                              )}
+                              {isSelectedForMove && (
+                                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                                  Tap a heat to move
                                 </p>
                               )}
                             </div>
@@ -1376,7 +1452,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 <p className={`text-sm font-medium ${
                   darkMode ? 'text-white' : 'text-slate-900'
                 }`}>
-                  {isSHRS ? (
+                  {initialEditMode ? (
+                    'Select an unranked skipper to move them, then tap the target heat header. Ranked skippers (green border with lock) are fixed in place.'
+                  ) : isSHRS ? (
                     completed
                       ? isTransitionRound
                         ? 'Qualifying series complete. Skippers will be ranked by cumulative qualifying scores and split into Gold, Silver and Bronze fleets for the Finals series.'
@@ -1407,11 +1485,43 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`flex ${isInitialAllocation || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-3 p-6 border-t flex-shrink-0 ${
+        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-3 p-6 border-t flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
-          {/* Show reshuffle/manual assign buttons only for initial Round 1 allocation */}
-          {isInitialAllocation && (onReshuffle || onManualAssign) && (
+          {/* Initial edit mode controls */}
+          {initialEditMode && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setInitialEditMode(false);
+                  setSelectedSkipperToMove(null);
+                  setLocalAssignments(null);
+                }}
+                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                  darkMode
+                    ? 'text-slate-300 hover:bg-slate-700'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (localAssignments && onUpdateAssignments) {
+                    onUpdateAssignments(localAssignments, 1);
+                  }
+                  setInitialEditMode(false);
+                  setSelectedSkipperToMove(null);
+                }}
+                className="flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium bg-green-600 text-white hover:bg-green-700"
+              >
+                <Check size={18} />
+                Apply Changes
+              </button>
+            </div>
+          )}
+          {/* Show reshuffle/manual assign/edit buttons only for initial Round 1 allocation */}
+          {isInitialAllocation && !initialEditMode && (onReshuffle || onManualAssign) && (
             <div className="flex gap-3">
               {onReshuffle && (
                 <button
@@ -1443,6 +1553,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 >
                   <Edit3 size={18} />
                   Manual Assign
+                </button>
+              )}
+              {rankedSkipperIndices.size > 0 && onUpdateAssignments && (
+                <button
+                  onClick={() => {
+                    setInitialEditMode(true);
+                    setLocalAssignments([...heatAssignments].map(a => ({
+                      ...a,
+                      skipperIndices: [...a.skipperIndices]
+                    })));
+                  }}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                    darkMode
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  <Edit3 size={18} />
+                  Edit Assignments
                 </button>
               )}
             </div>
@@ -1578,23 +1707,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
           )}
 
-          <button
+          {!initialEditMode && <button
             onClick={() => {
               if (!isInitialAllocation) {
                 if (completed && (nextRound || shouldAllowProgression)) {
-                  // Advancing to next round after completing current round
                   const targetRound = nextRound ? nextRound.round : round + 1;
                   console.log('Advancing to next round:', targetRound);
                   if (onAdvanceToNextRound) {
                     onAdvanceToNextRound(targetRound);
-                    // Don't close - modal will update to show new round allocations
                     return;
                   } else if (onStartRound) {
-                    // Fallback to old behavior
                     onStartRound(targetRound);
                   }
                 } else if (!completed && roundToDisplay && onStartRound) {
-                  // Start scoring the current round
                   console.log('Starting current round:', roundToDisplay.round);
                   onStartRound(roundToDisplay.round);
                 }
@@ -1631,7 +1756,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 ? 'Accept & Start Scoring'
                 : 'Start Scoring'
             )}
-          </button>
+          </button>}
         </div>
       </div>
 

@@ -469,18 +469,20 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     setShowManualAssignmentModal(false);
   };
 
-  const handleHMSSeedingConfirm = (assignments: any[]) => {
+  const handleHMSSeedingConfirm = (assignments: any[], rankedSkipperIndices?: number[]) => {
     console.log('🎯 HMS Seeding assignments received:', JSON.stringify(assignments, null, 2));
+    console.log('🎯 Ranked skipper indices:', rankedSkipperIndices);
 
     const finalHeatManagement = {
       configuration: {
         enabled: true,
         numberOfHeats: numHeats,
         promotionCount: promotionCount,
-        seedingMethod: 'manual' as SeedingMethod, // Use 'manual' since we're setting specific assignments
+        seedingMethod: 'manual' as SeedingMethod,
         autoAssign: false,
         scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {}),
+        ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {})
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
