@@ -171,6 +171,20 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
     return heatIndex < heats.length - 1 && position > (maxPos - promotionCount);
   };
 
+  const getShrsFleetInfo = (heat: HeatDesignation): { name: string; bgClass: string; textClass: string; borderClass: string } => {
+    const fleetMap: Record<string, { name: string; bgClass: string; textClass: string; borderClass: string }> = {
+      'A': { name: 'Gold Fleet', bgClass: 'bg-yellow-500', textClass: 'text-yellow-950', borderClass: 'border-yellow-500' },
+      'B': { name: 'Silver Fleet', bgClass: 'bg-slate-400', textClass: 'text-slate-950', borderClass: 'border-slate-400' },
+      'C': { name: 'Bronze Fleet', bgClass: 'bg-amber-600', textClass: 'text-white', borderClass: 'border-amber-600' },
+      'D': { name: '4th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+      'E': { name: '5th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+      'F': { name: '6th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+    };
+    return fleetMap[heat] || { name: `Fleet ${heat}`, bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' };
+  };
+
+  const hasFinalRounds = isShrs && completedRounds.some(r => r.round > shrsQualifyingRounds);
+
   // Export functions
   const exportAsJPG = async () => {
     if (!tableRef.current) return;
@@ -451,6 +465,26 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           </div>
         )}
 
+        {/* SHRS Fleet Legend */}
+        {isShrs && hasFinalRounds && (
+          <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex flex-wrap gap-4 text-xs items-center">
+              <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Fleet Finals:</span>
+              {heats.map(h => {
+                const fleet = getShrsFleetInfo(h);
+                return (
+                  <div key={h} className="flex items-center gap-1.5">
+                    <div className={`w-3 h-3 rounded-full ${fleet.bgClass}`} />
+                    <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                      Heat {h} = {fleet.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Results Table */}
         <div className="flex-1 overflow-auto">
           {completedRounds.length === 0 ? (
@@ -479,7 +513,16 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         {isShrs
                           ? (round.round <= shrsQualifyingRounds
                             ? `Qualifying Rd ${round.round}`
-                            : `Final ${round.round - shrsQualifyingRounds}`)
+                            : (
+                              <div>
+                                <span>Final {round.round - shrsQualifyingRounds}</span>
+                                <div className="flex gap-1 justify-center mt-1">
+                                  {heats.map(h => (
+                                    <div key={h} className={`w-2 h-2 rounded-full ${getShrsFleetInfo(h).bgClass}`} title={getShrsFleetInfo(h).name} />
+                                  ))}
+                                </div>
+                              </div>
+                            ))
                           : `Round ${round.round}`}
                       </th>
                     ))}
@@ -533,6 +576,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                 <span className={darkMode ? 'text-slate-200' : 'text-slate-900'}>
                                   Heat {heat}
                                 </span>
+                                {isShrs && hasFinalRounds && (
+                                  <div className={`mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${getShrsFleetInfo(heat).bgClass} ${getShrsFleetInfo(heat).textClass}`}>
+                                    {getShrsFleetInfo(heat).name}
+                                  </div>
+                                )}
                               </div>
                             </td>
                           ) : null}
@@ -633,7 +681,9 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                 {/* Sail Number */}
                                 <td className={`
                                   px-2 py-2 text-center text-xs border-l-4
-                                  ${darkMode ? 'text-slate-400 border-slate-600' : 'text-slate-600 border-slate-400'}
+                                  ${isShrs && round.round > shrsQualifyingRounds
+                                    ? `${darkMode ? 'text-slate-400' : 'text-slate-600'} ${getShrsFleetInfo(heat).borderClass}`
+                                    : `${darkMode ? 'text-slate-400 border-slate-600' : 'text-slate-600 border-slate-400'}`}
                                   ${cellZoneClass}
                                 `}>
                                   {skipper?.sailNo || '—'}
@@ -715,7 +765,9 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                               colSpan={3}
                               className={`
                                 px-3 py-2 text-xs border-l-4
-                                ${darkMode ? 'text-slate-300 border-slate-600' : 'text-slate-700 border-slate-400'}
+                                ${isShrs && round.round > shrsQualifyingRounds
+                                  ? `${darkMode ? 'text-slate-300' : 'text-slate-700'} ${getShrsFleetInfo(heat).borderClass}`
+                                  : `${darkMode ? 'text-slate-300 border-slate-600' : 'text-slate-700 border-slate-400'}`}
                               `}
                             >
                               {observers.length > 0 ? (
