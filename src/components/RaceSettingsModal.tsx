@@ -3,7 +3,7 @@ import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, Edit2, Che
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
-import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig } from '../utils/shrsHeatSystem';
+import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generateAllSHRSQualifyingRoundAssignments } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -634,22 +634,25 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           return;
         }
 
-        // CRITICAL: Compare against ACTUAL number of heats in assignments, not stored config
-        // The config might have been saved incorrectly before, so we need to check reality
         const actualHeatCount = currentHeatManagement.rounds[0]?.heatAssignments?.length || 0;
         const heatCountChanged = actualHeatCount !== numHeats;
         const hasAnyRoundResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
-
-        // When reducing heat count, we MUST regenerate even if there are results
-        // because we can't have 3 heats in assignments when config says 2 heats
         const isReducingHeats = actualHeatCount > numHeats;
-        const shouldRegenerate = heatCountChanged && (!hasAnyRoundResults || isReducingHeats);
+
+        const previousScoringSystem = currentHeatManagement.configuration.scoringSystem || 'hms';
+        const newScoringSystem = (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules as string : 'hms';
+        const scoringSystemChanged = previousScoringSystem !== newScoringSystem;
+
+        const shouldRegenerate = (heatCountChanged || scoringSystemChanged) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged);
 
         console.log('🔍 Heat regeneration check:', {
           storedConfigHeats: currentHeatManagement.configuration.numberOfHeats,
           actualHeatsInAssignments: actualHeatCount,
           newHeats: numHeats,
           heatCountChanged,
+          scoringSystemChanged,
+          previousScoringSystem,
+          newScoringSystem,
           hasAnyRoundResults,
           isReducingHeats,
           shouldRegenerate,
@@ -670,7 +673,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           let heatAssignments;
 
           if (currentDropRules === 'shrs') {
-            // Use SHRS-specific seeding (zigzag pattern)
             const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
             const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -678,15 +680,43 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               const heatIndex = Number(heatNum) - 1;
               return {
                 heatDesignation: heatLabels[heatIndex] as any,
-                skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => sk.sailNumber === s.sailNumber))
+                skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => sk.sailNo === s.sailNo))
               };
             });
           } else {
-            // Use HMS seeding
-            heatAssignments = seedInitialHeats(skippers, config);
+            const hmsSeederConfig: HMSConfig = {
+              numberOfHeats: numHeats,
+              promotionCount: promotionCount,
+              seedingMethod,
+              maxHeatSize: 12
+            };
+            heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
           }
 
-          console.log('✅ Generated', heatAssignments.length, 'heat assignments:', heatAssignments.map(h => h.heatDesignation));
+          let allRounds;
+          if (currentDropRules === 'shrs' && shrsQualifyingRounds > 1) {
+            const allQualifyingRounds = generateAllSHRSQualifyingRoundAssignments(
+              heatAssignments,
+              numHeats,
+              shrsQualifyingRounds
+            );
+            allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+              round: idx + 1,
+              heatAssignments: roundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as any,
+                skipperIndices: a.skipperIndices
+              })),
+              results: [],
+              completed: false
+            }));
+          } else {
+            allRounds = [{
+              round: 1,
+              heatAssignments,
+              results: [],
+              completed: false
+            }];
+          }
 
           finalHeatManagement = {
             configuration: {
@@ -700,14 +730,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             },
             currentRound: 1,
             currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
-            rounds: [
-              {
-                round: 1,
-                heatAssignments,
-                results: [],
-                completed: false
-              }
-            ]
+            rounds: allRounds
           };
         } else {
           // Only update configuration without regenerating heats
@@ -739,29 +762,52 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           return; // Don't save yet, wait for HMS seeding assignments
         }
 
-        // Create new heat management with seeded heats
         let heatAssignments;
 
         if (currentDropRules === 'shrs') {
-          // Use SHRS-specific seeding (zigzag pattern)
           const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
           const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
 
           heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
             const heatIndex = Number(heatNum) - 1;
-            const indices = heatSkippers.map(s => {
-              // Use object identity for exact matching
-              const index = skippers.indexOf(s);
-              return index;
-            });
             return {
               heatDesignation: heatLabels[heatIndex] as any,
-              skipperIndices: indices
+              skipperIndices: heatSkippers.map(s => skippers.indexOf(s))
             };
           });
         } else {
-          // Use HMS seeding
-          heatAssignments = seedInitialHeats(skippers, config);
+          const hmsSeederConfig: HMSConfig = {
+            numberOfHeats: numHeats,
+            promotionCount: promotionCount,
+            seedingMethod,
+            maxHeatSize: 12
+          };
+          heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
+        }
+
+        let allRounds;
+        if (currentDropRules === 'shrs' && shrsQualifyingRounds > 1) {
+          const allQualifyingRounds = generateAllSHRSQualifyingRoundAssignments(
+            heatAssignments,
+            numHeats,
+            shrsQualifyingRounds
+          );
+          allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+            round: idx + 1,
+            heatAssignments: roundAssignments.map(a => ({
+              heatDesignation: a.heatDesignation as any,
+              skipperIndices: a.skipperIndices
+            })),
+            results: [],
+            completed: false
+          }));
+        } else {
+          allRounds = [{
+            round: 1,
+            heatAssignments,
+            results: [],
+            completed: false
+          }];
         }
 
         finalHeatManagement = {
@@ -775,15 +821,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
           },
           currentRound: 1,
-          currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation, // Start with lowest heat
-          rounds: [
-            {
-              round: 1,
-              heatAssignments,
-              results: [],
-              completed: false
-            }
-          ]
+          currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
+          rounds: allRounds
         };
       }
     } else {

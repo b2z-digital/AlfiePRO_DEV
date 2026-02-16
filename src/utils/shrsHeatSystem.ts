@@ -126,8 +126,8 @@ export function seedInitialHeatsForSHRS(
   let sortedSkippers = [...skippers];
   if (seedingList && seedingList.length > 0) {
     sortedSkippers.sort((a, b) => {
-      const aSail = a.sailNumber || '';
-      const bSail = b.sailNumber || '';
+      const aSail = a.sailNo || a.sailNumber || '';
+      const bSail = b.sailNo || b.sailNumber || '';
       const aIndex = seedingList.indexOf(aSail);
       const bIndex = seedingList.indexOf(bSail);
       if (aIndex === -1 && bIndex === -1) return compareSailNumbers(aSail, bSail);
@@ -136,7 +136,7 @@ export function seedInitialHeatsForSHRS(
       return aIndex - bIndex;
     });
   } else {
-    sortedSkippers.sort((a, b) => compareSailNumbers(a.sailNumber || '', b.sailNumber || ''));
+    sortedSkippers.sort((a, b) => compareSailNumbers(a.sailNo || a.sailNumber || '', b.sailNo || b.sailNumber || ''));
   }
 
   let currentHeat = 1;
@@ -290,19 +290,19 @@ export function assignToFinalFleets(
   }
 
   const activeSkippers = skippers.filter(s => {
-    const sail = s.sailNumber || '';
+    const sail = s.sailNo || s.sailNumber || '';
     return !withdrawnSailNumbers || !withdrawnSailNumbers.has(sail);
   });
   const withdrawnSkippers = skippers.filter(s => {
-    const sail = s.sailNumber || '';
+    const sail = s.sailNo || s.sailNumber || '';
     return withdrawnSailNumbers && withdrawnSailNumbers.has(sail);
   });
 
   const sortedActive = [...activeSkippers].sort((a, b) => {
-    const scoreA = rankingScores.get(a.sailNumber || '') || 999999;
-    const scoreB = rankingScores.get(b.sailNumber || '') || 999999;
+    const scoreA = rankingScores.get(a.sailNo || a.sailNumber || '') || 999999;
+    const scoreB = rankingScores.get(b.sailNo || b.sailNumber || '') || 999999;
     if (scoreA !== scoreB) return scoreA - scoreB;
-    return compareSailNumbers(a.sailNumber || '', b.sailNumber || '');
+    return compareSailNumbers(a.sailNo || a.sailNumber || '', b.sailNo || b.sailNumber || '');
   });
 
   const fleetSizes = calculateFinalFleetSizes(skippers.length, numberOfFleets);
@@ -323,6 +323,56 @@ export function assignToFinalFleets(
   });
 
   return fleets;
+}
+
+/**
+ * SHRS Rule 3.2: Pre-Assignments.
+ * Generate all heat assignments for the entire qualifying series before racing starts.
+ * Uses Heat Movement Tables to determine each skipper's heat for every qualifying round.
+ * Position within the heat (slot order) determines movement, not race results.
+ */
+export function generateAllSHRSQualifyingRoundAssignments(
+  initialAssignments: { heatDesignation: string; skipperIndices: number[] }[],
+  numberOfHeats: number,
+  qualifyingRounds: number
+): { heatDesignation: string; skipperIndices: number[] }[][] {
+  const allRounds: { heatDesignation: string; skipperIndices: number[] }[][] = [];
+
+  allRounds.push(initialAssignments.map(a => ({
+    heatDesignation: a.heatDesignation,
+    skipperIndices: [...a.skipperIndices]
+  })));
+
+  const heatLabels = initialAssignments.map(a => a.heatDesignation);
+
+  for (let round = 2; round <= qualifyingRounds; round++) {
+    const prevRound = allRounds[round - 2];
+    const newAssignments = heatLabels.map(label => ({
+      heatDesignation: label,
+      skipperIndices: [] as number[]
+    }));
+
+    for (const prevHeat of prevRound) {
+      prevHeat.skipperIndices.forEach((skipperIndex, positionZeroBased) => {
+        const position = positionZeroBased + 1;
+        const nextHeatLabel = getNextHeat(
+          position,
+          prevHeat.heatDesignation,
+          numberOfHeats,
+          true
+        );
+
+        const targetIdx = heatLabels.indexOf(nextHeatLabel as string);
+        if (targetIdx >= 0) {
+          newAssignments[targetIdx].skipperIndices.push(skipperIndex);
+        }
+      });
+    }
+
+    allRounds.push(newAssignments);
+  }
+
+  return allRounds;
 }
 
 /**

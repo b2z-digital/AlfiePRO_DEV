@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight } from 'lucide-react';
+import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -46,11 +46,49 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [initialEditMode, setInitialEditMode] = useState(false);
   const [selectedSkipperToMove, setSelectedSkipperToMove] = useState<number | null>(null);
   const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
+  const [previewRoundIndex, setPreviewRoundIndex] = useState<number | null>(null);
 
   const rankedSkipperIndices = useMemo(() => {
     const indices = (heatManagement.configuration as any)?.rankedSkipperIndices;
     return new Set<number>(Array.isArray(indices) ? indices : []);
   }, [heatManagement.configuration]);
+
+  const shrsHasPreAssignments = heatManagement.configuration.scoringSystem === 'shrs' &&
+    heatManagement.rounds.length > 1 &&
+    !heatManagement.rounds.some(r => r.results && r.results.length > 0);
+
+  const totalPreAssignedRounds = shrsHasPreAssignments ? heatManagement.rounds.length : 0;
+
+  const exportAllSHRSAssignments = () => {
+    const rows: string[] = ['Round,Heat,Sail Number,Skipper Name,Club'];
+
+    for (const rd of heatManagement.rounds) {
+      const sortedAssignments = [...rd.heatAssignments].sort((a, b) =>
+        a.heatDesignation.localeCompare(b.heatDesignation)
+      );
+      const config = heatManagement.configuration;
+      const roundLabel = config.scoringSystem === 'shrs'
+        ? getSHRSRoundLabel(rd.round, config)
+        : `R${rd.round}`;
+
+      for (const assignment of sortedAssignments) {
+        for (const idx of assignment.skipperIndices) {
+          const skipper = skippers[idx];
+          if (skipper) {
+            rows.push(`${roundLabel},Heat ${assignment.heatDesignation},${skipper.sailNo || ''},${skipper.name || ''},${skipper.club || ''}`);
+          }
+        }
+      }
+    }
+
+    const csvContent = rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `SHRS_Heat_Assignments_All_Qualifying_Rounds.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
 
   const resolveObserverConflicts = (updatedAssignments: HeatAssignment[]) => {
     setObserversByHeat(prev => {
@@ -541,11 +579,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const roundJustCompleted = heatManagement.roundJustCompleted;
   let roundToDisplay;
 
-  if (roundJustCompleted) {
-    // Show the round that was just completed (with results)
+  if (previewRoundIndex !== null && shrsHasPreAssignments) {
+    roundToDisplay = rounds[previewRoundIndex];
+  } else if (roundJustCompleted) {
     roundToDisplay = rounds.find(r => r.round === roundJustCompleted);
   } else {
-    // Show the next uncompleted round, or current round
     roundToDisplay = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
   }
 
@@ -696,21 +734,83 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              if (!isInitialAllocation && onStartRound && completed && nextRound) {
-                console.log('X button - Starting next round:', nextRound.round);
-                onStartRound(nextRound.round);
-              }
-              onClose();
-            }}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
-            }`}
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            {shrsHasPreAssignments && (
+              <button
+                onClick={exportAllSHRSAssignments}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+                title="Export all qualifying round assignments as CSV"
+              >
+                <Download size={16} />
+                Export All
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (!isInitialAllocation && onStartRound && completed && nextRound) {
+                  onStartRound(nextRound.round);
+                }
+                setPreviewRoundIndex(null);
+                onClose();
+              }}
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
+              }`}
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
+
+        {shrsHasPreAssignments && totalPreAssignedRounds > 1 && (
+          <div className={`flex items-center justify-center gap-3 px-5 py-2 border-b flex-shrink-0 ${
+            darkMode ? 'border-slate-700 bg-slate-750' : 'border-slate-200 bg-slate-50'
+          }`}>
+            <button
+              onClick={() => setPreviewRoundIndex(prev => Math.max(0, (prev ?? 0) - 1))}
+              disabled={(previewRoundIndex ?? 0) === 0}
+              className={`p-1 rounded transition-colors ${
+                (previewRoundIndex ?? 0) === 0
+                  ? 'opacity-30 cursor-not-allowed'
+                  : darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'
+              }`}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="flex items-center gap-1.5">
+              {heatManagement.rounds.map((rd, idx) => (
+                <button
+                  key={rd.round}
+                  onClick={() => setPreviewRoundIndex(idx)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                    (previewRoundIndex ?? 0) === idx
+                      ? 'bg-blue-500 text-white'
+                      : darkMode
+                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                >
+                  {getSHRSRoundLabel(rd.round, heatManagement.configuration)}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPreviewRoundIndex(prev => Math.min(totalPreAssignedRounds - 1, (prev ?? 0) + 1))}
+              disabled={(previewRoundIndex ?? 0) === totalPreAssignedRounds - 1}
+              className={`p-1 rounded transition-colors ${
+                (previewRoundIndex ?? 0) === totalPreAssignedRounds - 1
+                  ? 'opacity-30 cursor-not-allowed'
+                  : darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'
+              }`}
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
 
         {limitWarning && (
           <div className={`mx-5 mt-2 p-2 rounded-lg border flex-shrink-0 ${
