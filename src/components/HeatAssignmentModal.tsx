@@ -572,7 +572,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             <Users className="text-blue-400" size={28} />
             <div>
               <h2 className="text-2xl font-bold">
-                Round {round} {completed ? 'Heat Results' : 'Heat Assignments'}
+                Round {round} - {heatManagement.configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
               </h2>
               <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {completed ? 'Round Complete' : 'Current Round'} • {heatAssignments.length} heats
