@@ -84,6 +84,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
 
+  // SHRS qualifying/finals structure
+  const [shrsQualifyingRounds, setShrsQualifyingRounds] = useState(
+    initialHeatManagement?.configuration.shrsQualifyingRounds || Math.max(2, Math.floor(initialNumRaces * 2 / 3))
+  );
+
   // Load national association ID from club's state association
   useEffect(() => {
     const loadNationalAssociationId = async () => {
@@ -435,7 +440,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         promotionCount: promotionCount,
         seedingMethod: 'manual' as SeedingMethod,
         autoAssign: false,
-        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -470,7 +476,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         promotionCount: promotionCount,
         seedingMethod: 'manual' as SeedingMethod, // Use 'manual' since we're setting specific assignments
         autoAssign: false,
-        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
@@ -642,7 +649,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               promotionCount: promotionCount,
               seedingMethod,
               autoAssign: initialAssignment === 'random',
-              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
             },
             currentRound: 1,
             currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
@@ -667,7 +675,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               promotionCount: promotionCount,
               seedingMethod,
               autoAssign: initialAssignment === 'random',
-              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
             }
           };
         }
@@ -716,7 +725,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             promotionCount: promotionCount,
             seedingMethod,
             autoAssign: initialAssignment === 'random',
-            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
           },
           currentRound: 1,
           currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation, // Start with lowest heat
@@ -1378,10 +1388,59 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           </div>
                         </div>
 
+                        {isSHRS && (
+                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
+                            <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
+                              Race Structure
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
+                                  Qualifying Rounds
+                                </label>
+                                <input
+                                  type="number"
+                                  min="2"
+                                  max={Math.max(2, currentNumRaces - 2)}
+                                  value={shrsQualifyingRounds}
+                                  onChange={(e) => {
+                                    const val = Math.max(2, Math.min(parseInt(e.target.value) || 2, currentNumRaces - 2));
+                                    setShrsQualifyingRounds(val);
+                                  }}
+                                  disabled={hasHeatScores}
+                                  className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
+                                    hasHeatScores ? 'opacity-50 cursor-not-allowed' : ''
+                                  } ${
+                                    darkMode
+                                      ? 'bg-slate-700 border-slate-600 text-white'
+                                      : 'bg-white border-slate-300 text-slate-900'
+                                  }`}
+                                />
+                              </div>
+                              <div>
+                                <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
+                                  Finals Rounds
+                                </label>
+                                <div className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
+                                  darkMode
+                                    ? 'bg-slate-700/50 border-slate-600 text-slate-300'
+                                    : 'bg-slate-50 border-slate-300 text-slate-700'
+                                }`}>
+                                  {Math.max(0, currentNumRaces - shrsQualifyingRounds)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className={`mt-3 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
+                              <p>Qualifying: Heats rotate via movement tables (Heat A, B{numHeats > 2 ? ', C' : ''}...)</p>
+                              <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank</p>
+                            </div>
+                          </div>
+                        )}
+
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                           {isSHRS ? (
                             <>
-                              <strong>SHRS Configuration:</strong> {numHeats} heats with sizes of {heatSizes.join(', ')} boats. No promotion/relegation.
+                              <strong>SHRS Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds. Sizes: {heatSizes.join(', ')} boats.
                             </>
                           ) : manualHeatCount !== null || manualPromotionCount !== null ? (
                             <>

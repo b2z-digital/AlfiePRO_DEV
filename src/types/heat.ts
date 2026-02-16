@@ -29,6 +29,8 @@ export interface HeatConfiguration {
   maxHeatSize?: number; // Safety limit
   allowPromotionCountChange?: boolean; // Allow RO to change promotion count mid-event
   scoringSystem?: 'hms' | 'shrs'; // Heat racing scoring system type
+  shrsQualifyingRounds?: number; // SHRS: number of qualifying rounds before finals
+  shrsFinalsStarted?: boolean; // SHRS: whether finals have been initiated
 }
 
 export interface HeatAssignment {
@@ -247,6 +249,49 @@ export const calculateOverallPositions = (
   return overallPositions;
 };
 
+export type SHRSPhase = 'qualifying' | 'finals';
+
+export const getSHRSPhase = (round: number, config: HeatConfiguration): SHRSPhase => {
+  if (config.scoringSystem !== 'shrs') return 'qualifying';
+  const qualifyingRounds = config.shrsQualifyingRounds || 0;
+  if (qualifyingRounds <= 0) return 'qualifying';
+  return round <= qualifyingRounds ? 'qualifying' : 'finals';
+};
+
+export const isSHRSFinalsRound = (round: number, config: HeatConfiguration): boolean => {
+  return getSHRSPhase(round, config) === 'finals';
+};
+
+export const isSHRSTransitionRound = (round: number, config: HeatConfiguration): boolean => {
+  if (config.scoringSystem !== 'shrs') return false;
+  const qualifyingRounds = config.shrsQualifyingRounds || 0;
+  return qualifyingRounds > 0 && round === qualifyingRounds;
+};
+
+export const getSHRSHeatLabel = (heat: HeatDesignation, round: number, config: HeatConfiguration): string => {
+  const phase = getSHRSPhase(round, config);
+  if (phase === 'finals') {
+    const fleetNames: Record<string, string> = {
+      'A': 'Gold Fleet',
+      'B': 'Silver Fleet',
+      'C': 'Bronze Fleet',
+      'D': 'Copper Fleet',
+      'E': 'Fleet E',
+      'F': 'Fleet F'
+    };
+    return fleetNames[heat] || `Fleet ${heat}`;
+  }
+  return `Heat ${heat}`;
+};
+
+export const getSHRSRoundLabel = (round: number, config: HeatConfiguration): string => {
+  if (config.scoringSystem !== 'shrs') return `R${round}`;
+  const qualifyingRounds = config.shrsQualifyingRounds || 0;
+  if (qualifyingRounds <= 0) return `R${round}`;
+  if (round <= qualifyingRounds) return `Q${round}`;
+  return `F${round - qualifyingRounds}`;
+};
+
 // Function to generate heat assignments for the next round based on results
 // HMS: This handles the STARTING lineup for the next round (after relegations from current round)
 export const generateNextRoundAssignments = (
@@ -265,6 +310,71 @@ export const generateNextRoundAssignments = (
   console.log('\n========================================');
   console.log('=== GENERATING NEXT ROUND ASSIGNMENTS ===');
   console.log(`Current Round: ${currentRound.round}`);
+
+  if (configuration.scoringSystem === 'shrs' && isSHRSTransitionRound(currentRound.round, configuration)) {
+    console.log('SHRS: Transitioning from Qualifying to Finals');
+    console.log('SHRS: Ranking all skippers by cumulative qualifying scores, splitting into fleets');
+
+    const allSkipperScores = new Map<number, number>();
+    const allSkipperRaceScores = new Map<number, number[]>();
+
+    for (const r of heatManagement.rounds) {
+      if (r.round > currentRound.round) continue;
+      for (const result of r.results) {
+        if (!allSkipperScores.has(result.skipperIndex)) {
+          allSkipperScores.set(result.skipperIndex, 0);
+          allSkipperRaceScores.set(result.skipperIndex, []);
+        }
+        const score = result.letterScore
+          ? (Math.max(...heats.map((_, i) => {
+              const ha = r.heatAssignments.find(a => a.heatDesignation === heats[i]);
+              return ha ? ha.skipperIndices.length : 0;
+            })) + 1)
+          : (result.position || 999);
+        allSkipperRaceScores.get(result.skipperIndex)!.push(score);
+      }
+    }
+
+    const qualRacesCompleted = currentRound.round;
+    const numDiscards = qualRacesCompleted < 4 ? 0 : qualRacesCompleted < 8 ? 1 : 2 + Math.floor((qualRacesCompleted - 8) / 8);
+
+    allSkipperRaceScores.forEach((scores, idx) => {
+      const sorted = [...scores].sort((a, b) => b - a);
+      const kept = sorted.slice(numDiscards);
+      allSkipperScores.set(idx, kept.reduce((sum, s) => sum + s, 0));
+    });
+
+    const rankedSkippers = Array.from(allSkipperScores.entries())
+      .sort(([, scoreA], [, scoreB]) => scoreA - scoreB);
+
+    const fleetSizes: number[] = [];
+    const totalSkippers = rankedSkippers.length;
+    const baseSize = Math.floor(totalSkippers / numberOfHeats);
+    const remainder = totalSkippers % numberOfHeats;
+    for (let i = 0; i < numberOfHeats; i++) {
+      fleetSizes.push(baseSize + (i < remainder ? 1 : 0));
+    }
+
+    const newAssignments: HeatAssignment[] = heats.map(heat => ({
+      heatDesignation: heat,
+      skipperIndices: []
+    }));
+
+    let skipperIdx = 0;
+    for (let fleetIdx = 0; fleetIdx < numberOfHeats; fleetIdx++) {
+      for (let i = 0; i < fleetSizes[fleetIdx] && skipperIdx < rankedSkippers.length; i++) {
+        newAssignments[fleetIdx].skipperIndices.push(rankedSkippers[skipperIdx][0]);
+        skipperIdx++;
+      }
+    }
+
+    console.log('SHRS Finals fleet assignments:');
+    newAssignments.forEach((a, i) => {
+      console.log(`  ${heats[i]} (${getSHRSHeatLabel(heats[i], currentRound.round + 1, configuration)}): ${a.skipperIndices.length} skippers`);
+    });
+
+    return newAssignments;
+  }
 
   // Group results by heat
   const resultsByHeat = currentRound.results.reduce((acc, result) => {
@@ -297,6 +407,14 @@ export const generateNextRoundAssignments = (
   console.log(`Using ${scoringSystem.toUpperCase()} heat system for Round ${currentRound.round} → Round ${currentRound.round + 1}`);
 
   if (scoringSystem === 'shrs') {
+    if (isSHRSFinalsRound(currentRound.round, configuration)) {
+      console.log('SHRS Finals: Keeping same fleet assignments (no movement tables in finals)');
+      return currentRound.heatAssignments.map(a => ({
+        heatDesignation: a.heatDesignation,
+        skipperIndices: [...a.skipperIndices]
+      }));
+    }
+
     // SHRS Rule 3.1.ii: Use Heat Movement Tables to assign boats to next race heats.
     // Each skipper's next heat is determined by their position within their current heat
     // and their current heat designation, looked up in the movement table.

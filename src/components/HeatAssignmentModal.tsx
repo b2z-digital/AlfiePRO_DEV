@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { selectObservers, saveObserverAssignments, getObserverAssignments, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
@@ -518,7 +518,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
   // For SHRS, check if we should allow progression even if next round doesn't exist yet
   const isSHRS = heatManagement.configuration.scoringSystem === 'shrs';
-  const expectedRounds = heatManagement.configuration.numberOfRounds || 6; // Default SHRS rounds
+  const shrsPhase = isSHRS ? getSHRSPhase(round, configuration) : null;
+  const isFinalsPhase = shrsPhase === 'finals';
+  const isTransitionRound = isSHRS && isSHRSTransitionRound(round, configuration);
+  const expectedRounds = heatManagement.configuration.numberOfRounds || 6;
   const shouldAllowProgression = completed && round < expectedRounds;
 
   console.log('HeatAssignmentModal Debug:', {
@@ -533,18 +536,28 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     allRounds: rounds.map(r => ({ round: r.round, completed: r.completed }))
   });
 
-  // Get vibrant gradient colors for each heat
   const getHeatGradient = (heat: HeatDesignation): string => {
     if (isSHRS) {
-      const shrsGradients: Record<HeatDesignation, string> = {
-        'A': 'bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-700',
-        'B': 'bg-gradient-to-br from-slate-300 to-slate-400 border-slate-500',
-        'C': 'bg-gradient-to-br from-amber-600 to-amber-700 border-amber-800',
-        'D': 'bg-gradient-to-br from-orange-600 to-orange-700 border-orange-800',
-        'E': 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-700',
+      if (isFinalsPhase) {
+        const finalsGradients: Record<HeatDesignation, string> = {
+          'A': 'bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-700',
+          'B': 'bg-gradient-to-br from-slate-300 to-slate-400 border-slate-500',
+          'C': 'bg-gradient-to-br from-amber-600 to-amber-700 border-amber-800',
+          'D': 'bg-gradient-to-br from-orange-600 to-orange-700 border-orange-800',
+          'E': 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-700',
+          'F': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700'
+        };
+        return finalsGradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
+      }
+      const qualifyingGradients: Record<HeatDesignation, string> = {
+        'A': 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-700',
+        'B': 'bg-gradient-to-br from-teal-500 to-teal-600 border-teal-700',
+        'C': 'bg-gradient-to-br from-cyan-500 to-cyan-600 border-cyan-700',
+        'D': 'bg-gradient-to-br from-sky-500 to-sky-600 border-sky-700',
+        'E': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700',
         'F': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700'
       };
-      return shrsGradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
+      return qualifyingGradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
     }
     const gradients: Record<HeatDesignation, string> = {
       'A': 'bg-gradient-to-br from-yellow-500 to-amber-600 border-amber-700',
@@ -572,10 +585,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             <Users className="text-blue-400" size={28} />
             <div>
               <h2 className="text-2xl font-bold">
-                Round {round} - {heatManagement.configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
+                {isSHRS ? getSHRSRoundLabel(round, configuration) : `Round ${round}`} - {configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
               </h2>
               <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {completed ? 'Round Complete' : 'Current Round'} • {heatAssignments.length} heats
+                {isSHRS && shrsPhase ? (
+                  <span className={`font-semibold ${isFinalsPhase ? 'text-yellow-500' : 'text-blue-400'}`}>
+                    {isFinalsPhase ? 'Finals Series' : 'Qualifying Series'}
+                  </span>
+                ) : (
+                  completed ? 'Round Complete' : 'Current Round'
+                )}
+                {' '} • {heatAssignments.length} heats
                 {editMode && <span className="ml-2 text-amber-500 font-semibold">• Edit Mode</span>}
                 {!editMode && hasAppliedChanges && <span className="ml-2 text-green-500 font-semibold">• Changes Applied</span>}
               </p>
@@ -779,14 +799,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <h3 className={`${
                         heatAssignments.length >= 3 ? 'text-base' : 'text-lg'
                       } font-bold text-white`}>
-                        {isSHRS ? ({
-                          'A': 'Gold Fleet',
-                          'B': 'Silver Fleet',
-                          'C': 'Bronze Fleet',
-                          'D': 'Copper Fleet',
-                          'E': 'Fleet E',
-                          'F': 'Fleet F'
-                        } as Record<string, string>)[heatDesignation] || `Fleet ${heatDesignation}` : `Heat ${heatDesignation}`}
+                        {isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${heatDesignation}`}
                       </h3>
                       {heatCompleted ? (
                         <span className="text-xs font-semibold px-2 py-1 rounded bg-green-500 text-white">
@@ -1363,14 +1376,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 <p className={`text-sm font-medium ${
                   darkMode ? 'text-white' : 'text-slate-900'
                 }`}>
-                  {editMode
-                    ? `Click any skipper in Heat ${(window as any).__lastCompletedHeat} to toggle promotion/relegation. Promoted skippers (green) move up to the next heat.`
-                    : completed
-                    ? 'This round is complete. Green cards show skippers who will be promoted to the next heat in the following round.'
-                    : 'Skippers are assigned to heats for this round. Close this modal to begin scoring.'
-                  }
+                  {isSHRS ? (
+                    completed
+                      ? isTransitionRound
+                        ? 'Qualifying series complete. Skippers will be ranked by cumulative qualifying scores and split into Gold, Silver and Bronze fleets for the Finals series.'
+                        : isFinalsPhase
+                        ? 'Finals round complete. Fleet assignments remain fixed throughout the Finals series.'
+                        : 'Qualifying round complete. Skippers will rotate heats via movement tables for the next qualifying round.'
+                      : isFinalsPhase
+                      ? 'Finals series - fleet assignments are fixed based on qualifying results. Close this modal to begin scoring.'
+                      : 'Qualifying series - skippers rotate heats each round. Close this modal to begin scoring.'
+                  ) : (
+                    editMode
+                      ? `Click any skipper in Heat ${(window as any).__lastCompletedHeat} to toggle promotion/relegation. Promoted skippers (green) move up to the next heat.`
+                      : completed
+                      ? 'This round is complete. Green cards show skippers who will be promoted to the next heat in the following round.'
+                      : 'Skippers are assigned to heats for this round. Close this modal to begin scoring.'
+                  )}
                 </p>
-                {!completed && round > 1 && (
+                {!isSHRS && !completed && round > 1 && (
                   <p className={`text-xs mt-1 ${
                     darkMode ? 'text-slate-400' : 'text-slate-600'
                   }`}>
@@ -1594,9 +1618,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               </span>
             ) : (
               completed && shouldAllowProgression
-                ? `Progress to Round ${round + 1}`
+                ? isSHRS
+                  ? `Progress to ${getSHRSRoundLabel(round + 1, configuration)}${isSHRSTransitionRound(round, configuration) ? ' (Finals)' : ''}`
+                  : `Progress to Round ${round + 1}`
                 : completed && nextRound
-                ? `Next Round (Round ${nextRound.round})`
+                ? isSHRS
+                  ? `Next: ${getSHRSRoundLabel(nextRound.round, configuration)}${isSHRSTransitionRound(round, configuration) ? ' (Finals)' : ''}`
+                  : `Next Round (Round ${nextRound.round})`
                 : completed
                 ? 'Close'
                 : isInitialAllocation
