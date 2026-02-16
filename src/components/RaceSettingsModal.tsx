@@ -591,6 +591,16 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       if (currentHeatManagement) {
+        if (initialAssignment === 'manual') {
+          setShowManualAssignmentModal(true);
+          return;
+        }
+
+        if (initialAssignment === 'hms') {
+          setShowHMSSeedingModal(true);
+          return;
+        }
+
         // CRITICAL: Compare against ACTUAL number of heats in assignments, not stored config
         // The config might have been saved incorrectly before, so we need to check reality
         const actualHeatCount = currentHeatManagement.rounds[0]?.heatAssignments?.length || 0;
