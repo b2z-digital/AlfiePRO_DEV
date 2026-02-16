@@ -653,15 +653,26 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     return gradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
   };
 
+  const heatCount = heatAssignments.length;
+  const maxWidthClass = heatCount >= 5
+    ? 'max-w-[95vw]'
+    : heatCount === 4
+    ? 'max-w-[85vw]'
+    : heatCount === 3
+    ? 'max-w-[75vw]'
+    : heatCount === 2
+    ? 'max-w-[60vw]'
+    : 'max-w-[40vw]';
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black bg-opacity-50">
       <div
-        className={`w-full h-full flex flex-col ${
+        className={`w-full ${maxWidthClass} max-h-[92vh] rounded-xl shadow-2xl overflow-hidden flex flex-col ${
           darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
         }`}
       >
-        {/* Header - Compact */}
-        <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-3 border-b flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           <div className="flex items-center gap-3">
@@ -702,7 +713,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         </div>
 
         {limitWarning && (
-          <div className={`mx-4 mt-2 p-2 rounded-lg border flex-shrink-0 ${
+          <div className={`mx-5 mt-2 p-2 rounded-lg border flex-shrink-0 ${
             darkMode
               ? 'bg-amber-900/20 border-amber-700/50 text-amber-300'
               : 'bg-amber-50 border-amber-300 text-amber-800'
@@ -717,7 +728,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         )}
 
         {/* Heat Grid - Always columns */}
-        <div className="px-4 py-3 overflow-hidden flex-1 flex flex-col">
+        <div className="px-5 py-3 overflow-hidden flex-1 flex flex-col min-h-0">
           <div className="flex gap-3 flex-1 overflow-hidden">
             {/* Find the last completed heat (for edit mode) */}
             {/* Heats complete from bottom to top (C → B → A), so the "last" completed is the HIGHEST one */}
@@ -1457,8 +1468,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </div>
         </div>
 
-        {/* Footer - Compact */}
-        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-2 px-4 py-2.5 border-t flex-shrink-0 ${
+        {/* Footer */}
+        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-2 px-5 py-3 border-t flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           {/* Initial edit mode controls */}
