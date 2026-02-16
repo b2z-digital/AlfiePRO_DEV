@@ -27,6 +27,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   const tableRef = useRef<HTMLDivElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [observersByHeatRound, setObserversByHeatRound] = useState<Map<string, ObserverAssignment[]>>(new Map());
+  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
 
   // Close export menu when clicking outside
   useEffect(() => {
@@ -437,15 +439,17 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           </div>
         </div>
 
-        {/* Legend */}
-        <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
-          <div className="flex flex-wrap gap-6 text-xs">
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded ${darkMode ? 'bg-emerald-500/20 border-2 border-emerald-500' : 'bg-emerald-50 border-2 border-emerald-400'}`} />
-              <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Promotion Zone (Top {promotionCount})</span>
+        {/* Legend - only show for HMS (promotion/relegation system) */}
+        {!isShrs && (
+          <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex flex-wrap gap-6 text-xs">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded ${darkMode ? 'bg-emerald-500/20 border-2 border-emerald-500' : 'bg-emerald-50 border-2 border-emerald-400'}`} />
+                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Promotion Zone (Top {promotionCount})</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Results Table */}
         <div className="flex-1 overflow-auto">
@@ -472,7 +476,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         colSpan={3}
                         className={`px-4 py-3 text-center text-sm font-bold border-l-4 ${darkMode ? 'text-slate-300 border-slate-600' : 'text-slate-700 border-slate-400'}`}
                       >
-                        Round {round.round}
+                        {isShrs
+                          ? (round.round <= shrsQualifyingRounds
+                            ? `Qualifying Rd ${round.round}`
+                            : `Final ${round.round - shrsQualifyingRounds}`)
+                          : `Round ${round.round}`}
                       </th>
                     ))}
                   </tr>
@@ -578,40 +586,44 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                               }
                             }
 
-                            // Only show promotion zone for rounds after the first (seeding) round
-                            const showZones = round.round > 1;
+                            const showZones = !isShrs && round.round > 1;
                             const cellZoneClass = showZones && isPromo
                               ? (darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50/50')
                               : '';
 
-                            // Calculate points for this result
-                            const totalCompetitorsInRound = round.results.length;
                             let points = '—';
                             if (result) {
-                              if (result.letterScore) {
-                                points = String(totalCompetitorsInRound + 1);
-                              } else if (result.position !== null) {
-                                // For rounds after seeding, calculate overall position
-                                if (round.round === 1) {
-                                  // Seeded round: use position within heat
+                              if (isShrs) {
+                                if (result.letterScore) {
+                                  const heatSizes = round.heatAssignments.map(a => a.skipperIndices.length);
+                                  const largestHeat = Math.max(...heatSizes);
+                                  points = String(largestHeat + 1);
+                                } else if (result.position !== null) {
                                   points = String(result.position);
-                                } else {
-                                  // Later rounds: calculate overall position based on heat hierarchy
-                                  // Count all finishers from higher heats
-                                  let overallPoints = 0;
-                                  const heats: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
-                                  const currentHeatIndex = heats.indexOf(heat);
+                                }
+                              } else {
+                                const totalCompetitorsInRound = round.results.length;
+                                if (result.letterScore) {
+                                  points = String(totalCompetitorsInRound + 1);
+                                } else if (result.position !== null) {
+                                  if (round.round === 1) {
+                                    points = String(result.position);
+                                  } else {
+                                    let overallPoints = 0;
+                                    const heats: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+                                    const currentHeatIndex = heats.indexOf(heat);
 
-                                  for (let i = 0; i < currentHeatIndex; i++) {
-                                    const higherHeat = heats[i];
-                                    const higherHeatResults = round.results.filter(
-                                      r => r.heatDesignation === higherHeat && r.position !== null
-                                    );
-                                    overallPoints += higherHeatResults.length;
+                                    for (let i = 0; i < currentHeatIndex; i++) {
+                                      const higherHeat = heats[i];
+                                      const higherHeatResults = round.results.filter(
+                                        r => r.heatDesignation === higherHeat && r.position !== null
+                                      );
+                                      overallPoints += higherHeatResults.length;
+                                    }
+
+                                    overallPoints += position;
+                                    points = String(overallPoints);
                                   }
-
-                                  overallPoints += position;
-                                  points = String(overallPoints);
                                 }
                               }
                             }

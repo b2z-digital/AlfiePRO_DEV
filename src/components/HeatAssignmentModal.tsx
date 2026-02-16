@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { selectObservers, saveObserverAssignments, getObserverAssignments, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
@@ -1728,11 +1728,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             ) : (
               completed && shouldAllowProgression
                 ? isSHRS
-                  ? `Progress to ${getSHRSRoundLabel(round + 1, configuration)}${isSHRSTransitionRound(round, configuration) ? ' (Finals)' : ''}`
+                  ? `Progress to ${isSHRSFinalsRound(round + 1, configuration) ? `Final ${(round + 1) - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${round + 1}`}`
                   : `Progress to Round ${round + 1}`
                 : completed && nextRound
                 ? isSHRS
-                  ? `Next: ${getSHRSRoundLabel(nextRound.round, configuration)}${isSHRSTransitionRound(round, configuration) ? ' (Finals)' : ''}`
+                  ? `Score ${isSHRSFinalsRound(nextRound.round, configuration) ? `Final ${nextRound.round - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${nextRound.round}`}`
                   : `Next Round (Round ${nextRound.round})`
                 : completed
                 ? 'Close'
