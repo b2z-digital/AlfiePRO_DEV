@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Users, UserPlus, UserCog, AlertCircle, Check, Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2 } from 'lucide-react';
+import { X, Plus, Users, UserPlus, UserCog, AlertCircle, Check, CheckCircle, Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap } from 'lucide-react';
 import Papa from 'papaparse';
 import { Skipper } from '../types';
 import { getStoredMembers, isValidUUID, updateMember } from '../utils/storage';
@@ -50,7 +50,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [importData, setImportData] = useState<any[]>([]);
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const [importMappings, setImportMappings] = useState<Record<string, string>>({});
+  const [importAutoDetected, setImportAutoDetected] = useState<Set<string>>(new Set());
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'importing' | 'complete'>('upload');
+  const [pasteText, setPasteText] = useState('');
   const [members, setMembers] = useState<MemberWithValidation[]>([]);
   const [memberAvatars, setMemberAvatars] = useState<{[key: string]: string}>({});
   const [selectedMemberBoats, setSelectedMemberBoats] = useState<Record<string, MemberBoat>>({});
@@ -90,7 +92,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       setImportData([]);
       setImportHeaders([]);
       setImportMappings({});
+      setImportAutoDetected(new Set());
       setImportStep('upload');
+      setPasteText('');
       setError(null);
       setEditingSkipperIndex(null);
     }
@@ -295,8 +299,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       setUpdateSuccess(null);
       setSearchTerm('');
 
-      // Default to members view if there are no skippers yet
-      if (skippers.length === 0) {
+      // Default to members view if there are no skippers yet (only on initial open)
+      if (skippers.length === 0 && view === 'initial') {
         setView('members');
       }
     }
@@ -1741,6 +1745,98 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
   // Import view
   if (view === 'import') {
+    const SKIPPER_FIELDS: Array<{ key: string; label: string; required: boolean; aliases: string[] }> = [
+      { key: 'first_name', label: 'First Name', required: true, aliases: ['first name', 'first_name', 'firstname', 'fname', 'given name', 'given_name'] },
+      { key: 'last_name', label: 'Last Name', required: true, aliases: ['last name', 'last_name', 'lastname', 'lname', 'surname', 'family name', 'family_name'] },
+      { key: 'sail_number', label: 'Sail Number', required: true, aliases: ['sail no', 'sail_no', 'sail number', 'sail_number', 'sailno', 'sail'] },
+      { key: 'club', label: 'Club', required: false, aliases: ['club', 'club name', 'club_name', 'organisation', 'organization', 'yacht club'] },
+      { key: 'boat_type', label: 'Boat Type / Design', required: false, aliases: ['boat design', 'boat_design', 'boat type', 'boat_type', 'class', 'boat class', 'boat_class', 'design'] },
+      { key: 'country_code', label: 'Country Code (IOC)', required: false, aliases: ['nat', 'nationality', 'nation', 'ioc', 'country code', 'country_code', 'nat.'] },
+      { key: 'country', label: 'Country', required: false, aliases: ['country', 'country name', 'country_name'] },
+      { key: 'state', label: 'State', required: false, aliases: ['state', 'province', 'region'] },
+      { key: 'category', label: 'Category', required: false, aliases: ['category', 'age', 'age group', 'division', 'cat', 'cat.'] },
+      { key: 'email', label: 'Email', required: false, aliases: ['email', 'e-mail', 'email address', 'contact email'] },
+      { key: 'hull_number', label: 'Hull / Reg No', required: false, aliases: ['hull', 'hull reg no', 'hull_reg_no', 'hull number', 'hull_number', 'registration', 'reg no', 'reg_no'] },
+    ];
+
+    const autoDetectSkipperMappings = (headers: string[]): { mappings: Record<string, string>; autoDetected: Set<string> } => {
+      const mappings: Record<string, string> = {};
+      const autoDetected = new Set<string>();
+      const usedFields = new Set<string>();
+
+      headers.forEach(header => {
+        const normalizedHeader = header.toLowerCase().trim();
+        for (const field of SKIPPER_FIELDS) {
+          if (usedFields.has(field.key)) continue;
+          const isMatch = field.aliases.some(alias => normalizedHeader === alias);
+          if (isMatch) {
+            mappings[header] = field.key;
+            autoDetected.add(field.key);
+            usedFields.add(field.key);
+            break;
+          }
+        }
+      });
+
+      if (!usedFields.has('sail_number')) {
+        const sailHeader = headers.find(h => {
+          const n = h.toLowerCase().trim();
+          return n.includes('sail') || (n.includes('number') && !n.includes('hull') && !n.includes('phone') && !n.includes('reg'));
+        });
+        if (sailHeader && !mappings[sailHeader]) {
+          mappings[sailHeader] = 'sail_number';
+          autoDetected.add('sail_number');
+        }
+      }
+
+      if (!usedFields.has('club')) {
+        const clubHeader = headers.find(h => h.toLowerCase().trim().includes('club'));
+        if (clubHeader && !mappings[clubHeader]) {
+          mappings[clubHeader] = 'club';
+          autoDetected.add('club');
+        }
+      }
+
+      return { mappings, autoDetected };
+    };
+
+    const parseImportText = (text: string) => {
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) return;
+
+      let headerLineIndex = -1;
+      for (let i = 0; i < Math.min(lines.length, 5); i++) {
+        const line = lines[i].toLowerCase();
+        const fieldCount = ['first', 'last', 'surname', 'sail', 'club', 'name', 'email', 'boat', 'nat'].filter(k => line.includes(k)).length;
+        if (fieldCount >= 2) {
+          headerLineIndex = i;
+          break;
+        }
+      }
+
+      if (headerLineIndex === -1) headerLineIndex = 0;
+
+      const dataText = lines.slice(headerLineIndex).join('\n');
+      Papa.parse(dataText, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const validData = (results.data as any[]).filter(row => {
+            const values = Object.values(row).filter(v => typeof v === 'string' && (v as string).trim());
+            return values.length >= 2;
+          });
+          if (validData.length === 0) return;
+
+          setImportData(validData);
+          setImportHeaders(results.meta.fields || []);
+          const { mappings, autoDetected } = autoDetectSkipperMappings(results.meta.fields || []);
+          setImportMappings(mappings);
+          setImportAutoDetected(autoDetected);
+          setImportStep('mapping');
+        }
+      });
+    };
+
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -1748,77 +1844,74 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        Papa.parse(text, {
-          header: true,
-          skipEmptyLines: true,
-          complete: (results) => {
-            setImportData(results.data);
-            setImportHeaders(results.meta.fields || []);
-            setImportStep('mapping');
-
-            // Auto-detect mappings
-            const autoMappings: Record<string, string> = {};
-            results.meta.fields?.forEach(header => {
-              const normalized = header.toLowerCase().trim();
-              if (normalized.includes('first') || normalized.includes('fname')) autoMappings[header] = 'first_name';
-              else if (normalized.includes('last') || normalized.includes('lname') || normalized.includes('surname')) autoMappings[header] = 'last_name';
-              else if (normalized.includes('club')) autoMappings[header] = 'club';
-              else if (normalized.includes('boat') || normalized.includes('class') || normalized.includes('type')) autoMappings[header] = 'boat_type';
-              else if (normalized.includes('sail') || normalized.includes('number')) autoMappings[header] = 'sail_number';
-              else if (normalized.includes('country') && (normalized.includes('code') || normalized.includes('ioc'))) autoMappings[header] = 'country_code';
-              else if (normalized.includes('country')) autoMappings[header] = 'country';
-              else if (normalized.includes('category') || normalized.includes('age')) autoMappings[header] = 'category';
-            });
-            setImportMappings(autoMappings);
-          }
-        });
+        parseImportText(text);
       };
       reader.readAsText(file);
+    };
+
+    const handlePasteImport = () => {
+      if (!pasteText.trim()) return;
+      parseImportText(pasteText);
     };
 
     const handleImport = async () => {
       setImportStep('importing');
       const newSkippers: Skipper[] = [];
 
-      // Reverse the mapping: field -> CSV column
       const fieldToColumn: Record<string, string> = {};
       Object.entries(importMappings).forEach(([csvColumn, field]) => {
         fieldToColumn[field] = csvColumn;
       });
 
       for (const row of importData) {
-        const firstName = row[fieldToColumn['first_name']] || '';
-        const lastName = row[fieldToColumn['last_name']] || '';
-        const club = row[fieldToColumn['club']] || '';
-        const boatType = row[fieldToColumn['boat_type']] || currentEvent?.raceClass || '';
-        const sailNo = row[fieldToColumn['sail_number']] || '';
-        const countryCode = row[fieldToColumn['country_code']] || '';
-        const country = row[fieldToColumn['country']] || '';
-        const category = row[fieldToColumn['category']] || '';
+        const firstName = (row[fieldToColumn['first_name']] || '').trim();
+        const lastName = (row[fieldToColumn['last_name']] || '').trim();
+        const club = (row[fieldToColumn['club']] || '').trim();
+        const boatType = (row[fieldToColumn['boat_type']] || currentEvent?.raceClass || '').trim();
+        const sailNo = (row[fieldToColumn['sail_number']] || '').trim();
+        const countryCode = (row[fieldToColumn['country_code']] || '').trim();
+        const country = (row[fieldToColumn['country']] || '').trim();
+        const category = (row[fieldToColumn['category']] || '').trim();
+        const state = (row[fieldToColumn['state']] || '').trim();
+        const hullNumber = (row[fieldToColumn['hull_number']] || '').trim();
 
         if (firstName && lastName && sailNo) {
-          newSkippers.push({
-            name: `${firstName} ${lastName}`.trim(),
-            sailNo,
-            club,
-            boatModel: boatType,
-            hull: boatType, // Set hull to boat type so it displays under skipper name
-            startHcap: 0,
-            country_code: countryCode,
-            country: country,
-            category: category
-          });
+          const isDuplicate = skippers.some(s =>
+            s.name.toLowerCase() === `${firstName} ${lastName}`.toLowerCase().trim() &&
+            s.sailNo === sailNo
+          );
+          if (!isDuplicate) {
+            newSkippers.push({
+              name: `${firstName} ${lastName}`.trim(),
+              sailNo,
+              club,
+              boatModel: boatType,
+              hull: hullNumber || boatType,
+              startHcap: 0,
+              country_code: countryCode,
+              country: country,
+              category: category,
+              clubState: state
+            });
+          }
         }
       }
 
       onUpdateSkippers([...skippers, ...newSkippers]);
       setImportStep('complete');
+      setError(null);
     };
+
+    const importFieldsList = SKIPPER_FIELDS;
+    const mappedCount = importFieldsList.filter(f => Object.values(importMappings).includes(f.key)).length;
+    const requiredMapped = importFieldsList.filter(f => f.required && Object.values(importMappings).includes(f.key)).length;
+    const requiredTotal = importFieldsList.filter(f => f.required).length;
+    const canImport = requiredMapped === requiredTotal;
+    const autoDetectedCount = importAutoDetected.size;
 
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="w-full max-w-3xl rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
-          {/* Blue gradient header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Upload className="text-white" size={24} />
@@ -1827,7 +1920,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   Import Skippers
                 </h2>
                 <p className="text-sm text-blue-100">
-                  Upload CSV or XLS file with skipper details
+                  Upload a file or paste skipper data
                 </p>
               </div>
             </div>
@@ -1841,14 +1934,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
           <div className="flex-1 overflow-y-auto p-6">
             {importStep === 'upload' && (
-              <div className="space-y-4">
-                <div className="border-2 border-dashed border-slate-600 rounded-lg p-12 text-center">
-                  <FileUp className="mx-auto mb-4 text-slate-500" size={48} />
-                  <h3 className="text-lg font-medium text-slate-200 mb-2">Upload Skipper File</h3>
+              <div className="space-y-6">
+                <div className="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center hover:border-slate-500 transition-colors">
+                  <FileUp className="mx-auto mb-3 text-slate-500" size={40} />
+                  <h3 className="text-lg font-medium text-slate-200 mb-1">Upload Skipper File</h3>
                   <p className="text-sm text-slate-400 mb-4">
-                    CSV or XLS file with columns: First Name, Last Name, Club, Boat Type, Sail Number
+                    CSV or XLS with skipper details (any format supported)
                   </p>
-                  <label className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
+                  <label className="inline-block px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
                     Choose File
                     <input
                       type="file"
@@ -1858,61 +1951,187 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     />
                   </label>
                 </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-px bg-slate-700" />
+                  <span className="text-sm text-slate-500 font-medium">OR</span>
+                  <div className="flex-1 h-px bg-slate-700" />
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ClipboardPaste size={16} className="text-slate-400" />
+                    <h3 className="text-sm font-medium text-slate-300">Paste Data</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Copy rows from a spreadsheet, website table, or CSV and paste below. Include the header row.
+                  </p>
+                  <textarea
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    placeholder={"First Name,Surname,Sail No,Club Name,Country\nJohn,Smith,AUS42,Royal YC,Australia\nJane,Doe,NZL7,Auckland SC,New Zealand"}
+                    className="w-full h-32 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 resize-none font-mono"
+                  />
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={handlePasteImport}
+                      disabled={!pasteText.trim()}
+                      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <ArrowRight size={16} />
+                      Process Pasted Data
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
             {importStep === 'mapping' && (
-              <div className="space-y-4">
-                <div className="bg-slate-900/50 rounded-lg p-4">
-                  <h3 className="text-lg font-medium text-slate-200 mb-4">Map Your Columns</h3>
-                  <p className="text-sm text-slate-400 mb-4">
-                    Found {importData.length} rows. Map your CSV columns to the required fields:
-                  </p>
-                  <div className="space-y-3">
-                    {[
-                      { field: 'first_name', label: 'First Name', required: true },
-                      { field: 'last_name', label: 'Last Name', required: true },
-                      { field: 'club', label: 'Club', required: false },
-                      { field: 'boat_type', label: 'Boat Type', required: false },
-                      { field: 'sail_number', label: 'Sail Number', required: true },
-                      { field: 'country_code', label: 'Country Code (IOC)', required: false },
-                      { field: 'country', label: 'Country Name', required: false },
-                      { field: 'category', label: 'Category', required: false }
-                    ].map(({ field, label, required }) => {
-                      const isMapped = Object.values(importMappings).includes(field);
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Map Your Fields</h3>
+                    <p className="text-sm text-slate-400 mt-1">
+                      {importData.length} skipper{importData.length !== 1 ? 's' : ''} detected with {importHeaders.length} columns
+                    </p>
+                  </div>
+                  {autoDetectedCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <Zap size={14} className="text-emerald-400" />
+                      <span className="text-emerald-400 font-medium">
+                        {autoDetectedCount} auto-detected
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 overflow-hidden">
+                  <div className="grid grid-cols-[1fr,32px,1fr,36px] items-center gap-0 px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/50">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Skipper Field</span>
+                    <span />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Your Column</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center">Status</span>
+                  </div>
+                  <div className="divide-y divide-slate-700/30 max-h-[340px] overflow-y-auto">
+                    {importFieldsList.map(({ key, label, required }) => {
+                      const mappedColumn = Object.keys(importMappings).find(k => importMappings[k] === key) || '';
+                      const isMapped = !!mappedColumn;
+                      const isAutoDetected = importAutoDetected.has(key);
+
                       return (
-                        <div key={field} className="flex items-center gap-4">
-                          <label className="w-32 text-sm font-medium text-slate-300 flex items-center gap-2">
-                            {label}
-                            {required && <span className="text-red-400">*</span>}
-                            {isMapped && <Check className="text-green-400" size={16} />}
-                          </label>
+                        <div
+                          key={key}
+                          className="grid grid-cols-[1fr,32px,1fr,36px] items-center gap-0 px-4 py-2.5 hover:bg-slate-800/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-200">{label}</span>
+                            {required && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                Required
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex justify-center">
+                            <ArrowRight size={12} className="text-slate-600" />
+                          </div>
                           <select
-                            value={Object.keys(importMappings).find(k => importMappings[k] === field) || ''}
+                            value={mappedColumn}
                             onChange={(e) => {
                               const newMappings = { ...importMappings };
                               Object.keys(newMappings).forEach(k => {
-                                if (newMappings[k] === field) delete newMappings[k];
+                                if (newMappings[k] === key) delete newMappings[k];
                               });
-                              if (e.target.value) newMappings[e.target.value] = field;
+                              if (e.target.value) newMappings[e.target.value] = key;
                               setImportMappings(newMappings);
+                              const newAuto = new Set(importAutoDetected);
+                              newAuto.delete(key);
+                              setImportAutoDetected(newAuto);
                             }}
-                            className={`flex-1 px-3 py-2 rounded-lg border text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              isMapped
-                                ? 'bg-slate-700 border-green-500/50'
-                                : 'bg-slate-700 border-slate-600'
+                            className={`w-full px-3 py-2 rounded-lg text-sm bg-slate-800/80 border text-slate-200 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all ${
+                              isMapped ? 'border-green-500/50' : 'border-slate-700/60'
                             }`}
                           >
-                            <option value="">Select column...</option>
+                            <option value="">-- Skip --</option>
                             {importHeaders.map(header => (
                               <option key={header} value={header}>{header}</option>
                             ))}
                           </select>
+                          <div className="flex justify-center">
+                            {isMapped ? (
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isAutoDetected ? 'bg-emerald-500/20' : 'bg-blue-500/20'}`}>
+                                <CheckCircle size={14} className={isAutoDetected ? 'text-emerald-400' : 'text-blue-400'} />
+                              </div>
+                            ) : required ? (
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-red-500/20">
+                                <AlertCircle size={14} className="text-red-400" />
+                              </div>
+                            ) : (
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-slate-700/50">
+                                <span className="text-slate-600 text-xs">-</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
+
+                <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/30">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <span className="text-slate-400">Mapped: </span>
+                        <span className="text-white font-medium">{mappedCount}/{importFieldsList.length}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Required: </span>
+                        <span className={`font-medium ${canImport ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {requiredMapped}/{requiredTotal}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-500">{importHeaders.length} columns in source</span>
+                  </div>
+                </div>
+
+                {!canImport && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+                    <div className="flex items-center gap-2 text-sm text-red-300">
+                      <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+                      Please map all required fields. Missing:{' '}
+                      {importFieldsList.filter(f => f.required && !Object.values(importMappings).includes(f.key)).map(f => f.label).join(', ')}
+                    </div>
+                  </div>
+                )}
+
+                {importData.length > 0 && (
+                  <div className="bg-slate-900/40 rounded-xl border border-slate-700/50 p-3">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Data Preview (first 3 rows)</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-700/50">
+                            {importHeaders.slice(0, 6).map(h => (
+                              <th key={h} className="text-left py-1 px-2 text-slate-400 font-medium truncate max-w-[120px]">{h}</th>
+                            ))}
+                            {importHeaders.length > 6 && <th className="text-slate-500 px-2">...</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importData.slice(0, 3).map((row, i) => (
+                            <tr key={i} className="border-b border-slate-800/50">
+                              {importHeaders.slice(0, 6).map(h => (
+                                <td key={h} className="py-1 px-2 text-slate-300 truncate max-w-[120px]">{row[h] || ''}</td>
+                              ))}
+                              {importHeaders.length > 6 && <td className="text-slate-600 px-2">...</td>}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1925,31 +2144,46 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
             {importStep === 'complete' && (
               <div className="text-center py-12">
-                <Check className="mx-auto mb-4 text-green-400" size={48} />
-                <h3 className="text-lg font-medium text-slate-200 mb-2">Import Complete!</h3>
-                <p className="text-slate-400">Successfully imported skippers</p>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <Check className="text-emerald-400" size={32} />
+                </div>
+                <h3 className="text-lg font-medium text-slate-200 mb-2">Import Complete</h3>
+                <p className="text-slate-400">
+                  {skippers.length} skipper{skippers.length !== 1 ? 's' : ''} now in the list
+                </p>
               </div>
             )}
           </div>
 
           <div className="flex justify-between gap-3 p-6 border-t border-slate-700">
             <button
-              onClick={() => setView('initial')}
+              onClick={() => {
+                if (importStep === 'mapping') {
+                  setImportStep('upload');
+                  setImportData([]);
+                  setImportHeaders([]);
+                  setImportMappings({});
+                  setImportAutoDetected(new Set());
+                  setPasteText('');
+                } else {
+                  setView('initial');
+                }
+              }}
               className="px-4 py-2 rounded-lg font-medium transition-colors text-slate-300 hover:text-slate-100 hover:bg-slate-700"
             >
-              {importStep === 'complete' ? 'Close' : 'Back'}
+              {importStep === 'complete' ? 'Close' : importStep === 'mapping' ? 'Upload Different Data' : 'Back'}
             </button>
             {importStep === 'mapping' && (
               <button
                 onClick={handleImport}
-                disabled={
-                  !Object.values(importMappings).includes('first_name') ||
-                  !Object.values(importMappings).includes('last_name') ||
-                  !Object.values(importMappings).includes('sail_number')
-                }
-                className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
+                disabled={!canImport}
+                className={`px-5 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors ${
+                  canImport
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                }`}
               >
-                Import {importData.length} Skippers
+                Import {importData.length} Skipper{importData.length !== 1 ? 's' : ''}
               </button>
             )}
             {importStep === 'complete' && (
