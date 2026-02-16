@@ -261,10 +261,24 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     return { isValid: true };
   };
 
-  // SHRS doesn't use promotion/relegation, so skip that validation for SHRS
   const isSHRS = currentDropRules === 'shrs';
+
+  const validateSHRSPractical = (totalSkippers: number, heats: number): { isValid: boolean; message?: string } => {
+    if (heats > 5) {
+      return { isValid: false, message: 'SHRS allows a maximum of 5 heats.' };
+    }
+    const maxPerHeat = Math.ceil(totalSkippers / heats);
+    if (maxPerHeat > 20) {
+      return { isValid: false, message: `SHRS allows a maximum of 20 boats per heat. With ${totalSkippers} boats and ${heats} heats, the largest heat would have ${maxPerHeat}. Add more heats or reduce entries.` };
+    }
+    if (totalSkippers > 100) {
+      return { isValid: false, message: `SHRS supports a maximum of 100 boats (5 heats x 20 boats). You have ${totalSkippers} entries.` };
+    }
+    return { isValid: true };
+  };
+
   const configValidation = isSHRS
-    ? { isValid: true } // SHRS is always valid (no promotion/relegation)
+    ? validateSHRSPractical(skippers.length, numHeats)
     : validatePromotionRelegationPractical(skippers.length, numHeats, promotionCount);
 
   // Calculate heat sizes based on actual heat count (manual or auto)
@@ -273,11 +287,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     const baseSize = Math.floor(totalSkippers / heats);
     const remainder = totalSkippers % heats;
     const sizes = new Array(heats).fill(baseSize);
-    // Add remainder boats to the FIRST heat (Heat A - top heat)
-    // In HMS, Heat A is the top heat with best skippers and should be largest
-    // Bottom heats (B, C, D, etc.) get base size
-    if (remainder > 0) {
-      sizes[0] += remainder;
+    if (isSHRS) {
+      for (let i = 0; i < remainder; i++) {
+        sizes[i]++;
+      }
+    } else {
+      if (remainder > 0) {
+        sizes[0] += remainder;
+      }
     }
     return sizes;
   };
@@ -1245,15 +1262,22 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 <input
                                   type="number"
                                   min="2"
-                                  max="6"
+                                  max={isSHRS ? 5 : 6}
                                   value={manualHeatCount !== null ? manualHeatCount : optimalHeats.numberOfHeats}
                                   onChange={(e) => {
                                     const value = parseInt(e.target.value);
-                                    if (value >= 2 && value <= 6) {
-                                      // Check if this configuration would be valid
-                                      const validation = validatePromotionRelegationPractical(skippers.length, value, promotionCount);
-                                      if (!validation.isValid && addNotification) {
-                                        addNotification('warning', validation.message || 'Invalid heat configuration');
+                                    const maxHeats = isSHRS ? 5 : 6;
+                                    if (value >= 2 && value <= maxHeats) {
+                                      if (isSHRS) {
+                                        const shrsVal = validateSHRSPractical(skippers.length, value);
+                                        if (!shrsVal.isValid && addNotification) {
+                                          addNotification('warning', shrsVal.message || 'Invalid SHRS configuration');
+                                        }
+                                      } else {
+                                        const validation = validatePromotionRelegationPractical(skippers.length, value, promotionCount);
+                                        if (!validation.isValid && addNotification) {
+                                          addNotification('warning', validation.message || 'Invalid heat configuration');
+                                        }
                                       }
                                       setManualHeatCount(value);
                                     }

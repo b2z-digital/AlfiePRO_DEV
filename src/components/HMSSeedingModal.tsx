@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award, AlertTriangle, CheckCircle, Users, RefreshCw } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle, Users, RefreshCw, Hash, Trophy, Loader2 } from 'lucide-react';
 import type { Skipper } from '../types';
 import type { HeatDesignation } from '../types/heat';
 import type { RaceEvent } from '../types/race';
@@ -249,199 +249,245 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
     ? validateHMSSeeding(skippersWithRankings, numHeats)
     : null;
 
+  const rankedCount = preview?.summary.rankedSkippers ?? 0;
+  const unrankedCount = preview?.summary.unrankedSkippers ?? 0;
+  const totalCount = preview?.summary.totalSkippers ?? skippers.length;
+  const rankedPercent = totalCount > 0 ? Math.round((rankedCount / totalCount) * 100) : 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className={`relative w-full max-w-6xl max-h-[90vh] rounded-lg shadow-xl overflow-hidden ${
-        darkMode ? 'bg-slate-800' : 'bg-white'
+      <div className={`relative w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden ${
+        darkMode ? 'bg-slate-900 border border-slate-700/50' : 'bg-white'
       }`}>
         {/* Header */}
-        <div className={`flex items-center justify-between p-6 border-b ${
-          darkMode ? 'border-slate-700' : 'border-gray-200'
+        <div className={`px-6 py-5 border-b ${
+          darkMode ? 'border-slate-800 bg-slate-900' : 'border-gray-100 bg-gray-50/50'
         }`}>
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Award className="w-6 h-6 text-green-600" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                darkMode ? 'bg-blue-500/10' : 'bg-blue-50'
+              }`}>
+                <Trophy className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+              </div>
+              <div>
+                <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Ranking Allocation
+                </h2>
+                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                  Seed heats based on national rankings
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Ranking Allocation
-              </h2>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Assign skippers based on national rankings
-              </p>
-            </div>
-          </div>
 
-          <button
-            onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode
-                ? 'hover:bg-slate-700 text-gray-400 hover:text-white'
-                : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <X className="w-6 h-6" />
-          </button>
+            <button
+              onClick={onClose}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                darkMode
+                  ? 'hover:bg-slate-800 text-slate-400 hover:text-white'
+                  : 'hover:bg-gray-100 text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-900">Error</p>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {validation && validation.warnings.length > 0 && (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div className="overflow-y-auto max-h-[calc(90vh-180px)]">
+          <div className="p-6 space-y-5">
+            {error && (
+              <div className={`p-3.5 rounded-xl flex items-start gap-3 ${
+                darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-100'
+              }`}>
+                <AlertTriangle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${darkMode ? 'text-red-400' : 'text-red-500'}`} />
                 <div>
-                  <p className="text-sm font-medium text-yellow-900">Warnings</p>
-                  <ul className="text-sm text-yellow-700 mt-1 list-disc list-inside">
+                  <p className={`text-sm font-medium ${darkMode ? 'text-red-300' : 'text-red-800'}`}>Error</p>
+                  <p className={`text-xs mt-0.5 ${darkMode ? 'text-red-400/80' : 'text-red-600'}`}>{error}</p>
+                </div>
+              </div>
+            )}
+
+            {validation && validation.warnings.length > 0 && (
+              <div className={`p-3.5 rounded-xl flex items-start gap-3 ${
+                darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-100'
+              }`}>
+                <AlertTriangle className={`w-4 h-4 flex-shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-500'}`} />
+                <div>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>Warnings</p>
+                  <ul className={`text-xs mt-1 space-y-0.5 ${darkMode ? 'text-amber-400/80' : 'text-amber-600'}`}>
                     {validation.warnings.map((warning, index) => (
-                      <li key={index}>{warning}</li>
+                      <li key={index} className="flex items-start gap-1.5">
+                        <span className="mt-1.5 w-1 h-1 rounded-full bg-current flex-shrink-0" />
+                        {warning}
+                      </li>
                     ))}
                   </ul>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {loading ? (
-            <div className="text-center py-12">
-              <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-3" />
-              <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
-                Loading rankings...
-              </p>
-            </div>
-          ) : preview ? (
-            <>
-              {/* Summary Stats */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Total Skippers
-                      </p>
-                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {preview.summary.totalSkippers}
-                      </p>
-                    </div>
-                    <Users className={`w-8 h-8 ${darkMode ? 'text-slate-600' : 'text-gray-300'}`} />
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Ranked Skippers
-                      </p>
-                      <p className={`text-2xl font-bold text-green-600`}>
-                        {preview.summary.rankedSkippers}
-                      </p>
-                    </div>
-                    <CheckCircle className="w-8 h-8 text-green-600" />
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-gray-50'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Unranked Skippers
-                      </p>
-                      <p className={`text-2xl font-bold ${preview.summary.unrankedSkippers > 0 ? 'text-yellow-600' : darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {preview.summary.unrankedSkippers}
-                      </p>
-                    </div>
-                    <AlertTriangle className={`w-8 h-8 ${preview.summary.unrankedSkippers > 0 ? 'text-yellow-600' : darkMode ? 'text-slate-600' : 'text-gray-300'}`} />
-                  </div>
-                </div>
+            {loading ? (
+              <div className="text-center py-16">
+                <Loader2 className={`w-6 h-6 animate-spin mx-auto mb-3 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+                <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                  Loading rankings...
+                </p>
               </div>
+            ) : preview ? (
+              <>
+                {/* Stats Row */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className={`p-4 rounded-xl ${
+                    darkMode ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-gray-50 border border-gray-100'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                        Total
+                      </span>
+                      <Users className={`w-4 h-4 ${darkMode ? 'text-slate-600' : 'text-gray-300'}`} />
+                    </div>
+                    <p className={`text-3xl font-bold tabular-nums ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {totalCount}
+                    </p>
+                  </div>
 
-              {/* Heat Preview */}
-              <div className="space-y-4">
-                {preview.heats.map((heat, index) => (
-                  <div
-                    key={heat.heatName}
-                    className={`p-4 rounded-lg border ${
-                      darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        Heat {heat.heatName}
-                      </h3>
-                      <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {heat.skippers.length} skippers
+                  <div className={`p-4 rounded-xl ${
+                    darkMode ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-gray-50 border border-gray-100'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                        Ranked
+                      </span>
+                      <CheckCircle className={`w-4 h-4 ${darkMode ? 'text-emerald-500/60' : 'text-emerald-400'}`} />
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <p className={`text-3xl font-bold tabular-nums ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                        {rankedCount}
+                      </p>
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                        {rankedPercent}%
                       </span>
                     </div>
-
-                    <div className="space-y-2">
-                      {heat.skippers.map((skipper, skipperIndex) => (
-                        <div
-                          key={skipperIndex}
-                          className={`flex items-center justify-between p-3 rounded-lg ${
-                            darkMode ? 'bg-slate-800' : 'bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center space-x-3">
-                            {skipper.rank ? (
-                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-800 font-bold text-sm">
-                                {skipper.rank}
-                              </div>
-                            ) : (
-                              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                                darkMode ? 'bg-slate-600 text-gray-400' : 'bg-gray-200 text-gray-500'
-                              }`}>
-                                -
-                              </div>
-                            )}
-
-                            <div>
-                              <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                {skipper.name}
-                              </p>
-                              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                Sail #{skipper.sailNumber}
-                              </p>
-                            </div>
-                          </div>
-
-                          {skipper.rank && (
-                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 border border-green-200">
-                              Ranked #{skipper.rank}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                ))}
-              </div>
-            </>
-          ) : null}
+
+                  <div className={`p-4 rounded-xl ${
+                    darkMode ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-gray-50 border border-gray-100'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                        Unranked
+                      </span>
+                      {unrankedCount > 0 ? (
+                        <AlertTriangle className={`w-4 h-4 ${darkMode ? 'text-amber-500/60' : 'text-amber-400'}`} />
+                      ) : (
+                        <CheckCircle className={`w-4 h-4 ${darkMode ? 'text-slate-600' : 'text-gray-300'}`} />
+                      )}
+                    </div>
+                    <p className={`text-3xl font-bold tabular-nums ${
+                      unrankedCount > 0
+                        ? darkMode ? 'text-amber-400' : 'text-amber-600'
+                        : darkMode ? 'text-white' : 'text-gray-900'
+                    }`}>
+                      {unrankedCount}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Heat Preview */}
+                <div className="space-y-3">
+                  {preview.heats.map((heat, index) => (
+                    <div
+                      key={heat.heatName}
+                      className={`rounded-xl overflow-hidden ${
+                        darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white border border-gray-100 shadow-sm'
+                      }`}
+                    >
+                      <div className={`flex items-center justify-between px-4 py-3 ${
+                        darkMode ? 'bg-slate-800' : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                            darkMode ? 'bg-slate-700 text-white' : 'bg-white text-gray-700 shadow-sm border border-gray-200'
+                          }`}>
+                            {heat.heatName}
+                          </div>
+                          <span className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            Heat {heat.heatName}
+                          </span>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                          darkMode ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {heat.skippers.length} skippers
+                        </span>
+                      </div>
+
+                      <div className="divide-y divide-slate-800/50">
+                        {heat.skippers.map((skipper, skipperIndex) => (
+                          <div
+                            key={skipperIndex}
+                            className={`flex items-center justify-between px-4 py-2.5 transition-colors ${
+                              darkMode ? 'hover:bg-slate-800/60' : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {skipper.rank ? (
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                                  darkMode ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                }`}>
+                                  {skipper.rank}
+                                </div>
+                              ) : (
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs ${
+                                  darkMode ? 'bg-slate-700/50 text-slate-500' : 'bg-gray-100 text-gray-400'
+                                }`}>
+                                  -
+                                </div>
+                              )}
+
+                              <div>
+                                <p className={`text-sm font-medium leading-tight ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                  {skipper.name}
+                                </p>
+                                <p className={`text-xs leading-tight ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
+                                  Sail #{skipper.sailNumber}
+                                </p>
+                              </div>
+                            </div>
+
+                            {skipper.rank && (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                                darkMode
+                                  ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
+                                  : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                              }`}>
+                                #{skipper.rank}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center justify-between p-6 border-t ${
-          darkMode ? 'border-slate-700' : 'border-gray-200'
+        <div className={`flex items-center justify-between px-6 py-4 border-t ${
+          darkMode ? 'border-slate-800 bg-slate-900' : 'border-gray-100 bg-gray-50/50'
         }`}>
           <button
             onClick={onClose}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-5 py-2 rounded-xl text-sm font-medium transition-colors ${
               darkMode
-                ? 'bg-slate-700 text-white hover:bg-slate-600'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
             }`}
           >
             Cancel
@@ -450,7 +496,11 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
           <button
             onClick={handleConfirm}
             disabled={!preview || loading || (validation && !validation.valid)}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+              darkMode
+                ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-600/20'
+                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+            }`}
           >
             Apply Rankings
           </button>
