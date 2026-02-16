@@ -654,23 +654,23 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex flex-col bg-black bg-opacity-50">
       <div
-        className={`w-full max-w-7xl max-h-[90vh] rounded-lg shadow-2xl overflow-hidden flex flex-col ${
+        className={`w-full h-full flex flex-col ${
           darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
         }`}
       >
-        {/* Header */}
-        <div className={`flex items-center justify-between p-6 border-b ${
+        {/* Header - Compact */}
+        <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           <div className="flex items-center gap-3">
-            <Users className="text-blue-400" size={28} />
+            <Users className="text-blue-400" size={24} />
             <div>
-              <h2 className="text-2xl font-bold">
+              <h2 className="text-lg font-bold">
                 {isSHRS ? getSHRSRoundLabel(round, configuration) : `Round ${round}`} - {configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
               </h2>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {isSHRS && shrsPhase ? (
                   <span className={`font-semibold ${isFinalsPhase ? 'text-yellow-500' : 'text-blue-400'}`}>
                     {isFinalsPhase ? 'Finals Series' : 'Qualifying Series'}
@@ -681,12 +681,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 {' '} • {heatAssignments.length} heats
                 {editMode && <span className="ml-2 text-amber-500 font-semibold">• Edit Mode</span>}
                 {!editMode && hasAppliedChanges && <span className="ml-2 text-green-500 font-semibold">• Changes Applied</span>}
+                {initialEditMode && <span className="ml-2 text-amber-500 font-semibold">• Tap unranked skippers to swap between heats</span>}
               </p>
             </div>
           </div>
           <button
             onClick={() => {
-              // Same logic as main button - if round completed, advance to next
               if (!isInitialAllocation && onStartRound && completed && nextRound) {
                 console.log('X button - Starting next round:', nextRound.round);
                 onStartRound(nextRound.round);
@@ -701,31 +701,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           </button>
         </div>
 
-        {/* Warning notification for promotion limit */}
         {limitWarning && (
-          <div className={`mx-6 mt-4 p-3 rounded-lg border ${
+          <div className={`mx-4 mt-2 p-2 rounded-lg border flex-shrink-0 ${
             darkMode
               ? 'bg-amber-900/20 border-amber-700/50 text-amber-300'
               : 'bg-amber-50 border-amber-300 text-amber-800'
           }`}>
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm font-medium">{limitWarning}</p>
+              <p className="text-xs font-medium">{limitWarning}</p>
             </div>
           </div>
         )}
 
-        {/* Heat Grid */}
-        <div className="p-6 overflow-y-auto flex-1">
-          <div className={`gap-4 pb-2 ${
-            heatAssignments.length >= 3
-              ? 'grid grid-cols-1' // Stack vertically for 3+ heats
-              : 'flex overflow-x-auto' // Horizontal for 1-2 heats
-          }`} style={{
-            scrollBehavior: 'smooth'
-          }}>
+        {/* Heat Grid - Always columns */}
+        <div className="px-4 py-3 overflow-hidden flex-1 flex flex-col">
+          <div className="flex gap-3 flex-1 overflow-hidden">
             {/* Find the last completed heat (for edit mode) */}
             {/* Heats complete from bottom to top (C → B → A), so the "last" completed is the HIGHEST one */}
             {(() => {
@@ -866,23 +859,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               return (
                 <div
                   key={heatDesignation}
-                  className={`rounded-lg border-2 overflow-hidden flex flex-col ${
-                    heatAssignments.length >= 3 ? 'flex-auto' : 'flex-shrink-0'
-                  } ${
+                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 ${
                     isDropTarget
                       ? 'border-amber-400 ring-2 ring-amber-400/50'
                       : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
-                  style={{
-                    minWidth: heatAssignments.length >= 3 ? 'auto' : '380px',
-                    width: heatAssignments.length === 1 ? '100%' : heatAssignments.length === 2 ? 'calc((100% - 1rem) / 2)' : 'auto'
-                  }}
                 >
                   {/* Heat Header */}
                   <div
-                    className={`${
-                      heatAssignments.length >= 3 ? 'p-2' : 'p-3'
-                    } ${getHeatGradient(heatDesignation)} border-b-2 ${
+                    className={`p-2 ${getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
                       isDropTarget ? 'cursor-pointer' : ''
                     }`}
                     onClick={() => {
@@ -907,27 +892,22 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     }}
                   >
                     <div className="flex items-center justify-between">
-                      <h3 className={`${
-                        heatAssignments.length >= 3 ? 'text-base' : 'text-lg'
-                      } font-bold text-white`}>
+                      <h3 className="text-sm font-bold text-white">
                         {(isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${heatDesignation}`).toUpperCase()}
                       </h3>
-                      {heatCompleted ? (
-                        <span className="text-xs font-semibold px-2 py-1 rounded bg-green-500 text-white">
-                          Complete
-                        </span>
-                      ) : heatResults.length > 0 && !completed && (
-                        <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-500 text-white">
-                          Scoring
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
+                        {heatCompleted ? (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500 text-white">
+                            Complete
+                          </span>
+                        ) : heatResults.length > 0 && !completed && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500 text-white">
+                            Scoring
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs mt-1 text-white opacity-90">
-                      {skippersToDisplay.length} skippers
-                      {!isSHRS && !completed && round >= 2 && !isBottomHeat && !heatCompleted && (
-                        <span className="ml-1 opacity-75">+ {promotionCount} P slots</span>
-                      )}
-                    </p>
                     {isDropTarget && (
                       <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-amber-200">
                         <ArrowRight size={12} />
@@ -936,12 +916,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     )}
                   </div>
 
-                  {/* Skipper List - Responsive Grid - Flex-1 to push observers to bottom */}
-                  <div className={`flex-1 ${
-                    heatAssignments.length >= 3 ? 'p-2' : 'p-3'
-                  } grid ${
-                    heatAssignments.length >= 3 ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5' : 'grid-cols-2 gap-2'
-                  } content-start`}>
+                  {/* Skipper List - Vertical scroll within column */}
+                  <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
                     {sortedSkippers.map((skipperIndex, idx) => {
                       const skipper = skippers[skipperIndex];
                       const result = heatResults.find(r => r.skipperIndex === skipperIndex);
@@ -1206,9 +1182,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               });
                             }
                           }}
-                          className={`${
-                            heatAssignments.length >= 3 ? 'p-1.5' : 'p-2'
-                          } rounded border-2 transition-all ${
+                          className={`p-1.5 rounded border-2 transition-all ${
                             isSelectedForMove
                               ? 'ring-2 ring-amber-400 cursor-pointer'
                               : isMovable
@@ -1230,14 +1204,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               : darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                           }`}
                         >
-                          <div className={`flex items-center ${
-                            heatAssignments.length >= 3 ? 'gap-1' : 'gap-2'
-                          }`}>
+                          <div className="flex items-center gap-1.5">
                             {result && result.position !== null && (
                               <span className={`
-                                flex-shrink-0 ${heatAssignments.length >= 3 ? 'w-5 h-5' : 'w-6 h-6'} rounded-full flex items-center justify-center ${
-                                  heatAssignments.length >= 3 ? 'text-[10px]' : 'text-xs'
-                                } font-bold
+                                flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
                                 ${result.position === 1 ? 'bg-yellow-500 text-yellow-900' :
                                   result.position === 2 ? 'bg-slate-300 text-slate-900' :
                                   result.position === 3 ? 'bg-amber-600 text-white' :
@@ -1247,10 +1217,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               </span>
                             )}
 
-                            {/* Sail Number - Prominent Display */}
-                            <div className={`flex-shrink-0 ${
-                              heatAssignments.length >= 3 ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-sm'
-                            } rounded font-bold ${
+                            <div className={`flex-shrink-0 px-1.5 py-0.5 text-xs rounded font-bold ${
                               darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'
                             }`}>
                               {currentEvent?.show_country && skipper.country_code && (
@@ -1261,51 +1228,45 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               {skipper.sailNo}
                             </div>
 
-                            {/* Flag (if event shows flag) */}
                             {currentEvent?.show_flag && skipper.country_code && (
-                              <div className="flex-shrink-0 text-xl leading-none">
+                              <div className="flex-shrink-0 text-lg leading-none">
                                 {getCountryFlag(skipper.country_code)}
                               </div>
                             )}
 
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`font-medium truncate ${
-                                  heatAssignments.length >= 3 ? 'text-xs' : 'text-sm'
-                                } ${
+                                className={`font-medium truncate text-xs ${
                                   darkMode ? 'text-white' : 'text-slate-900'
                                 }`}
-                                title={skipper.name}  // Show full name on hover
+                                title={skipper.name}
                               >
                                 {skipper.name}
                               </p>
                               {isPromoted && (
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
-                                  {wasPromotedFromBelow ? `↑ From Heat ${lowerHeatLetter}` : '↑ Promoted'}
+                                <p className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                  {wasPromotedFromBelow ? `From Heat ${lowerHeatLetter}` : 'Promoted'}
                                 </p>
                               )}
                               {isRelegated && (
-                                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
-                                  ↓ Relegate
+                                <p className="text-[10px] font-semibold text-red-600 dark:text-red-400">
+                                  Relegate
                                 </p>
                               )}
                               {initialEditMode && isRanked && (
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5 flex items-center gap-0.5">
-                                  <Lock size={10} /> Ranked
+                                <p className="text-[10px] font-semibold text-green-600 dark:text-green-400 flex items-center gap-0.5">
+                                  <Lock size={8} /> Ranked
                                 </p>
                               )}
                               {isSelectedForMove && (
-                                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-                                  Tap another skipper to swap
+                                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                  Tap to swap
                                 </p>
                               )}
                             </div>
 
-                            {/* Avatar moved to the right */}
                             {skipper.avatarUrl ? (
-                              <div className={`${
-                                heatAssignments.length >= 3 ? 'w-6 h-6' : 'w-8 h-8'
-                              } rounded-full overflow-hidden flex-shrink-0`}>
+                              <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
                                 <img
                                   src={skipper.avatarUrl}
                                   alt={skipper.name}
@@ -1313,9 +1274,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 />
                               </div>
                             ) : (
-                              <div className={`${
-                                heatAssignments.length >= 3 ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'
-                              } rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
+                              <div className={`w-6 h-6 text-[10px] rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
                                 darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
                               }`}>
                                 {skipper.name.split(' ').map(n => n[0]).join('')}
@@ -1323,7 +1282,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             )}
 
                             {result && result.letterScore && (
-                              <span className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded bg-red-500 text-white">
+                              <span className="flex-shrink-0 text-[10px] font-semibold px-1 py-0.5 rounded bg-red-500 text-white">
                                 {result.letterScore}
                               </span>
                             )}
@@ -1384,22 +1343,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     const isPreviousHeatObservers = heatCompleted;
 
                     return (
-                      <div className={`mt-auto border-t ${
+                      <div className={`mt-auto border-t flex-shrink-0 ${
                         darkMode ? 'border-slate-600' : 'border-slate-200'
                       }`}>
-                        <div className={`${
-                          heatAssignments.length >= 3 ? 'p-2' : 'p-3'
-                        } ${
+                        <div className={`p-2 ${
                           darkMode ? 'bg-slate-700' : 'bg-slate-50'
                         }`}>
-                          <div className={`flex items-center justify-between ${
-                            heatAssignments.length >= 3 ? 'mb-1' : 'mb-2'
-                          }`}>
-                            <div className="flex items-center gap-2">
-                              <Eye size={heatAssignments.length >= 3 ? 14 : 16} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
-                              <h5 className={`${
-                                heatAssignments.length >= 3 ? 'text-xs' : 'text-sm'
-                              } font-semibold ${
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <Eye size={12} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
+                              <h5 className={`text-[11px] font-semibold ${
                                 isPreviousHeatObservers
                                   ? (darkMode ? 'text-slate-300' : 'text-slate-700')
                                   : (darkMode ? 'text-purple-300' : 'text-purple-700')
@@ -1413,98 +1366,62 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                   setSelectedHeatForObserver(heatNumber);
                                   setShowObserverSelector(true);
                                 }}
-                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-all ${
                                   darkMode
                                     ? 'bg-purple-700 text-purple-200 hover:bg-purple-600'
                                     : 'bg-purple-600 text-white hover:bg-purple-700'
                                 }`}
                                 title="Manage observers"
                               >
-                                <Edit3 size={12} />
+                                <Edit3 size={10} />
                                 <span>Manage</span>
                               </button>
                             )}
                           </div>
-                          <div className={`grid ${
-                            heatAssignments.length >= 3 ? 'grid-cols-1 sm:grid-cols-2 gap-1.5' : 'grid-cols-2 gap-2'
-                          }`}>
+                          <div className="flex flex-col gap-1">
                             {heatObservers.map((observer, idx) => {
                               const observerSkipper = skippers[observer.skipper_index];
                               if (!observerSkipper) return null;
 
-                              // Style previous observers like regular skipper cards, active observers with purple
                               if (isPreviousHeatObservers) {
-                                // Previous observers - styled like regular skipper cards (no purple, not clickable)
                                 return (
                                   <div
                                     key={observer.skipper_index}
-                                    className={`flex items-center ${
-                                      heatAssignments.length >= 3 ? 'gap-1 p-1.5' : 'gap-2 p-2'
-                                    } rounded border-2 ${
+                                    className={`flex items-center gap-1 p-1 rounded border ${
                                       darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                                     }`}
                                   >
-                                    <Eye size={heatAssignments.length >= 3 ? 12 : 14} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
-                                    {observerSkipper.avatarUrl ? (
-                                      <div className={`${
-                                        heatAssignments.length >= 3 ? 'w-5 h-5' : 'w-6 h-6'
-                                      } rounded-full overflow-hidden flex-shrink-0`}>
-                                        <img
-                                          src={observerSkipper.avatarUrl}
-                                          alt={observerSkipper.name}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      </div>
-                                    ) : (
-                                      <div className={`${
-                                        heatAssignments.length >= 3 ? 'w-5 h-5 text-[10px]' : 'w-6 h-6 text-xs'
-                                      } rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
-                                        darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
-                                      }`}>
-                                        {observerSkipper.name.split(' ').map(n => n[0]).join('')}
-                                      </div>
-                                    )}
-                                    <span className={`font-medium truncate flex-1 ${
-                                      heatAssignments.length >= 3 ? 'text-[11px]' : 'text-xs'
-                                    } ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    <Eye size={10} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
+                                    <span className={`font-medium truncate flex-1 text-[11px] ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                       {observerSkipper.name}
                                     </span>
-                                    <span className={`${
-                                      heatAssignments.length >= 3 ? 'text-[10px]' : 'text-xs'
-                                    } ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                       #{observerSkipper.sailNo}
                                     </span>
                                   </div>
                                 );
                               }
 
-                              // Active observers - purple styling, clickable to remove
                               return (
                                 <button
                                   key={observer.skipper_index}
                                   onClick={async () => {
                                     if (!currentEvent?.id) return;
-
-                                    // Toggle observer status (remove this observer)
                                     const success = await toggleObserver(
                                       currentEvent.id,
                                       heatNumber,
-                                      round, // Use the round being displayed
+                                      round,
                                       observer.skipper_index,
                                       observerSkipper.name,
                                       observerSkipper.sailNo,
                                       observer.times_served
                                     );
-
                                     if (success) {
-                                      // Reload observers
                                       const updatedObservers = await getObserverAssignments(
                                         currentEvent.id,
                                         heatNumber,
-                                        round // Use the round being displayed
+                                        round
                                       );
-
-                                      // Update state
                                       setObserversByHeat(prev => {
                                         const newMap = new Map(prev);
                                         newMap.set(heatNumber, updatedObservers || []);
@@ -1513,21 +1430,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     }
                                   }}
                                   title="Click to remove this observer"
-                                  className={`flex items-center ${
-                                    heatAssignments.length >= 3 ? 'gap-1 p-1.5 text-[11px]' : 'gap-2 p-2 text-xs'
-                                  } rounded transition-all hover:scale-[1.02] cursor-pointer ${
+                                  className={`flex items-center gap-1 p-1 text-[11px] rounded transition-all hover:scale-[1.01] cursor-pointer ${
                                     darkMode
-                                      ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50 hover:bg-purple-900/50 hover:border-purple-600'
-                                      : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100 hover:border-purple-300'
+                                      ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50 hover:bg-purple-900/50'
+                                      : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100'
                                   }`}
                                 >
-                                  <Eye size={heatAssignments.length >= 3 ? 12 : 14} className="text-purple-400 flex-shrink-0" />
+                                  <Eye size={10} className="text-purple-400 flex-shrink-0" />
                                   <span className="font-medium truncate flex-1 text-left">
                                     {observerSkipper.name}
                                   </span>
-                                  <span className={`${
-                                    heatAssignments.length >= 3 ? 'text-[10px]' : 'text-xs'
-                                  } ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     #{observerSkipper.sailNo}
                                   </span>
                                 </button>
@@ -1542,51 +1455,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               );
             })}
           </div>
-
-          {/* Info footer */}
-          <div className={`mt-6 p-4 rounded-lg border ${
-            darkMode ? 'bg-slate-700 border-slate-600' : 'bg-blue-50 border-blue-200'
-          }`}>
-            <div className="flex items-start gap-3">
-              <Users className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-              <div>
-                <p className={`text-sm font-medium ${
-                  darkMode ? 'text-white' : 'text-slate-900'
-                }`}>
-                  {initialEditMode ? (
-                    'Select an unranked skipper, then tap another unranked skipper in a different heat to swap them. Ranked skippers (green border with lock) are fixed in place.'
-                  ) : isSHRS ? (
-                    completed
-                      ? isTransitionRound
-                        ? 'Qualifying series complete. Skippers will be ranked by cumulative qualifying scores and split into Gold, Silver and Bronze fleets for the Finals series.'
-                        : isFinalsPhase
-                        ? 'Finals round complete. Fleet assignments remain fixed throughout the Finals series.'
-                        : 'Qualifying round complete. Skippers will rotate heats via movement tables for the next qualifying round.'
-                      : isFinalsPhase
-                      ? 'Finals series - fleet assignments are fixed based on qualifying results. Close this modal to begin scoring.'
-                      : 'Qualifying series - skippers rotate heats each round. Close this modal to begin scoring.'
-                  ) : (
-                    editMode
-                      ? `Click any skipper in Heat ${(window as any).__lastCompletedHeat} to toggle promotion/relegation. Promoted skippers (green) move up to the next heat.`
-                      : completed
-                      ? 'This round is complete. Green cards show skippers who will be promoted to the next heat in the following round.'
-                      : 'Skippers are assigned to heats for this round. Close this modal to begin scoring.'
-                  )}
-                </p>
-                {!isSHRS && !completed && round > 1 && (
-                  <p className={`text-xs mt-1 ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}>
-                    Heat assignments are based on previous round performance.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Footer */}
-        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-3 p-6 border-t flex-shrink-0 ${
+        {/* Footer - Compact */}
+        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-2 px-4 py-2.5 border-t flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           {/* Initial edit mode controls */}
@@ -1598,7 +1470,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   setSelectedSkipperToMove(null);
                   setLocalAssignments(null);
                 }}
-                className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                   darkMode
                     ? 'text-slate-300 hover:bg-slate-700'
                     : 'text-slate-600 hover:bg-slate-100'
@@ -1614,7 +1486,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   setInitialEditMode(false);
                   setSelectedSkipperToMove(null);
                 }}
-                className="flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium bg-green-600 text-white hover:bg-green-700"
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm bg-green-600 text-white hover:bg-green-700"
               >
                 <Check size={18} />
                 Apply Changes
@@ -1630,7 +1502,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     onReshuffle();
                     onClose();
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-amber-600 text-white hover:bg-amber-700'
                       : 'bg-amber-500 text-white hover:bg-amber-600'
@@ -1646,7 +1518,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     onManualAssign();
                     onClose();
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-teal-600 text-white hover:bg-teal-700'
                       : 'bg-teal-500 text-white hover:bg-teal-600'
@@ -1665,7 +1537,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       skipperIndices: [...a.skipperIndices]
                     })));
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -1693,7 +1565,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       setModifiedRelegations(new Set(appliedRelegations));
                     }
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-amber-600 text-white hover:bg-amber-700'
                       : 'bg-amber-500 text-white hover:bg-amber-600'
@@ -1716,7 +1588,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         setModifiedRelegations(new Set());
                       }
                     }}
-                    className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                    className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                       darkMode
                         ? 'text-slate-300 hover:bg-slate-700'
                         : 'text-slate-600 hover:bg-slate-100'
@@ -1794,7 +1666,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       }
                     }}
                     disabled={isApplyingChanges}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                       isApplyingChanges
                         ? 'bg-green-400 cursor-not-allowed'
                         : 'bg-green-600 hover:bg-green-700'
@@ -1828,7 +1700,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClose();
             }}
             disabled={loadingObservers}
-            className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+            className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
               loadingObservers
                 ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
                 : 'bg-blue-500 text-white hover:bg-blue-600'
