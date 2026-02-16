@@ -1082,19 +1082,20 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   const raceCols = needsTwoRows ? row1Races.length : raceNumbers.length;
                   const totalCols = raceCols + 6 + (showClub ? 1 : 0) + (showClubState ? 1 : 0) + (showCategory ? 1 : 0) + 1;
                   fleetSeparator = (
-                    <tr key={`fleet-${skipperFleet}`}>
+                    <tr key={`fleet-${skipperFleet}`} style={isExportMode ? { backgroundColor: fleetColor?.exportBg || '#f1f5f9' } : undefined}>
                       <td
                         colSpan={totalCols}
                         className={isExportMode ? '' : `px-4 py-2 font-bold text-sm border-t-2 ${fleetColor?.border || 'border-slate-600'} ${fleetColor?.bg || 'bg-slate-700'} ${fleetColor?.text || 'text-slate-300'}`}
                         style={isExportMode ? {
-                          padding: '8px 12px',
+                          padding: '10px 12px',
                           fontWeight: 'bold',
-                          fontSize: '13px',
+                          fontSize: '14px',
                           textAlign: 'center',
                           borderTop: `3px solid ${fleetColor?.exportBorder || '#666'}`,
                           backgroundColor: fleetColor?.exportBg || '#f1f5f9',
                           color: fleetColor?.exportText || '#333',
-                          letterSpacing: '0.05em',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
                         } : undefined}
                       >
                         {fleetName}

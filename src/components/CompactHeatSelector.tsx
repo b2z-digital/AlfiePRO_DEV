@@ -19,6 +19,7 @@ interface CompactHeatSelectorProps {
   isViewingPreviousRound?: boolean;
   activeRound?: number;
   onGoToRound?: (round: number) => void;
+  getRoundLabel?: (roundNum: number) => string;
 }
 
 export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
@@ -37,8 +38,10 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
   onAdvanceToNextRound,
   isViewingPreviousRound,
   activeRound,
-  onGoToRound
+  onGoToRound,
+  getRoundLabel: getRoundLabelProp
 }) => {
+  const getRoundLabel = getRoundLabelProp || ((n: number) => `Round ${n}`);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showQuickSelect, setShowQuickSelect] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -269,7 +272,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
               `}>
                 <Info size={16} className="text-blue-500" />
                 <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                  Round {currentRound} • {availableHeats.length} Heats
+                  {getRoundLabel(currentRound)} • {availableHeats.length} Heats
                 </p>
               </div>
             </div>
@@ -359,7 +362,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
                   }}
                   className="w-full px-4 py-3 rounded-xl font-medium transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-lg"
                 >
-                  ← Back to Round {currentRound - 1}
+                  ← Back to {getRoundLabel(currentRound - 1)}
                 </button>
               )}
 
@@ -371,7 +374,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
                   }}
                   className="w-full px-4 py-3 rounded-xl font-medium transition-all bg-blue-500 text-white hover:bg-blue-600 shadow-lg"
                 >
-                  Continue to Round {currentRound + 1} →
+                  Continue to {getRoundLabel(currentRound + 1)} →
                 </button>
               )}
 
@@ -383,7 +386,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
                   }}
                   className="w-full px-4 py-3 rounded-xl font-medium transition-all bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg"
                 >
-                  Go to Round {activeRound} →
+                  Go to {getRoundLabel(activeRound!)} →
                 </button>
               )}
             </div>

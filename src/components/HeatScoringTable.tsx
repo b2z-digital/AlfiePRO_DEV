@@ -81,6 +81,17 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onSelectHeat
 }) => {
   const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
+  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
+
+  const getShrsRoundLabel = (roundNum: number): string => {
+    if (isShrs && shrsQualifyingRounds > 0) {
+      return roundNum <= shrsQualifyingRounds
+        ? `Qualifying Rd ${roundNum}`
+        : `Final ${roundNum - shrsQualifyingRounds}`;
+    }
+    return `Round ${roundNum}`;
+  };
 
   // Get all available heats for current round, sorted in reverse order (F -> A)
   // This ensures the last element is the lowest heat (e.g., C in a 3-heat setup)
@@ -808,7 +819,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <div className={`font-semibold ${darkMode ? 'text-green-400' : 'text-green-800'}`}>
-                  All heats scored for Round {heatManagement.currentRound}!
+                  All heats scored for {getShrsRoundLabel(heatManagement.currentRound)}!
                 </div>
                 <div className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
                   Ready to advance to next round with promotion/relegation
@@ -836,7 +847,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 }}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors shadow-md"
               >
-                Advance to Round {heatManagement.currentRound + 1}
+                Advance to {getShrsRoundLabel(heatManagement.currentRound + 1)}
               </button>
             </div>
           </div>
@@ -863,7 +874,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                       : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                   }`}
-                  title={`Go back to Round ${heatManagement.currentRound - 1}`}
+                  title={`Go back to ${getShrsRoundLabel(heatManagement.currentRound - 1)}`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -875,7 +886,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <div className={`px-3 py-1.5 rounded-lg ${
                 darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-100 text-blue-700 border border-blue-300'
               } font-semibold text-sm`}>
-                Round {heatManagement.currentRound}
+                {getShrsRoundLabel(heatManagement.currentRound)}
               </div>
 
               {/* Heat Buttons - Inline */}
@@ -947,7 +958,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-green-600 hover:bg-green-700 text-white'
                       : 'bg-green-500 hover:bg-green-600 text-white'
                   }`}
-                  title={`Return to active Round ${activeRound}`}
+                  title={`Return to active ${getShrsRoundLabel(activeRound)}`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -966,7 +977,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-blue-600 hover:bg-blue-700 text-white animate-pulse'
                       : 'bg-blue-500 hover:bg-blue-600 text-white animate-pulse'
                   }`}
-                  title={`Advance to Round ${heatManagement.currentRound + 1}`}
+                  title={`Advance to ${getShrsRoundLabel(heatManagement.currentRound + 1)}`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -184,7 +184,15 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
       // Check current status
       const statusData = await getRaceStatus(currentEvent.id);
-      const raceNote = `${isHeatScoring ? 'Round' : 'Race'} ${currentRace}`;
+      const raceNote = (() => {
+        if (!isHeatScoring) return `Race ${currentRace}`;
+        const isShrsScoring = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
+        const shrsQR = currentEvent?.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+        if (isShrsScoring && shrsQR > 0) {
+          return currentRace <= shrsQR ? `Qualifying Rd ${currentRace}` : `Final ${currentRace - shrsQR}`;
+        }
+        return `Round ${currentRace}`;
+      })();
 
       // If status is not "live", automatically set it to "live" with race/round number
       if (statusData && statusData.status !== 'live') {
@@ -802,7 +810,18 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           </button>
 
           <div className="text-2xl font-bold">
-            {isHeatScoring ? 'Round' : 'Race'} {currentRace}
+            {isHeatScoring
+              ? (() => {
+                  const isShrs = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
+                  const shrsQR = currentEvent?.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+                  if (isShrs && shrsQR > 0) {
+                    return currentRace <= shrsQR
+                      ? `Qualifying Rd ${currentRace}`
+                      : `Final ${currentRace - shrsQR}`;
+                  }
+                  return `Round ${currentRace}`;
+                })()
+              : `Race ${currentRace}`}
           </div>
 
           <button
