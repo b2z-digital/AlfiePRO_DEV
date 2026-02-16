@@ -643,7 +643,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         const newScoringSystem = (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules as string : 'hms';
         const scoringSystemChanged = previousScoringSystem !== newScoringSystem;
 
-        const shouldRegenerate = (heatCountChanged || scoringSystemChanged) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged);
+        // Check if heat sizes are unbalanced (indicates old seeding algorithm or corrupted data)
+        const currentHeatSizes = currentHeatManagement.rounds[0]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+        const maxSize = Math.max(...currentHeatSizes);
+        const minSize = Math.min(...currentHeatSizes);
+        const hasUnbalancedHeats = currentHeatSizes.length > 0 && maxSize - minSize > 1 && !hasAnyRoundResults;
+
+        const shouldRegenerate = (heatCountChanged || scoringSystemChanged || hasUnbalancedHeats) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged || hasUnbalancedHeats);
 
         console.log('🔍 Heat regeneration check:', {
           storedConfigHeats: currentHeatManagement.configuration.numberOfHeats,
@@ -655,6 +661,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           newScoringSystem,
           hasAnyRoundResults,
           isReducingHeats,
+          currentHeatSizes,
+          hasUnbalancedHeats,
           shouldRegenerate,
           roundsData: currentHeatManagement.rounds.map(r => ({
             round: r.round,
@@ -668,6 +676,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           if (hasAnyRoundResults) {
             console.log('⚠️ Regenerating heats will clear existing results!');
           }
+
+          if (hasUnbalancedHeats && addNotification) {
+            addNotification('info', `Detected unbalanced heat sizes (${currentHeatSizes.join(', ')}). Auto-fixing to balanced distribution.`);
+          }
+
           console.log('🔄 Heat count changed from', currentHeatManagement.configuration.numberOfHeats, 'to', numHeats, '- regenerating heats');
 
           let heatAssignments;
