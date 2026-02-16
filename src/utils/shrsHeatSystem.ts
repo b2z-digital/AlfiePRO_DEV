@@ -81,12 +81,17 @@ const HEAT_MOVEMENT_TABLE_2: Record<number, string[][]> = {
 /**
  * SHRS Rule 2.1: The number of heats shall be as few as possible.
  * SHRS Rule 2.3: The maximum number of boats in a heat shall be 20.
+ * Minimum fleet size target: 12 boats per heat.
+ * Maximum: 5 heats.
  */
 export function calculateOptimalHeats(totalSkippers: number): number {
-  if (totalSkippers <= 20) return 2;
-  if (totalSkippers <= 40) return 3;
-  if (totalSkippers <= 60) return 4;
-  return 5;
+  const MAX_FLEET = 20;
+  const MAX_HEATS = 5;
+
+  for (let h = 2; h <= MAX_HEATS; h++) {
+    if (Math.ceil(totalSkippers / h) <= MAX_FLEET) return h;
+  }
+  return MAX_HEATS;
 }
 
 /**

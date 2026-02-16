@@ -78,6 +78,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
+  const [autoEnableHeatRacing, setAutoEnableHeatRacing] = useState(false);
+  const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
   const [heatManagement, setHeatManagement] = useState<HeatManagement | null>(null);
   const [selectedVenueName, setSelectedVenueName] = useState<string | null>(null);
   const [currentNumRaces, setCurrentNumRaces] = useState(12);
@@ -1068,8 +1070,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       // addNotification('info', `${newlyAddedSkippers.length} new skipper${newlyAddedSkippers.length > 1 ? 's' : ''} added with DNS scores for ${lastCompletedRace} completed race${lastCompletedRace > 1 ? 's' : ''}.`);
     }
 
-    // If heat management is enabled, we need to reset it
-    // Skip opening the modal if requested (e.g., when editing from ManualHeatAssignmentModal)
+    if (
+      newlyAddedSkippers.length > 0 &&
+      uniqueSkippers.length >= 20 &&
+      !heatManagement?.configuration.enabled &&
+      !options?.skipRaceSettingsModal
+    ) {
+      setShowHeatRacingRecommendation(true);
+      return;
+    }
+
     if (heatManagement?.configuration.enabled && !options?.skipRaceSettingsModal) {
       setShowRaceSettingsModal(true);
     } else if (newlyAddedSkippers.length === 0 && uniqueSkippers.length < skippers.length) {
@@ -3001,9 +3011,27 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           darkMode={darkMode}
         />
         
+        <ConfirmationModal
+          isOpen={showHeatRacingRecommendation}
+          onClose={() => setShowHeatRacingRecommendation(false)}
+          onConfirm={() => {
+            setShowHeatRacingRecommendation(false);
+            setAutoEnableHeatRacing(true);
+            setShowRaceSettingsModal(true);
+          }}
+          title="Heat Racing Recommended"
+          message={`With ${skippers.length} skippers, Alfie recommends enabling Heat Racing for fairer competition. Skippers will be divided into heats with promotion and relegation between races. Would you like to enable Heat Racing?`}
+          confirmText="Yes, Enable Heat Racing"
+          cancelText="No Thanks"
+          darkMode={darkMode}
+        />
+
         <RaceSettingsModal
           isOpen={showRaceSettingsModal}
-          onClose={() => setShowRaceSettingsModal(false)}
+          onClose={() => {
+            setShowRaceSettingsModal(false);
+            setAutoEnableHeatRacing(false);
+          }}
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           skippers={skippers}
@@ -3011,12 +3039,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           initialNumRaces={currentNumRaces}
           initialDropRules={currentDropRules}
           currentEvent={getCurrentEvent()}
+          autoEnableHeatRacing={autoEnableHeatRacing}
           onSaveSettings={async (settings) => {
             await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);
+            setAutoEnableHeatRacing(false);
           }}
           onManageSkippers={() => {
             setShowRaceSettingsModal(false);
+            setAutoEnableHeatRacing(false);
             setIsSkipperModalOpen(true);
           }}
           addNotification={addNotification}

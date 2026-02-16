@@ -37,6 +37,7 @@ interface RaceSettingsModalProps {
   onClearAllRaceResults?: () => void;
   onScoringModeChange?: (mode: 'pro' | 'touch') => void;
   currentEvent?: any;
+  autoEnableHeatRacing?: boolean;
 }
 
 const DROP_RULE_OPTIONS = [
@@ -65,7 +66,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   hasRaceResults = false,
   onClearAllRaceResults,
   onScoringModeChange,
-  currentEvent
+  currentEvent,
+  autoEnableHeatRacing = false
 }) => {
   const [currentNumRaces, setCurrentNumRaces] = useState(initialNumRaces);
   const [currentDropRules, setCurrentDropRules] = useState<number[] | string>(initialDropRules);
@@ -419,6 +421,18 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
     }
   };
+
+  useEffect(() => {
+    if (isOpen && autoEnableHeatRacing && !isHeatRacingEnabled && skippers.length >= 16) {
+      handleHeatToggle(true);
+      setTimeout(() => {
+        const heatSection = document.getElementById('heat-racing-section');
+        if (heatSection) {
+          heatSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 200);
+    }
+  }, [isOpen, autoEnableHeatRacing]);
 
   if (!isOpen) return null;
 
@@ -1062,48 +1076,50 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </h3>
             </div>
 
-            {/* Number of Races */}
-            <div className="space-y-3">
-              <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Hash size={16} />
-                  Number of Races
-                </div>
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {NUM_RACES_OPTIONS.map(num => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setCurrentNumRaces(num)}
+            {/* Number of Races - only in General section when heat racing is off */}
+            {!isHeatRacingEnabled && (
+              <div className="space-y-3">
+                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Hash size={16} />
+                    Number of Races
+                  </div>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {NUM_RACES_OPTIONS.map(num => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setCurrentNumRaces(num)}
+                      className={`
+                        px-4 py-2 rounded-lg text-sm font-medium transition-all
+                        ${currentNumRaces === num
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : darkMode
+                            ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }
+                      `}
+                    >
+                      {num} Races
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    value={currentNumRaces}
+                    onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
+                    min="1"
+                    max="50"
                     className={`
-                      px-4 py-2 rounded-lg text-sm font-medium transition-all
-                      ${currentNumRaces === num
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : darkMode
-                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }
+                      w-20 px-3 py-2 rounded-lg text-sm text-center border
+                      ${darkMode
+                        ? 'bg-slate-700 border-slate-600 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'}
                     `}
-                  >
-                    {num} Races
-                  </button>
-                ))}
-                <input
-                  type="number"
-                  value={currentNumRaces}
-                  onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
-                  min="1"
-                  max="50"
-                  className={`
-                    w-20 px-3 py-2 rounded-lg text-sm text-center border
-                    ${darkMode
-                      ? 'bg-slate-700 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'}
-                  `}
-                />
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Scoring System - Only show when heat racing is disabled */}
             {!isHeatRacingEnabled && (
@@ -1262,11 +1278,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 <input
                                   type="number"
                                   min="2"
-                                  max={isSHRS ? 5 : 6}
+                                  max={5}
                                   value={manualHeatCount !== null ? manualHeatCount : optimalHeats.numberOfHeats}
                                   onChange={(e) => {
                                     const value = parseInt(e.target.value);
-                                    const maxHeats = isSHRS ? 5 : 6;
+                                    const maxHeats = 5;
                                     if (value >= 2 && value <= maxHeats) {
                                       if (isSHRS) {
                                         const shrsVal = validateSHRSPractical(skippers.length, value);
@@ -1424,6 +1440,45 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           <div className="flex items-center gap-2">
                             <Users size={14} />
                             <span>{skippers.length} total skippers</span>
+                          </div>
+                        </div>
+
+                        <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
+                          <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
+                            Number of Races
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {NUM_RACES_OPTIONS.map(num => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => setCurrentNumRaces(num)}
+                                className={`
+                                  px-4 py-2 rounded-lg text-sm font-medium transition-all
+                                  ${currentNumRaces === num
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  }
+                                `}
+                              >
+                                {num} Races
+                              </button>
+                            ))}
+                            <input
+                              type="number"
+                              value={currentNumRaces}
+                              onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
+                              min="1"
+                              max="50"
+                              className={`
+                                w-20 px-3 py-2 rounded-lg text-sm text-center border
+                                ${darkMode
+                                  ? 'bg-slate-700 border-slate-600 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'}
+                              `}
+                            />
                           </div>
                         </div>
 
