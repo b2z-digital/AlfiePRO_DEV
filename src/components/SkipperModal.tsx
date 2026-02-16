@@ -1763,37 +1763,53 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       const mappings: Record<string, string> = {};
       const autoDetected = new Set<string>();
       const usedFields = new Set<string>();
+      const usedHeaders = new Set<string>();
 
       headers.forEach(header => {
         const normalizedHeader = header.toLowerCase().trim();
+        const strippedHeader = normalizedHeader.replace(/[_ .]/g, '');
         for (const field of SKIPPER_FIELDS) {
           if (usedFields.has(field.key)) continue;
-          const isMatch = field.aliases.some(alias => normalizedHeader === alias);
+          const isMatch = field.aliases.some(alias => {
+            if (normalizedHeader === alias) return true;
+            if (strippedHeader === alias.replace(/[_ .]/g, '')) return true;
+            return false;
+          });
           if (isMatch) {
             mappings[header] = field.key;
             autoDetected.add(field.key);
             usedFields.add(field.key);
+            usedHeaders.add(header);
             break;
           }
         }
       });
 
-      if (!usedFields.has('sail_number')) {
-        const sailHeader = headers.find(h => {
-          const n = h.toLowerCase().trim();
-          return n.includes('sail') || (n.includes('number') && !n.includes('hull') && !n.includes('phone') && !n.includes('reg'));
-        });
-        if (sailHeader && !mappings[sailHeader]) {
-          mappings[sailHeader] = 'sail_number';
-          autoDetected.add('sail_number');
-        }
-      }
+      const fuzzyRules: Array<{ field: string; match: (h: string) => boolean }> = [
+        { field: 'first_name', match: h => (h.includes('first') && h.includes('name')) || h === 'fname' },
+        { field: 'last_name', match: h => (h.includes('last') && h.includes('name')) || h.includes('surname') || h === 'lname' },
+        { field: 'sail_number', match: h => h.includes('sail') },
+        { field: 'club', match: h => h.includes('club') },
+        { field: 'boat_type', match: h => (h.includes('boat') && (h.includes('design') || h.includes('type') || h.includes('class'))) || (h === 'class') || (h === 'design') },
+        { field: 'country_code', match: h => h === 'nat' || h === 'nat.' || h === 'nationality' || h === 'ioc' || (h.includes('country') && h.includes('code')) },
+        { field: 'country', match: h => h === 'country' || h === 'country name' },
+        { field: 'state', match: h => h === 'state' || h === 'province' },
+        { field: 'category', match: h => h === 'category' || h === 'cat' || h === 'cat.' || h.includes('age group') },
+        { field: 'email', match: h => h.includes('email') || h.includes('e-mail') },
+        { field: 'hull_number', match: h => h.includes('hull') || (h.includes('reg') && h.includes('no')) },
+      ];
 
-      if (!usedFields.has('club')) {
-        const clubHeader = headers.find(h => h.toLowerCase().trim().includes('club'));
-        if (clubHeader && !mappings[clubHeader]) {
-          mappings[clubHeader] = 'club';
-          autoDetected.add('club');
+      for (const rule of fuzzyRules) {
+        if (usedFields.has(rule.field)) continue;
+        const matchedHeader = headers.find(h => {
+          if (usedHeaders.has(h)) return false;
+          return rule.match(h.toLowerCase().trim());
+        });
+        if (matchedHeader) {
+          mappings[matchedHeader] = rule.field;
+          autoDetected.add(rule.field);
+          usedFields.add(rule.field);
+          usedHeaders.add(matchedHeader);
         }
       }
 
@@ -1801,35 +1817,85 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     };
 
     const parseImportText = (text: string) => {
-      const lines = text.split('\n').filter(l => l.trim());
-      if (lines.length < 2) return;
-
-      let headerLineIndex = -1;
-      for (let i = 0; i < Math.min(lines.length, 5); i++) {
-        const line = lines[i].toLowerCase();
-        const fieldCount = ['first', 'last', 'surname', 'sail', 'club', 'name', 'email', 'boat', 'nat'].filter(k => line.includes(k)).length;
-        if (fieldCount >= 2) {
-          headerLineIndex = i;
-          break;
-        }
-      }
-
-      if (headerLineIndex === -1) headerLineIndex = 0;
-
-      const dataText = lines.slice(headerLineIndex).join('\n');
-      Papa.parse(dataText, {
-        header: true,
+      Papa.parse(text, {
+        header: false,
         skipEmptyLines: true,
         complete: (results) => {
-          const validData = (results.data as any[]).filter(row => {
-            const values = Object.values(row).filter(v => typeof v === 'string' && (v as string).trim());
-            return values.length >= 2;
-          });
-          if (validData.length === 0) return;
+          const rows = results.data as string[][];
+          if (rows.length < 2) return;
 
-          setImportData(validData);
-          setImportHeaders(results.meta.fields || []);
-          const { mappings, autoDetected } = autoDetectSkipperMappings(results.meta.fields || []);
+          const headerKeywords = [
+            'first name', 'first_name', 'firstname', 'fname',
+            'last name', 'last_name', 'lastname', 'lname', 'surname',
+            'sail no', 'sail number', 'sail_no', 'sail_number', 'sailno',
+            'club name', 'club_name', 'club',
+            'boat design', 'boat type', 'boat_type', 'boat class', 'class', 'design',
+            'nat', 'nationality', 'country code', 'country_code', 'ioc',
+            'country', 'state', 'email', 'phone',
+            'category', 'hull', 'hull reg no', 'hull_reg_no', 'hull number',
+            'competitor id', 'entry date', 'rank', 'pn',
+          ];
+
+          let bestRowIndex = 0;
+          let bestScore = 0;
+
+          for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            const row = rows[i];
+            let score = 0;
+            for (const cell of row) {
+              const normalized = (cell || '').toLowerCase().trim();
+              if (!normalized) continue;
+              if (headerKeywords.includes(normalized)) {
+                score += 2;
+              } else if (headerKeywords.some(kw => normalized === kw.replace(/[_ ]/g, ''))) {
+                score += 2;
+              } else if (headerKeywords.some(kw => normalized.includes(kw) && normalized.length < kw.length + 8)) {
+                score += 1;
+              }
+            }
+            if (score > bestScore) {
+              bestScore = score;
+              bestRowIndex = i;
+            }
+          }
+
+          if (bestScore < 3) {
+            let maxCells = 0;
+            for (let i = 0; i < Math.min(rows.length, 10); i++) {
+              const nonEmpty = rows[i].filter(c => c && c.trim()).length;
+              if (nonEmpty > maxCells) {
+                maxCells = nonEmpty;
+                bestRowIndex = i;
+              }
+            }
+          }
+
+          const headerRow = rows[bestRowIndex];
+          const dataRows = rows.slice(bestRowIndex + 1);
+
+          const headers = headerRow.map((h, i) => {
+            const trimmed = (h || '').trim();
+            return trimmed || `Column_${i + 1}`;
+          });
+
+          const data = dataRows
+            .filter(row => {
+              const nonEmpty = row.filter(cell => cell && cell.trim()).length;
+              return nonEmpty >= 2;
+            })
+            .map(row => {
+              const obj: Record<string, string> = {};
+              headers.forEach((header, i) => {
+                obj[header] = (row[i] || '').trim();
+              });
+              return obj;
+            });
+
+          if (data.length === 0) return;
+
+          setImportData(data);
+          setImportHeaders(headers);
+          const { mappings, autoDetected } = autoDetectSkipperMappings(headers);
           setImportMappings(mappings);
           setImportAutoDetected(autoDetected);
           setImportStep('mapping');
