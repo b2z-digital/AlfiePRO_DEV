@@ -257,7 +257,6 @@ export const RaceTable: React.FC<RaceTableProps> = ({
         setHasManualHandicaps(false);
       }
       clearRace(raceToDelete);
-      addNotification('success', `Race ${raceToDelete} results have been cleared`);
       setRaceToDelete(null);
     }
   };
@@ -458,11 +457,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
       // Update the skipper to mark them as withdrawn from this race onwards
       updateSkipper(skipperIndex, { withdrawnFromRace: race });
 
-      // Close the selector
       setShowLetterScoreSelector(null);
-
-      // Show notification
-      addNotification('success', `${skipperName} has been withdrawn from the event starting from Race ${race}. All subsequent races will automatically receive ${skippers.length + 1} points.`);
     } else {
       console.error('❌ Cannot withdraw - missing updateSkipper or showLetterScoreSelector', {
         hasUpdateSkipper: !!updateSkipper,

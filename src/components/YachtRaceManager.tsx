@@ -808,7 +808,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       };
 
       setHeatManagement(resetHeatManagement);
-      addNotification('success', 'Heat racing results cleared. Heat configuration preserved.');
     } else {
       // No heat management, just clear everything
       setHeatManagement(null);
@@ -1888,11 +1887,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
         // Show success notification
         if (currentEvent.multiDay && !isComplete) {
-          addNotification('success', `Day ${currentDay} scoring completed! ${totalDays - currentDay} day(s) remaining.`);
-          // Update localStorage with next day
           setCurrentEvent(currentEvent);
-        } else {
-          addNotification('success', 'Results published successfully!');
         }
       }
 
@@ -2375,10 +2370,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
     }
 
-    // If heat racing was just enabled, show success notification
-    if (settings.heatManagement?.configuration.enabled && !heatManagement?.configuration.enabled) {
-      addNotification('success', '🏁 Heat Racing has been configured! The race table now shows heat-based scoring.');
-    }
   };
 
   const handleRaceSettingsChange = (settings: { numRaces: number; dropRules: number[] | string }) => {
@@ -2431,9 +2422,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           const scoringSystem = updatedHeatManagement.configuration.scoringSystem || 'hms';
           const systemName = scoringSystem === 'shrs' ? 'SHRS' : 'HMS';
 
-          addNotification('success', `Round ${nextRoundNumber - 1} complete! Advancing to Round ${nextRoundNumber} with ${systemName} heat assignments.`);
         } else {
-          addNotification('success', `Round ${updatedHeatManagement.currentRound} complete! Final round finished.`);
         }
       } else {
         // Round not completed yet - set to highest completed round
@@ -2501,7 +2490,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     // Update lastCompletedRace to the previous round (now that we've advanced)
     setLastCompletedRace(nextRoundNumber - 1);
 
-    addNotification('success', `Advanced to Round ${nextRoundNumber}! Heat assignments ready for scoring.`);
   };
 
   const handleGoToRound = (roundNumber: number) => {

@@ -242,11 +242,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       // Update the skipper to mark them as withdrawn from this race onwards
       updateSkipper(skipperIndex, { withdrawnFromRace: race });
 
-      // Close the selector
       setShowLetterScoreSelector(null);
-
-      // Show notification
-      addNotification('success', `${skipperName} has been withdrawn from the event starting from Race ${race}. All subsequent races will automatically receive ${skippers.length + 1} points.`);
     }
   };
 
@@ -258,7 +254,6 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
   const handleConfirmClearRace = () => {
     if (raceToDelete !== null) {
       clearRace(raceToDelete);
-      addNotification('success', `Race ${raceToDelete} and all subsequent races have been cleared`);
       setRaceToDelete(null);
     }
   };
@@ -721,7 +716,6 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       }
     } catch (err) {
       console.error('Error entering fullscreen:', err);
-      addNotification('error', 'Unable to enter fullscreen mode');
     }
   };
 
@@ -799,7 +793,6 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       setTimeout(async () => {
         await exitFullscreen();
         setIsFocusMode(false);
-        addNotification('info', `Round ${currentHeatRound} completed! Advance to next round to continue.`);
       }, 1500);
     }
   }, [isHeatRacing, isFocusMode, currentHeatRound, raceResults, skippers]);
