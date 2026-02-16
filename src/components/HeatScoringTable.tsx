@@ -84,11 +84,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
 
-  const getShrsRoundLabel = (roundNum: number): string => {
+  const getShrsRoundLabel = (roundNum: number, heat?: HeatDesignation | null): string => {
     if (isShrs && shrsQualifyingRounds > 0) {
-      return roundNum <= shrsQualifyingRounds
-        ? `Qualifying Rd ${roundNum}`
-        : `Final ${roundNum - shrsQualifyingRounds}`;
+      if (roundNum <= shrsQualifyingRounds) {
+        return `Qualifying Rd ${roundNum}`;
+      }
+      const finalNum = roundNum - shrsQualifyingRounds;
+      const fleetName = heat ? SHRS_FLEET_FULL_NAMES[heat] : null;
+      return fleetName ? `Final ${finalNum} - ${fleetName}` : `Final ${finalNum}`;
     }
     return `Round ${roundNum}`;
   };
@@ -617,7 +620,29 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return lastCompleted;
   }, [heatSkipperIndices, raceResults, selectedHeat]);
 
+  const SHRS_FLEET_NAMES: Record<string, string> = {
+    'A': 'Gold', 'B': 'Silver', 'C': 'Bronze',
+    'D': 'Copper', 'E': 'Fleet E', 'F': 'Fleet F',
+  };
+  const SHRS_FLEET_FULL_NAMES: Record<string, string> = {
+    'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet',
+    'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F',
+  };
+  const SHRS_FLEET_BUTTON_COLORS: Record<string, string> = {
+    'A': 'bg-yellow-600',
+    'B': 'bg-slate-400',
+    'C': 'bg-amber-700',
+    'D': 'bg-orange-600',
+    'E': 'bg-teal-600',
+    'F': 'bg-green-600',
+  };
+
+  const isInFinals = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound > shrsQualifyingRounds;
+
   const getHeatColor = (heat: HeatDesignation): string => {
+    if (isInFinals) {
+      return SHRS_FLEET_BUTTON_COLORS[heat] || 'bg-slate-600';
+    }
     const colors: Record<HeatDesignation, string> = {
       'A': 'bg-yellow-600',
       'B': 'bg-orange-600',
@@ -630,6 +655,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   };
 
   const getHeatLabel = (heat: HeatDesignation): string => {
+    if (isInFinals) {
+      return SHRS_FLEET_FULL_NAMES[heat] || `Heat ${heat}`;
+    }
     return `Heat ${heat}`;
   };
 
@@ -886,7 +914,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <div className={`px-3 py-1.5 rounded-lg ${
                 darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-100 text-blue-700 border border-blue-300'
               } font-semibold text-sm`}>
-                {getShrsRoundLabel(heatManagement.currentRound)}
+                {getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
               </div>
 
               {/* Heat Buttons - Inline */}
@@ -937,7 +965,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       }
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold">{heat}</span>
+                        <span className="text-base font-bold">{isInFinals ? (SHRS_FLEET_NAMES[heat] || heat) : heat}</span>
                         {isComplete && (
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1055,6 +1083,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             numRaces={12}
             isHeatScoring={true}
             isScoringLastHeat={isScoringLastHeat()}
+            roundLabel={getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
+            allSkippers={skippers}
+            allRaceResults={raceResults}
             raceResults={mappedRaceResults}
             heatObservers={currentHeatObservers}
             updateRaceResults={(updatedResults) => {

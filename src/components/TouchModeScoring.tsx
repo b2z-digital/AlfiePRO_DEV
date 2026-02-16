@@ -27,7 +27,10 @@ interface TouchModeScoringProps {
   isScoringLastHeat?: boolean; // True when all other heats are complete and this is the last one
   onConfirmResults?: () => void; // Called when user confirms the finish order
   updateSkipper?: (skipperIndex: number, updates: Partial<Skipper>) => void;
-  heatObservers?: ObserverAssignment[]; // Observers for the current heat
+  heatObservers?: ObserverAssignment[];
+  roundLabel?: string;
+  allSkippers?: Skipper[];
+  allRaceResults?: RaceResult[];
 }
 
 interface FinishingEntry {
@@ -53,7 +56,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   isScoringLastHeat = false,
   onConfirmResults,
   updateSkipper,
-  heatObservers = []
+  heatObservers = [],
+  roundLabel,
+  allSkippers,
+  allRaceResults
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
   const [finishOrder, setFinishOrder] = useState<FinishingEntry[]>([]);
@@ -810,7 +816,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           </button>
 
           <div className="text-2xl font-bold">
-            {isHeatScoring
+            {roundLabel || (isHeatScoring
               ? (() => {
                   const isShrs = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
                   const shrsQR = currentEvent?.heatManagement?.configuration?.shrsQualifyingRounds || 0;
@@ -821,7 +827,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                   }
                   return `Round ${currentRace}`;
                 })()
-              : `Race ${currentRace}`}
+              : `Race ${currentRace}`)}
           </div>
 
           <button
@@ -1265,6 +1271,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         dropRules={Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]}
         isScratchEvent={!isHandicapEvent}
         currentEvent={currentEvent}
+        allSkippers={allSkippers}
+        allRaceResults={allRaceResults}
       />
 
       {/* Post-Race Handicap Modal */}
