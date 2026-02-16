@@ -416,7 +416,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
     } else {
       setIsCustomDropRules(false);
-      setCurrentDropRules(value); // Can be either array or string ('hms' or 'shrs')
+      setCurrentDropRules(value);
+      if (value === 'shrs') {
+        setInitialAssignment('hms');
+      }
     }
   };
 
@@ -1662,10 +1665,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     <button
                       onClick={() => {
                         setInitialAssignment('manual');
-                        // If heat racing is enabled, open modal immediately
-                        if (isHeatRacingEnabled) {
-                          setShowManualAssignmentModal(true);
-                        }
                       }}
                       disabled={hasHeatScores}
                       className={`
@@ -1686,10 +1685,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     <button
                       onClick={() => {
                         setInitialAssignment('hms');
-                        // If heat racing is enabled, open modal immediately
-                        if (isHeatRacingEnabled) {
-                          setShowHMSSeedingModal(true);
-                        }
                       }}
                       disabled={hasHeatScores}
                       className={`
