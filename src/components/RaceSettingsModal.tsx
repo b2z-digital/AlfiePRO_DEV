@@ -1247,6 +1247,80 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   </div>
                 )}
 
+                {/* Heat Racing Scoring System */}
+                <div className="space-y-3">
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award size={16} />
+                      Scoring System
+                    </div>
+                  </label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {DROP_RULE_OPTIONS
+                      .filter(option => option.forHeatRacing)
+                      .map((option, index) => {
+                        const isHMS = option.value === 'hms';
+                        const isSHRSOption = option.value === 'shrs';
+                        const isSelected = option.value === currentDropRules;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleDropRuleChange(option.value)}
+                            className={`
+                              group relative w-full text-left p-4 rounded-xl transition-all border-2
+                              ${isSelected
+                                ? isHMS
+                                  ? 'bg-gradient-to-br from-purple-600 to-purple-700 border-purple-400 text-white shadow-lg'
+                                  : 'bg-gradient-to-br from-blue-600 to-blue-700 border-blue-400 text-white shadow-lg'
+                                : darkMode
+                                  ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:border-slate-500 hover:bg-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md'
+                              }
+                            `}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                                isSelected
+                                  ? 'bg-white/20'
+                                  : darkMode
+                                    ? 'bg-slate-800'
+                                    : 'bg-slate-100'
+                              }`}>
+                                <Trophy className={isSelected ? 'text-white' : darkMode ? 'text-purple-400' : 'text-purple-600'} size={24} />
+                              </div>
+                              <div className="flex-1">
+                                <div className={`text-2xl font-black mb-1 tracking-tight ${
+                                  isSelected ? 'text-white' : darkMode ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {isHMS ? 'HMS' : 'SHRS'}
+                                </div>
+                                <div className={`text-sm font-medium ${
+                                  isSelected ? 'text-white/90' : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                }`}>
+                                  {isHMS ? 'Heat Management System' : 'Simple Heat Racing System'}
+                                </div>
+                                <div className={`text-xs mt-2 ${
+                                  isSelected ? 'text-white/75' : darkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                  {isSHRSOption ? '1 after 4, 2 after 8, +1 per 8 races' : 'Dynamic heat management with promotion/relegation'}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <div className="flex-shrink-0">
+                                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
+                                    <Check size={16} className={isHMS ? 'text-purple-600' : 'text-blue-600'} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
                 {/* Automatic Heat Configuration */}
                 <div className={`p-5 rounded-xl border-2 ${
                   hasHeatScores
@@ -1566,80 +1640,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         Need at least 12 skippers to enable heat racing. Currently: {skippers.length}
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* Heat Racing Scoring System */}
-                <div className="space-y-3">
-                  <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Award size={16} />
-                      Scoring System
-                    </div>
-                  </label>
-                  <div className="grid grid-cols-1 gap-3">
-                    {DROP_RULE_OPTIONS
-                      .filter(option => option.forHeatRacing)
-                      .map((option, index) => {
-                        const isHMS = option.value === 'hms';
-                        const isSHRS = option.value === 'shrs';
-                        const isSelected = option.value === currentDropRules;
-
-                        return (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => handleDropRuleChange(option.value)}
-                            className={`
-                              group relative w-full text-left p-4 rounded-xl transition-all border-2
-                              ${isSelected
-                                ? isHMS
-                                  ? 'bg-gradient-to-br from-purple-600 to-purple-700 border-purple-400 text-white shadow-lg'
-                                  : 'bg-gradient-to-br from-blue-600 to-blue-700 border-blue-400 text-white shadow-lg'
-                                : darkMode
-                                  ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:border-slate-500 hover:bg-slate-700'
-                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md'
-                              }
-                            `}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
-                                isSelected
-                                  ? 'bg-white/20'
-                                  : darkMode
-                                    ? 'bg-slate-800'
-                                    : 'bg-slate-100'
-                              }`}>
-                                <Trophy className={isSelected ? 'text-white' : darkMode ? 'text-purple-400' : 'text-purple-600'} size={24} />
-                              </div>
-                              <div className="flex-1">
-                                <div className={`text-2xl font-black mb-1 tracking-tight ${
-                                  isSelected ? 'text-white' : darkMode ? 'text-white' : 'text-slate-900'
-                                }`}>
-                                  {isHMS ? 'HMS' : 'SHRS'}
-                                </div>
-                                <div className={`text-sm font-medium ${
-                                  isSelected ? 'text-white/90' : darkMode ? 'text-slate-300' : 'text-slate-700'
-                                }`}>
-                                  {isHMS ? 'Heat Management System' : 'Simple Heat Racing System'}
-                                </div>
-                                <div className={`text-xs mt-2 ${
-                                  isSelected ? 'text-white/75' : darkMode ? 'text-slate-400' : 'text-slate-500'
-                                }`}>
-                                  {isSHRS ? '1 after 4, 2 after 8, +1 per 8 races' : 'Dynamic heat management with promotion/relegation'}
-                                </div>
-                              </div>
-                              {isSelected && (
-                                <div className="flex-shrink-0">
-                                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
-                                    <Check size={16} className={isHMS ? 'text-purple-600' : 'text-blue-600'} />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
                   </div>
                 </div>
 

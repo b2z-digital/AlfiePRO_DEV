@@ -3020,7 +3020,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setShowRaceSettingsModal(true);
           }}
           title="Heat Racing Recommended"
-          message={`With ${skippers.length} skippers, Alfie recommends enabling Heat Racing for fairer competition. Skippers will be divided into heats with promotion and relegation between races. Would you like to enable Heat Racing?`}
+          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHRS scoring systems. Would you like to enable Heat Racing?`}
           confirmText="Yes, Enable Heat Racing"
           cancelText="No Thanks"
           darkMode={darkMode}

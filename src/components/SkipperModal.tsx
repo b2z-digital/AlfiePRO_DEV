@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../types/auth';
 import { getCountryFlag, getCountryName, SAILING_NATIONS } from '../utils/countryFlags';
+import { useNotifications } from '../contexts/NotificationContext';
 
 interface SkipperModalProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   skipperHasResults,
   currentEvent
 }) => {
+  const { addNotification } = useNotifications();
   const [view, setView] = useState<'initial' | 'members' | 'manual' | 'import' | 'edit'>('initial');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importData, setImportData] = useState<any[]>([]);
@@ -1964,8 +1966,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       }
 
       onUpdateSkippers([...skippers, ...newSkippers]);
-      setImportStep('complete');
       setError(null);
+      const count = newSkippers.length;
+      addNotification('success', `${count} skipper${count !== 1 ? 's' : ''} imported successfully`);
+      onClose();
     };
 
     const importFieldsList = SKIPPER_FIELDS;
