@@ -2473,7 +2473,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     if (!heatManagement) return;
 
     // First complete the current heat to generate next round assignments
-    const updatedHeatManagement = completeHeat(heatManagement, currentHeat);
+    const updatedHeatManagement = completeHeat(heatManagement, currentHeat, currentDropRules);
 
     // Find the newly created next round
     const nextRoundNumber = updatedHeatManagement.currentRound + 1;

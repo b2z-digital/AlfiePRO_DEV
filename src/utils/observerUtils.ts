@@ -140,7 +140,7 @@ export async function saveObserverAssignments(
           event_id: eventId,
           heat_number: heatNumber,
           race_number: raceNumber,
-          skipper_index: observer.skipper_index || null,
+          skipper_index: observer.skipper_index ?? null,
           skipper_name: observer.skipper_name,
           skipper_sail_number: observer.skipper_sail_number,
           is_manual_assignment: observer.is_manual_assignment || false,

@@ -279,7 +279,7 @@ export function assignToFinalFleets(
     rankingScores = new Map<string, number>();
     allRaceScores.forEach((scores, sailNumber) => {
       const sorted = [...scores].sort((a, b) => b - a);
-      const excluded = sorted.length >= 2 ? sorted.slice(1) : sorted;
+      const excluded = sorted.length >= 2 ? sorted.slice(2) : sorted;
       rankingScores.set(sailNumber, excluded.reduce((sum, s) => sum + s, 0));
     });
   }

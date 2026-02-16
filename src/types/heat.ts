@@ -337,10 +337,11 @@ export const generateNextRoundAssignments = (
 
     const qualRacesCompleted = currentRound.round;
     const numDiscards = qualRacesCompleted < 4 ? 0 : qualRacesCompleted < 8 ? 1 : 2 + Math.floor((qualRacesCompleted - 8) / 8);
+    const fleetRankingDiscards = (qualRacesCompleted > 5 && qualRacesCompleted < 8) ? numDiscards + 1 : numDiscards;
 
     allSkipperRaceScores.forEach((scores, idx) => {
       const sorted = [...scores].sort((a, b) => b - a);
-      const kept = sorted.slice(numDiscards);
+      const kept = sorted.slice(fleetRankingDiscards);
       allSkipperScores.set(idx, kept.reduce((sum, s) => sum + s, 0));
     });
 
