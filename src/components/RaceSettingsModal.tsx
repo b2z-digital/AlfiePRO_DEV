@@ -3,7 +3,7 @@ import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, Edit2, Che
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
-import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generateAllSHRSQualifyingRoundAssignments } from '../utils/shrsHeatSystem';
+import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generateAllSHRSQualifyingRoundAssignments, seedSHRSHeatsByIndex } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -673,16 +673,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           let heatAssignments;
 
           if (currentDropRules === 'shrs') {
-            const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
-            const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-            heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
-              const heatIndex = Number(heatNum) - 1;
-              return {
-                heatDesignation: heatLabels[heatIndex] as any,
-                skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => sk.sailNo === s.sailNo))
-              };
-            });
+            heatAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
           } else {
             const hmsSeederConfig: HMSConfig = {
               numberOfHeats: numHeats,
@@ -733,21 +724,53 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             rounds: allRounds
           };
         } else {
-          // Only update configuration without regenerating heats
-          // This happens when increasing heat count with existing results
           console.log('ℹ️ Updating configuration only - preserving existing heat assignments and results');
-          finalHeatManagement = {
-            ...currentHeatManagement,
-            configuration: {
-              enabled: true,
-              numberOfHeats: numHeats,
-              promotionCount: promotionCount,
-              seedingMethod,
-              autoAssign: initialAssignment === 'random',
-              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
-        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
-            }
+          const updatedConfig = {
+            enabled: true,
+            numberOfHeats: numHeats,
+            promotionCount: promotionCount,
+            seedingMethod,
+            autoAssign: initialAssignment === 'random',
+            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+            ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds } : {})
           };
+
+          const hasResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
+          const needsPreAssignments = currentDropRules === 'shrs' &&
+            shrsQualifyingRounds > 1 &&
+            !hasResults &&
+            currentHeatManagement.rounds.length < shrsQualifyingRounds;
+
+          if (needsPreAssignments) {
+            const firstRoundAssignments = currentHeatManagement.rounds[0]?.heatAssignments || [];
+            const allQualifyingRounds = generateAllSHRSQualifyingRoundAssignments(
+              firstRoundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as string,
+                skipperIndices: [...a.skipperIndices]
+              })),
+              numHeats,
+              shrsQualifyingRounds
+            );
+            const allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+              round: idx + 1,
+              heatAssignments: roundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as any,
+                skipperIndices: a.skipperIndices
+              })),
+              results: [],
+              completed: false
+            }));
+            finalHeatManagement = {
+              ...currentHeatManagement,
+              configuration: updatedConfig,
+              rounds: allRounds
+            };
+          } else {
+            finalHeatManagement = {
+              ...currentHeatManagement,
+              configuration: updatedConfig
+            };
+          }
         }
       } else {
         // For manual assignment, show the manual assignment modal
@@ -765,16 +788,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         let heatAssignments;
 
         if (currentDropRules === 'shrs') {
-          const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
-          const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-          heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
-            const heatIndex = Number(heatNum) - 1;
-            return {
-              heatDesignation: heatLabels[heatIndex] as any,
-              skipperIndices: heatSkippers.map(s => skippers.indexOf(s))
-            };
-          });
+          heatAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
         } else {
           const hmsSeederConfig: HMSConfig = {
             numberOfHeats: numHeats,

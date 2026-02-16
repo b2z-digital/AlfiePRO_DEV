@@ -376,6 +376,53 @@ export function generateAllSHRSQualifyingRoundAssignments(
 }
 
 /**
+ * SHRS Snake Seeding - Index Based
+ * Returns heat assignments as arrays of skipper indices (positions in the original skippers array).
+ * Sorts skippers by sail number, then assigns via snake pattern: 1,2,3,3,2,1,1,2,3,...
+ * This avoids reference-equality issues with indexOf.
+ */
+export function seedSHRSHeatsByIndex(
+  skippers: Skipper[],
+  numberOfHeats: number
+): { heatDesignation: string; skipperIndices: number[] }[] {
+  const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  const sortedIndices = skippers
+    .map((_, i) => i)
+    .sort((a, b) => compareSailNumbers(
+      skippers[a].sailNo || skippers[a].sailNumber || '',
+      skippers[b].sailNo || skippers[b].sailNumber || ''
+    ));
+
+  const heatBuckets: number[][] = Array.from({ length: numberOfHeats }, () => []);
+
+  let currentHeat = 0;
+  let direction = 1;
+
+  for (const idx of sortedIndices) {
+    heatBuckets[currentHeat].push(idx);
+    if (direction === 1) {
+      currentHeat++;
+      if (currentHeat >= numberOfHeats) {
+        currentHeat = numberOfHeats - 1;
+        direction = -1;
+      }
+    } else {
+      currentHeat--;
+      if (currentHeat < 0) {
+        currentHeat = 0;
+        direction = 1;
+      }
+    }
+  }
+
+  return heatBuckets.map((indices, i) => ({
+    heatDesignation: heatLabels[i],
+    skipperIndices: indices
+  }));
+}
+
+/**
  * Validate SHRS configuration
  */
 export function validateSHRSConfig(config: SHRSConfig, skipperCount: number): {
