@@ -52,6 +52,68 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     return new Set<number>(Array.isArray(indices) ? indices : []);
   }, [heatManagement.configuration]);
 
+  const resolveObserverConflicts = (updatedAssignments: HeatAssignment[]) => {
+    setObserversByHeat(prev => {
+      const newMap = new Map(prev);
+      const sortedDesignations = updatedAssignments
+        .map(a => a.heatDesignation)
+        .sort((a, b) => a.localeCompare(b));
+
+      for (let i = 0; i < sortedDesignations.length; i++) {
+        const designation = sortedDesignations[i];
+        const heatNumber = i + 1;
+        const assignment = updatedAssignments.find(a => a.heatDesignation === designation);
+        if (!assignment) continue;
+
+        const observers = newMap.get(heatNumber);
+        if (!observers || observers.length === 0) continue;
+
+        const racingSet = new Set(assignment.skipperIndices);
+        const conflicting = observers.filter(o => racingSet.has(o.skipper_index));
+        if (conflicting.length === 0) continue;
+
+        const allRacingIndices = new Set<number>();
+        updatedAssignments.forEach(a => a.skipperIndices.forEach(idx => {
+          const aHeatIdx = sortedDesignations.indexOf(a.heatDesignation);
+          if (aHeatIdx + 1 === heatNumber) {
+            allRacingIndices.add(idx);
+          }
+        }));
+        assignment.skipperIndices.forEach(idx => allRacingIndices.add(idx));
+
+        const existingObserverIndices = new Set(observers.map(o => o.skipper_index));
+        const allObserverIndicesAcrossHeats = new Set<number>();
+        newMap.forEach(obs => obs.forEach(o => allObserverIndicesAcrossHeats.add(o.skipper_index)));
+
+        let cleaned = observers.filter(o => !racingSet.has(o.skipper_index));
+        const needed = observers.length - cleaned.length;
+
+        for (let r = 0; r < needed; r++) {
+          const candidate = skippers.findIndex((s, idx) =>
+            s &&
+            !racingSet.has(idx) &&
+            !existingObserverIndices.has(idx) &&
+            !cleaned.some(o => o.skipper_index === idx)
+          );
+          if (candidate !== -1) {
+            cleaned.push({
+              skipper_index: candidate,
+              skipper_name: skippers[candidate].name,
+              sail_number: skippers[candidate].sailNo,
+              times_served: 0,
+              is_active: true
+            });
+            existingObserverIndices.add(candidate);
+          }
+        }
+
+        newMap.set(heatNumber, cleaned);
+      }
+
+      return newMap;
+    });
+  };
+
   // Observer state - store per heat
   const [observersByHeat, setObserversByHeat] = useState<Map<number, ObserverAssignment[]>>(new Map());
   const [loadingObservers, setLoadingObservers] = useState(false);
@@ -274,9 +336,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           console.log(`  isNextHeatToScore: ${isNextHeatToScore}, isCompletedHeat: ${isCompletedHeat}`);
 
-          if (!isNextHeatToScore && !isCompletedHeat) {
-            console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet`);
+          const isSHRSMode = heatManagement.configuration.scoringSystem === 'shrs';
+
+          if (!isSHRSMode && !isNextHeatToScore && !isCompletedHeat) {
+            console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet (HMS mode)`);
             continue;
+          }
+
+          if (isSHRSMode && !isNextHeatToScore && !isCompletedHeat) {
+            console.log(`  🔄 SHRS mode - assigning observers for all heats upfront`);
           }
 
           if (isCompletedHeat) {
@@ -287,8 +355,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             console.log(`  ✅ This is the next heat to score - assigning observers`);
           }
 
-          // For completed heats, load existing observers to show who observed
-          // For the next heat to score in an active round, we may need to re-select if heat composition changed
+          const needsObserverAssignment = isNextHeatToScore || (isSHRSMode && !isCompletedHeat);
+
           let shouldSelectNewObservers = false;
           let existingObservers: ObserverAssignment[] | null = null;
 
@@ -304,9 +372,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             if (existingObservers && existingObservers.length > 0) {
               newObserversByHeat.set(heatNumber, existingObservers);
             }
-          } else if (isNextHeatToScore) {
-            // For the next heat to score, check if we can reuse existing observers
-            // This applies to BOTH completed and uncompleted rounds
+          } else if (needsObserverAssignment) {
+            // For heats that need observers (next to score in HMS, or all heats in SHRS)
             existingObservers = await getObserverAssignments(
               currentEvent.id,
               heatNumber,
@@ -820,13 +887,22 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     }`}
                     onClick={() => {
                       if (!isDropTarget || selectedSkipperToMove === null || !localAssignments) return;
-                      const updated = localAssignments.map(a => ({
-                        ...a,
-                        skipperIndices: a.heatDesignation === heatDesignation
-                          ? [...a.skipperIndices, selectedSkipperToMove]
-                          : a.skipperIndices.filter(i => i !== selectedSkipperToMove)
-                      }));
+                      const targetAssignment = localAssignments.find(a => a.heatDesignation === heatDesignation);
+                      if (!targetAssignment) return;
+                      const unrankedInTarget = targetAssignment.skipperIndices.filter(i => !rankedSkipperIndices.has(i));
+                      if (unrankedInTarget.length === 0) return;
+                      const swapWith = unrankedInTarget[unrankedInTarget.length - 1];
+                      const updated = localAssignments.map(a => {
+                        if (a.skipperIndices.includes(selectedSkipperToMove)) {
+                          return { ...a, skipperIndices: a.skipperIndices.map(i => i === selectedSkipperToMove ? swapWith : i) };
+                        }
+                        if (a.heatDesignation === heatDesignation) {
+                          return { ...a, skipperIndices: a.skipperIndices.map(i => i === swapWith ? selectedSkipperToMove : i) };
+                        }
+                        return a;
+                      });
                       setLocalAssignments(updated);
+                      resolveObserverConflicts(updated);
                       setSelectedSkipperToMove(null);
                     }}
                   >
@@ -834,7 +910,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <h3 className={`${
                         heatAssignments.length >= 3 ? 'text-base' : 'text-lg'
                       } font-bold text-white`}>
-                        {isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${heatDesignation}`}
+                        {(isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${heatDesignation}`).toUpperCase()}
                       </h3>
                       {heatCompleted ? (
                         <span className="text-xs font-semibold px-2 py-1 rounded bg-green-500 text-white">
@@ -855,7 +931,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     {isDropTarget && (
                       <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-amber-200">
                         <ArrowRight size={12} />
-                        Move skipper here
+                        Swap skipper here
                       </div>
                     )}
                   </div>
@@ -1010,13 +1086,38 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         <div
                           key={skipperIndex}
                           onClick={() => {
-                            if (initialEditMode) {
+                            if (initialEditMode && localAssignments) {
                               if (isRanked) return;
                               if (selectedSkipperToMove === skipperIndex) {
                                 setSelectedSkipperToMove(null);
-                              } else {
-                                setSelectedSkipperToMove(skipperIndex);
+                                return;
                               }
+                              if (selectedSkipperToMove !== null) {
+                                const sourceHeat = localAssignments.find(a => a.skipperIndices.includes(selectedSkipperToMove));
+                                const targetHeat = localAssignments.find(a => a.skipperIndices.includes(skipperIndex));
+                                if (sourceHeat && targetHeat && sourceHeat.heatDesignation !== targetHeat.heatDesignation) {
+                                  const updated = localAssignments.map(a => {
+                                    if (a.heatDesignation === sourceHeat.heatDesignation) {
+                                      return {
+                                        ...a,
+                                        skipperIndices: a.skipperIndices.map(i => i === selectedSkipperToMove ? skipperIndex : i)
+                                      };
+                                    }
+                                    if (a.heatDesignation === targetHeat.heatDesignation) {
+                                      return {
+                                        ...a,
+                                        skipperIndices: a.skipperIndices.map(i => i === skipperIndex ? selectedSkipperToMove : i)
+                                      };
+                                    }
+                                    return a;
+                                  });
+                                  setLocalAssignments(updated);
+                                  resolveObserverConflicts(updated);
+                                  setSelectedSkipperToMove(null);
+                                  return;
+                                }
+                              }
+                              setSelectedSkipperToMove(skipperIndex);
                               return;
                             }
                             // Only allow editing if:
@@ -1195,7 +1296,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               )}
                               {isSelectedForMove && (
                                 <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-                                  Tap a heat to move
+                                  Tap another skipper to swap
                                 </p>
                               )}
                             </div>
@@ -1453,7 +1554,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   darkMode ? 'text-white' : 'text-slate-900'
                 }`}>
                   {initialEditMode ? (
-                    'Select an unranked skipper to move them, then tap the target heat header. Ranked skippers (green border with lock) are fixed in place.'
+                    'Select an unranked skipper, then tap another unranked skipper in a different heat to swap them. Ranked skippers (green border with lock) are fixed in place.'
                   ) : isSHRS ? (
                     completed
                       ? isTransitionRound
