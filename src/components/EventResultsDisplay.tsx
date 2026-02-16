@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { LetterScore } from '../types';
+import { HeatDesignation } from '../types/heat';
 import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
 import { SkipperPerformanceInsights } from './SkipperPerformanceInsights';
 import { RaceReportModal } from './RaceReportModal';
@@ -568,6 +569,59 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
     netTotal: totals[index]?.net || 0
   })).sort(compareSkippersWithCountback) : [];
 
+  const isShrs = event.heatManagement?.configuration?.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = event.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+
+  const shrsFleetMap = (() => {
+    if (!isShrs || !event.heatManagement) return new Map<number, HeatDesignation>();
+    const map = new Map<number, HeatDesignation>();
+    const finalsRounds = event.heatManagement.rounds
+      .filter(r => r.round > shrsQualifyingRounds && r.completed);
+    if (finalsRounds.length === 0) return map;
+    finalsRounds[0].heatAssignments.forEach(assignment => {
+      assignment.skipperIndices.forEach(idx => {
+        map.set(idx, assignment.heatDesignation);
+      });
+    });
+    return map;
+  })();
+
+  const shrsHasFinals = isShrs && shrsFleetMap.size > 0;
+
+  const shrsFleetSortedSkippers = shrsHasFinals
+    ? [...sortedSkippers].sort((a, b) => {
+        const fleetA = shrsFleetMap.get(a.index) || 'Z';
+        const fleetB = shrsFleetMap.get(b.index) || 'Z';
+        if (fleetA !== fleetB) return fleetA.localeCompare(fleetB);
+        return compareSkippersWithCountback(a, b);
+      })
+    : sortedSkippers;
+
+  const displaySkippers = shrsHasFinals ? shrsFleetSortedSkippers : sortedSkippers;
+
+  const SHRS_FLEET_NAMES: Record<string, string> = {
+    'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet',
+    'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F',
+  };
+  const SHRS_FLEET_COLORS: Record<string, { border: string; text: string; bg: string; exportBorder: string; exportText: string; exportBg: string }> = {
+    'A': { border: 'border-yellow-500', text: 'text-yellow-500', bg: 'bg-yellow-500/10', exportBorder: '#eab308', exportText: '#a16207', exportBg: '#fefce8' },
+    'B': { border: 'border-slate-400', text: 'text-slate-400', bg: 'bg-slate-400/10', exportBorder: '#94a3b8', exportText: '#475569', exportBg: '#f1f5f9' },
+    'C': { border: 'border-amber-600', text: 'text-amber-600', bg: 'bg-amber-700/10', exportBorder: '#d97706', exportText: '#92400e', exportBg: '#fffbeb' },
+    'D': { border: 'border-orange-500', text: 'text-orange-500', bg: 'bg-orange-500/10', exportBorder: '#f97316', exportText: '#c2410c', exportBg: '#fff7ed' },
+    'E': { border: 'border-pink-500', text: 'text-pink-500', bg: 'bg-pink-500/10', exportBorder: '#ec4899', exportText: '#be185d', exportBg: '#fdf2f8' },
+    'F': { border: 'border-cyan-500', text: 'text-cyan-500', bg: 'bg-cyan-500/10', exportBorder: '#06b6d4', exportText: '#0e7490', exportBg: '#ecfeff' },
+  };
+
+  const getShrsRaceLabel = (raceNum: number): string => {
+    if (!isShrs) return `R${raceNum}`;
+    if (raceNum <= shrsQualifyingRounds) return `Q${raceNum}`;
+    return `F${raceNum - shrsQualifyingRounds}`;
+  };
+
+  const isShrsFinalsRace = (raceNum: number): boolean => {
+    return isShrs && raceNum > shrsQualifyingRounds;
+  };
+
   // Get the maximum race number
   const resultsByRace = groupResultsByRace();
   const allRaceNumbers = Object.keys(resultsByRace).map(Number).sort((a, b) => a - b);
@@ -911,8 +965,15 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
               {showCategory && (
                 <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>Category</th>
               )}
+              {shrsHasFinals && (
+                <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '50px', ...exportThStyle }}>Fleet</th>
+              )}
               {raceNumbers.map(raceNum => (
-                <th key={raceNum} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>R{raceNum}</th>
+                <th key={raceNum} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${
+                  isShrsFinalsRace(raceNum)
+                    ? isExportMode ? '' : 'text-yellow-300'
+                    : isExportMode ? '' : 'text-blue-200'
+                }`} style={{ minWidth: '60px', ...exportThStyle }}>{getShrsRaceLabel(raceNum)}</th>
               ))}
               <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>Gross</th>
               <th className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle }}>Net</th>
@@ -927,6 +988,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 {showClubState && <th className={`${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>}
                 <th className={`sticky left-[330px] z-20 ${isExportMode ? '' : 'bg-slate-800'}`} style={{ boxShadow: '2px 0 4px rgba(0,0,0,0.1)', ...exportSubThStyle }}></th>
                 {showCategory && <th className={`${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>}
+                {shrsHasFinals && <th className={`${isExportMode ? '' : 'bg-slate-800'}`} style={exportSubThStyle}></th>}
                 {raceNumbers.map(raceNum => {
                   // Get all results for this race
                   const raceData = resultsByRace[raceNum] || [];
@@ -989,8 +1051,45 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
             )}
           </thead>
           <tbody className="divide-y divide-slate-700">
-            {sortedSkippers.map((skipper, position) => (
+            {(() => {
+              let currentFleet: string | null = null;
+              let fleetPositionCounter = 0;
+              return displaySkippers.map((skipper, position) => {
+                const skipperFleet = shrsHasFinals ? (shrsFleetMap.get(skipper.index) || 'Z') : null;
+                let fleetSeparator: React.ReactNode = null;
+
+                if (shrsHasFinals && skipperFleet !== currentFleet) {
+                  currentFleet = skipperFleet;
+                  fleetPositionCounter = 0;
+                  const fleetName = SHRS_FLEET_NAMES[skipperFleet!] || `Fleet ${skipperFleet}`;
+                  const fleetColor = SHRS_FLEET_COLORS[skipperFleet!];
+                  const totalCols = raceNumbers.length + 6 + (showClub ? 1 : 0) + (showClubState ? 1 : 0) + (showCategory ? 1 : 0) + 1;
+                  fleetSeparator = (
+                    <tr key={`fleet-${skipperFleet}`}>
+                      <td
+                        colSpan={totalCols}
+                        className={isExportMode ? '' : `px-4 py-2 font-bold text-sm border-t-2 ${fleetColor?.border || 'border-slate-600'} ${fleetColor?.bg || 'bg-slate-700'} ${fleetColor?.text || 'text-slate-300'}`}
+                        style={isExportMode ? {
+                          padding: '6px 12px',
+                          fontWeight: 'bold',
+                          fontSize: '13px',
+                          borderTop: `3px solid ${fleetColor?.exportBorder || '#666'}`,
+                          backgroundColor: fleetColor?.exportBg || '#f1f5f9',
+                          color: fleetColor?.exportText || '#333',
+                        } : undefined}
+                      >
+                        {fleetName}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const isFleetTopThree = shrsHasFinals && fleetPositionCounter < 3 && skipperFleet === 'A';
+                fleetPositionCounter++;
+
+                return (
               <React.Fragment key={skipper.index}>
+                {fleetSeparator}
                 <tr
                   onClick={() => toggleSkipperExpansion(skipper.index)}
                   className={`
@@ -1010,13 +1109,20 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                         <ChevronUp size={14} className="text-slate-400" /> :
                         <ChevronDown size={14} className="text-slate-400" />
                     )}
-                    <div>
+                    <div className={shrsHasFinals && isFleetTopThree ? 'text-yellow-500 font-bold' : ''}>
                       {position + 1}
-                      {!isExportMode && (
+                      {!isExportMode && !shrsHasFinals && (
                         <>
                           {position === 0 && <Trophy className="inline ml-1 text-yellow-400 position-icon" size={14} />}
                           {position === 1 && <Medal className="inline ml-1 text-gray-400 position-icon" size={14} />}
                           {position === 2 && <Medal className="inline ml-1 text-amber-700 position-icon" size={14} />}
+                        </>
+                      )}
+                      {!isExportMode && shrsHasFinals && isFleetTopThree && (
+                        <>
+                          {fleetPositionCounter - 1 === 1 && <Trophy className="inline ml-1 text-yellow-400 position-icon" size={14} />}
+                          {fleetPositionCounter - 1 === 2 && <Medal className="inline ml-1 text-gray-400 position-icon" size={14} />}
+                          {fleetPositionCounter - 1 === 3 && <Medal className="inline ml-1 text-amber-700 position-icon" size={14} />}
                         </>
                       )}
                     </div>
@@ -1080,6 +1186,23 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     style={isExportMode ? { backgroundColor: '#ffffff', color: '#000', height: '44px', verticalAlign: 'middle' } : undefined}
                   >
                     {abbreviateCategory(skipper.category)}
+                  </td>
+                )}
+                {shrsHasFinals && (
+                  <td
+                    className={`px-3 py-3 text-center text-xs font-semibold ${
+                      SHRS_FLEET_COLORS[skipperFleet!]?.text || (isExportMode ? '' : 'text-slate-400')
+                    }`}
+                    style={isExportMode ? {
+                      backgroundColor: '#ffffff',
+                      color: SHRS_FLEET_COLORS[skipperFleet!]?.exportText || '#333',
+                      height: '44px',
+                      verticalAlign: 'middle',
+                      fontSize: '11px',
+                      fontWeight: 'bold'
+                    } : undefined}
+                  >
+                    {skipperFleet === 'A' ? 'G' : skipperFleet === 'B' ? 'S' : skipperFleet === 'C' ? 'B' : skipperFleet}
                   </td>
                 )}
                 {raceNumbers.map(raceNum => {
@@ -1239,7 +1362,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     raceNumbers.length + 7 +
                     (showCountry ? 1 : 0) +
                     (showClubState ? 1 : 0) +
-                    (showCategory ? 1 : 0)
+                    (showCategory ? 1 : 0) +
+                    (shrsHasFinals ? 1 : 0)
                   }>
                     <SkipperPerformanceInsights
                       skipper={skipper}
@@ -1254,7 +1378,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 </tr>
               )}
             </React.Fragment>
-            ))}
+                );
+              });
+            })()}
           </tbody>
         </table>
       </div>
