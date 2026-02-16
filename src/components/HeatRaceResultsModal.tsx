@@ -146,15 +146,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   const { completedRounds, heats, promotionCount, maxPositionsByHeat } = processedData;
 
   const getHeatColor = (heat: HeatDesignation) => {
-    const colors = {
-      'A': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'B': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'C': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'D': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'E': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'F': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-    };
-    return colors[heat] || (darkMode ? 'bg-slate-700/50' : 'bg-slate-100');
+    return darkMode ? 'bg-slate-700' : 'bg-slate-100';
   };
 
   const getHeatBorderColor = (heat: HeatDesignation) => {
@@ -222,24 +214,29 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   };
 
   const exportAsCSV = () => {
-    // Build CSV data
     const rows: string[][] = [];
 
-    // Header row 1
+    const getRoundLabel = (roundNum: number) => {
+      if (isShrs) {
+        return roundNum <= shrsQualifyingRounds
+          ? `Qualifying Rd ${roundNum}`
+          : `Final ${roundNum - shrsQualifyingRounds}`;
+      }
+      return `Round ${roundNum}`;
+    };
+
     const header1 = ['Heat', 'Pos'];
     completedRounds.forEach(round => {
-      header1.push(`Round ${round.round}`, '', '');
+      header1.push(getRoundLabel(round.round), '', '');
     });
     rows.push(header1);
 
-    // Header row 2
     const header2 = ['', ''];
     completedRounds.forEach(() => {
       header2.push('Sail No', 'Skipper', 'Pts');
     });
     rows.push(header2);
 
-    // Data rows
     heats.forEach(heat => {
       const maxPos = maxPositionsByHeat.get(heat) || 0;
       const positions = Array.from({ length: maxPos }, (_, i) => i + 1);
@@ -247,17 +244,14 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       positions.forEach((position, posIdx) => {
         const row: string[] = [];
 
-        // Heat column (only on first row)
         if (posIdx === 0) {
           row.push(`Heat ${heat}`);
         } else {
           row.push('');
         }
 
-        // Position column
         row.push(String(position));
 
-        // Round data
         completedRounds.forEach(round => {
           const heatResults = round.results
             .filter(r => r.heatDesignation === heat)
@@ -275,30 +269,39 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           const result = heatResults[position - 1];
           const skipper = result ? skippers[result.skipperIndex] : null;
 
-          // Calculate points
-          const totalCompetitorsInRound = round.results.length;
           let points = '';
           if (result) {
-            if (result.letterScore) {
-              points = String(totalCompetitorsInRound + 1);
-            } else if (result.position !== null) {
-              if (round.round === 1) {
+            if (isShrs) {
+              if (result.letterScore) {
+                const heatSizes = round.heatAssignments.map(a => a.skipperIndices.length);
+                const largestHeat = Math.max(...heatSizes);
+                points = String(largestHeat + 1);
+              } else if (result.position !== null) {
                 points = String(result.position);
-              } else {
-                let overallPoints = 0;
-                const heatsArray: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
-                const currentHeatIndex = heatsArray.indexOf(heat);
+              }
+            } else {
+              const totalCompetitorsInRound = round.results.length;
+              if (result.letterScore) {
+                points = String(totalCompetitorsInRound + 1);
+              } else if (result.position !== null) {
+                if (round.round === 1) {
+                  points = String(result.position);
+                } else {
+                  let overallPoints = 0;
+                  const heatsArray: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+                  const currentHeatIndex = heatsArray.indexOf(heat);
 
-                for (let i = 0; i < currentHeatIndex; i++) {
-                  const higherHeat = heatsArray[i];
-                  const higherHeatResults = round.results.filter(
-                    r => r.heatDesignation === higherHeat && r.position !== null
-                  );
-                  overallPoints += higherHeatResults.length;
+                  for (let i = 0; i < currentHeatIndex; i++) {
+                    const higherHeat = heatsArray[i];
+                    const higherHeatResults = round.results.filter(
+                      r => r.heatDesignation === higherHeat && r.position !== null
+                    );
+                    overallPoints += higherHeatResults.length;
+                  }
+
+                  overallPoints += position;
+                  points = String(overallPoints);
                 }
-
-                overallPoints += position;
-                points = String(overallPoints);
               }
             }
           }
@@ -313,27 +316,24 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
         rows.push(row);
       });
 
-      // Add observer row for this heat
       const observerRow: string[] = ['', 'Observers'];
       completedRounds.forEach(round => {
         const key = `${heat}-${round.round}`;
         const observers = observersByHeatRound.get(key) || [];
 
         const observerNames = observers.length > 0
-          ? observers.map(o => o.member_name).join(', ')
-          : 'No observers recorded';
+          ? observers.map(o => `${o.skipper_name} #${o.skipper_sail_number || ''}`).join(', ')
+          : '';
 
         observerRow.push('', observerNames, '');
       });
       rows.push(observerRow);
     });
 
-    // Convert to CSV string
     const csvContent = rows.map(row =>
       row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
 
-    // Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -540,7 +540,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                           {/* Position */}
                           <td className={`
                             px-3 py-2 text-center font-semibold text-sm sticky left-[80px] z-20
-                            ${position % 2 === 0 ? (darkMode ? 'bg-slate-800/30' : 'bg-slate-50/50') : (darkMode ? 'bg-slate-800' : 'bg-white')}
+                            ${darkMode ? 'bg-slate-800' : 'bg-white'}
                             ${darkMode ? 'text-slate-300' : 'text-slate-700'}
                           `}>
                             {position}
@@ -691,11 +691,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'}
                       `}>
                         {/* Empty cell for Heat column */}
-                        <td className={`sticky left-0 z-20 ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'}`}></td>
+                        <td className={`sticky left-0 z-20 ${darkMode ? 'bg-slate-900' : 'bg-purple-50'}`}></td>
                         {/* Observer label */}
                         <td colSpan={1} className={`
                           px-3 py-2 text-xs font-semibold sticky left-[80px] z-20
-                          ${darkMode ? 'text-purple-300 bg-purple-900/20' : 'text-purple-700 bg-purple-50'}
+                          ${darkMode ? 'text-purple-300 bg-slate-900' : 'text-purple-700 bg-purple-50'}
                         `}>
                           <div className="flex items-center gap-1.5">
                             <Eye size={14} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
