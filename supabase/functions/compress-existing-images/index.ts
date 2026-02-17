@@ -13,7 +13,7 @@ const SKIP_BUCKETS = new Set(["backups", "race-documents", "event-documents"]);
 
 const MIN_SIZE_BYTES = 100 * 1024;
 const MAX_DIMENSION = 1920;
-const JPEG_QUALITY = 80;
+const JPEG_QUALITY = 75;
 
 async function authenticateRequest(
   req: Request,
@@ -90,34 +90,29 @@ function isCompressibleImage(fileName: string): boolean {
   return IMAGE_EXTENSIONS.has(ext);
 }
 
-async function compressImageBuffer(
-  data: Uint8Array,
-  _ext: string
-): Promise<{ compressed: Uint8Array; width: number; height: number } | null> {
-  try {
-    const { Image } = await import("npm:imagescript@1.3.0");
-    let img = await Image.decode(data);
+async function compressViaTransformApi(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  bucket: string,
+  filePath: string
+): Promise<{ data: Uint8Array; contentType: string } | null> {
+  const transformUrl = `${supabaseUrl}/storage/v1/render/image/authenticated/${bucket}/${filePath}?width=${MAX_DIMENSION}&height=${MAX_DIMENSION}&resize=contain&quality=${JPEG_QUALITY}`;
 
-    const w = img.width;
-    const h = img.height;
+  const resp = await fetch(transformUrl, {
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+    },
+  });
 
-    if (w > MAX_DIMENSION || h > MAX_DIMENSION) {
-      const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h);
-      const newW = Math.round(w * ratio);
-      const newH = Math.round(h * ratio);
-      img = img.resize(newW, newH);
-    }
+  if (!resp.ok) return null;
 
-    const compressed = await img.encodeJPEG(JPEG_QUALITY);
+  const arrayBuffer = await resp.arrayBuffer();
+  const contentType = resp.headers.get("content-type") || "image/jpeg";
 
-    return {
-      compressed: new Uint8Array(compressed),
-      width: img.width,
-      height: img.height,
-    };
-  } catch {
-    return null;
-  }
+  return {
+    data: new Uint8Array(arrayBuffer),
+    contentType,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -126,10 +121,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const authResult = await authenticateRequest(req, supabase);
     if ("error" in authResult) {
@@ -234,46 +229,48 @@ Deno.serve(async (req: Request) => {
           }
 
           try {
-            const { data: fileData, error: downloadError } =
-              await supabase.storage.from(bucket).download(file.name);
+            const transformed = await compressViaTransformApi(
+              supabaseUrl,
+              serviceRoleKey,
+              bucket,
+              file.name
+            );
 
-            if (downloadError || !fileData) {
-              errorCount++;
-              errors.push(
-                `Download failed: ${bucket}/${file.name}: ${downloadError?.message || "no data"}`
-              );
-              continue;
-            }
+            if (!transformed) {
+              const { data: fileData, error: downloadError } =
+                await supabase.storage.from(bucket).download(file.name);
 
-            const arrayBuffer = await fileData.arrayBuffer();
-            const uint8 = new Uint8Array(arrayBuffer);
-            const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+              if (downloadError || !fileData) {
+                errorCount++;
+                errors.push(
+                  `Download failed: ${bucket}/${file.name}: ${downloadError?.message || "no data"}`
+                );
+                continue;
+              }
 
-            const result = await compressImageBuffer(uint8, ext);
-            if (!result) {
-              errorCount++;
-              errors.push(`Compress failed: ${bucket}/${file.name}`);
-              continue;
-            }
-
-            if (result.compressed.byteLength >= size) {
               skippedCount++;
               continue;
             }
 
+            if (transformed.data.byteLength >= size) {
+              skippedCount++;
+              continue;
+            }
+
+            const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
             const newPath =
               ext === "jpg" || ext === "jpeg"
                 ? file.name
                 : file.name.replace(/\.[^.]+$/, ".jpg");
 
-            const blob = new Blob([result.compressed], {
-              type: "image/jpeg",
+            const blob = new Blob([transformed.data], {
+              type: transformed.contentType,
             });
 
             const { error: uploadError } = await supabase.storage
               .from(bucket)
               .upload(newPath, blob, {
-                contentType: "image/jpeg",
+                contentType: transformed.contentType,
                 cacheControl: "3600",
                 upsert: true,
               });
@@ -290,7 +287,7 @@ Deno.serve(async (req: Request) => {
               await supabase.storage.from(bucket).remove([file.name]);
             }
 
-            const saved = size - result.compressed.byteLength;
+            const saved = size - transformed.data.byteLength;
             totalSaved += saved;
             totalOriginalBytes += size;
             processedCount++;
@@ -299,7 +296,7 @@ Deno.serve(async (req: Request) => {
               bucket,
               file: file.name,
               originalKB: (size / 1024).toFixed(1),
-              compressedKB: (result.compressed.byteLength / 1024).toFixed(1),
+              compressedKB: (transformed.data.byteLength / 1024).toFixed(1),
               savedKB: (saved / 1024).toFixed(1),
               reductionPercent: ((saved / size) * 100).toFixed(0),
             });
