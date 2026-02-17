@@ -802,6 +802,13 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                   <span className="text-slate-400">Skipped: {compressionResult.skipped}</span>
                   {compressionResult.errors > 0 && <span className="text-red-400">Errors: {compressionResult.errors}</span>}
                 </div>
+                {compressionResult.errorDetails?.length > 0 && (
+                  <div className={`text-xs p-3 rounded-lg max-h-32 overflow-y-auto ${darkMode ? 'bg-red-500/10 border border-red-500/20 text-red-300' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                    {compressionResult.errorDetails.map((err: string, i: number) => (
+                      <div key={i} className="py-0.5">{err}</div>
+                    ))}
+                  </div>
+                )}
                 {compressionResult.files?.length > 0 && (
                   <div className={`max-h-48 overflow-y-auto rounded-lg border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
                     <table className="w-full text-xs">
