@@ -30,15 +30,20 @@ const PAGE_SECTION_MAP: Record<string, string> = {
   '/news': 'news',
   '/my-garage': 'garage',
   '/calendar': 'calendar',
+  '/engagement': 'admin',
+  '/resources': 'admin',
+  '/super-admin': 'admin',
   '/': 'dashboard',
 };
 
 function getPageSection(path: string): string {
   for (const [prefix, section] of Object.entries(PAGE_SECTION_MAP)) {
+    if (prefix === '/') continue;
     if (path === prefix || path.startsWith(prefix + '/')) {
       return section;
     }
   }
+  if (path === '/' || path === '') return 'dashboard';
   return 'other';
 }
 
@@ -50,31 +55,74 @@ export function usePlatformTracking(
   const sessionIdRef = useRef<string | null>(null);
   const lastPathRef = useRef<string>('');
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sessionCreatingRef = useRef(false);
+  const contextRef = useRef({ clubId: currentClubId, associationId, associationType });
 
-  const startSession = useCallback(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+  contextRef.current = { clubId: currentClubId, associationId, associationType };
 
-      const { data, error } = await supabase
-        .from('platform_sessions')
-        .insert({
-          user_id: session.user.id,
-          club_id: currentClubId || null,
-          association_id: associationId || null,
-          association_type: associationType || null,
-          user_agent: navigator.userAgent.slice(0, 200),
-        })
-        .select('id')
-        .single();
+  useEffect(() => {
+    let cancelled = false;
 
-      if (!error && data) {
-        sessionIdRef.current = data.id;
+    const createSession = async () => {
+      if (sessionCreatingRef.current || sessionIdRef.current) return;
+      sessionCreatingRef.current = true;
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || cancelled) {
+          sessionCreatingRef.current = false;
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('platform_sessions')
+          .insert({
+            user_id: session.user.id,
+            club_id: contextRef.current.clubId || null,
+            association_id: contextRef.current.associationId || null,
+            association_type: contextRef.current.associationType || null,
+            user_agent: navigator.userAgent.slice(0, 200),
+          })
+          .select('id')
+          .maybeSingle();
+
+        if (!cancelled && !error && data) {
+          sessionIdRef.current = data.id;
+        }
+      } catch (_e) {
+        // Never break the app
+      } finally {
+        sessionCreatingRef.current = false;
       }
-    } catch (e) {
-      // Silently fail - tracking should never break the app
-    }
-  }, [currentClubId, associationId, associationType]);
+    };
+
+    createSession();
+
+    const hb = setInterval(async () => {
+      if (!sessionIdRef.current) return;
+      try {
+        const ctx = contextRef.current;
+        await supabase
+          .from('platform_sessions')
+          .update({
+            last_active_at: new Date().toISOString(),
+            club_id: ctx.clubId || null,
+            association_id: ctx.associationId || null,
+            association_type: ctx.associationType || null,
+          })
+          .eq('id', sessionIdRef.current);
+      } catch (_e) {
+        // Silent
+      }
+    }, HEARTBEAT_INTERVAL);
+
+    heartbeatRef.current = hb;
+
+    return () => {
+      cancelled = true;
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    };
+  }, []);
 
   const trackPageView = useCallback(async (path: string) => {
     if (path === lastPathRef.current) return;
@@ -84,45 +132,19 @@ export function usePlatformTracking(
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      const ctx = contextRef.current;
       await supabase.from('platform_page_views').insert({
         session_id: sessionIdRef.current || null,
         user_id: session.user.id,
-        club_id: currentClubId || null,
-        association_id: associationId || null,
+        club_id: ctx.clubId || null,
+        association_id: ctx.associationId || null,
         page_path: path,
         page_section: getPageSection(path),
       });
-    } catch (e) {
-      // Silently fail
+    } catch (_e) {
+      // Silent
     }
-  }, [currentClubId, associationId]);
-
-  const heartbeat = useCallback(async () => {
-    if (!sessionIdRef.current) return;
-    try {
-      await supabase
-        .from('platform_sessions')
-        .update({
-          last_active_at: new Date().toISOString(),
-          club_id: currentClubId || undefined,
-          association_id: associationId || undefined,
-          association_type: associationType || undefined,
-        })
-        .eq('id', sessionIdRef.current);
-    } catch (e) {
-      // Silently fail
-    }
-  }, [currentClubId, associationId, associationType]);
-
-  useEffect(() => {
-    startSession();
-
-    heartbeatRef.current = setInterval(heartbeat, HEARTBEAT_INTERVAL);
-
-    return () => {
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-    };
-  }, [startSession, heartbeat]);
+  }, []);
 
   return { trackPageView, sessionId: sessionIdRef.current };
 }

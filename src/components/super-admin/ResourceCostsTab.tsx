@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Database, Cloud, DollarSign, HardDrive, Server, TrendingUp,
-  RefreshCw, Plus, Calendar, ChevronDown, ChevronUp, Building,
+  RefreshCw, Plus, Calendar, Building,
   Globe2, AlertTriangle, CheckCircle, Zap, BarChart3, Cpu, Wifi,
-  X, Save, ArrowUpRight
+  Save
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
@@ -44,6 +44,15 @@ interface ClubCostEstimate {
   costShare: number;
 }
 
+interface DbMetrics {
+  totalRows: number;
+  totalSizeMb: number;
+  tableCount: number;
+  storageBuckets: number;
+  sessionsThisMonth: number;
+  pageViewsThisMonth: number;
+}
+
 type ViewMode = 'overview' | 'breakdown' | 'forecast' | 'entry';
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -58,19 +67,95 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const COST_CATEGORIES = [
-  { key: 'aws_hosting', label: 'AWS Amplify Hosting', source: 'aws', icon: Cloud },
-  { key: 'aws_build', label: 'AWS Build Minutes', source: 'aws', icon: Cpu },
-  { key: 'aws_bandwidth', label: 'AWS Bandwidth', source: 'aws', icon: Wifi },
-  { key: 'supabase_database', label: 'Supabase Database', source: 'supabase', icon: Database },
-  { key: 'supabase_storage', label: 'Supabase Storage', source: 'supabase', icon: HardDrive },
-  { key: 'supabase_auth', label: 'Supabase Auth MAUs', source: 'supabase', icon: Zap },
-  { key: 'supabase_edge_functions', label: 'Edge Functions', source: 'supabase', icon: Server },
-  { key: 'supabase_realtime', label: 'Realtime Connections', source: 'supabase', icon: Wifi },
-  { key: 'domain_dns', label: 'Domain & DNS', source: 'domain', icon: Globe2 },
-  { key: 'email_services', label: 'Email Services', source: 'email', icon: Zap },
-  { key: 'cdn_cloudflare', label: 'CDN / Cloudflare', source: 'cdn', icon: Cloud },
-  { key: 'other', label: 'Other Services', source: 'other', icon: DollarSign },
+  { key: 'aws_hosting', label: 'AWS Amplify Hosting', source: 'aws' },
+  { key: 'aws_build', label: 'AWS Build Minutes', source: 'aws' },
+  { key: 'aws_bandwidth', label: 'AWS Bandwidth', source: 'aws' },
+  { key: 'supabase_database', label: 'Supabase Database', source: 'supabase' },
+  { key: 'supabase_storage', label: 'Supabase Storage', source: 'supabase' },
+  { key: 'supabase_auth', label: 'Supabase Auth MAUs', source: 'supabase' },
+  { key: 'supabase_edge_functions', label: 'Edge Functions', source: 'supabase' },
+  { key: 'supabase_realtime', label: 'Realtime Connections', source: 'supabase' },
+  { key: 'domain_dns', label: 'Domain & DNS', source: 'domain' },
+  { key: 'email_services', label: 'Email Services', source: 'email' },
+  { key: 'cdn_cloudflare', label: 'CDN / Cloudflare', source: 'cdn' },
+  { key: 'other', label: 'Other Services', source: 'other' },
 ];
+
+async function fetchDbMetrics(): Promise<DbMetrics> {
+  const defaults: DbMetrics = { totalRows: 0, totalSizeMb: 0, tableCount: 0, storageBuckets: 0, sessionsThisMonth: 0, pageViewsThisMonth: 0 };
+
+  try {
+    const { data: tableStats } = await supabase.rpc('get_public_table_stats');
+
+    if (tableStats && Array.isArray(tableStats)) {
+      let totalRows = 0;
+      let totalSizeMb = 0;
+      for (const t of tableStats) {
+        totalRows += parseInt(t.row_count || '0', 10);
+        const sizeStr = t.total_size || '0 bytes';
+        const mbMatch = sizeStr.match(/([\d.]+)\s*(MB|GB|kB|bytes)/i);
+        if (mbMatch) {
+          const val = parseFloat(mbMatch[1]);
+          const unit = mbMatch[2].toLowerCase();
+          if (unit === 'gb') totalSizeMb += val * 1024;
+          else if (unit === 'mb') totalSizeMb += val;
+          else if (unit === 'kb') totalSizeMb += val / 1024;
+          else totalSizeMb += val / (1024 * 1024);
+        }
+      }
+      defaults.totalRows = totalRows;
+      defaults.totalSizeMb = Math.round(totalSizeMb * 100) / 100;
+      defaults.tableCount = tableStats.length;
+    }
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [sessionsRes, viewsRes] = await Promise.all([
+      supabase.from('platform_sessions').select('id', { count: 'exact', head: true }).gte('started_at', monthStart),
+      supabase.from('platform_page_views').select('id', { count: 'exact', head: true }).gte('viewed_at', monthStart),
+    ]);
+
+    defaults.sessionsThisMonth = sessionsRes.count || 0;
+    defaults.pageViewsThisMonth = viewsRes.count || 0;
+
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-platform-resources`;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'get_db_size' }),
+        });
+        if (res.ok) {
+          const stats = await res.json();
+          const dbMetrics = stats?.database || [];
+          const storageMetrics = stats?.storage || [];
+
+          const edgeSizeMb = dbMetrics.find((m: any) => m.metric_name === 'db_total_size_mb')?.metric_value;
+          const edgeRows = dbMetrics.find((m: any) => m.metric_name === 'db_total_rows')?.metric_value;
+          const edgeTables = dbMetrics.find((m: any) => m.metric_name === 'db_table_count')?.metric_value;
+          const edgeBuckets = storageMetrics.find((m: any) => m.metric_name === 'storage_bucket_count')?.metric_value;
+
+          if (edgeSizeMb && edgeSizeMb > defaults.totalSizeMb) defaults.totalSizeMb = edgeSizeMb;
+          if (edgeRows && edgeRows > defaults.totalRows) defaults.totalRows = edgeRows;
+          if (edgeTables && edgeTables > defaults.tableCount) defaults.tableCount = edgeTables;
+          if (edgeBuckets) defaults.storageBuckets = edgeBuckets;
+        }
+      }
+    } catch (_e) {
+      // Edge function may not respond - that's OK, we have direct data
+    }
+  } catch (err) {
+    console.error('Error fetching DB metrics:', err);
+  }
+
+  return defaults;
+}
 
 export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   const [loading, setLoading] = useState(true);
@@ -79,7 +164,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlyCostSummary[]>([]);
   const [clubEstimates, setClubEstimates] = useState<ClubCostEstimate[]>([]);
-  const [dbStats, setDbStats] = useState<any>(null);
+  const [dbMetrics, setDbMetrics] = useState<DbMetrics>({ totalRows: 0, totalSizeMb: 0, tableCount: 0, storageBuckets: 0, sessionsThisMonth: 0, pageViewsThisMonth: 0 });
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [newEntry, setNewEntry] = useState({
     metric_name: '',
@@ -92,16 +177,22 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
 
   const loadData = useCallback(async () => {
     try {
-      const { data: snapshots } = await supabase
-        .from('platform_resource_snapshots')
-        .select('*')
-        .order('snapshot_date', { ascending: false })
-        .limit(500);
+      const [metrics, snapshotsRes] = await Promise.all([
+        fetchDbMetrics(),
+        supabase
+          .from('platform_resource_snapshots')
+          .select('*')
+          .order('snapshot_date', { ascending: false })
+          .limit(500),
+      ]);
 
-      setCostEntries(snapshots || []);
+      setDbMetrics(metrics);
+
+      const snapshots = snapshotsRes.data || [];
+      setCostEntries(snapshots);
 
       const monthMap: Record<string, MonthlyCostSummary> = {};
-      (snapshots || []).forEach((s: CostEntry) => {
+      snapshots.forEach((s: CostEntry) => {
         const month = s.snapshot_date?.slice(0, 7) || 'unknown';
         if (!monthMap[month]) monthMap[month] = { month, aws: 0, supabase: 0, other: 0, total: 0 };
         const cost = s.cost_usd || 0;
@@ -114,12 +205,8 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
       const sorted = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month));
       setMonthlySummary(sorted.slice(-12));
 
-      const { data: clubs } = await supabase
-        .from('clubs')
-        .select('id, name, abbreviation');
-      const { data: members } = await supabase
-        .from('members')
-        .select('club_id');
+      const { data: clubs } = await supabase.from('clubs').select('id, name, abbreviation');
+      const { data: members } = await supabase.from('members').select('club_id');
 
       const membersByClub: Record<string, number> = {};
       (members || []).forEach((m: any) => {
@@ -143,27 +230,6 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
       }).sort((a: ClubCostEstimate, b: ClubCostEstimate) => b.costShare - a.costShare);
 
       setClubEstimates(estimates);
-
-      try {
-        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-platform-resources`;
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const res = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: 'get_db_size' }),
-          });
-          if (res.ok) {
-            const stats = await res.json();
-            setDbStats(stats);
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching live DB stats:', e);
-      }
     } catch (err) {
       console.error('Error loading resource data:', err);
     } finally {
@@ -180,9 +246,12 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     if (!newEntry.metric_name || !newEntry.cost_usd) return;
     setSaving(true);
     try {
+      const catInfo = COST_CATEGORIES.find(c => c.key === newEntry.metric_name);
+      const source = catInfo?.source || newEntry.source;
+
       await supabase.from('platform_resource_snapshots').insert({
         snapshot_date: newEntry.snapshot_date,
-        source: newEntry.source,
+        source,
         metric_name: newEntry.metric_name,
         metric_value: parseFloat(newEntry.cost_usd) || 0,
         unit: 'USD',
@@ -208,13 +277,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   };
 
   const currentMonth = monthlySummary.length > 0 ? monthlySummary[monthlySummary.length - 1] : null;
-  const prevMonth = monthlySummary.length > 1 ? monthlySummary[monthlySummary.length - 2] : null;
   const totalAllTime = costEntries.reduce((sum, e) => sum + (e.cost_usd || 0), 0);
-
-  const dbMetrics = dbStats?.database || [];
-  const dbSizeMb = dbMetrics.find((m: any) => m.metric_name === 'db_total_size_mb')?.metric_value || 0;
-  const dbRows = dbMetrics.find((m: any) => m.metric_name === 'db_total_rows')?.metric_value || 0;
-  const dbTables = dbMetrics.find((m: any) => m.metric_name === 'db_table_count')?.metric_value || 0;
 
   const monthlyTrendData = {
     labels: monthlySummary.map(m => {
@@ -222,46 +285,20 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
       return new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' });
     }),
     datasets: [
-      {
-        label: 'AWS Amplify',
-        data: monthlySummary.map(m => m.aws),
-        backgroundColor: '#f59e0b',
-        borderRadius: 4,
-        stack: 'stack1',
-      },
-      {
-        label: 'Supabase',
-        data: monthlySummary.map(m => m.supabase),
-        backgroundColor: '#10b981',
-        borderRadius: 4,
-        stack: 'stack1',
-      },
-      {
-        label: 'Other',
-        data: monthlySummary.map(m => m.other),
-        backgroundColor: '#0ea5e9',
-        borderRadius: 4,
-        stack: 'stack1',
-      },
+      { label: 'AWS Amplify', data: monthlySummary.map(m => m.aws), backgroundColor: '#f59e0b', borderRadius: 4, stack: 'stack1' },
+      { label: 'Supabase', data: monthlySummary.map(m => m.supabase), backgroundColor: '#10b981', borderRadius: 4, stack: 'stack1' },
+      { label: 'Other', data: monthlySummary.map(m => m.other), backgroundColor: '#0ea5e9', borderRadius: 4, stack: 'stack1' },
     ],
   };
 
   const costBreakdownData = {
     labels: currentMonth ? ['AWS Amplify', 'Supabase', 'Other'] : [],
-    datasets: [{
-      data: currentMonth ? [currentMonth.aws, currentMonth.supabase, currentMonth.other] : [],
-      backgroundColor: ['#f59e0b', '#10b981', '#0ea5e9'],
-      borderWidth: 0,
-    }],
+    datasets: [{ data: currentMonth ? [currentMonth.aws, currentMonth.supabase, currentMonth.other] : [], backgroundColor: ['#f59e0b', '#10b981', '#0ea5e9'], borderWidth: 0 }],
   };
 
   const forecastMonths = 6;
-  const avgMonthly = monthlySummary.length > 0
-    ? monthlySummary.reduce((s, m) => s + m.total, 0) / monthlySummary.length
-    : 0;
-  const growthRate = monthlySummary.length >= 2
-    ? (monthlySummary[monthlySummary.length - 1].total - monthlySummary[0].total) / (monthlySummary.length - 1)
-    : 0;
+  const avgMonthly = monthlySummary.length > 0 ? monthlySummary.reduce((s, m) => s + m.total, 0) / monthlySummary.length : 0;
+  const growthRate = monthlySummary.length >= 2 ? (monthlySummary[monthlySummary.length - 1].total - monthlySummary[0].total) / (monthlySummary.length - 1) : 0;
 
   const forecastLabels: string[] = [];
   const forecastActual: (number | null)[] = [];
@@ -286,29 +323,8 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   const forecastChartData = {
     labels: forecastLabels,
     datasets: [
-      {
-        label: 'Actual',
-        data: forecastActual,
-        borderColor: '#0ea5e9',
-        backgroundColor: darkMode ? 'rgba(14, 165, 233, 0.1)' : 'rgba(14, 165, 233, 0.08)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-        pointBackgroundColor: '#0ea5e9',
-        spanGaps: false,
-      },
-      {
-        label: 'Forecast',
-        data: forecastProjected,
-        borderColor: '#f59e0b',
-        borderDash: [6, 4],
-        backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.05)' : 'rgba(245, 158, 11, 0.05)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-        pointBackgroundColor: '#f59e0b',
-        spanGaps: false,
-      },
+      { label: 'Actual', data: forecastActual, borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.08)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#0ea5e9', spanGaps: false },
+      { label: 'Forecast', data: forecastProjected, borderColor: '#f59e0b', borderDash: [6, 4], backgroundColor: 'rgba(245, 158, 11, 0.05)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f59e0b', spanGaps: false },
     ],
   };
 
@@ -316,36 +332,15 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        display: true,
-        position: 'bottom' as const,
-        labels: { color: chartColors.text, padding: 16, usePointStyle: true, pointStyleWidth: 8, font: { size: 11 } },
-      },
+      legend: { display: true, position: 'bottom' as const, labels: { color: chartColors.text, padding: 16, usePointStyle: true, pointStyleWidth: 8, font: { size: 11 } } },
       tooltip: {
-        backgroundColor: chartColors.tooltipBg,
-        titleColor: chartColors.tooltipText,
-        bodyColor: chartColors.tooltipText,
-        borderColor: chartColors.tooltipBorder,
-        borderWidth: 1,
-        padding: 12,
-        cornerRadius: 8,
-        callbacks: {
-          label: (ctx: any) => `${ctx.dataset.label}: $${(ctx.raw || 0).toFixed(2)} USD`,
-        },
+        backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText, borderColor: chartColors.tooltipBorder, borderWidth: 1, padding: 12, cornerRadius: 8,
+        callbacks: { label: (ctx: any) => `${ctx.dataset.label}: $${(ctx.raw || 0).toFixed(2)} USD` },
       },
     },
     scales: {
       x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 11 } } },
-      y: {
-        grid: { color: chartColors.grid },
-        ticks: {
-          color: chartColors.text,
-          font: { size: 11 },
-          callback: (v: any) => `$${v}`,
-        },
-        beginAtZero: true,
-        stacked: true,
-      },
+      y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 11 }, callback: (v: any) => `$${v}` }, beginAtZero: true, stacked: true },
     },
   };
 
@@ -371,7 +366,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === mode
                   ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
-                  : 'text-slate-400 hover:bg-slate-800/50'
+                  : `${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`
               }`}
             >
               {mode === 'overview' && <><BarChart3 size={14} className="inline mr-1.5" />Overview</>}
@@ -384,7 +379,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
         <button
           onClick={() => { setRefreshing(true); loadData(); }}
           disabled={refreshing}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-slate-800/50 transition-all"
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
         >
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           Refresh
@@ -395,11 +390,11 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
-              { label: 'This Month', value: currentMonth?.total || 0, prefix: '$', color: 'sky', icon: DollarSign, sub: currentMonth?.month },
+              { label: 'This Month', value: currentMonth?.total || 0, prefix: '$', color: 'sky', icon: DollarSign, sub: currentMonth?.month || 'No data' },
               { label: 'AWS Cost', value: currentMonth?.aws || 0, prefix: '$', color: 'amber', icon: Cloud, sub: 'Amplify' },
               { label: 'Supabase Cost', value: currentMonth?.supabase || 0, prefix: '$', color: 'emerald', icon: Database, sub: 'Database + Storage' },
-              { label: 'DB Size', value: dbSizeMb, suffix: ' MB', color: 'cyan', icon: HardDrive, sub: `${dbTables} tables` },
-              { label: 'Total Rows', value: dbRows, color: 'rose', icon: Server, sub: 'All tables' },
+              { label: 'DB Size', value: dbMetrics.totalSizeMb, suffix: ' MB', color: 'cyan', icon: HardDrive, sub: `${dbMetrics.tableCount} tables` },
+              { label: 'Total Rows', value: dbMetrics.totalRows, color: 'rose', icon: Server, sub: 'All tables' },
               { label: 'Total Spend', value: totalAllTime, prefix: '$', color: 'slate', icon: DollarSign, sub: 'All time' },
             ].map(card => {
               const cMap: Record<string, string> = {
@@ -419,7 +414,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                   <div className="flex items-center gap-2 mb-2">
                     <card.icon size={14} className={iMap[card.color]} />
                   </div>
-                  <p className="text-xl font-bold text-white">
+                  <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     {card.prefix || ''}{typeof card.value === 'number' ? card.value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : card.value}{card.suffix || ''}
                   </p>
                   <p className="text-xs font-medium text-slate-400">{card.label}</p>
@@ -439,7 +434,11 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                 {monthlySummary.length > 0 ? (
                   <Bar data={monthlyTrendData} options={{ ...commonChartOptions, scales: { ...commonChartOptions.scales, x: { ...commonChartOptions.scales.x, stacked: true } } }} />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">No cost data recorded yet. Use "Record Costs" to add monthly expenses.</div>
+                  <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2">
+                    <DollarSign size={32} className="text-slate-600" />
+                    <p>No cost data recorded yet.</p>
+                    <p className="text-xs text-slate-600">Use "Record Costs" tab to add monthly expenses.</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -454,119 +453,109 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                   <Doughnut
                     data={costBreakdownData}
                     options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      cutout: '60%',
+                      responsive: true, maintainAspectRatio: false, cutout: '60%',
                       plugins: {
                         legend: { display: true, position: 'bottom', labels: { color: chartColors.text, padding: 12, usePointStyle: true, font: { size: 11 } } },
-                        tooltip: {
-                          backgroundColor: chartColors.tooltipBg,
-                          titleColor: chartColors.tooltipText,
-                          bodyColor: chartColors.tooltipText,
-                          borderColor: chartColors.tooltipBorder,
-                          borderWidth: 1,
-                          padding: 12,
-                          cornerRadius: 8,
-                          callbacks: { label: (ctx: any) => `${ctx.label}: $${(ctx.raw || 0).toFixed(2)}` },
-                        },
+                        tooltip: { backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText, borderColor: chartColors.tooltipBorder, borderWidth: 1, padding: 12, cornerRadius: 8, callbacks: { label: (ctx: any) => `${ctx.label}: $${(ctx.raw || 0).toFixed(2)}` } },
                       },
                     }}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-slate-500 text-sm">No data for current month</div>
+                  <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2">
+                    <BarChart3 size={32} className="text-slate-600" />
+                    <p>No cost data for current month</p>
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {dbStats && (
-            <div className={cardClass}>
-              <h3 className={headingClass}>
-                <Database size={18} className="inline mr-2 text-emerald-500" />
-                Live Database Metrics
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                  { label: 'Database Size', value: `${dbSizeMb} MB`, icon: HardDrive, health: dbSizeMb < 500 ? 'good' : dbSizeMb < 4000 ? 'warn' : 'critical' },
-                  { label: 'Total Rows', value: dbRows.toLocaleString(), icon: Server, health: 'good' },
-                  { label: 'Tables', value: dbTables.toString(), icon: Database, health: 'good' },
-                  { label: 'Storage Buckets', value: (dbStats?.storage?.find((s: any) => s.metric_name === 'storage_bucket_count')?.metric_value || 0).toString(), icon: HardDrive, health: 'good' },
-                ].map(metric => (
-                  <div key={metric.label} className="rounded-xl border border-slate-700/40 bg-slate-800/40 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <metric.icon size={16} className="text-slate-400" />
-                      {metric.health === 'good' && <CheckCircle size={14} className="text-emerald-400" />}
-                      {metric.health === 'warn' && <AlertTriangle size={14} className="text-amber-400" />}
-                      {metric.health === 'critical' && <AlertTriangle size={14} className="text-rose-400" />}
-                    </div>
-                    <p className="text-lg font-bold text-white">{metric.value}</p>
-                    <p className="text-xs text-slate-400">{metric.label}</p>
+          <div className={cardClass}>
+            <h3 className={headingClass}>
+              <Database size={18} className="inline mr-2 text-emerald-500" />
+              Live Database Metrics
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[
+                { label: 'Database Size', value: `${dbMetrics.totalSizeMb} MB`, icon: HardDrive, health: dbMetrics.totalSizeMb < 500 ? 'good' : dbMetrics.totalSizeMb < 4000 ? 'warn' : 'critical' },
+                { label: 'Total Rows', value: dbMetrics.totalRows.toLocaleString(), icon: Server, health: 'good' as const },
+                { label: 'Tables', value: dbMetrics.tableCount.toString(), icon: Database, health: 'good' as const },
+                { label: 'Storage Buckets', value: dbMetrics.storageBuckets.toString(), icon: HardDrive, health: 'good' as const },
+                { label: 'Sessions (Month)', value: dbMetrics.sessionsThisMonth.toLocaleString(), icon: Zap, health: 'good' as const },
+                { label: 'Page Views (Month)', value: dbMetrics.pageViewsThisMonth.toLocaleString(), icon: Globe2, health: 'good' as const },
+              ].map(metric => (
+                <div key={metric.label} className={`rounded-xl border p-4 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <metric.icon size={16} className="text-slate-400" />
+                    {metric.health === 'good' && <CheckCircle size={14} className="text-emerald-400" />}
+                    {metric.health === 'warn' && <AlertTriangle size={14} className="text-amber-400" />}
+                    {metric.health === 'critical' && <AlertTriangle size={14} className="text-rose-400" />}
                   </div>
-                ))}
-              </div>
+                  <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{metric.value}</p>
+                  <p className="text-xs text-slate-400">{metric.label}</p>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </>
       )}
 
       {viewMode === 'breakdown' && (
-        <>
-          <div className={cardClass}>
-            <h3 className={headingClass}>
-              <Building size={18} className="inline mr-2 text-sky-500" />
-              Estimated Cost per Club (Based on Member Count)
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Costs are allocated proportionally based on each club's member count relative to total platform members.
-              Current month total: ${(currentMonth?.total || 0).toFixed(2)} USD
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
-                    <th className="pb-3 pr-4">Club</th>
-                    <th className="pb-3 pr-4 text-right">Members</th>
-                    <th className="pb-3 pr-4 text-right">Est. DB (MB)</th>
-                    <th className="pb-3 pr-4 text-right">Cost Share</th>
-                    <th className="pb-3 text-right">% of Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/30">
-                  {clubEstimates.map(club => {
-                    const totalMembers = clubEstimates.reduce((s, c) => s + c.members, 0);
-                    const pct = totalMembers > 0 ? ((club.members / totalMembers) * 100).toFixed(1) : '0';
-                    return (
-                      <tr key={club.id} className="hover:bg-slate-700/20 transition-colors">
-                        <td className="py-3 pr-4 font-medium text-white">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold bg-sky-500/20 text-sky-400">
-                              {club.abbreviation?.slice(0, 2) || club.name.slice(0, 2)}
-                            </div>
-                            <span className="text-sm">{club.name}</span>
+        <div className={cardClass}>
+          <h3 className={headingClass}>
+            <Building size={18} className="inline mr-2 text-sky-500" />
+            Estimated Cost per Club (Based on Member Count)
+          </h3>
+          <p className="text-xs text-slate-400 mb-4">
+            Costs are allocated proportionally based on each club's member count relative to total platform members.
+            Current month total: ${(currentMonth?.total || 0).toFixed(2)} USD
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                  <th className="pb-3 pr-4">Club</th>
+                  <th className="pb-3 pr-4 text-right">Members</th>
+                  <th className="pb-3 pr-4 text-right">Est. DB (MB)</th>
+                  <th className="pb-3 pr-4 text-right">Cost Share</th>
+                  <th className="pb-3 text-right">% of Total</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
+                {clubEstimates.map(club => {
+                  const totalMembers = clubEstimates.reduce((s, c) => s + c.members, 0);
+                  const pct = totalMembers > 0 ? ((club.members / totalMembers) * 100).toFixed(1) : '0';
+                  return (
+                    <tr key={club.id} className={`${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'} transition-colors`}>
+                      <td className={`py-3 pr-4 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold bg-sky-500/20 text-sky-400">
+                            {club.abbreviation?.slice(0, 2) || club.name.slice(0, 2)}
                           </div>
-                        </td>
-                        <td className="py-3 pr-4 text-right text-slate-300">{club.members}</td>
-                        <td className="py-3 pr-4 text-right text-slate-300">{club.dbEstimateMb}</td>
-                        <td className="py-3 pr-4 text-right font-medium text-emerald-400">${club.costShare.toFixed(2)}</td>
-                        <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="w-12 h-1.5 rounded-full bg-slate-700 overflow-hidden">
-                              <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.min(100, parseFloat(pct))}%` }} />
-                            </div>
-                            <span className="text-xs text-slate-400 w-10 text-right">{pct}%</span>
+                          <span className="text-sm">{club.name}</span>
+                        </div>
+                      </td>
+                      <td className={`py-3 pr-4 text-right ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{club.members}</td>
+                      <td className={`py-3 pr-4 text-right ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{club.dbEstimateMb}</td>
+                      <td className="py-3 pr-4 text-right font-medium text-emerald-400">${club.costShare.toFixed(2)}</td>
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className={`w-12 h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                            <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.min(100, parseFloat(pct))}%` }} />
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {clubEstimates.length === 0 && (
-                    <tr><td colSpan={5} className="py-8 text-center text-slate-500">No clubs found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          <span className="text-xs text-slate-400 w-10 text-right">{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {clubEstimates.length === 0 && (
+                  <tr><td colSpan={5} className="py-8 text-center text-slate-500">No clubs found</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
 
       {viewMode === 'forecast' && (
@@ -582,7 +571,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                   <card.icon size={16} className="text-sky-400" />
                   <span className="text-xs text-slate-400">{card.label}</span>
                 </div>
-                <p className="text-2xl font-bold text-white">${card.value.toFixed(2)}</p>
+                <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>${card.value.toFixed(2)}</p>
               </div>
             ))}
           </div>
@@ -594,19 +583,11 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
             </h3>
             <div className="h-[350px]">
               {monthlySummary.length > 0 ? (
-                <Line
-                  data={forecastChartData}
-                  options={{
-                    ...commonChartOptions,
-                    scales: {
-                      ...commonChartOptions.scales,
-                      y: { ...commonChartOptions.scales.y, stacked: false },
-                    },
-                  }}
-                />
+                <Line data={forecastChartData} options={{ ...commonChartOptions, scales: { ...commonChartOptions.scales, y: { ...commonChartOptions.scales.y, stacked: false } } }} />
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-                  Record at least 2 months of cost data to see forecasts.
+                <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2">
+                  <TrendingUp size={32} className="text-slate-600" />
+                  <p>Record at least 2 months of cost data to see forecasts.</p>
                 </div>
               )}
             </div>
@@ -619,25 +600,23 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
             </h3>
             <div className="space-y-3">
               {[
-                { label: 'Supabase Database', current: dbSizeMb, limit: 8000, unit: 'MB', threshold: 0.75 },
+                { label: 'Supabase Database', current: dbMetrics.totalSizeMb, limit: 8000, unit: 'MB', threshold: 0.75 },
                 { label: 'Monthly Spend', current: currentMonth?.total || 0, limit: 500, unit: 'USD', threshold: 0.8 },
               ].map(alert => {
                 const usage = alert.limit > 0 ? alert.current / alert.limit : 0;
-                const status = usage >= alert.threshold ? 'warn' : usage >= 0.9 ? 'critical' : 'ok';
+                const status = usage >= 0.9 ? 'critical' : usage >= alert.threshold ? 'warn' : 'ok';
                 return (
-                  <div key={alert.label} className="flex items-center justify-between p-3 rounded-xl border border-slate-700/40 bg-slate-800/40">
+                  <div key={alert.label} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
                     <div>
-                      <p className="text-sm font-medium text-white">{alert.label}</p>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{alert.label}</p>
                       <p className="text-xs text-slate-400">
                         {alert.current.toLocaleString(undefined, { maximumFractionDigits: 2 })} / {alert.limit.toLocaleString()} {alert.unit}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-24 h-2 rounded-full bg-slate-700 overflow-hidden">
+                      <div className={`w-24 h-2 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            status === 'ok' ? 'bg-emerald-500' : status === 'warn' ? 'bg-amber-500' : 'bg-rose-500'
-                          }`}
+                          className={`h-full rounded-full transition-all ${status === 'ok' ? 'bg-emerald-500' : status === 'warn' ? 'bg-amber-500' : 'bg-rose-500'}`}
                           style={{ width: `${Math.min(100, usage * 100)}%` }}
                         />
                       </div>
@@ -652,139 +631,137 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
       )}
 
       {viewMode === 'entry' && (
-        <>
-          <div className={cardClass}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={headingClass.replace(' mb-4', '')}>
-                <Plus size={18} className="inline mr-2 text-emerald-500" />
-                Record Monthly Costs
-              </h3>
-              <button
-                onClick={() => setShowAddEntry(!showAddEntry)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-sky-500/15 text-sky-400 border border-sky-500/30 hover:bg-sky-500/25 transition-all"
-              >
-                <Plus size={14} />
-                Add Entry
-              </button>
-            </div>
+        <div className={cardClass}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={headingClass.replace(' mb-4', '')}>
+              <Plus size={18} className="inline mr-2 text-emerald-500" />
+              Record Monthly Costs
+            </h3>
+            <button
+              onClick={() => setShowAddEntry(!showAddEntry)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-sky-500/15 text-sky-400 border border-sky-500/30 hover:bg-sky-500/25 transition-all"
+            >
+              <Plus size={14} />
+              Add Entry
+            </button>
+          </div>
 
-            {showAddEntry && (
-              <div className="mb-6 p-4 rounded-xl border border-sky-500/20 bg-sky-500/5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Cost Category</label>
-                    <select
-                      value={newEntry.metric_name}
-                      onChange={e => setNewEntry({ ...newEntry, metric_name: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                      <option value="">Select category...</option>
-                      {COST_CATEGORIES.map(cat => (
-                        <option key={cat.key} value={cat.key}>{cat.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Amount (USD)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={newEntry.cost_usd}
-                      onChange={e => setNewEntry({ ...newEntry, cost_usd: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Source</label>
-                    <select
-                      value={newEntry.source}
-                      onChange={e => setNewEntry({ ...newEntry, source: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    >
-                      {Object.entries(SOURCE_LABELS).map(([key, label]) => (
-                        <option key={key} value={key}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={newEntry.snapshot_date}
-                      onChange={e => setNewEntry({ ...newEntry, snapshot_date: e.target.value })}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    />
-                  </div>
+          {showAddEntry && (
+            <div className="mb-6 p-4 rounded-xl border border-sky-500/20 bg-sky-500/5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Cost Category</label>
+                  <select
+                    value={newEntry.metric_name}
+                    onChange={e => setNewEntry({ ...newEntry, metric_name: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                  >
+                    <option value="">Select category...</option>
+                    {COST_CATEGORIES.map(cat => (
+                      <option key={cat.key} value={cat.key}>{cat.label}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="mb-4">
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Notes (optional)</label>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Amount (USD)</label>
                   <input
-                    type="text"
-                    placeholder="e.g. February invoice from AWS"
-                    value={newEntry.notes}
-                    onChange={e => setNewEntry({ ...newEntry, notes: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newEntry.cost_usd}
+                    onChange={e => setNewEntry({ ...newEntry, cost_usd: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
                   />
                 </div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setShowAddEntry(false)} className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-700/50 transition-all">
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveEntry}
-                    disabled={saving || !newEntry.metric_name || !newEntry.cost_usd}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-all"
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Source</label>
+                  <select
+                    value={newEntry.source}
+                    onChange={e => setNewEntry({ ...newEntry, source: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
                   >
-                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-                    Save Entry
-                  </button>
+                    {Object.entries(SOURCE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={newEntry.snapshot_date}
+                    onChange={e => setNewEntry({ ...newEntry, snapshot_date: e.target.value })}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                  />
                 </div>
               </div>
-            )}
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
-                    <th className="pb-3 pr-4">Date</th>
-                    <th className="pb-3 pr-4">Category</th>
-                    <th className="pb-3 pr-4">Source</th>
-                    <th className="pb-3 pr-4 text-right">Amount</th>
-                    <th className="pb-3 text-right">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/30">
-                  {costEntries.filter(e => e.cost_usd && e.cost_usd > 0).slice(0, 50).map(entry => {
-                    const cat = COST_CATEGORIES.find(c => c.key === entry.metric_name);
-                    return (
-                      <tr key={entry.id} className="hover:bg-slate-700/20 transition-colors">
-                        <td className="py-3 pr-4 text-sm text-slate-300">
-                          {new Date(entry.snapshot_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="py-3 pr-4 text-sm text-white">{cat?.label || entry.metric_name}</td>
-                        <td className="py-3 pr-4">
-                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
-                            entry.source === 'aws' ? 'bg-amber-500/20 text-amber-400' :
-                            entry.source === 'supabase' ? 'bg-emerald-500/20 text-emerald-400' :
-                            'bg-sky-500/20 text-sky-400'
-                          }`}>
-                            {SOURCE_LABELS[entry.source] || entry.source}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-4 text-right font-medium text-emerald-400">${(entry.cost_usd || 0).toFixed(2)}</td>
-                        <td className="py-3 text-right text-xs text-slate-500">{entry.metadata?.notes || ''}</td>
-                      </tr>
-                    );
-                  })}
-                  {costEntries.filter(e => e.cost_usd && e.cost_usd > 0).length === 0 && (
-                    <tr><td colSpan={5} className="py-8 text-center text-slate-500">No cost entries recorded yet. Click "Add Entry" to start tracking costs.</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-slate-400 mb-1">Notes (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. February invoice from AWS"
+                  value={newEntry.notes}
+                  onChange={e => setNewEntry({ ...newEntry, notes: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowAddEntry(false)} className={`px-4 py-2 rounded-lg text-sm transition-all ${darkMode ? 'text-slate-400 hover:bg-slate-700/50' : 'text-slate-500 hover:bg-slate-100'}`}>
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEntry}
+                  disabled={saving || !newEntry.metric_name || !newEntry.cost_usd}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-all"
+                >
+                  {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Entry
+                </button>
+              </div>
             </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                  <th className="pb-3 pr-4">Date</th>
+                  <th className="pb-3 pr-4">Category</th>
+                  <th className="pb-3 pr-4">Source</th>
+                  <th className="pb-3 pr-4 text-right">Amount</th>
+                  <th className="pb-3 text-right">Notes</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
+                {costEntries.filter(e => e.cost_usd && e.cost_usd > 0).slice(0, 50).map(entry => {
+                  const cat = COST_CATEGORIES.find(c => c.key === entry.metric_name);
+                  return (
+                    <tr key={entry.id} className={`${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'} transition-colors`}>
+                      <td className={`py-3 pr-4 text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        {new Date(entry.snapshot_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className={`py-3 pr-4 text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>{cat?.label || entry.metric_name}</td>
+                      <td className="py-3 pr-4">
+                        <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+                          entry.source === 'aws' ? 'bg-amber-500/20 text-amber-400' :
+                          entry.source === 'supabase' ? 'bg-emerald-500/20 text-emerald-400' :
+                          'bg-sky-500/20 text-sky-400'
+                        }`}>
+                          {SOURCE_LABELS[entry.source] || entry.source}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-right font-medium text-emerald-400">${(entry.cost_usd || 0).toFixed(2)}</td>
+                      <td className="py-3 text-right text-xs text-slate-500">{entry.metadata?.notes || ''}</td>
+                    </tr>
+                  );
+                })}
+                {costEntries.filter(e => e.cost_usd && e.cost_usd > 0).length === 0 && (
+                  <tr><td colSpan={5} className="py-8 text-center text-slate-500">No cost entries recorded yet. Click "Add Entry" to start tracking costs.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
