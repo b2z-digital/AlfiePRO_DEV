@@ -10,7 +10,8 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye } from 'lucide-react';
+import { Hand, Eye, FileDown } from 'lucide-react';
+import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
 
 interface HeatScoringTableProps {
@@ -1047,7 +1048,27 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               >
                 View Assignments
               </button>
-              {/* Only show Race Results and Overall Results after Round 1 is complete and advanced */}
+              {heatManagement.configuration.scoringSystem === 'shrs' && heatManagement.rounds.length > 1 && (
+                <button
+                  onClick={() => {
+                    exportAllRoundsPdf(heatManagement, skippers, {
+                      eventName: currentEvent?.name || currentEvent?.eventName || '',
+                      eventDate: currentEvent?.date || '',
+                      venueName: (currentEvent as any)?.venue || '',
+                      clubName: (currentEvent as any)?.clubName || '',
+                    });
+                  }}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    darkMode
+                      ? 'bg-slate-600 text-white hover:bg-slate-500'
+                      : 'bg-slate-600 text-white hover:bg-slate-500'
+                  }`}
+                  title="Export all qualifying rounds as multi-page PDF"
+                >
+                  <FileDown size={16} />
+                  Export All Rounds
+                </button>
+              )}
               {heatManagement.currentRound > 1 && (
                 <>
                   <button

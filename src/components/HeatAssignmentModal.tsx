@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, Printer, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { selectObservers, saveObserverAssignments, getObserverAssignments, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
+import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 
 interface HeatAssignmentModalProps {
   isOpen: boolean;
@@ -88,6 +89,40 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     link.download = `SHRS_Heat_Assignments_All_Qualifying_Rounds.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
+  };
+
+  const buildObserverMap = () => {
+    const obsMap = new Map<string, { skipperName: string; sailNumber: string }[]>();
+    observersByHeat.forEach((observers, heatNumber) => {
+      const sortedDesignations = heatAssignments
+        .map(a => a.heatDesignation)
+        .sort((a, b) => a.localeCompare(b));
+      const designation = sortedDesignations[heatNumber - 1];
+      if (!designation) return;
+      const key = `${round}-${designation}`;
+      obsMap.set(key, observers.map(o => ({
+        skipperName: o.skipper_name,
+        sailNumber: o.skipper_sail_number || '',
+      })));
+    });
+    return obsMap;
+  };
+
+  const getExportOptions = () => ({
+    eventName: currentEvent?.name || currentEvent?.eventName || '',
+    eventDate: currentEvent?.date || '',
+    venueName: (currentEvent as any)?.venue || '',
+    clubName: (currentEvent as any)?.clubName || '',
+  });
+
+  const handleExportCurrentRoundPdf = () => {
+    const roundIdx = previewRoundIndex ?? heatManagement.rounds.findIndex(r => r.round === round);
+    if (roundIdx < 0) return;
+    exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), buildObserverMap());
+  };
+
+  const handleExportAllRoundsPdf = () => {
+    exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), buildObserverMap());
   };
 
   const resolveObserverConflicts = (updatedAssignments: HeatAssignment[]) => {
@@ -735,18 +770,30 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCurrentRoundPdf}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                darkMode
+                  ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+              title="Export this round as PDF"
+            >
+              <Printer size={16} />
+              Print
+            </button>
             {shrsHasPreAssignments && (
               <button
-                onClick={exportAllSHRSAssignments}
+                onClick={handleExportAllRoundsPdf}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   darkMode
-                    ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
-                title="Export all qualifying round assignments as CSV"
+                title="Export all qualifying rounds as multi-page PDF"
               >
-                <Download size={16} />
-                Export All
+                <FileDown size={16} />
+                Export All Rounds
               </button>
             )}
             <button
