@@ -2387,9 +2387,33 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }) => {
     console.log('💾 Saving race settings in YachtRaceManager:', JSON.stringify(settings.heatManagement, null, 2));
 
+    let finalHM = settings.heatManagement;
+    if (finalHM && finalHM.configuration.scoringSystem === 'shrs') {
+      const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
+      if (qRounds > 1 && finalHM.rounds.length < qRounds) {
+        console.log('⚠️ SHRS safety net: rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
+        const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
+        const numHeats = finalHM.configuration.numberOfHeats;
+        const allQR = generateAllSHRSQualifyingRoundAssignments(
+          firstRoundAssignments.map(a => ({ heatDesignation: a.heatDesignation as string, skipperIndices: [...a.skipperIndices] })),
+          numHeats,
+          qRounds
+        );
+        finalHM = {
+          ...finalHM,
+          rounds: allQR.map((ra, idx) => ({
+            round: idx + 1,
+            heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
+            results: [] as any[],
+            completed: false
+          }))
+        };
+      }
+    }
+
     setCurrentNumRaces(settings.numRaces);
     setCurrentDropRules(settings.dropRules);
-    setHeatManagement(settings.heatManagement);
+    setHeatManagement(finalHM);
 
     console.log('💾 Heat management state updated');
 
@@ -2408,7 +2432,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           isManualHandicaps,
           false, // not completed
           currentDay,
-          settings.heatManagement, // Use the new heat management from settings
+          finalHM, // Use the new heat management (with safety-net rounds if needed)
           settings.numRaces,
           settings.dropRules as number[]
         );

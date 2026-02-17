@@ -871,7 +871,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       heatDesignations: finalHeatManagement?.rounds[0]?.heatAssignments.map(h => h.heatDesignation)
     });
 
-    onSaveSettings({
+    await onSaveSettings({
       numRaces: currentNumRaces,
       dropRules: currentDropRules,
       heatManagement: finalHeatManagement,
@@ -885,13 +885,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
     });
 
-    // Show success notification
     if (addNotification) {
       addNotification('success', 'Updated Successfully');
     }
-
-    // Close the modal
-    onClose();
   };
 
   return (

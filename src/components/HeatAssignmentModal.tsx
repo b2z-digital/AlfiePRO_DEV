@@ -4,7 +4,7 @@ import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
-import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
+import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 
@@ -232,13 +232,13 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     }
   }, [isOpen]);
 
-  // Create a stable key that represents the state of rounds that should trigger observer reload
   const roundDataKey = useMemo(() => {
     const { currentRound, roundJustCompleted, rounds } = heatManagement;
 
-    // Determine which round we're displaying
     let targetRound;
-    if (roundJustCompleted && currentRound > roundJustCompleted) {
+    if (previewRoundIndex !== null) {
+      targetRound = rounds[previewRoundIndex]?.round || currentRound;
+    } else if (roundJustCompleted && currentRound > roundJustCompleted) {
       targetRound = currentRound;
     } else if (roundJustCompleted) {
       targetRound = roundJustCompleted;
@@ -258,44 +258,26 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       .map(h => `${h.heatDesignation}:${h.skipperIndices.slice().sort().join(',')}`)
       .join('|');
 
-    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}-${assignmentHash}`;
-  }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds]);
+    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}-${assignmentHash}-preview${previewRoundIndex}`;
+  }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds, previewRoundIndex]);
 
-  // Load and select observers when modal opens
+  const preAllocationDone = React.useRef(false);
+
   useEffect(() => {
-    console.log('🔵 HeatAssignmentModal useEffect TRIGGERED:', {
-      isOpen,
-      hasEventId: !!currentEvent?.id,
-      roundDataKey,
-      dependencies: {
-        isOpen,
-        eventId: currentEvent?.id,
-        enable_observers: currentEvent?.enable_observers,
-        observers_per_heat: currentEvent?.observers_per_heat,
-        skipperCount: skippers?.length
-      }
-    });
+    if (!isOpen) {
+      preAllocationDone.current = false;
+    }
+  }, [isOpen]);
 
+  useEffect(() => {
     const loadObservers = async () => {
-      console.log('🎯 HeatAssignmentModal - Checking observer conditions:', {
-        isOpen,
-        hasEventId: !!currentEvent?.id,
-        enable_observers: currentEvent?.enable_observers,
-        observers_per_heat: currentEvent?.observers_per_heat,
-        roundDataKey,
-        currentEvent
-      });
-
       if (!isOpen || !currentEvent?.id) {
-        console.log('⏭️ Skipping observer load - no event or modal closed');
         setObserversByHeat(new Map());
         return;
       }
 
-      // Check if observers are enabled - if undefined, fetch from database
-      const enableObservers = currentEvent?.enable_observers;
-      if (enableObservers === undefined) {
-        console.log('🔄 Observer settings undefined, fetching from database...');
+      let enableObs = currentEvent?.enable_observers;
+      if (enableObs === undefined) {
         const { data: eventData, error } = await supabase
           .from('quick_races')
           .select('enable_observers, observers_per_heat')
@@ -303,27 +285,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           .maybeSingle();
 
         if (error) {
-          console.error('❌ Error fetching observer settings:', error);
           setObserversByHeat(new Map());
           return;
         }
 
-        console.log('📥 Fetched observer settings from DB:', eventData);
-
-        // Update currentEvent with the fetched values
         if (eventData) {
           (currentEvent as any).enable_observers = eventData.enable_observers ?? true;
           (currentEvent as any).observers_per_heat = eventData.observers_per_heat ?? 2;
         }
 
-        // If observers are not enabled, don't proceed
         if (!eventData?.enable_observers) {
-          console.log('⏭️ Observers disabled for this event');
           setObserversByHeat(new Map());
           return;
         }
-      } else if (!enableObservers) {
-        console.log('⏭️ Observers disabled for this event');
+        enableObs = eventData?.enable_observers;
+      } else if (!enableObs) {
         setObserversByHeat(new Map());
         return;
       }
@@ -331,239 +307,144 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setLoadingObservers(true);
       try {
         const { currentRound, rounds, roundJustCompleted } = heatManagement;
+        const isSHRSMode = heatManagement.configuration.scoringSystem === 'shrs';
+        const observersPerHeat = currentEvent.observers_per_heat || 2;
 
-        // CRITICAL: Use the SAME logic as the modal display to determine which round to load observers for
-        // This ensures observers match the round being displayed
-        let roundToLoadObserversFor;
-        if (roundJustCompleted) {
-          // Show the round that was just completed (with results)
-          // This matches the modal display logic at line 383-385
-          roundToLoadObserversFor = rounds.find(r => r.round === roundJustCompleted);
-          console.log('🏁 Showing completed round', roundJustCompleted);
-        } else {
-          // Show the next uncompleted round, or current round
-          // This matches the modal display logic at line 388
-          roundToLoadObserversFor = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
-          console.log('➡️ Showing current/next round', roundToLoadObserversFor?.round);
+        const shrsPreAssign = isSHRSMode &&
+          rounds.length > 1 &&
+          !rounds.some(r => r.results && r.results.length > 0);
+
+        if (shrsPreAssign && !preAllocationDone.current) {
+          preAllocationDone.current = true;
+          console.log('🔄 SHRS pre-allocation: allocating observers for all', rounds.length, 'qualifying rounds');
+          await preAllocateObserversForAllRounds(
+            currentEvent.id,
+            rounds.map(r => ({
+              round: r.round,
+              heatAssignments: r.heatAssignments.map(h => ({
+                heatDesignation: h.heatDesignation as string,
+                skipperIndices: h.skipperIndices
+              }))
+            })),
+            skippers,
+            observersPerHeat
+          );
         }
 
-        console.log('✅ Loading observers for round', roundToLoadObserversFor?.round);
-        console.log('   Round data:', roundToLoadObserversFor);
-
-        // CRITICAL FIX: If the round we're displaying is NOT completed, don't load old observers
-        // This handles the case where Round 1 completes, modal shows Round 2 assignments,
-        // but we shouldn't load Round 1 observers - we need to assign NEW observers for Round 2
-        if (roundToLoadObserversFor && !roundToLoadObserversFor.completed) {
-          console.log('🆕 Round is not completed - will assign new observers, not load historical ones');
+        let roundToLoadObserversFor;
+        if (previewRoundIndex !== null && shrsPreAssign) {
+          roundToLoadObserversFor = rounds[previewRoundIndex];
+        } else if (roundJustCompleted) {
+          roundToLoadObserversFor = rounds.find(r => r.round === roundJustCompleted);
+        } else {
+          roundToLoadObserversFor = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
         }
 
         if (!roundToLoadObserversFor) {
-          console.warn('⚠️ No round data found');
           setObserversByHeat(new Map());
           return;
         }
 
         const currentRoundData = roundToLoadObserversFor;
-        const roundNumberToLoad = currentRoundData.round; // Use the round we're displaying, not currentRound
+        const roundNumberToLoad = currentRoundData.round;
 
-        // Load observers PER HEAT
         const newObserversByHeat = new Map<number, ObserverAssignment[]>();
-        const observersPerHeat = currentEvent.observers_per_heat || 2;
 
-        console.log('👀 Loading', observersPerHeat, 'observers per heat');
-        console.log('🔥 Total heats:', currentRoundData.heatAssignments.length);
-
-        // IMPORTANT: Sort heats alphabetically to match UI rendering order
-        // This ensures heatNumber (1, 2, 3...) maps correctly to Heat A, B, C...
         const sortedHeats = [...currentRoundData.heatAssignments].sort((a, b) =>
           a.heatDesignation.localeCompare(b.heatDesignation)
         );
 
-        // Use results from the round we're displaying
         const roundResults = currentRoundData.results || [];
 
-        // Check which heats are completed to determine observer assignment
-        // Heats complete from bottom to top (B -> A for 2 heats, C -> B -> A for 3 heats)
         const heatCompletionStatus = sortedHeats.map((heat, idx) => {
           const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
-
-          // For completed rounds, check if this heat has ANY results with positions
-          // (don't rely on original skipperIndices as skippers may have moved between heats)
           let isCompleted;
           if (currentRoundData.completed) {
-            // If round is complete, a heat is complete if it has any results with scored positions
             isCompleted = heatResults.some(r => r.position !== null || r.letterScore || r.markedAsUP);
           } else {
-            // For active rounds, check if all skippers in the original assignment have results
             isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
               const result = heatResults.find(r => r.skipperIndex === skipperIdx);
               return result && (result.position !== null || result.letterScore || result.markedAsUP);
             });
           }
-
           return { heatDesignation: heat.heatDesignation, heatNumber: idx + 1, isCompleted };
         });
 
-        console.log('📊 Heat completion status:', heatCompletionStatus);
-
-        // Determine which heat should have observers (the first uncompleted heat from bottom to top)
-        // Reverse to check from bottom (last) to top (first)
         const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
-        console.log('🎯 Next heat to score:', nextHeatToScore?.heatDesignation || 'All heats completed');
 
-        // Get all completed heats to show their previous observers
-        const completedHeats = heatCompletionStatus.filter(h => h.isCompleted);
-        console.log('🏁 Completed heats:', completedHeats.map(h => h.heatDesignation).join(', ') || 'None');
-
-        // Process each heat separately
         for (let i = 0; i < sortedHeats.length; i++) {
           const heat = sortedHeats[i];
-          const heatNumber = i + 1; // Heat 1 = Heat A, Heat 2 = Heat B, etc.
-
-          console.log(`\n🔍 Heat ${heat.heatDesignation} (heat ${heatNumber}):`);
-
-          // Assign observers to:
-          // 1. The next heat that needs scoring (active observers)
-          // 2. ALL completed heats (to show previous observers)
+          const heatNumber = i + 1;
           const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
           const isCompletedHeat = heatCompletionStatus[i].isCompleted;
 
-          console.log(`  isNextHeatToScore: ${isNextHeatToScore}, isCompletedHeat: ${isCompletedHeat}`);
-
-          const isSHRSMode = heatManagement.configuration.scoringSystem === 'shrs';
-
           if (!isSHRSMode && !isNextHeatToScore && !isCompletedHeat) {
-            console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet (HMS mode)`);
             continue;
-          }
-
-          if (isSHRSMode && !isNextHeatToScore && !isCompletedHeat) {
-            console.log(`  🔄 SHRS mode - assigning observers for all heats upfront`);
-          }
-
-          if (isCompletedHeat) {
-            console.log(`  ✅ This is a completed heat - loading observers for completed heat`);
-          }
-
-          if (isNextHeatToScore) {
-            console.log(`  ✅ This is the next heat to score - assigning observers`);
           }
 
           const needsObserverAssignment = isNextHeatToScore || (isSHRSMode && !isCompletedHeat);
 
           let shouldSelectNewObservers = false;
-          let existingObservers: ObserverAssignment[] | null = null;
 
-          if (isCompletedHeat) {
-            // Heat is complete - load observers who actually observed this heat
-            existingObservers = await getObserverAssignments(
-              currentEvent.id,
-              heatNumber,
-              roundNumberToLoad
-            );
-            console.log(`  📖 Loading ${existingObservers?.length || 0} observers for completed heat`);
-
-            if (existingObservers && existingObservers.length > 0) {
-              newObserversByHeat.set(heatNumber, existingObservers);
-            }
-          } else if (needsObserverAssignment) {
-            // For heats that need observers (next to score in HMS, or all heats in SHRS)
-            existingObservers = await getObserverAssignments(
+          if (isCompletedHeat || needsObserverAssignment) {
+            const existingObservers = await getObserverAssignments(
               currentEvent.id,
               heatNumber,
               roundNumberToLoad
             );
 
-            console.log(`  📋 Checking existing observers for Round ${roundNumberToLoad}, Heat ${heatNumber}:`, existingObservers?.length || 0);
-            if (existingObservers && existingObservers.length > 0) {
-              console.log(`     Existing observer indices:`, existingObservers.map(o => o.skipper_index));
-              console.log(`     Racing skipper indices:`, heat.skipperIndices);
-            }
-
-            // Validate existing observers:
-            // 1. Count must match expected
-            // 2. None of the observers can be racing in THIS heat
-            const observersRacingInHeat = existingObservers?.filter(obs => {
-              const isRacing = heat.skipperIndices.includes(obs.skipper_index);
-              if (isRacing) {
-                console.log(`     ❌ Observer ${obs.skipper_name} (index ${obs.skipper_index}) is RACING in this heat!`);
-              }
-              return isRacing;
-            }) || [];
-
-            // Also check if ALL observers are still available
-            const observersStillInHeat = existingObservers?.filter(obs => {
-              const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
-              if (!skipperStillExists) {
-                console.log(`     ⚠️ Observer ${obs.skipper_name} (index ${obs.skipper_index}) no longer exists in skipper list`);
-              }
-              return skipperStillExists;
-            }) || [];
-
-            const hasValidExistingObservers = existingObservers &&
-              existingObservers.length > 0 &&
-              existingObservers.length === observersPerHeat &&
-              observersRacingInHeat.length === 0 && // No observers can be racing in this heat
-              observersStillInHeat.length === existingObservers.length; // All observers still exist
-
-            if (hasValidExistingObservers) {
-              console.log(`  ✅ Using existing ${existingObservers.length} valid observers:`, existingObservers.map(o => `${o.skipper_name} (${o.skipper_index})`));
-              newObserversByHeat.set(heatNumber, existingObservers);
-            } else {
+            if (isCompletedHeat) {
               if (existingObservers && existingObservers.length > 0) {
-                console.warn(`  ⚠️ Existing observers invalid - will re-select`);
-              } else {
-                console.log(`  ℹ️ No existing observers found - will select new`);
+                newObserversByHeat.set(heatNumber, existingObservers);
               }
-              shouldSelectNewObservers = true;
+            } else {
+              const observersRacingInHeat = existingObservers?.filter(obs =>
+                obs.skipper_index !== undefined && obs.skipper_index !== null &&
+                heat.skipperIndices.includes(obs.skipper_index)
+              ) || [];
+
+              const observersStillExist = existingObservers?.filter(obs =>
+                obs.skipper_index !== undefined && obs.skipper_index !== null &&
+                obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index]
+              ) || [];
+
+              const hasValid = existingObservers &&
+                existingObservers.length > 0 &&
+                existingObservers.length === observersPerHeat &&
+                observersRacingInHeat.length === 0 &&
+                observersStillExist.length === existingObservers.length;
+
+              if (hasValid) {
+                newObserversByHeat.set(heatNumber, existingObservers);
+              } else {
+                shouldSelectNewObservers = true;
+              }
             }
-          } else {
-            console.log(`  ⏭️ Not next heat to score and not completed - skipping observer assignment`);
           }
 
-          // Select new observers if needed
           if (shouldSelectNewObservers) {
-            console.log(`  🔄 Selecting new observers for this heat`);
-            console.log('  🏁 Skippers racing in this heat:', heat.skipperIndices);
-
-            // Select observers from skippers NOT racing in THIS specific heat
             const observersForThisHeat = await selectObservers(
               currentEvent.id,
               heatNumber,
               roundNumberToLoad,
-              heat.skipperIndices, // Only exclude skippers in THIS heat
+              heat.skipperIndices,
               skippers,
               observersPerHeat
             );
 
-            console.log(`  ✅ Selected ${observersForThisHeat.length} observers:`, observersForThisHeat);
-
-            // Save observers for this specific heat
             if (observersForThisHeat.length > 0) {
-              console.log(`  💾 Saving ${observersForThisHeat.length} observers to database for Heat ${heatNumber}, Round ${roundNumberToLoad}...`);
               await saveObserverAssignments(
                 currentEvent.id,
                 heatNumber,
                 roundNumberToLoad,
                 observersForThisHeat
               );
-              console.log(`  ✅ Successfully saved observers to database`);
               newObserversByHeat.set(heatNumber, observersForThisHeat);
             }
           }
         }
 
-        console.log('\n📊 Loaded observers for', newObserversByHeat.size, 'heats');
-        console.log('   Observer details by heat:');
-        for (let i = 1; i <= sortedHeats.length; i++) {
-          const observers = newObserversByHeat.get(i);
-          console.log(`   Heat ${['A', 'B', 'C', 'D', 'E', 'F'][i-1]}: ${observers ? observers.map(o => `${o.skipper_name} (${o.skipper_index})`).join(', ') : 'NONE'}`);
-        }
         setObserversByHeat(newObserversByHeat);
-
-        if (newObserversByHeat.size === 0) {
-          console.warn('⚠️ No observers selected - may need more skippers or different configuration');
-        }
       } catch (error) {
         console.error('Error loading observers:', error);
       } finally {

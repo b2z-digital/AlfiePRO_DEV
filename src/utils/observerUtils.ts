@@ -239,6 +239,54 @@ export async function getAllObserversForEvent(
   return obsMap;
 }
 
+export async function preAllocateObserversForAllRounds(
+  eventId: string,
+  rounds: Array<{ round: number; heatAssignments: Array<{ heatDesignation: string; skipperIndices: number[] }> }>,
+  allSkippers: Skipper[],
+  observersPerHeat: number
+): Promise<boolean> {
+  try {
+    console.log(`🔄 Pre-allocating observers for ${rounds.length} rounds, ${observersPerHeat} per heat`);
+
+    for (const roundData of rounds) {
+      const sortedHeats = [...roundData.heatAssignments].sort((a, b) =>
+        a.heatDesignation.localeCompare(b.heatDesignation)
+      );
+
+      for (let i = 0; i < sortedHeats.length; i++) {
+        const heat = sortedHeats[i];
+        const heatNumber = i + 1;
+
+        const existing = await getObserverAssignments(eventId, heatNumber, roundData.round);
+        if (existing && existing.length === observersPerHeat) {
+          const hasConflict = existing.some(obs =>
+            obs.skipper_index !== undefined && obs.skipper_index !== null &&
+            heat.skipperIndices.includes(obs.skipper_index)
+          );
+          if (!hasConflict) {
+            continue;
+          }
+        }
+
+        const observers = await selectObservers(
+          eventId, heatNumber, roundData.round,
+          heat.skipperIndices, allSkippers, observersPerHeat
+        );
+
+        if (observers.length > 0) {
+          await saveObserverAssignments(eventId, heatNumber, roundData.round, observers);
+        }
+      }
+    }
+
+    console.log(`✅ Pre-allocation complete for ${rounds.length} rounds`);
+    return true;
+  } catch (err) {
+    console.error('Error pre-allocating observers:', err);
+    return false;
+  }
+}
+
 /**
  * Toggle an observer assignment (add or remove manually)
  * @param eventId - The event/race ID
