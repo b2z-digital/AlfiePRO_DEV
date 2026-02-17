@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Database, Cloud, DollarSign, HardDrive, Server, TrendingUp,
   RefreshCw, Plus, Calendar, Building,
-  Globe2, AlertTriangle, CheckCircle, Zap, BarChart3, Cpu, Wifi,
-  Save
+  Globe2, AlertTriangle, CheckCircle, Zap, BarChart3,
+  Save, Archive, FolderOpen, Loader2, CloudOff
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
@@ -49,11 +49,37 @@ interface DbMetrics {
   totalSizeMb: number;
   tableCount: number;
   storageBuckets: number;
+  storageFiles: number;
+  storageSizeMb: number;
   sessionsThisMonth: number;
   pageViewsThisMonth: number;
 }
 
-type ViewMode = 'overview' | 'breakdown' | 'forecast' | 'entry';
+interface StorageBucketInfo {
+  id: string;
+  name: string;
+  public: boolean;
+  file_count: number;
+  total_bytes: number;
+}
+
+interface AwsCostData {
+  monthly: { month: string; total: number }[];
+  total: number;
+  topServices: { name: string; cost: number }[];
+  period: { start: string; end: string };
+}
+
+interface AmplifyInfo {
+  name: string;
+  appId: string;
+  platform: string;
+  defaultDomain: string;
+  productionBranch: string;
+  branches: { branchName: string; stage: string; lastDeployTime: string; status: string }[];
+}
+
+type ViewMode = 'overview' | 'breakdown' | 'storage' | 'aws' | 'forecast' | 'entry';
 
 const SOURCE_LABELS: Record<string, string> = {
   aws: 'AWS Amplify',
@@ -81,12 +107,16 @@ const COST_CATEGORIES = [
   { key: 'other', label: 'Other Services', source: 'other' },
 ];
 
-async function fetchDbMetrics(): Promise<DbMetrics> {
-  const defaults: DbMetrics = { totalRows: 0, totalSizeMb: 0, tableCount: 0, storageBuckets: 0, sessionsThisMonth: 0, pageViewsThisMonth: 0 };
+async function fetchDbMetrics(): Promise<{ metrics: DbMetrics; buckets: StorageBucketInfo[] }> {
+  const defaults: DbMetrics = {
+    totalRows: 0, totalSizeMb: 0, tableCount: 0,
+    storageBuckets: 0, storageFiles: 0, storageSizeMb: 0,
+    sessionsThisMonth: 0, pageViewsThisMonth: 0,
+  };
+  let bucketList: StorageBucketInfo[] = [];
 
   try {
     const { data: tableStats } = await supabase.rpc('get_public_table_stats');
-
     if (tableStats && Array.isArray(tableStats)) {
       let totalRows = 0;
       let totalSizeMb = 0;
@@ -110,51 +140,61 @@ async function fetchDbMetrics(): Promise<DbMetrics> {
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
     const [sessionsRes, viewsRes] = await Promise.all([
       supabase.from('platform_sessions').select('id', { count: 'exact', head: true }).gte('started_at', monthStart),
       supabase.from('platform_page_views').select('id', { count: 'exact', head: true }).gte('viewed_at', monthStart),
     ]);
-
     defaults.sessionsThisMonth = sessionsRes.count || 0;
     defaults.pageViewsThisMonth = viewsRes.count || 0;
 
-    try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-platform-resources`;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ action: 'get_db_size' }),
-        });
-        if (res.ok) {
-          const stats = await res.json();
-          const dbMetrics = stats?.database || [];
-          const storageMetrics = stats?.storage || [];
-
-          const edgeSizeMb = dbMetrics.find((m: any) => m.metric_name === 'db_total_size_mb')?.metric_value;
-          const edgeRows = dbMetrics.find((m: any) => m.metric_name === 'db_total_rows')?.metric_value;
-          const edgeTables = dbMetrics.find((m: any) => m.metric_name === 'db_table_count')?.metric_value;
-          const edgeBuckets = storageMetrics.find((m: any) => m.metric_name === 'storage_bucket_count')?.metric_value;
-
-          if (edgeSizeMb && edgeSizeMb > defaults.totalSizeMb) defaults.totalSizeMb = edgeSizeMb;
-          if (edgeRows && edgeRows > defaults.totalRows) defaults.totalRows = edgeRows;
-          if (edgeTables && edgeTables > defaults.tableCount) defaults.tableCount = edgeTables;
-          if (edgeBuckets) defaults.storageBuckets = edgeBuckets;
-        }
-      }
-    } catch (_e) {
-      // Edge function may not respond - that's OK, we have direct data
+    const { data: storageData } = await supabase.rpc('get_storage_stats');
+    if (storageData && !storageData.error) {
+      defaults.storageBuckets = storageData.bucket_count || 0;
+      defaults.storageFiles = storageData.total_files || 0;
+      defaults.storageSizeMb = Math.round((storageData.total_bytes || 0) / (1024 * 1024) * 100) / 100;
+      bucketList = (storageData.buckets || []).map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        public: b.public,
+        file_count: b.file_count || 0,
+        total_bytes: b.total_bytes || 0,
+      }));
     }
   } catch (err) {
     console.error('Error fetching DB metrics:', err);
   }
 
-  return defaults;
+  return { metrics: defaults, buckets: bucketList };
+}
+
+async function fetchAwsData(): Promise<{ costs: AwsCostData | null; amplify: AmplifyInfo | null; error: string | null }> {
+  try {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-platform-resources`;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { costs: null, amplify: null, error: 'Not authenticated' };
+
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'get_aws_costs', months: 6 }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { costs: null, amplify: null, error: errBody.error || `HTTP ${res.status}` };
+    }
+
+    const data = await res.json();
+    const costs = data.costs?.error ? null : data.costs;
+    const amplify = data.amplify?.error ? null : data.amplify;
+
+    return { costs, amplify, error: data.costs?.error || data.amplify?.error || null };
+  } catch (err: any) {
+    return { costs: null, amplify: null, error: err.message };
+  }
 }
 
 export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
@@ -164,7 +204,16 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   const [costEntries, setCostEntries] = useState<CostEntry[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlyCostSummary[]>([]);
   const [clubEstimates, setClubEstimates] = useState<ClubCostEstimate[]>([]);
-  const [dbMetrics, setDbMetrics] = useState<DbMetrics>({ totalRows: 0, totalSizeMb: 0, tableCount: 0, storageBuckets: 0, sessionsThisMonth: 0, pageViewsThisMonth: 0 });
+  const [dbMetrics, setDbMetrics] = useState<DbMetrics>({
+    totalRows: 0, totalSizeMb: 0, tableCount: 0,
+    storageBuckets: 0, storageFiles: 0, storageSizeMb: 0,
+    sessionsThisMonth: 0, pageViewsThisMonth: 0,
+  });
+  const [storageBuckets, setStorageBuckets] = useState<StorageBucketInfo[]>([]);
+  const [awsCosts, setAwsCosts] = useState<AwsCostData | null>(null);
+  const [amplifyInfo, setAmplifyInfo] = useState<AmplifyInfo | null>(null);
+  const [awsLoading, setAwsLoading] = useState(false);
+  const [awsError, setAwsError] = useState<string | null>(null);
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [newEntry, setNewEntry] = useState({
     metric_name: '',
@@ -177,7 +226,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
 
   const loadData = useCallback(async () => {
     try {
-      const [metrics, snapshotsRes] = await Promise.all([
+      const [{ metrics, buckets }, snapshotsRes] = await Promise.all([
         fetchDbMetrics(),
         supabase
           .from('platform_resource_snapshots')
@@ -187,6 +236,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
       ]);
 
       setDbMetrics(metrics);
+      setStorageBuckets(buckets);
 
       const snapshots = snapshotsRes.data || [];
       setCostEntries(snapshots);
@@ -238,9 +288,23 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     }
   }, []);
 
+  const loadAwsData = useCallback(async () => {
+    setAwsLoading(true);
+    setAwsError(null);
+    const { costs, amplify, error } = await fetchAwsData();
+    setAwsCosts(costs);
+    setAmplifyInfo(amplify);
+    if (error && !costs && !amplify) setAwsError(error);
+    setAwsLoading(false);
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    loadAwsData();
+  }, [loadAwsData]);
 
   const handleSaveEntry = async () => {
     if (!newEntry.metric_name || !newEntry.cost_usd) return;
@@ -268,6 +332,13 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     }
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
+
   const chartColors = {
     grid: darkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(148, 163, 184, 0.15)',
     text: darkMode ? '#94a3b8' : '#64748b',
@@ -279,25 +350,65 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   const currentMonth = monthlySummary.length > 0 ? monthlySummary[monthlySummary.length - 1] : null;
   const totalAllTime = costEntries.reduce((sum, e) => sum + (e.cost_usd || 0), 0);
 
-  const monthlyTrendData = {
-    labels: monthlySummary.map(m => {
-      const [y, mo] = m.month.split('-');
-      return new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' });
-    }),
-    datasets: [
-      { label: 'AWS Amplify', data: monthlySummary.map(m => m.aws), backgroundColor: '#f59e0b', borderRadius: 4, stack: 'stack1' },
-      { label: 'Supabase', data: monthlySummary.map(m => m.supabase), backgroundColor: '#10b981', borderRadius: 4, stack: 'stack1' },
-      { label: 'Other', data: monthlySummary.map(m => m.other), backgroundColor: '#0ea5e9', borderRadius: 4, stack: 'stack1' },
-    ],
-  };
+  const awsMonthlyTotal = awsCosts?.monthly?.length
+    ? awsCosts.monthly[awsCosts.monthly.length - 1].total
+    : 0;
 
-  const costBreakdownData = {
-    labels: currentMonth ? ['AWS Amplify', 'Supabase', 'Other'] : [],
-    datasets: [{ data: currentMonth ? [currentMonth.aws, currentMonth.supabase, currentMonth.other] : [], backgroundColor: ['#f59e0b', '#10b981', '#0ea5e9'], borderWidth: 0 }],
-  };
+  const combinedMonthlyData = (() => {
+    const labels: string[] = [];
+    const awsData: number[] = [];
+    const supabaseData: number[] = [];
+    const otherData: number[] = [];
+
+    if (awsCosts?.monthly?.length) {
+      const awsMap = new Map(awsCosts.monthly.map(m => [m.month, m.total]));
+      const manualMap = new Map<string, MonthlyCostSummary>();
+      monthlySummary.forEach(m => manualMap.set(m.month, m));
+
+      const allMonths = new Set([...awsMap.keys(), ...manualMap.keys()]);
+      const sortedMonths = [...allMonths].sort();
+
+      sortedMonths.forEach(month => {
+        const [y, mo] = month.split('-');
+        labels.push(new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }));
+        awsData.push(awsMap.get(month) || 0);
+        supabaseData.push(manualMap.get(month)?.supabase || 0);
+        otherData.push(manualMap.get(month)?.other || 0);
+      });
+    } else {
+      monthlySummary.forEach(m => {
+        const [y, mo] = m.month.split('-');
+        labels.push(new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }));
+        awsData.push(m.aws);
+        supabaseData.push(m.supabase);
+        otherData.push(m.other);
+      });
+    }
+
+    return {
+      labels,
+      datasets: [
+        { label: 'AWS', data: awsData, backgroundColor: '#f59e0b', borderRadius: 4, stack: 'stack1' },
+        { label: 'Supabase', data: supabaseData, backgroundColor: '#10b981', borderRadius: 4, stack: 'stack1' },
+        { label: 'Other', data: otherData, backgroundColor: '#0ea5e9', borderRadius: 4, stack: 'stack1' },
+      ],
+    };
+  })();
+
+  const costBreakdownData = (() => {
+    const awsTotal = awsCosts?.total || currentMonth?.aws || 0;
+    const supTotal = currentMonth?.supabase || 0;
+    const othTotal = currentMonth?.other || 0;
+    if (awsTotal + supTotal + othTotal === 0) return { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0 }] };
+    return {
+      labels: ['AWS', 'Supabase', 'Other'],
+      datasets: [{ data: [awsTotal, supTotal, othTotal], backgroundColor: ['#f59e0b', '#10b981', '#0ea5e9'], borderWidth: 0 }],
+    };
+  })();
 
   const forecastMonths = 6;
   const avgMonthly = monthlySummary.length > 0 ? monthlySummary.reduce((s, m) => s + m.total, 0) / monthlySummary.length : 0;
+  const effectiveAvg = awsCosts ? avgMonthly + (awsCosts.total / Math.max(awsCosts.monthly.length, 1)) : avgMonthly;
   const growthRate = monthlySummary.length >= 2 ? (monthlySummary[monthlySummary.length - 1].total - monthlySummary[0].total) / (monthlySummary.length - 1) : 0;
 
   const forecastLabels: string[] = [];
@@ -307,11 +418,11 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   monthlySummary.forEach(m => {
     const [y, mo] = m.month.split('-');
     forecastLabels.push(new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }));
-    forecastActual.push(m.total);
+    forecastActual.push(m.total + (awsCosts?.monthly?.find(a => a.month === m.month)?.total || 0));
     forecastProjected.push(null);
   });
 
-  const lastTotal = monthlySummary.length > 0 ? monthlySummary[monthlySummary.length - 1].total : 0;
+  const lastTotal = forecastActual.length > 0 ? (forecastActual[forecastActual.length - 1] || 0) : 0;
   for (let i = 1; i <= forecastMonths; i++) {
     const d = new Date();
     d.setMonth(d.getMonth() + i);
@@ -359,7 +470,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-2 flex-wrap">
-          {(['overview', 'breakdown', 'forecast', 'entry'] as ViewMode[]).map(mode => (
+          {(['overview', 'storage', 'aws', 'breakdown', 'forecast', 'entry'] as ViewMode[]).map(mode => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
@@ -370,14 +481,16 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
               }`}
             >
               {mode === 'overview' && <><BarChart3 size={14} className="inline mr-1.5" />Overview</>}
-              {mode === 'breakdown' && <><Building size={14} className="inline mr-1.5" />Cost Breakdown</>}
+              {mode === 'storage' && <><Archive size={14} className="inline mr-1.5" />Storage</>}
+              {mode === 'aws' && <><Cloud size={14} className="inline mr-1.5" />AWS</>}
+              {mode === 'breakdown' && <><Building size={14} className="inline mr-1.5" />Club Costs</>}
               {mode === 'forecast' && <><TrendingUp size={14} className="inline mr-1.5" />Forecast</>}
               {mode === 'entry' && <><Plus size={14} className="inline mr-1.5" />Record Costs</>}
             </button>
           ))}
         </div>
         <button
-          onClick={() => { setRefreshing(true); loadData(); }}
+          onClick={() => { setRefreshing(true); loadData(); loadAwsData(); }}
           disabled={refreshing}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
         >
@@ -388,14 +501,16 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
 
       {viewMode === 'overview' && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
             {[
-              { label: 'This Month', value: currentMonth?.total || 0, prefix: '$', color: 'sky', icon: DollarSign, sub: currentMonth?.month || 'No data' },
-              { label: 'AWS Cost', value: currentMonth?.aws || 0, prefix: '$', color: 'amber', icon: Cloud, sub: 'Amplify' },
+              { label: 'This Month', value: (currentMonth?.total || 0) + awsMonthlyTotal, prefix: '$', color: 'sky', icon: DollarSign, sub: currentMonth?.month || 'Current' },
+              { label: 'AWS Cost', value: awsMonthlyTotal || currentMonth?.aws || 0, prefix: '$', color: 'amber', icon: Cloud, sub: 'Live from AWS' },
               { label: 'Supabase Cost', value: currentMonth?.supabase || 0, prefix: '$', color: 'emerald', icon: Database, sub: 'Database + Storage' },
               { label: 'DB Size', value: dbMetrics.totalSizeMb, suffix: ' MB', color: 'cyan', icon: HardDrive, sub: `${dbMetrics.tableCount} tables` },
               { label: 'Total Rows', value: dbMetrics.totalRows, color: 'rose', icon: Server, sub: 'All tables' },
-              { label: 'Total Spend', value: totalAllTime, prefix: '$', color: 'slate', icon: DollarSign, sub: 'All time' },
+              { label: 'Storage', value: dbMetrics.storageSizeMb, suffix: ' MB', color: 'teal', icon: Archive, sub: `${dbMetrics.storageBuckets} buckets` },
+              { label: 'Files Stored', value: dbMetrics.storageFiles, color: 'blue', icon: FolderOpen, sub: `${dbMetrics.storageBuckets} buckets` },
+              { label: 'Total Spend', value: totalAllTime + (awsCosts?.total || 0), prefix: '$', color: 'slate', icon: DollarSign, sub: 'All time' },
             ].map(card => {
               const cMap: Record<string, string> = {
                 sky: 'from-sky-500/20 to-sky-700/20 border-sky-500/30',
@@ -403,18 +518,21 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                 emerald: 'from-emerald-500/20 to-emerald-700/20 border-emerald-500/30',
                 cyan: 'from-cyan-500/20 to-cyan-700/20 border-cyan-500/30',
                 rose: 'from-rose-500/20 to-rose-700/20 border-rose-500/30',
+                teal: 'from-teal-500/20 to-teal-700/20 border-teal-500/30',
+                blue: 'from-blue-500/20 to-blue-700/20 border-blue-500/30',
                 slate: 'from-slate-600/20 to-slate-800/20 border-slate-500/30',
               };
               const iMap: Record<string, string> = {
                 sky: 'text-sky-400', amber: 'text-amber-400', emerald: 'text-emerald-400',
-                cyan: 'text-cyan-400', rose: 'text-rose-400', slate: 'text-slate-300',
+                cyan: 'text-cyan-400', rose: 'text-rose-400', teal: 'text-teal-400',
+                blue: 'text-blue-400', slate: 'text-slate-300',
               };
               return (
                 <div key={card.label} className={`rounded-2xl border p-4 backdrop-blur-sm bg-gradient-to-br ${cMap[card.color]} transition-all hover:scale-[1.02]`}>
                   <div className="flex items-center gap-2 mb-2">
                     <card.icon size={14} className={iMap[card.color]} />
                   </div>
-                  <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     {card.prefix || ''}{typeof card.value === 'number' ? card.value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : card.value}{card.suffix || ''}
                   </p>
                   <p className="text-xs font-medium text-slate-400">{card.label}</p>
@@ -429,15 +547,15 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
               <h3 className={headingClass}>
                 <TrendingUp size={18} className="inline mr-2 text-sky-500" />
                 Monthly Cost Trend
+                {awsCosts && <span className="text-xs font-normal text-emerald-400 ml-2">(includes live AWS data)</span>}
               </h3>
               <div className="h-[300px]">
-                {monthlySummary.length > 0 ? (
-                  <Bar data={monthlyTrendData} options={{ ...commonChartOptions, scales: { ...commonChartOptions.scales, x: { ...commonChartOptions.scales.x, stacked: true } } }} />
+                {combinedMonthlyData.labels.length > 0 ? (
+                  <Bar data={combinedMonthlyData} options={{ ...commonChartOptions, scales: { ...commonChartOptions.scales, x: { ...commonChartOptions.scales.x, stacked: true } } }} />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2">
                     <DollarSign size={32} className="text-slate-600" />
                     <p>No cost data recorded yet.</p>
-                    <p className="text-xs text-slate-600">Use "Record Costs" tab to add monthly expenses.</p>
                   </div>
                 )}
               </div>
@@ -446,10 +564,10 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
             <div className={cardClass}>
               <h3 className={headingClass}>
                 <DollarSign size={18} className="inline mr-2 text-amber-500" />
-                Current Month Split
+                Cost Split
               </h3>
               <div className="h-[300px]">
-                {currentMonth && currentMonth.total > 0 ? (
+                {costBreakdownData.labels.length > 0 ? (
                   <Doughnut
                     data={costBreakdownData}
                     options={{
@@ -473,30 +591,315 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
           <div className={cardClass}>
             <h3 className={headingClass}>
               <Database size={18} className="inline mr-2 text-emerald-500" />
-              Live Database Metrics
+              Live Platform Metrics
             </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
               {[
                 { label: 'Database Size', value: `${dbMetrics.totalSizeMb} MB`, icon: HardDrive, health: dbMetrics.totalSizeMb < 500 ? 'good' : dbMetrics.totalSizeMb < 4000 ? 'warn' : 'critical' },
                 { label: 'Total Rows', value: dbMetrics.totalRows.toLocaleString(), icon: Server, health: 'good' as const },
                 { label: 'Tables', value: dbMetrics.tableCount.toString(), icon: Database, health: 'good' as const },
-                { label: 'Storage Buckets', value: dbMetrics.storageBuckets.toString(), icon: HardDrive, health: 'good' as const },
-                { label: 'Sessions (Month)', value: dbMetrics.sessionsThisMonth.toLocaleString(), icon: Zap, health: 'good' as const },
-                { label: 'Page Views (Month)', value: dbMetrics.pageViewsThisMonth.toLocaleString(), icon: Globe2, health: 'good' as const },
+                { label: 'Storage Buckets', value: dbMetrics.storageBuckets.toString(), icon: Archive, health: 'good' as const },
+                { label: 'Files Stored', value: dbMetrics.storageFiles.toLocaleString(), icon: FolderOpen, health: 'good' as const },
+                { label: 'Storage Size', value: `${dbMetrics.storageSizeMb} MB`, icon: HardDrive, health: dbMetrics.storageSizeMb < 1000 ? 'good' : 'warn' },
+                { label: 'Sessions/Mo', value: dbMetrics.sessionsThisMonth.toLocaleString(), icon: Zap, health: 'good' as const },
+                { label: 'Views/Mo', value: dbMetrics.pageViewsThisMonth.toLocaleString(), icon: Globe2, health: 'good' as const },
               ].map(metric => (
-                <div key={metric.label} className={`rounded-xl border p-4 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <metric.icon size={16} className="text-slate-400" />
-                    {metric.health === 'good' && <CheckCircle size={14} className="text-emerald-400" />}
-                    {metric.health === 'warn' && <AlertTriangle size={14} className="text-amber-400" />}
-                    {metric.health === 'critical' && <AlertTriangle size={14} className="text-rose-400" />}
+                <div key={metric.label} className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <metric.icon size={14} className="text-slate-400" />
+                    {metric.health === 'good' && <CheckCircle size={12} className="text-emerald-400" />}
+                    {metric.health === 'warn' && <AlertTriangle size={12} className="text-amber-400" />}
+                    {metric.health === 'critical' && <AlertTriangle size={12} className="text-rose-400" />}
                   </div>
-                  <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{metric.value}</p>
-                  <p className="text-xs text-slate-400">{metric.label}</p>
+                  <p className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{metric.value}</p>
+                  <p className="text-[10px] text-slate-400">{metric.label}</p>
                 </div>
               ))}
             </div>
           </div>
+        </>
+      )}
+
+      {viewMode === 'storage' && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            {[
+              { label: 'Storage Buckets', value: dbMetrics.storageBuckets, icon: Archive, color: 'teal' },
+              { label: 'Total Files', value: dbMetrics.storageFiles.toLocaleString(), icon: FolderOpen, color: 'blue' },
+              { label: 'Total Size', value: `${dbMetrics.storageSizeMb} MB`, icon: HardDrive, color: 'cyan' },
+              { label: 'Avg per Bucket', value: dbMetrics.storageBuckets > 0 ? `${Math.round(dbMetrics.storageFiles / dbMetrics.storageBuckets)} files` : '0', icon: Database, color: 'emerald' },
+            ].map(card => {
+              const cMap: Record<string, string> = {
+                teal: 'from-teal-500/20 to-teal-700/20 border-teal-500/30',
+                blue: 'from-blue-500/20 to-blue-700/20 border-blue-500/30',
+                cyan: 'from-cyan-500/20 to-cyan-700/20 border-cyan-500/30',
+                emerald: 'from-emerald-500/20 to-emerald-700/20 border-emerald-500/30',
+              };
+              return (
+                <div key={card.label} className={`rounded-2xl border p-5 bg-gradient-to-br ${cMap[card.color]} transition-all`}>
+                  <card.icon size={16} className="text-slate-400 mb-2" />
+                  <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{card.value}</p>
+                  <p className="text-xs text-slate-400">{card.label}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className={cardClass}>
+            <h3 className={headingClass}>
+              <Archive size={18} className="inline mr-2 text-teal-500" />
+              Storage Bucket Breakdown
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className={`text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                    <th className="pb-3 pr-4">Bucket</th>
+                    <th className="pb-3 pr-4 text-center">Public</th>
+                    <th className="pb-3 pr-4 text-right">Files</th>
+                    <th className="pb-3 pr-4 text-right">Size</th>
+                    <th className="pb-3 text-right">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
+                  {storageBuckets.map(bucket => {
+                    const totalBytes = storageBuckets.reduce((s, b) => s + b.total_bytes, 0);
+                    const pct = totalBytes > 0 ? ((bucket.total_bytes / totalBytes) * 100) : 0;
+                    return (
+                      <tr key={bucket.id} className={`${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'} transition-colors`}>
+                        <td className={`py-3 pr-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] ${bucket.public ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                              <Archive size={12} />
+                            </div>
+                            <span className="text-sm font-medium">{bucket.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${bucket.public ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            {bucket.public ? 'Public' : 'Private'}
+                          </span>
+                        </td>
+                        <td className={`py-3 pr-4 text-right text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{bucket.file_count.toLocaleString()}</td>
+                        <td className={`py-3 pr-4 text-right text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{formatBytes(bucket.total_bytes)}</td>
+                        <td className="py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className={`w-16 h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                              <div className="h-full rounded-full bg-teal-500" style={{ width: `${Math.min(100, pct)}%` }} />
+                            </div>
+                            <span className="text-xs text-slate-400 w-12 text-right">{pct.toFixed(1)}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {storageBuckets.length === 0 && (
+                    <tr><td colSpan={5} className="py-8 text-center text-slate-500">No storage buckets found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {storageBuckets.length > 0 && (
+            <div className={cardClass}>
+              <h3 className={headingClass}>
+                <BarChart3 size={18} className="inline mr-2 text-blue-500" />
+                Storage Distribution
+              </h3>
+              <div className="h-[300px]">
+                <Doughnut
+                  data={{
+                    labels: storageBuckets.filter(b => b.total_bytes > 0).map(b => b.name),
+                    datasets: [{
+                      data: storageBuckets.filter(b => b.total_bytes > 0).map(b => Math.round(b.total_bytes / 1024)),
+                      backgroundColor: ['#14b8a6', '#0ea5e9', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4', '#6366f1', '#84cc16', '#d946ef', '#fb923c', '#22d3ee'],
+                      borderWidth: 0,
+                    }],
+                  }}
+                  options={{
+                    responsive: true, maintainAspectRatio: false, cutout: '55%',
+                    plugins: {
+                      legend: { display: true, position: 'right', labels: { color: chartColors.text, padding: 8, usePointStyle: true, font: { size: 10 } } },
+                      tooltip: {
+                        backgroundColor: chartColors.tooltipBg, titleColor: chartColors.tooltipText, bodyColor: chartColors.tooltipText,
+                        callbacks: { label: (ctx: any) => `${ctx.label}: ${formatBytes((ctx.raw || 0) * 1024)}` },
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {viewMode === 'aws' && (
+        <>
+          {awsLoading && (
+            <div className="flex items-center justify-center h-48 gap-3">
+              <Loader2 size={24} className="animate-spin text-amber-500" />
+              <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Fetching live data from AWS...</span>
+            </div>
+          )}
+
+          {!awsLoading && awsError && !awsCosts && (
+            <div className={`${cardClass} text-center py-12`}>
+              <CloudOff size={48} className="mx-auto text-amber-500 mb-4" />
+              <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>AWS Connection</h3>
+              <p className="text-sm text-slate-400 mb-2">{awsError}</p>
+              <p className="text-xs text-slate-500">AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) must be set as Supabase Edge Function secrets with Cost Explorer read access (ce:GetCostAndUsage).</p>
+            </div>
+          )}
+
+          {!awsLoading && awsCosts && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                {[
+                  { label: 'AWS Total (Period)', value: awsCosts.total, prefix: '$', icon: Cloud, color: 'amber' },
+                  { label: 'Latest Month', value: awsCosts.monthly.length > 0 ? awsCosts.monthly[awsCosts.monthly.length - 1].total : 0, prefix: '$', icon: DollarSign, color: 'sky' },
+                  { label: 'AWS Services', value: awsCosts.topServices.length, icon: Server, color: 'emerald' },
+                  { label: 'Period', value: `${awsCosts.period.start.slice(0, 7)} to ${awsCosts.period.end.slice(0, 7)}`, icon: Calendar, color: 'cyan' },
+                ].map(card => {
+                  const cMap: Record<string, string> = {
+                    amber: 'from-amber-500/20 to-amber-700/20 border-amber-500/30',
+                    sky: 'from-sky-500/20 to-sky-700/20 border-sky-500/30',
+                    emerald: 'from-emerald-500/20 to-emerald-700/20 border-emerald-500/30',
+                    cyan: 'from-cyan-500/20 to-cyan-700/20 border-cyan-500/30',
+                  };
+                  return (
+                    <div key={card.label} className={`rounded-2xl border p-5 bg-gradient-to-br ${cMap[card.color]} transition-all`}>
+                      <card.icon size={16} className="text-slate-400 mb-2" />
+                      <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {card.prefix || ''}{typeof card.value === 'number' ? card.value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : card.value}
+                      </p>
+                      <p className="text-xs text-slate-400">{card.label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={cardClass}>
+                  <h3 className={headingClass}>
+                    <Cloud size={18} className="inline mr-2 text-amber-500" />
+                    AWS Monthly Costs (Live)
+                  </h3>
+                  <div className="h-[280px]">
+                    <Bar
+                      data={{
+                        labels: awsCosts.monthly.map(m => {
+                          const [y, mo] = m.month.split('-');
+                          return new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString('en-AU', { month: 'short', year: '2-digit' });
+                        }),
+                        datasets: [{
+                          label: 'AWS Cost',
+                          data: awsCosts.monthly.map(m => m.total),
+                          backgroundColor: '#f59e0b',
+                          borderRadius: 6,
+                        }],
+                      }}
+                      options={{
+                        ...commonChartOptions,
+                        scales: { ...commonChartOptions.scales, y: { ...commonChartOptions.scales.y, stacked: false } },
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className={cardClass}>
+                  <h3 className={headingClass}>
+                    <Server size={18} className="inline mr-2 text-emerald-500" />
+                    AWS Service Breakdown
+                  </h3>
+                  <div className="space-y-3 max-h-[280px] overflow-y-auto">
+                    {awsCosts.topServices.map((svc, idx) => {
+                      const pct = awsCosts.total > 0 ? (svc.cost / awsCosts.total) * 100 : 0;
+                      return (
+                        <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                          <div className="flex-1 min-w-0 mr-4">
+                            <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{svc.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
+                                <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.min(100, pct)}%` }} />
+                              </div>
+                              <span className="text-[10px] text-slate-400 w-10 text-right">{pct.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                          <span className="text-sm font-bold text-amber-400">${svc.cost.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                    {awsCosts.topServices.length === 0 && (
+                      <p className="text-sm text-slate-500 text-center py-8">No AWS service costs found</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!awsLoading && amplifyInfo && (
+            <div className={cardClass}>
+              <h3 className={headingClass}>
+                <Cloud size={18} className="inline mr-2 text-amber-500" />
+                AWS Amplify App Info
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-[10px] text-slate-400 uppercase">App Name</p>
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{amplifyInfo.name || 'N/A'}</p>
+                </div>
+                <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-[10px] text-slate-400 uppercase">App ID</p>
+                  <p className={`text-sm font-mono ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{amplifyInfo.appId || 'N/A'}</p>
+                </div>
+                <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-[10px] text-slate-400 uppercase">Production Branch</p>
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{amplifyInfo.productionBranch || 'N/A'}</p>
+                </div>
+                <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700/40 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-[10px] text-slate-400 uppercase">Default Domain</p>
+                  <p className={`text-sm font-mono truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{amplifyInfo.defaultDomain || 'N/A'}</p>
+                </div>
+              </div>
+              {amplifyInfo.branches.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className={`text-left text-xs font-medium uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                        <th className="pb-3 pr-4">Branch</th>
+                        <th className="pb-3 pr-4">Stage</th>
+                        <th className="pb-3 pr-4">Status</th>
+                        <th className="pb-3 text-right">Last Deploy</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
+                      {amplifyInfo.branches.map((b, i) => (
+                        <tr key={i} className={`${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'} transition-colors`}>
+                          <td className={`py-2.5 pr-4 text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{b.branchName}</td>
+                          <td className="py-2.5 pr-4">
+                            <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${b.stage === 'PRODUCTION' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-sky-500/20 text-sky-400'}`}>
+                              {b.stage}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            <span className={`inline-flex items-center gap-1 text-xs ${b.status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                              <div className={`w-1.5 h-1.5 rounded-full ${b.status === 'active' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                              {b.status}
+                            </span>
+                          </td>
+                          <td className={`py-2.5 text-right text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {b.lastDeployTime ? new Date(b.lastDeployTime).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -508,7 +911,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
           </h3>
           <p className="text-xs text-slate-400 mb-4">
             Costs are allocated proportionally based on each club's member count relative to total platform members.
-            Current month total: ${(currentMonth?.total || 0).toFixed(2)} USD
+            Current month total: ${((currentMonth?.total || 0) + awsMonthlyTotal).toFixed(2)} USD
           </p>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -562,9 +965,9 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { label: 'Avg Monthly Cost', value: avgMonthly, icon: DollarSign },
-              { label: '6-Month Forecast', value: avgMonthly * 6 + (growthRate * 21), icon: TrendingUp },
-              { label: '12-Month Forecast', value: avgMonthly * 12 + (growthRate * 78), icon: Calendar },
+              { label: 'Avg Monthly Cost', value: effectiveAvg, icon: DollarSign },
+              { label: '6-Month Forecast', value: effectiveAvg * 6 + (growthRate * 21), icon: TrendingUp },
+              { label: '12-Month Forecast', value: effectiveAvg * 12 + (growthRate * 78), icon: Calendar },
             ].map(card => (
               <div key={card.label} className="rounded-2xl border p-5 backdrop-blur-sm bg-gradient-to-br from-sky-500/15 to-cyan-600/15 border-sky-500/30">
                 <div className="flex items-center gap-2 mb-2">
@@ -601,7 +1004,8 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
             <div className="space-y-3">
               {[
                 { label: 'Supabase Database', current: dbMetrics.totalSizeMb, limit: 8000, unit: 'MB', threshold: 0.75 },
-                { label: 'Monthly Spend', current: currentMonth?.total || 0, limit: 500, unit: 'USD', threshold: 0.8 },
+                { label: 'Supabase Storage', current: dbMetrics.storageSizeMb, limit: 1000, unit: 'MB', threshold: 0.75 },
+                { label: 'Monthly Spend', current: (currentMonth?.total || 0) + awsMonthlyTotal, limit: 500, unit: 'USD', threshold: 0.8 },
               ].map(alert => {
                 const usage = alert.limit > 0 ? alert.current / alert.limit : 0;
                 const status = usage >= 0.9 ? 'critical' : usage >= alert.threshold ? 'warn' : 'ok';
