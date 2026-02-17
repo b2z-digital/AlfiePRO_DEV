@@ -263,8 +263,12 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
       });
       const data = await res.json();
       setCompressionResult(data);
+      if (data.processed > 0) {
+        loadData();
+      }
     } catch (err) {
       console.error('Compression error:', err);
+      setCompressionResult({ error: 'Network error - compression request failed', processed: 0, skipped: 0, errors: 1, totalSavedMB: '0.00', files: [] });
     } finally {
       setCompressing(false);
     }
@@ -795,25 +799,78 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
             )}
 
             {compressionResult && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-emerald-400">Saved: <strong>{compressionResult.totalSavedMB} MB</strong></span>
-                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Processed: {compressionResult.processed}</span>
-                  <span className="text-slate-400">Skipped: {compressionResult.skipped}</span>
-                  {compressionResult.errors > 0 && <span className="text-red-400">Errors: {compressionResult.errors}</span>}
-                </div>
+              <div className="space-y-3">
+                {compressionResult.processed > 0 ? (
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle size={18} className="text-emerald-400" />
+                      <span className={`text-sm font-semibold ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                        Compression Complete
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400">Files Compressed</p>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{compressionResult.processed}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400">Space Saved</p>
+                        <p className="text-lg font-bold text-emerald-400">
+                          {parseFloat(compressionResult.totalSavedMB) >= 1 ? `${compressionResult.totalSavedMB} MB` : `${compressionResult.totalSavedKB || '0'} KB`}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400">Avg Reduction</p>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{compressionResult.avgReduction || 0}%</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400">Skipped / Errors</p>
+                        <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          {compressionResult.skipped} / {compressionResult.errors > 0 ? <span className="text-red-400">{compressionResult.errors}</span> : '0'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : compressionResult.error ? (
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-red-500/10 border-red-500/25' : 'bg-red-50 border-red-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={18} className="text-red-400" />
+                      <span className={`text-sm font-semibold ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                        Compression Failed
+                      </span>
+                    </div>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-red-300/70' : 'text-red-600'}`}>{compressionResult.error}</p>
+                  </div>
+                ) : (
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-sky-500/10 border-sky-500/25' : 'bg-sky-50 border-sky-200'}`}>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className="text-sky-400" />
+                      <span className={`text-sm font-semibold ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>
+                        No images needed compression
+                      </span>
+                    </div>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {compressionResult.skipped} images were already optimised or below the 100 KB threshold.
+                      {compressionResult.errors > 0 && ` ${compressionResult.errors} file(s) had errors.`}
+                    </p>
+                  </div>
+                )}
+
                 {compressionResult.errorDetails?.length > 0 && (
                   <div className={`text-xs p-3 rounded-lg max-h-32 overflow-y-auto ${darkMode ? 'bg-red-500/10 border border-red-500/20 text-red-300' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                    <p className="font-semibold mb-1">Error Details:</p>
                     {compressionResult.errorDetails.map((err: string, i: number) => (
                       <div key={i} className="py-0.5">{err}</div>
                     ))}
                   </div>
                 )}
+
                 {compressionResult.files?.length > 0 && (
-                  <div className={`max-h-48 overflow-y-auto rounded-lg border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                  <div className={`max-h-56 overflow-y-auto rounded-lg border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
                     <table className="w-full text-xs">
-                      <thead>
-                        <tr className={`text-left uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                      <thead className="sticky top-0">
+                        <tr className={`text-left uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+                          <th className="p-2">Bucket</th>
                           <th className="p-2">File</th>
                           <th className="p-2 text-right">Original</th>
                           <th className="p-2 text-right">Compressed</th>
@@ -822,11 +879,12 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                       </thead>
                       <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
                         {compressionResult.files.map((f: any, i: number) => (
-                          <tr key={i}>
+                          <tr key={i} className={`${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'}`}>
+                            <td className={`p-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{f.bucket}</td>
                             <td className={`p-2 truncate max-w-[200px] ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{f.file}</td>
                             <td className="p-2 text-right text-slate-400">{f.originalKB} KB</td>
                             <td className="p-2 text-right text-slate-400">{f.compressedKB} KB</td>
-                            <td className="p-2 text-right text-emerald-400">-{f.reductionPercent}%</td>
+                            <td className="p-2 text-right text-emerald-400 font-medium">-{f.reductionPercent}%</td>
                           </tr>
                         ))}
                       </tbody>

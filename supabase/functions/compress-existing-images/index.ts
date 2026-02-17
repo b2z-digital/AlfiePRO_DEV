@@ -10,8 +10,9 @@ const corsHeaders = {
 };
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "bmp"]);
+const SKIP_BUCKETS = new Set(["backups", "race-documents", "event-documents"]);
 
-const MIN_SIZE_BYTES = 800 * 1024;
+const MIN_SIZE_BYTES = 100 * 1024;
 const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 80;
 
@@ -77,6 +78,14 @@ async function listAllFiles(
   return allFiles;
 }
 
+async function getAllBucketNames(supabase: any): Promise<string[]> {
+  const { data, error } = await supabase.storage.listBuckets();
+  if (error || !data) return [];
+  return data
+    .map((b: any) => b.name)
+    .filter((name: string) => !SKIP_BUCKETS.has(name));
+}
+
 function isCompressibleImage(fileName: string): boolean {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   return IMAGE_EXTENSIONS.has(ext);
@@ -132,16 +141,12 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || "preview";
-    const buckets: string[] = body.buckets || [
-      "media",
-      "event-media",
-      "ad-banners",
-      "boat-classes",
-      "user-avatars",
-      "avatars",
-      "article-images",
-    ];
     const maxFiles = body.maxFiles || 50;
+
+    const buckets: string[] =
+      body.buckets && body.buckets.length > 0
+        ? body.buckets
+        : await getAllBucketNames(supabase);
 
     if (action === "preview") {
       const results = [];
@@ -153,9 +158,11 @@ Deno.serve(async (req: Request) => {
           const allFiles = await listAllFiles(supabase, bucket, "");
           let bucketOriginal = 0;
           let bucketCompressible = 0;
+          let imageCount = 0;
 
           for (const file of allFiles) {
             if (!isCompressibleImage(file.name)) continue;
+            imageCount++;
             const size = file.metadata?.size || 0;
             bucketOriginal += size;
             if (size > MIN_SIZE_BYTES) {
@@ -168,8 +175,7 @@ Deno.serve(async (req: Request) => {
 
           results.push({
             bucket,
-            totalImages: allFiles.filter((f) => isCompressibleImage(f.name))
-              .length,
+            totalImages: imageCount,
             compressibleImages: bucketCompressible,
             totalSizeMB: (bucketOriginal / (1024 * 1024)).toFixed(2),
           });
@@ -190,6 +196,7 @@ Deno.serve(async (req: Request) => {
           buckets: results,
           totalOriginalMB: (totalOriginal / (1024 * 1024)).toFixed(2),
           compressibleImages: compressibleCount,
+          minSizeKB: Math.round(MIN_SIZE_BYTES / 1024),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -198,6 +205,7 @@ Deno.serve(async (req: Request) => {
     if (action === "compress") {
       const fileResults: any[] = [];
       let totalSaved = 0;
+      let totalOriginalBytes = 0;
       let processedCount = 0;
       let skippedCount = 0;
       let errorCount = 0;
@@ -284,6 +292,7 @@ Deno.serve(async (req: Request) => {
 
             const saved = size - result.compressed.byteLength;
             totalSaved += saved;
+            totalOriginalBytes += size;
             processedCount++;
 
             fileResults.push({
@@ -310,6 +319,12 @@ Deno.serve(async (req: Request) => {
           skipped: skippedCount,
           errors: errorCount,
           totalSavedMB: (totalSaved / (1024 * 1024)).toFixed(2),
+          totalSavedKB: (totalSaved / 1024).toFixed(1),
+          totalOriginalMB: (totalOriginalBytes / (1024 * 1024)).toFixed(2),
+          avgReduction:
+            totalOriginalBytes > 0
+              ? ((totalSaved / totalOriginalBytes) * 100).toFixed(0)
+              : "0",
           files: fileResults,
           errorDetails: errors.slice(0, 20),
         }),
