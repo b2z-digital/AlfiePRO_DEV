@@ -26,6 +26,7 @@ import { HeatManagement, HeatResult, HeatDesignation } from '../types/heat';
 import { HeatScoringTable } from './HeatScoringTable';
 import { updateHeatResult, completeHeat, convertHeatResultsToRaceResults, clearHeatRaceResults } from '../utils/heatUtils';
 import { HMSConfig } from '../utils/hmsHeatSystem';
+import { seedSHRSHeatsByIndex, generateAllSHRSQualifyingRoundAssignments } from '../utils/shrsHeatSystem';
 import { SingleEventManagement } from './SingleEventManagement';
 import { TouchModeScoring } from './TouchModeScoring';
 import { calculateHandicaps } from '../utils/handicapCalculator';
@@ -493,11 +494,53 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
           if (storedSkipperCount === skippers.length) {
-            setHeatManagement(currentEvent.heatManagement);
+            let loadedHM = currentEvent.heatManagement;
+
+            // Auto-correct unbalanced SHRS heats from old seeding algorithm
+            if (loadedHM.configuration.scoringSystem === 'shrs') {
+              const hasResults = loadedHM.rounds.some(r => r.results && r.results.length > 0);
+              if (!hasResults) {
+                const sizes = loadedHM.rounds[0]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+                const maxS = Math.max(...sizes);
+                const minS = Math.min(...sizes);
+                if (sizes.length > 0 && maxS - minS > 1) {
+                  console.log('Auto-correcting unbalanced SHRS heats:', sizes.join(', '));
+                  const numHeats = loadedHM.configuration.numberOfHeats;
+                  const qRounds = loadedHM.configuration.shrsQualifyingRounds || 1;
+                  const newAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
+
+                  let newRounds;
+                  if (qRounds > 1) {
+                    const allQR = generateAllSHRSQualifyingRoundAssignments(newAssignments, numHeats, qRounds);
+                    newRounds = allQR.map((ra, idx) => ({
+                      round: idx + 1,
+                      heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
+                      results: [] as any[],
+                      completed: false
+                    }));
+                  } else {
+                    newRounds = [{ round: 1, heatAssignments: newAssignments.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })), results: [] as any[], completed: false }];
+                  }
+
+                  loadedHM = { ...loadedHM, rounds: newRounds };
+                  console.log('Corrected SHRS heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
+
+                  // Persist corrected assignments
+                  const eventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
+                  if (eventId) {
+                    supabase.from('quick_races').update({ heat_management: loadedHM }).eq('id', eventId).then(() => {
+                      console.log('Saved corrected SHRS heat assignments to database');
+                    });
+                  }
+                }
+              }
+            }
+
+            setHeatManagement(loadedHM);
 
             // Also load the drop rules from heat management configuration
-            if (currentEvent.heatManagement.configuration.scoringSystem) {
-              setCurrentDropRules(currentEvent.heatManagement.configuration.scoringSystem);
+            if (loadedHM.configuration.scoringSystem) {
+              setCurrentDropRules(loadedHM.configuration.scoringSystem);
             }
           } else {
             console.warn(`⚠️ Event heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
