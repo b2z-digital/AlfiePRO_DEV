@@ -31,21 +31,23 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const userClient = createClient(
-      supabaseUrl,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: authError,
-    } = await userClient.auth.getUser();
+    } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: authError?.message || "Invalid token" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
+
+    const isSuperAdminFromMetadata =
+      user.user_metadata?.is_super_admin === true;
 
     const { data: roleCheck } = await supabase
       .from("user_clubs")
@@ -54,7 +56,7 @@ Deno.serve(async (req: Request) => {
       .eq("role", "super_admin")
       .maybeSingle();
 
-    if (!roleCheck) {
+    if (!isSuperAdminFromMetadata && !roleCheck) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
