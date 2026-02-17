@@ -57,6 +57,24 @@ function getCountryFlagText(countryCode: string | undefined | null): string {
   return String.fromCodePoint(...codePoints);
 }
 
+function drawSailIcon(doc: jsPDF, x: number, y: number, w: number, h: number) {
+  doc.setFillColor(0, 102, 180);
+  doc.triangle(
+    x + w * 0.72, y,
+    x + w * 0.2, y + h,
+    x + w, y + h,
+    'F'
+  );
+
+  doc.setFillColor(1, 162, 233);
+  doc.triangle(
+    x + w * 0.35, y + h * 0.17,
+    x, y + h * 0.9,
+    x + w * 0.55, y + h * 0.82,
+    'F'
+  );
+}
+
 function renderRoundPage(
   doc: jsPDF,
   round: { round: number; heatAssignments: HeatAssignment[] },
@@ -144,13 +162,16 @@ function renderRoundPage(
 
     let rowY = y + headerHeight + 1;
 
+    const sailNumX = xStart + 2;
+    const nameX = xStart + (showCountry ? 22 : 16);
+
     heatSkippers.forEach((skipper, i) => {
       if (i % 2 === 0) {
         doc.setFillColor(248, 250, 252);
         doc.rect(xStart, rowY - 0.5, colWidth, rowHeight, 'F');
       }
 
-      let xCursor = xStart + 2;
+      let xCursor = sailNumX;
 
       if (showCountry && skipper.country_code) {
         const iocCode = getIOCCode(skipper.country_code);
@@ -158,16 +179,13 @@ function renderRoundPage(
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(100, 116, 139);
         doc.text(iocCode, xCursor, rowY + 2.2);
-        xCursor += doc.getTextWidth(iocCode) + 1.5;
+        xCursor += 6;
       }
 
       doc.setFontSize(fontSize);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(30, 41, 59);
       doc.text(String(skipper.sailNo || ''), xCursor, rowY + 2.2);
-
-      const sailWidth = doc.getTextWidth(String(skipper.sailNo || ''));
-      let nameX = xCursor + sailWidth + 3;
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(50, 60, 70);
@@ -206,42 +224,65 @@ function renderRoundPage(
       doc.text(`Observers (${heatObservers.length})`, xStart + colWidth / 2, obsY + 2, { align: 'center' });
       obsY += 6.5;
 
+      const obsSailX = xStart + 4;
+      const obsNameX = xStart + (showCountry ? 20 : 14);
+
       doc.setFontSize(6);
       heatObservers.forEach(obs => {
-        let obsCursor = xStart + 4;
+        let obsCursor = obsSailX;
 
         if (showCountry && obs.countryCode) {
           const obsIoc = getIOCCode(obs.countryCode);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(100, 116, 139);
           doc.text(obsIoc, obsCursor, obsY);
-          obsCursor += doc.getTextWidth(obsIoc) + 1;
+          obsCursor += 6;
         }
 
         if (obs.sailNumber) {
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(100, 116, 139);
           doc.text(obs.sailNumber, obsCursor, obsY);
-          obsCursor += doc.getTextWidth(obs.sailNumber) + 2;
         }
 
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(50, 60, 70);
-        doc.text(obs.skipperName, obsCursor, obsY);
+        doc.text(obs.skipperName, obsNameX, obsY);
         obsY += 3.5;
       });
     }
   });
 
+  const footerY = pageHeight - 6;
+  const footerText = `${config.scoringSystem?.toUpperCase()} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`;
+
   doc.setFontSize(6);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(160, 170, 180);
-  doc.text(
-    `${config.scoringSystem?.toUpperCase()} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`,
-    pageWidth / 2,
-    pageHeight - 6,
-    { align: 'center' }
-  );
+
+  const footerTextWidth = doc.getTextWidth(footerText);
+  const alfieTextWidth = 18;
+  const iconWidth = 3;
+  const totalFooterWidth = iconWidth + 1 + alfieTextWidth + 6 + footerTextWidth;
+  const footerStartX = (pageWidth - totalFooterWidth) / 2;
+
+  drawSailIcon(doc, footerStartX, footerY - 3, 3, 4.5);
+
+  const brandX = footerStartX + iconWidth + 1;
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50, 60, 70);
+  doc.text('Alfie', brandX, footerY);
+  const alfieW = doc.getTextWidth('Alfie');
+  doc.setFont('helvetica', 'bold');
+  doc.text('PRO', brandX + alfieW, footerY);
+  const proW = doc.getTextWidth('PRO');
+
+  const separatorX = brandX + alfieW + proW + 3;
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(160, 170, 180);
+  doc.text(`•  ${footerText}`, separatorX, footerY);
 }
 
 export function exportSingleRoundPdf(
