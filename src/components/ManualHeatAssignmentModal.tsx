@@ -79,17 +79,21 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
     const allSkipperIndices = skippers.map((_, idx) => idx);
     const shuffled = [...allSkipperIndices].sort(() => Math.random() - 0.5);
 
-    // Calculate base size and remainder
     const baseSize = Math.floor(shuffled.length / numHeats);
     const remainder = shuffled.length % numHeats;
 
-    // Assign skippers to heats, with Heat A (last in array) getting the extras
-    let skipperIdx = 0;
-    const newAssignments = availableHeats.map((heat, heatIdx) => {
-      // Heat A is at the end of availableHeats array and should get extra boats
-      const isHeatA = heatIdx === availableHeats.length - 1;
-      const heatSize = isHeatA ? baseSize + remainder : baseSize;
+    // Sort heats so A comes first for size calculation
+    const sortedHeats = [...availableHeats].sort();
 
+    // First N heats (A, B, C...) get baseSize + 1, rest get baseSize
+    const heatSizes = new Map<HeatDesignation, number>();
+    sortedHeats.forEach((heat, i) => {
+      heatSizes.set(heat, baseSize + (i < remainder ? 1 : 0));
+    });
+
+    let skipperIdx = 0;
+    const newAssignments = availableHeats.map((heat) => {
+      const heatSize = heatSizes.get(heat) || baseSize;
       const skipperIndices = shuffled.slice(skipperIdx, skipperIdx + heatSize);
       skipperIdx += heatSize;
 

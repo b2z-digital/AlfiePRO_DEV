@@ -139,23 +139,37 @@ export function seedInitialHeatsForSHRS(
     sortedSkippers.sort((a, b) => compareSailNumbers(a.sailNo || a.sailNumber || '', b.sailNo || b.sailNumber || ''));
   }
 
-  let currentHeat = 1;
-  let direction = 1;
+  const baseSize = Math.floor(sortedSkippers.length / numberOfHeats);
+  const extras = sortedSkippers.length % numberOfHeats;
+  const targetSizes = Array.from({ length: numberOfHeats }, (_, i) =>
+    baseSize + (i < extras ? 1 : 0)
+  );
+
+  // Snake pattern: 1,2,3,3,2,1,1,2,3...
+  let pos = 1;
+  let dir = 1;
+  const filled = Array.from({ length: numberOfHeats + 1 }, () => 0);
 
   for (const skipper of sortedSkippers) {
-    heats.get(currentHeat)!.push(skipper);
-    if (direction === 1) {
-      currentHeat++;
-      if (currentHeat > numberOfHeats) {
-        currentHeat = numberOfHeats;
-        direction = -1;
+    let heatIdx = pos;
+    if (filled[heatIdx] >= targetSizes[heatIdx - 1]) {
+      for (let j = 1; j <= numberOfHeats; j++) {
+        if (filled[j] < targetSizes[j - 1]) {
+          heatIdx = j;
+          break;
+        }
       }
-    } else {
-      currentHeat--;
-      if (currentHeat < 1) {
-        currentHeat = 1;
-        direction = 1;
-      }
+    }
+    heats.get(heatIdx)!.push(skipper);
+    filled[heatIdx]++;
+
+    pos += dir;
+    if (pos > numberOfHeats) {
+      pos = numberOfHeats;
+      dir = -1;
+    } else if (pos < 1) {
+      pos = 1;
+      dir = 1;
     }
   }
 
@@ -377,10 +391,11 @@ export function generateAllSHRSQualifyingRoundAssignments(
 
 /**
  * SHRS Initial Seeding - Index Based
- * Returns heat assignments as arrays of skipper indices (positions in the original skippers array).
- * Sorts skippers by sail number, then distributes using SHRS snake pattern: 1,2,3,3,2,1,1,2,3...
- * This ensures even distribution with top skippers spread across heats.
- * Example: 50 skippers, 3 heats -> [17, 17, 16] (pattern: A,B,C,C,B,A,A,B,C...)
+ * Sorts skippers by sail number, then distributes using SHRS snake pattern.
+ * Explicitly calculates exact heat sizes first, then fills using snake order.
+ * First heats (A, B...) get any extra skippers beyond the base size.
+ * Example: 50 skippers, 3 heats -> [17, 17, 16]
+ * Example: 50 skippers, 4 heats -> [13, 13, 12, 12]
  */
 export function seedSHRSHeatsByIndex(
   skippers: Skipper[],
@@ -388,7 +403,6 @@ export function seedSHRSHeatsByIndex(
 ): { heatDesignation: string; skipperIndices: number[] }[] {
   const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-  // Sort skippers by sail number
   const sortedIndices = skippers
     .map((_, i) => i)
     .sort((a, b) => compareSailNumbers(
@@ -396,27 +410,54 @@ export function seedSHRSHeatsByIndex(
       skippers[b].sailNo || skippers[b].sailNumber || ''
     ));
 
+  const baseSize = Math.floor(sortedIndices.length / numberOfHeats);
+  const extras = sortedIndices.length % numberOfHeats;
+  const targetSizes = Array.from({ length: numberOfHeats }, (_, i) =>
+    baseSize + (i < extras ? 1 : 0)
+  );
+
   const heatBuckets: number[][] = Array.from({ length: numberOfHeats }, () => []);
 
-  // SHRS snake pattern distribution: 1,2,3,3,2,1,1,2,3,3,2,1...
-  let currentHeat = 0;
-  let direction = 1; // 1 = forward, -1 = backward
-
-  for (const idx of sortedIndices) {
-    heatBuckets[currentHeat].push(idx);
-
-    // Move to next heat in current direction
-    currentHeat += direction;
-
-    // Reverse direction at boundaries
-    if (currentHeat >= numberOfHeats) {
-      currentHeat = numberOfHeats - 1; // Stay at last heat
-      direction = -1; // Reverse direction
-    } else if (currentHeat < 0) {
-      currentHeat = 0; // Stay at first heat
-      direction = 1; // Reverse direction
+  // Build snake-order sequence: A,B,C,C,B,A,A,B,C...
+  const snakeOrder: number[] = [];
+  let pos = 0;
+  let dir = 1;
+  for (let i = 0; i < sortedIndices.length; i++) {
+    snakeOrder.push(pos);
+    pos += dir;
+    if (pos >= numberOfHeats) {
+      pos = numberOfHeats - 1;
+      dir = -1;
+    } else if (pos < 0) {
+      pos = 0;
+      dir = 1;
     }
   }
+
+  // Count how many skippers each heat gets in the snake order
+  const snakeCounts = Array.from({ length: numberOfHeats }, () => 0);
+  for (const h of snakeOrder) {
+    snakeCounts[h]++;
+  }
+
+  // Assign skippers using snake order, but enforce exact target sizes
+  const filled = Array.from({ length: numberOfHeats }, () => 0);
+  for (let i = 0; i < sortedIndices.length; i++) {
+    let heatIdx = snakeOrder[i];
+    if (filled[heatIdx] >= targetSizes[heatIdx]) {
+      // This heat is full, find next available heat
+      for (let j = 0; j < numberOfHeats; j++) {
+        if (filled[j] < targetSizes[j]) {
+          heatIdx = j;
+          break;
+        }
+      }
+    }
+    heatBuckets[heatIdx].push(sortedIndices[i]);
+    filled[heatIdx]++;
+  }
+
+  console.log('SHRS seeding:', sortedIndices.length, 'skippers into', numberOfHeats, 'heats. Sizes:', heatBuckets.map(b => b.length).join(', '));
 
   return heatBuckets.map((indices, i) => ({
     heatDesignation: heatLabels[i],
