@@ -310,10 +310,13 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   useEffect(() => {
     if (initialHeatManagement?.configuration) {
       const config = initialHeatManagement.configuration;
-      // Determine assignment type based on configuration
-      // If it's manual and was seeded (not random), assume it could be HMS seeding
-      // For now, we'll default to manual for any non-random seeding
-      setInitialAssignment(config.seedingMethod === 'random' ? 'random' : 'manual');
+      if (config.seedingMethod === 'random') {
+        setInitialAssignment('random');
+      } else if (config.seedingMethod === 'ranking') {
+        setInitialAssignment('hms');
+      } else {
+        setInitialAssignment('manual');
+      }
     }
   }, [initialHeatManagement]);
 
@@ -351,7 +354,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       // Validate configuration
-      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : 'manual';
+      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : initialAssignment === 'hms' ? 'ranking' : 'manual';
       const config: HMSConfig = {
         numberOfHeats: numHeats,
         promotionCount,
@@ -566,7 +569,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
     if (isHeatRacingEnabled) {
       // Validate configuration
-      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : 'manual';
+      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : initialAssignment === 'hms' ? 'ranking' : 'manual';
       console.log('🎯 numHeats being used:', numHeats, '(manualHeatCount:', manualHeatCount, ', recommended:', optimalHeats.numberOfHeats, ')');
       console.log('🎯 promotionCount being used:', promotionCount, '(manualPromotionCount:', manualPromotionCount, ')');
       console.log('🎯 Scoring system:', currentDropRules);
@@ -620,16 +623,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       if (currentHeatManagement) {
-        if (initialAssignment === 'manual') {
-          setShowManualAssignmentModal(true);
-          return;
-        }
-
-        if (initialAssignment === 'hms') {
-          setShowHMSSeedingModal(true);
-          return;
-        }
-
         const actualHeatCount = currentHeatManagement.rounds[0]?.heatAssignments?.length || 0;
         const heatCountChanged = actualHeatCount !== numHeats;
         const hasAnyRoundResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
@@ -668,7 +661,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         });
 
         if (shouldRegenerate) {
-          // Regenerate heats when count changes (especially when reducing)
+          if (initialAssignment === 'manual') {
+            setShowManualAssignmentModal(true);
+            return;
+          }
+          if (initialAssignment === 'hms') {
+            setShowHMSSeedingModal(true);
+            return;
+          }
+
           if (hasAnyRoundResults) {
             console.log('⚠️ Regenerating heats will clear existing results!');
           }

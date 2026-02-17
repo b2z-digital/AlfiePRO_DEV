@@ -1048,7 +1048,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               >
                 View Assignments
               </button>
-              {heatManagement.configuration.scoringSystem === 'shrs' && heatManagement.rounds.length > 1 && (
+              {heatManagement.configuration.scoringSystem === 'shrs' && (
                 <button
                   onClick={() => {
                     exportAllRoundsPdf(heatManagement, skippers, {

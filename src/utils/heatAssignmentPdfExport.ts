@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { HeatManagement, HeatAssignment, HeatConfiguration, getSHRSRoundLabel, getSHRSHeatLabel, getSHRSPhase } from '../types/heat';
 import { Skipper } from '../types';
 
@@ -13,7 +12,6 @@ interface ExportOptions {
   eventDate?: string;
   venueName?: string;
   clubName?: string;
-  observersByRoundAndHeat?: Map<string, ObserverInfo[]>;
 }
 
 const HEAT_COLORS: Record<string, [number, number, number]> = {
@@ -48,157 +46,142 @@ function renderRoundPage(
   observers?: Map<string, ObserverInfo[]>
 ) {
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 14;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
   let y = margin;
 
   const roundLabel = getSHRSRoundLabel(round.round, config);
   const phase = getSHRSPhase(round.round, config);
   const phaseLabel = phase === 'finals' ? 'Finals Series' : 'Qualifying Series';
 
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59);
-  const title = options.eventName || 'Heat Assignments';
-  doc.text(title, pageWidth / 2, y, { align: 'center' });
-  y += 7;
+  doc.text(options.eventName || 'Heat Assignments', pageWidth / 2, y, { align: 'center' });
+  y += 5.5;
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139);
   const subtitleParts: string[] = [];
   if (options.clubName) subtitleParts.push(options.clubName);
   if (options.venueName) subtitleParts.push(options.venueName);
   if (options.eventDate) subtitleParts.push(formatDate(options.eventDate));
   if (subtitleParts.length > 0) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
     doc.text(subtitleParts.join('  |  '), pageWidth / 2, y, { align: 'center' });
-    y += 6;
+    y += 5;
   }
 
-  doc.setFontSize(13);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59);
-  const roundTitle = `${roundLabel} - ${config.scoringSystem?.toUpperCase() || 'SHRS'} Heat Assignments`;
-  doc.text(roundTitle, pageWidth / 2, y, { align: 'center' });
-  y += 5;
+  doc.text(`${roundLabel} - ${config.scoringSystem?.toUpperCase() || 'SHRS'} Heat Assignments`, pageWidth / 2, y, { align: 'center' });
+  y += 4;
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(`${phaseLabel}  •  ${round.heatAssignments.length} heats`, pageWidth / 2, y, { align: 'center' });
-  y += 8;
+  const totalSkippers = round.heatAssignments.reduce((sum, a) => sum + a.skipperIndices.length, 0);
+  doc.text(`${phaseLabel}  •  ${round.heatAssignments.length} heats  •  ${totalSkippers} skippers`, pageWidth / 2, y, { align: 'center' });
+  y += 4;
 
   doc.setDrawColor(200, 210, 220);
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(0.3);
   doc.line(margin, y, pageWidth - margin, y);
-  y += 6;
+  y += 4;
 
   const sortedAssignments = [...round.heatAssignments].sort((a, b) =>
     a.heatDesignation.localeCompare(b.heatDesignation)
   );
 
   const numHeats = sortedAssignments.length;
-  const colWidth = (pageWidth - margin * 2 - (numHeats - 1) * 4) / numHeats;
+  const colGap = 3;
+  const colWidth = (pageWidth - margin * 2 - (numHeats - 1) * colGap) / numHeats;
+  const headerHeight = 5.5;
+  const rowHeight = 3.8;
+  const fontSize = 6.5;
+  const headerFontSize = 8;
 
   sortedAssignments.forEach((assignment, heatIdx) => {
     const heatLabel = phase === 'finals'
       ? getSHRSHeatLabel(assignment.heatDesignation, round.round, config)
       : `Heat ${assignment.heatDesignation}`;
-
     const color = getHeatColor(assignment.heatDesignation);
-    const xStart = margin + heatIdx * (colWidth + 4);
+    const xStart = margin + heatIdx * (colWidth + colGap);
+    const heatSkippers = assignment.skipperIndices.map(idx => skippers[idx]).filter(Boolean);
 
-    const heatSkippers = assignment.skipperIndices
-      .map(idx => skippers[idx])
-      .filter(Boolean);
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.roundedRect(xStart, y, colWidth, headerHeight, 1, 1, 'F');
+    doc.setFontSize(headerFontSize);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(`${heatLabel}  (${heatSkippers.length})`, xStart + colWidth / 2, y + headerHeight / 2 + 1, { align: 'center' });
 
-    const tableData = heatSkippers.map((skipper, i) => [
-      String(i + 1),
-      String(skipper.sailNo || ''),
-      skipper.name || '',
-      skipper.club || ''
-    ]);
+    let rowY = y + headerHeight + 1;
 
-    autoTable(doc, {
-      startY: y,
-      margin: { left: xStart, right: pageWidth - xStart - colWidth },
-      tableWidth: colWidth,
-      head: [[
-        { content: `${heatLabel}  (${heatSkippers.length})`, colSpan: 4, styles: {
-          fillColor: color,
-          textColor: [255, 255, 255],
-          fontSize: 9,
-          fontStyle: 'bold',
-          halign: 'center',
-          cellPadding: 2.5,
-        }}
-      ]],
-      body: tableData,
-      columns: [
-        { header: '#', dataKey: '0' },
-        { header: 'Sail', dataKey: '1' },
-        { header: 'Skipper', dataKey: '2' },
-        { header: 'Club', dataKey: '3' },
-      ],
-      styles: {
-        fontSize: 7.5,
-        cellPadding: 1.5,
-        lineColor: [220, 225, 230],
-        lineWidth: 0.3,
-        textColor: [30, 41, 59],
-      },
-      headStyles: {
-        fillColor: color,
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        fontStyle: 'bold',
-      },
-      columnStyles: {
-        0: { cellWidth: colWidth * 0.08, halign: 'center', fontStyle: 'bold', textColor: [100, 116, 139] },
-        1: { cellWidth: colWidth * 0.15, halign: 'center', fontStyle: 'bold' },
-        2: { cellWidth: colWidth * 0.50 },
-        3: { cellWidth: colWidth * 0.27, fontSize: 7, textColor: [100, 116, 139] },
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      didDrawPage: () => {},
+    heatSkippers.forEach((skipper, i) => {
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(xStart, rowY - 0.5, colWidth, rowHeight, 'F');
+      }
+
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text(String(i + 1), xStart + 2, rowY + 2.2);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 41, 59);
+      doc.text(String(skipper.sailNo || ''), xStart + 8, rowY + 2.2);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(50, 60, 70);
+      const nameMaxW = colWidth * 0.52;
+      doc.text(skipper.name || '', xStart + 20, rowY + 2.2, { maxWidth: nameMaxW });
+
+      if (skipper.club) {
+        doc.setFontSize(5.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(skipper.club, xStart + colWidth - 2, rowY + 2.2, { align: 'right' });
+      }
+
+      rowY += rowHeight;
     });
+
+    doc.setDrawColor(220, 225, 230);
+    doc.setLineWidth(0.2);
+    doc.rect(xStart, y, colWidth, headerHeight + 1 + heatSkippers.length * rowHeight);
 
     const key = `${round.round}-${assignment.heatDesignation}`;
     const heatObservers = observers?.get(key);
     if (heatObservers && heatObservers.length > 0) {
-      const tableEndY = (doc as any).lastAutoTable?.finalY || y;
-      let obsY = tableEndY + 2;
-
-      doc.setFontSize(7);
+      let obsY = rowY + 1.5;
+      doc.setFontSize(5.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 116, 139);
       doc.text(`Observers (${heatObservers.length})`, xStart + 2, obsY);
-      obsY += 3;
+      obsY += 2.5;
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
       heatObservers.forEach(obs => {
-        doc.setTextColor(30, 41, 59);
-        doc.text(`${obs.skipperName}`, xStart + 4, obsY);
+        doc.setTextColor(50, 60, 70);
+        doc.text(obs.skipperName, xStart + 4, obsY);
         if (obs.sailNumber) {
           doc.setTextColor(100, 116, 139);
-          doc.text(`#${obs.sailNumber}`, xStart + colWidth - 4, obsY, { align: 'right' });
+          doc.text(`#${obs.sailNumber}`, xStart + colWidth - 2, obsY, { align: 'right' });
         }
-        obsY += 3;
+        obsY += 2.5;
       });
     }
   });
 
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setFontSize(7);
+  doc.setFontSize(6);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(160, 170, 180);
-  const totalSkippers = sortedAssignments.reduce((sum, a) => sum + a.skipperIndices.length, 0);
   doc.text(
-    `${totalSkippers} skippers  •  ${config.scoringSystem?.toUpperCase()} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`,
+    `${config.scoringSystem?.toUpperCase()} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`,
     pageWidth / 2,
-    pageHeight - 8,
+    pageHeight - 6,
     { align: 'center' }
   );
 }
@@ -215,7 +198,6 @@ export function exportSingleRoundPdf(
 
   const config = heatManagement.configuration;
   const roundLabel = getSHRSRoundLabel(round.round, config);
-
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   renderRoundPage(doc, round, config, skippers, options, observers);
