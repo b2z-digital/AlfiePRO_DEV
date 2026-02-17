@@ -141,15 +141,16 @@ export const EventWidgetSettingsModal: React.FC<Props> = ({ widget, websiteId, o
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(file, 'photo');
+
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `${websiteId}/${widget.id}_${key}_${Date.now()}.${fileExt}`;
       const filePath = `event-media/${fileName}`;
 
-      console.log('Uploading to:', filePath);
-
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, file, {
+        .upload(filePath, compressed, {
           cacheControl: '3600',
           upsert: true
         });

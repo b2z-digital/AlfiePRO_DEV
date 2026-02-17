@@ -166,9 +166,12 @@ export async function uploadBoatClassImage(
   file: File,
   path: string
 ): Promise<string> {
+  const { compressImage } = await import('./imageCompression');
+  const compressed = await compressImage(file, 'photo');
+
   const { data, error } = await supabase.storage
     .from('boat-classes')
-    .upload(path, file, {
+    .upload(path, compressed, {
       cacheControl: '3600',
       upsert: true
     });

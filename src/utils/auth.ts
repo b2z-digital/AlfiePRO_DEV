@@ -78,20 +78,20 @@ export const updateUserProfile = async (updates: { firstName?: string; lastName?
 
 export const uploadAvatar = async (file: File): Promise<string | null> => {
   try {
-    // Get current user
+    const { compressImage } = await import('./imageCompression');
+    const compressed = await compressImage(file, 'avatar');
+
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw userError;
     if (!user) throw new Error('User not found');
-    
-    // Create a unique file path
-    const fileExt = file.name.split('.').pop();
+
+    const fileExt = compressed.name.split('.').pop();
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
     const filePath = fileName;
-    
-    // Upload the file to Supabase Storage
+
     const { error: uploadError } = await supabase.storage
       .from('user-avatars')
-      .upload(filePath, file, {
+      .upload(filePath, compressed, {
         cacheControl: '3600',
         upsert: true
       });

@@ -223,6 +223,52 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [compressionPreview, setCompressionPreview] = useState<any>(null);
+  const [compressing, setCompressing] = useState(false);
+  const [compressionResult, setCompressionResult] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const runCompressionPreview = async () => {
+    setPreviewLoading(true);
+    setCompressionPreview(null);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compress-existing-images`;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview' }),
+      });
+      const data = await res.json();
+      setCompressionPreview(data);
+    } catch (err) {
+      console.error('Compression preview error:', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const runCompression = async (maxFiles = 50) => {
+    setCompressing(true);
+    setCompressionResult(null);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compress-existing-images`;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'compress', maxFiles }),
+      });
+      const data = await res.json();
+      setCompressionResult(data);
+    } catch (err) {
+      console.error('Compression error:', err);
+    } finally {
+      setCompressing(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -699,6 +745,89 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div className={cardClass}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={headingClass + ' !mb-0'}>
+                <Zap size={18} className="inline mr-2 text-amber-500" />
+                Image Compression
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={runCompressionPreview}
+                  disabled={previewLoading}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {previewLoading ? <Loader2 size={12} className="animate-spin" /> : <BarChart3 size={12} />}
+                  Scan Buckets
+                </button>
+                <button
+                  onClick={() => runCompression(50)}
+                  disabled={compressing}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {compressing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                  {compressing ? 'Compressing...' : 'Compress (50 files)'}
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              All new image uploads are automatically compressed. Use this tool to compress existing images already stored in your buckets.
+            </p>
+
+            {compressionPreview && (
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center gap-4 text-sm">
+                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Total image storage: <strong>{compressionPreview.totalOriginalMB} MB</strong></span>
+                  <span className="text-amber-400">Compressible images: <strong>{compressionPreview.compressibleImages}</strong></span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {compressionPreview.buckets?.map((b: any) => (
+                    <div key={b.bucket} className={`p-2 rounded-lg text-xs ${darkMode ? 'bg-slate-700/40' : 'bg-slate-100'}`}>
+                      <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{b.bucket}</div>
+                      <div className="text-slate-400">{b.totalImages} images / {b.totalSizeMB} MB</div>
+                      <div className="text-amber-400">{b.compressibleImages} to compress</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {compressionResult && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-emerald-400">Saved: <strong>{compressionResult.totalSavedMB} MB</strong></span>
+                  <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Processed: {compressionResult.processed}</span>
+                  <span className="text-slate-400">Skipped: {compressionResult.skipped}</span>
+                  {compressionResult.errors > 0 && <span className="text-red-400">Errors: {compressionResult.errors}</span>}
+                </div>
+                {compressionResult.files?.length > 0 && (
+                  <div className={`max-h-48 overflow-y-auto rounded-lg border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className={`text-left uppercase tracking-wider text-slate-400 border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                          <th className="p-2">File</th>
+                          <th className="p-2 text-right">Original</th>
+                          <th className="p-2 text-right">Compressed</th>
+                          <th className="p-2 text-right">Saved</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
+                        {compressionResult.files.map((f: any, i: number) => (
+                          <tr key={i}>
+                            <td className={`p-2 truncate max-w-[200px] ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{f.file}</td>
+                            <td className="p-2 text-right text-slate-400">{f.originalKB} KB</td>
+                            <td className="p-2 text-right text-slate-400">{f.compressedKB} KB</td>
+                            <td className="p-2 text-right text-emerald-400">-{f.reductionPercent}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {storageBuckets.length > 0 && (

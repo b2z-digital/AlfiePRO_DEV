@@ -249,7 +249,9 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
 
   const handleImageUploadWithPosition = async (boatId: string, file: File, position: { x: number; y: number; scale: number }) => {
     try {
-      // Get the club_id from the boat's member record
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(file, 'photo');
+
       const { data: boatData } = await supabase
         .from('member_boats')
         .select('member_id, members!inner(club_id)')
@@ -258,13 +260,13 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
 
       const clubId = boatData?.members?.club_id || currentClub?.clubId || 'default';
 
-      const fileExt = file.name.split('.').pop();
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `${boatId}-${Date.now()}.${fileExt}`;
       const filePath = `${clubId}/boats/${fileName}`;
 
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('media')
-        .upload(filePath, file, {
+        .upload(filePath, compressed, {
           cacheControl: '3600',
           upsert: true
         });

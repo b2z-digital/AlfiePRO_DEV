@@ -257,15 +257,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
     try {
       setIsUploadingAvatar(true);
-      
-      // Create a unique file path
-      const fileExt = avatarFile.name.split('.').pop();
+
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(avatarFile, 'avatar');
+
+      const fileExt = compressed.name.split('.').pop();
       const filePath = `${user.id}/${user.id}-${Date.now()}.${fileExt}`;
-      
-      // Upload the file to Supabase Storage
+
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, avatarFile, { upsert: true });
+        .upload(filePath, compressed, { upsert: true });
       
       if (uploadError) throw uploadError;
       

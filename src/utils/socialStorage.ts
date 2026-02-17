@@ -450,12 +450,18 @@ export const socialStorage = {
   },
 
   async uploadSocialMedia(file: File, folder: string = 'social') {
-    const fileExt = file.name.split('.').pop();
+    let uploadFile: File = file;
+    if (file.type.startsWith('image/')) {
+      const { compressImage } = await import('./imageCompression');
+      uploadFile = await compressImage(file, 'photo');
+    }
+
+    const fileExt = uploadFile.name.split('.').pop();
     const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
     const { data, error } = await supabase.storage
       .from('media')
-      .upload(fileName, file);
+      .upload(fileName, uploadFile);
 
     if (error) throw error;
 

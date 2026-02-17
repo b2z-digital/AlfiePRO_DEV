@@ -213,12 +213,15 @@ export default function EnhancedEmailPageBuilder({ content = [], onChange, darkM
     try {
       setUploadingImage(true);
 
-      const fileExt = file.name.split('.').pop();
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(file, 'photo');
+
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `${currentClub.clubId}/marketing/${Date.now()}.${fileExt}`;
 
       const { data, error } = await supabase.storage
         .from('media')
-        .upload(fileName, file, {
+        .upload(fileName, compressed, {
           cacheControl: '3600',
           upsert: false
         });
