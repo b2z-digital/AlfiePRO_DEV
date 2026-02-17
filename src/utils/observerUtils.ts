@@ -248,6 +248,41 @@ export async function preAllocateObserversForAllRounds(
   try {
     console.log(`🔄 Pre-allocating observers for ${rounds.length} rounds, ${observersPerHeat} per heat`);
 
+    const { data: allExisting } = await supabase
+      .from('heat_observers')
+      .select('race_number, heat_number')
+      .eq('event_id', eventId);
+
+    if (allExisting && allExisting.length > 0) {
+      const validRoundNumbers = new Set(rounds.map(r => r.round));
+      const roundsToInvalidate = new Set<number>();
+
+      for (const roundData of rounds) {
+        const currentHeatCount = roundData.heatAssignments.length;
+        const existingForRound = allExisting.filter(r => r.race_number === roundData.round);
+        if (existingForRound.length === 0) continue;
+        const maxHeatInDB = Math.max(...existingForRound.map(r => r.heat_number));
+        if (maxHeatInDB > currentHeatCount) {
+          roundsToInvalidate.add(roundData.round);
+        }
+      }
+
+      for (const row of allExisting) {
+        if (!validRoundNumbers.has(row.race_number)) {
+          roundsToInvalidate.add(row.race_number);
+        }
+      }
+
+      for (const roundNum of roundsToInvalidate) {
+        console.log(`  🗑️ Cleaning stale Q${roundNum} observers (structure changed)`);
+        await supabase
+          .from('heat_observers')
+          .delete()
+          .eq('event_id', eventId)
+          .eq('race_number', roundNum);
+      }
+    }
+
     for (const roundData of rounds) {
       const sortedHeats = [...roundData.heatAssignments].sort((a, b) =>
         a.heatDesignation.localeCompare(b.heatDesignation)

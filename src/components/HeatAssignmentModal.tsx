@@ -130,10 +130,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   };
 
   const handleExportAllRoundsPdf = async () => {
-    let obsMap = buildObserverMap();
+    const stateObsMap = buildObserverMap();
+    let obsMap = new Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]>();
     if (currentEvent?.id) {
       const rawMap = await getAllObserversForEvent(currentEvent.id);
-      obsMap = new Map();
       rawMap.forEach((observers, key) => {
         obsMap.set(key, observers.map(o => {
           const matched = skippers.find(s =>
@@ -143,10 +143,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }));
       });
     }
+    stateObsMap.forEach((observers, key) => {
+      obsMap.set(key, observers);
+    });
     exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), obsMap);
   };
 
   const resolveObserverConflicts = (updatedAssignments: HeatAssignment[]) => {
+    const changedHeats: number[] = [];
+    let resolvedMap: Map<number, ObserverAssignment[]> | undefined;
+
     setObserversByHeat(prev => {
       const newMap = new Map(prev);
       const sortedDesignations = updatedAssignments
@@ -166,18 +172,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         const conflicting = observers.filter(o => racingSet.has(o.skipper_index));
         if (conflicting.length === 0) continue;
 
-        const allRacingIndices = new Set<number>();
-        updatedAssignments.forEach(a => a.skipperIndices.forEach(idx => {
-          const aHeatIdx = sortedDesignations.indexOf(a.heatDesignation);
-          if (aHeatIdx + 1 === heatNumber) {
-            allRacingIndices.add(idx);
-          }
-        }));
-        assignment.skipperIndices.forEach(idx => allRacingIndices.add(idx));
-
         const existingObserverIndices = new Set(observers.map(o => o.skipper_index));
-        const allObserverIndicesAcrossHeats = new Set<number>();
-        newMap.forEach(obs => obs.forEach(o => allObserverIndicesAcrossHeats.add(o.skipper_index)));
 
         let cleaned = observers.filter(o => !racingSet.has(o.skipper_index));
         const needed = observers.length - cleaned.length;
@@ -193,19 +188,30 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             cleaned.push({
               skipper_index: candidate,
               skipper_name: skippers[candidate].name,
-              sail_number: skippers[candidate].sailNo,
+              skipper_sail_number: skippers[candidate].sailNo,
               times_served: 0,
-              is_active: true
+              is_manual_assignment: true
             });
             existingObserverIndices.add(candidate);
           }
         }
 
         newMap.set(heatNumber, cleaned);
+        changedHeats.push(heatNumber);
       }
 
+      resolvedMap = newMap;
       return newMap;
     });
+
+    if (resolvedMap && currentEvent?.id && changedHeats.length > 0) {
+      for (const heatNumber of changedHeats) {
+        const observers = resolvedMap.get(heatNumber);
+        if (observers && observers.length > 0) {
+          saveObserverAssignments(currentEvent.id, heatNumber, round, observers);
+        }
+      }
+    }
   };
 
   // Observer state - store per heat
