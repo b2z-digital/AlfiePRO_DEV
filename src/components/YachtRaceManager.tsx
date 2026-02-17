@@ -2624,30 +2624,40 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const handleGoToRound = (roundNumber: number) => {
     if (!heatManagement || roundNumber < 1) return;
 
-    // Use functional state update to get the latest state
-    // This is important because onCompleteHeat may have just been called
     setHeatManagement(prevHeatManagement => {
       if (!prevHeatManagement) return prevHeatManagement;
 
-      // Check if the round exists in the LATEST state
       if (roundNumber > prevHeatManagement.rounds.length) {
         console.warn(`Cannot advance to round ${roundNumber} - only ${prevHeatManagement.rounds.length} rounds exist`);
         return prevHeatManagement;
       }
 
-      // Jump to the specified round
+      const allPriorComplete = prevHeatManagement.rounds
+        .filter(r => r.round < roundNumber)
+        .every(r => r.completed);
+
+      if (!allPriorComplete && roundNumber > prevHeatManagement.currentRound) {
+        console.warn(`Cannot skip to round ${roundNumber} - prior rounds not completed`);
+        const firstIncomplete = prevHeatManagement.rounds.find(r => !r.completed);
+        if (firstIncomplete) {
+          return {
+            ...prevHeatManagement,
+            currentRound: firstIncomplete.round
+          };
+        }
+        return prevHeatManagement;
+      }
+
       const updatedHeatManagement = {
         ...prevHeatManagement,
         currentRound: roundNumber
       };
 
-      // When advancing to a new round, update lastCompletedRace to enable the column
       const previousRound = updatedHeatManagement.rounds.find(r => r.round === roundNumber - 1);
       if (previousRound?.completed) {
         setLastCompletedRace(roundNumber - 1);
       }
 
-      // Removed notification - heat operations should be silent
       return updatedHeatManagement;
     });
   };

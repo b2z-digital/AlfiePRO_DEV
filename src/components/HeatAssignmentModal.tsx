@@ -92,7 +92,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   };
 
   const buildObserverMap = () => {
-    const obsMap = new Map<string, { skipperName: string; sailNumber: string }[]>();
+    const obsMap = new Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]>();
     observersByHeat.forEach((observers, heatNumber) => {
       const sortedDesignations = heatAssignments
         .map(a => a.heatDesignation)
@@ -100,10 +100,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       const designation = sortedDesignations[heatNumber - 1];
       if (!designation) return;
       const key = `${round}-${designation}`;
-      obsMap.set(key, observers.map(o => ({
-        skipperName: o.skipper_name,
-        sailNumber: o.skipper_sail_number || '',
-      })));
+      obsMap.set(key, observers.map(o => {
+        const matchedSkipper = skippers.find(s =>
+          s.sailNo === o.skipper_sail_number || s.name === o.skipper_name
+        );
+        return {
+          skipperName: o.skipper_name,
+          sailNumber: o.skipper_sail_number || '',
+          countryCode: matchedSkipper?.country_code || undefined,
+        };
+      }));
     });
     return obsMap;
   };
@@ -113,6 +119,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     eventDate: currentEvent?.date || '',
     venueName: (currentEvent as any)?.venue || '',
     clubName: (currentEvent as any)?.clubName || '',
+    showFlag: currentEvent?.show_flag ?? false,
+    showCountry: currentEvent?.show_country ?? false,
   });
 
   const handleExportCurrentRoundPdf = () => {
@@ -124,7 +132,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const handleExportAllRoundsPdf = async () => {
     let obsMap = buildObserverMap();
     if (currentEvent?.id) {
-      obsMap = await getAllObserversForEvent(currentEvent.id);
+      const rawMap = await getAllObserversForEvent(currentEvent.id);
+      obsMap = new Map();
+      rawMap.forEach((observers, key) => {
+        obsMap.set(key, observers.map(o => {
+          const matched = skippers.find(s =>
+            s.sailNo === o.sailNumber || s.name === o.skipperName
+          );
+          return { ...o, countryCode: matched?.country_code || undefined };
+        }));
+      });
     }
     exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), obsMap);
   };

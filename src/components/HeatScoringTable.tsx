@@ -1056,10 +1056,21 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       eventDate: currentEvent?.date || '',
                       venueName: (currentEvent as any)?.venue || '',
                       clubName: (currentEvent as any)?.clubName || '',
+                      showFlag: currentEvent?.show_flag ?? false,
+                      showCountry: currentEvent?.show_country ?? false,
                     };
-                    let obsMap: Map<string, { skipperName: string; sailNumber: string }[]> | undefined;
+                    let obsMap: Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]> | undefined;
                     if (currentEvent?.id) {
-                      obsMap = await getAllObserversForEvent(currentEvent.id);
+                      const rawMap = await getAllObserversForEvent(currentEvent.id);
+                      obsMap = new Map();
+                      rawMap.forEach((observers, key) => {
+                        obsMap!.set(key, observers.map(o => {
+                          const matched = skippers.find(s =>
+                            s.sailNo === o.sailNumber || s.name === o.skipperName
+                          );
+                          return { ...o, countryCode: matched?.country_code || undefined };
+                        }));
+                      });
                     }
                     exportAllRoundsPdf(heatManagement, skippers, opts, obsMap);
                   }}
