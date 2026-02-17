@@ -155,22 +155,31 @@ function renderRoundPage(
     const key = `${round.round}-${assignment.heatDesignation}`;
     const heatObservers = observers?.get(key);
     if (heatObservers && heatObservers.length > 0) {
-      let obsY = rowY + 1.5;
-      doc.setFontSize(5.5);
+      let obsY = rowY + 4;
+
+      doc.setDrawColor(180, 190, 200);
+      doc.setLineWidth(0.15);
+      doc.line(xStart + 2, obsY - 1.5, xStart + colWidth - 2, obsY - 1.5);
+
+      doc.setFillColor(240, 242, 245);
+      doc.roundedRect(xStart + 1, obsY - 0.5, colWidth - 2, 4, 0.5, 0.5, 'F');
+      doc.setFontSize(6);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(100, 116, 139);
-      doc.text(`Observers (${heatObservers.length})`, xStart + 2, obsY);
-      obsY += 2.5;
+      doc.text(`Observers (${heatObservers.length})`, xStart + colWidth / 2, obsY + 2, { align: 'center' });
+      obsY += 5;
 
-      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
       heatObservers.forEach(obs => {
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(50, 60, 70);
         doc.text(obs.skipperName, xStart + 4, obsY);
         if (obs.sailNumber) {
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(100, 116, 139);
           doc.text(`#${obs.sailNumber}`, xStart + colWidth - 2, obsY, { align: 'right' });
         }
-        obsY += 2.5;
+        obsY += 3;
       });
     }
   });

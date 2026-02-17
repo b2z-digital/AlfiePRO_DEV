@@ -12,7 +12,7 @@ import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
 import { Hand, Eye, FileDown } from 'lucide-react';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
-import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
+import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment } from '../utils/observerUtils';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -1050,13 +1050,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </button>
               {heatManagement.configuration.scoringSystem === 'shrs' && (
                 <button
-                  onClick={() => {
-                    exportAllRoundsPdf(heatManagement, skippers, {
+                  onClick={async () => {
+                    const opts = {
                       eventName: currentEvent?.name || currentEvent?.eventName || '',
                       eventDate: currentEvent?.date || '',
                       venueName: (currentEvent as any)?.venue || '',
                       clubName: (currentEvent as any)?.clubName || '',
-                    });
+                    };
+                    let obsMap: Map<string, { skipperName: string; sailNumber: string }[]> | undefined;
+                    if (currentEvent?.id) {
+                      obsMap = await getAllObserversForEvent(currentEvent.id);
+                    }
+                    exportAllRoundsPdf(heatManagement, skippers, opts, obsMap);
                   }}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     darkMode

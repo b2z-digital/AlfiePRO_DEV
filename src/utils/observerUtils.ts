@@ -210,6 +210,35 @@ export async function getObserverAssignments(
   }
 }
 
+export async function getAllObserversForEvent(
+  eventId: string
+): Promise<Map<string, { skipperName: string; sailNumber: string }[]>> {
+  const obsMap = new Map<string, { skipperName: string; sailNumber: string }[]>();
+  try {
+    const { data, error } = await supabase
+      .from('heat_observers')
+      .select('*')
+      .eq('event_id', eventId);
+
+    if (error || !data) return obsMap;
+
+    const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+    for (const row of data) {
+      const designation = heatLabels[row.heat_number - 1];
+      if (!designation) continue;
+      const key = `${row.race_number}-${designation}`;
+      if (!obsMap.has(key)) obsMap.set(key, []);
+      obsMap.get(key)!.push({
+        skipperName: row.skipper_name || '',
+        sailNumber: row.skipper_sail_number || '',
+      });
+    }
+  } catch {
+    // ignore
+  }
+  return obsMap;
+}
+
 /**
  * Toggle an observer assignment (add or remove manually)
  * @param eventId - The event/race ID

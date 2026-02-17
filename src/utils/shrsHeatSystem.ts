@@ -352,6 +352,8 @@ export function generateAllSHRSQualifyingRoundAssignments(
 ): { heatDesignation: string; skipperIndices: number[] }[][] {
   const allRounds: { heatDesignation: string; skipperIndices: number[] }[][] = [];
 
+  const targetSizes = initialAssignments.map(a => a.skipperIndices.length);
+
   allRounds.push(initialAssignments.map(a => ({
     heatDesignation: a.heatDesignation,
     skipperIndices: [...a.skipperIndices]
@@ -381,6 +383,18 @@ export function generateAllSHRSQualifyingRoundAssignments(
           newAssignments[targetIdx].skipperIndices.push(skipperIndex);
         }
       });
+    }
+
+    const overflow: number[] = [];
+    for (let i = 0; i < newAssignments.length; i++) {
+      while (newAssignments[i].skipperIndices.length > targetSizes[i]) {
+        overflow.push(newAssignments[i].skipperIndices.pop()!);
+      }
+    }
+    for (let i = 0; i < newAssignments.length; i++) {
+      while (newAssignments[i].skipperIndices.length < targetSizes[i] && overflow.length > 0) {
+        newAssignments[i].skipperIndices.push(overflow.shift()!);
+      }
     }
 
     allRounds.push(newAssignments);

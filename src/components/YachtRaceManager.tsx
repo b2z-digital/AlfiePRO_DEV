@@ -496,15 +496,27 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           if (storedSkipperCount === skippers.length) {
             let loadedHM = currentEvent.heatManagement;
 
-            // Auto-correct unbalanced SHRS heats from old seeding algorithm
             if (loadedHM.configuration.scoringSystem === 'shrs') {
               const hasResults = loadedHM.rounds.some(r => r.results && r.results.length > 0);
               if (!hasResults) {
-                const sizes = loadedHM.rounds[0]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
-                const maxS = Math.max(...sizes);
-                const minS = Math.min(...sizes);
-                if (sizes.length > 0 && maxS - minS > 1) {
-                  console.log('Auto-correcting unbalanced SHRS heats:', sizes.join(', '));
+                const r1Sizes = loadedHM.rounds[0]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+                const maxS = Math.max(...r1Sizes);
+                const minS = Math.min(...r1Sizes);
+                const unbalancedR1 = r1Sizes.length > 0 && maxS - minS > 1;
+
+                let inconsistentAcrossRounds = false;
+                if (loadedHM.rounds.length > 1) {
+                  for (let ri = 1; ri < loadedHM.rounds.length; ri++) {
+                    const rSizes = loadedHM.rounds[ri]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+                    if (rSizes.length === r1Sizes.length && rSizes.some((s, i) => s !== r1Sizes[i])) {
+                      inconsistentAcrossRounds = true;
+                      break;
+                    }
+                  }
+                }
+
+                if (unbalancedR1 || inconsistentAcrossRounds) {
+                  console.log('Auto-correcting SHRS heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
                   const numHeats = loadedHM.configuration.numberOfHeats;
                   const qRounds = loadedHM.configuration.shrsQualifyingRounds || 1;
                   const newAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
@@ -525,7 +537,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   loadedHM = { ...loadedHM, rounds: newRounds };
                   console.log('Corrected SHRS heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
 
-                  // Persist corrected assignments
                   const eventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
                   if (eventId) {
                     supabase.from('quick_races').update({ heat_management: loadedHM }).eq('id', eventId).then(() => {

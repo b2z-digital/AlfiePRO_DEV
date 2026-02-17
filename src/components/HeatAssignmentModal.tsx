@@ -4,7 +4,7 @@ import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
-import { selectObservers, saveObserverAssignments, getObserverAssignments, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
+import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 
@@ -121,8 +121,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), buildObserverMap());
   };
 
-  const handleExportAllRoundsPdf = () => {
-    exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), buildObserverMap());
+  const handleExportAllRoundsPdf = async () => {
+    let obsMap = buildObserverMap();
+    if (currentEvent?.id) {
+      obsMap = await getAllObserversForEvent(currentEvent.id);
+    }
+    exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), obsMap);
   };
 
   const resolveObserverConflicts = (updatedAssignments: HeatAssignment[]) => {
