@@ -11,7 +11,15 @@ import {
   XCircle,
   ExternalLink,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Cloud,
+  Server,
+  Send,
+  Brain,
+  CloudSun,
+  Megaphone,
+  Camera,
+  Shield
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -113,11 +121,25 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
       case 'stripe':
         return <DollarSign size={24} className="text-blue-500" />;
       case 'google':
-        return <Mail size={24} className="text-yellow-500" />;
+        return <Globe size={24} className="text-yellow-500" />;
       case 'facebook':
         return <Globe size={24} className="text-blue-600" />;
       case 'instagram':
-        return <Globe size={24} className="text-pink-500" />;
+        return <Camera size={24} className="text-pink-500" />;
+      case 'cloudflare':
+        return <Cloud size={24} className="text-orange-500" />;
+      case 'aws':
+        return <Server size={24} className="text-amber-500" />;
+      case 'sendgrid':
+        return <Send size={24} className="text-blue-400" />;
+      case 'resend':
+        return <Mail size={24} className="text-cyan-500" />;
+      case 'openai':
+        return <Brain size={24} className="text-emerald-500" />;
+      case 'weather':
+        return <CloudSun size={24} className="text-sky-400" />;
+      case 'adsense':
+        return <Megaphone size={24} className="text-green-500" />;
       default:
         return <Database size={24} className="text-slate-400" />;
     }
@@ -127,41 +149,66 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
     const names: Record<string, string> = {
       youtube: 'YouTube',
       stripe: 'Stripe',
-      google: 'Google',
+      google: 'Google Services',
       facebook: 'Facebook',
       instagram: 'Instagram',
+      cloudflare: 'Cloudflare',
+      aws: 'AWS Amplify',
+      sendgrid: 'SendGrid',
+      resend: 'Resend',
+      openai: 'OpenAI',
+      weather: 'Weather Services',
+      adsense: 'Google AdSense',
     };
     return names[platform.toLowerCase()] || platform;
   };
 
   const getIntegrationDescription = (integration: Integration): string => {
+    if (integration.metadata?.description) {
+      return integration.metadata.description;
+    }
     switch (integration.platform.toLowerCase()) {
       case 'youtube':
-        return integration.metadata?.name || 'Default YouTube integration for all organizations';
+        return 'Default YouTube integration for all organizations';
       case 'stripe':
-        return 'Platform billing and payment processing';
+        return 'Platform billing and subscription payment processing';
       case 'google':
-        return 'Google services integration (Drive, Meet, etc.)';
+        return 'Google OAuth, Maps API, Drive, Meet, and Analytics';
       case 'facebook':
-        return 'Facebook integration for social sharing';
+        return 'Facebook social sharing and page integration';
       case 'instagram':
-        return 'Instagram integration for social sharing';
+        return 'Instagram social sharing integration';
+      case 'cloudflare':
+        return 'DNS management, domain routing, and livestreaming';
+      case 'aws':
+        return 'Amplify hosting, custom domains, and CloudFront CDN';
+      case 'sendgrid':
+        return 'Primary email delivery for notifications and marketing';
+      case 'resend':
+        return 'Secondary email delivery for event invitations';
+      case 'openai':
+        return 'AI-powered race report generation';
+      case 'weather':
+        return 'OpenWeatherMap and StormGlass weather data';
+      case 'adsense':
+        return 'Google AdSense advertising on public pages';
       default:
-        return integration.metadata?.description || 'Platform integration';
+        return 'Platform integration';
     }
   };
 
   const getConnectionStatus = (integration: Integration) => {
-    const hasCredentials = integration.credentials && Object.keys(integration.credentials).length > 0;
     const isActive = integration.is_active;
 
-    if (isActive && hasCredentials) {
-      return { status: 'connected', label: 'Connected', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20' };
-    } else if (!isActive) {
-      return { status: 'inactive', label: 'Inactive', color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/20' };
+    if (isActive) {
+      return { status: 'connected', label: 'Active', color: 'text-emerald-400', bgColor: 'bg-emerald-500/10', borderColor: 'border-emerald-500/20' };
     } else {
-      return { status: 'disconnected', label: 'Not Connected', color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/20' };
+      return { status: 'inactive', label: 'Inactive', color: 'text-amber-400', bgColor: 'bg-amber-500/10', borderColor: 'border-amber-500/20' };
     }
+  };
+
+  const getEnvVars = (integration: Integration): string[] => {
+    return integration.metadata?.env_vars || [];
   };
 
   if (loading) {
@@ -197,7 +244,7 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
           <div>
             <p className="text-sm text-blue-200 font-medium mb-1">Platform-Level Integrations</p>
             <p className="text-xs text-blue-300/80 leading-relaxed">
-              These integrations are available system-wide. Default integrations (like YouTube) are used by organizations that haven't connected their own accounts.
+              These integrations are available system-wide. Credentials are managed through Supabase Edge Function secrets. Default integrations are used by organizations that haven't connected their own accounts.
             </p>
           </div>
         </div>
@@ -221,29 +268,50 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
                     <h3 className="font-semibold text-white">
                       {getPlatformName(integration.platform)}
                     </h3>
-                    {integration.is_default && (
-                      <span className="text-xs text-sky-400 font-medium">Default</span>
-                    )}
                   </div>
                 </div>
               </div>
 
-              <p className="text-sm text-slate-400 mb-4 line-clamp-2">
+              <p className="text-sm text-slate-400 mb-3 line-clamp-2">
                 {getIntegrationDescription(integration)}
               </p>
 
+              {/* Env Vars */}
+              {getEnvVars(integration).length > 0 && (
+                <div className="mb-3">
+                  <div className="flex flex-wrap gap-1">
+                    {getEnvVars(integration).slice(0, 2).map((v) => (
+                      <span key={v} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 border border-slate-600/30">
+                        {v}
+                      </span>
+                    ))}
+                    {getEnvVars(integration).length > 2 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-500">
+                        +{getEnvVars(integration).length - 2} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Status Badge */}
-              <div className="mb-4">
+              <div className="mb-3 flex items-center gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.bgColor} ${status.color} border ${status.borderColor}`}>
                   {status.status === 'connected' && <CheckCircle2 size={12} />}
-                  {status.status === 'disconnected' && <XCircle size={12} />}
+                  {status.status === 'inactive' && <XCircle size={12} />}
                   {status.label}
                 </span>
+                {integration.is_default && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    <Shield size={10} />
+                    System Default
+                  </span>
+                )}
               </div>
 
               {/* Connection Info */}
               {integration.connected_at && (
-                <div className="text-xs text-slate-500 mb-4">
+                <div className="text-xs text-slate-500 mb-3">
                   Connected {new Date(integration.connected_at).toLocaleDateString()}
                 </div>
               )}
