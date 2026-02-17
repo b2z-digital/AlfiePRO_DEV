@@ -401,6 +401,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             const heatNumber = i + 1;
             const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
             const isCompletedHeat = heatCompletionStatus[i].isCompleted;
+            const nextHeat = i + 1 < sortedHeats.length ? sortedHeats[i + 1] : null;
+            const nextHeatIndices = nextHeat ? nextHeat.skipperIndices : undefined;
 
             if (!isNextHeatToScore && !isCompletedHeat) {
               continue;
@@ -424,6 +426,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               heat.skipperIndices.includes(obs.skipper_index)
             ) || [];
 
+            const observersInNextHeat = existingObservers?.filter(obs =>
+              obs.skipper_index !== undefined && obs.skipper_index !== null &&
+              nextHeatIndices && nextHeatIndices.includes(obs.skipper_index)
+            ) || [];
+
             const observersStillExist = existingObservers?.filter(obs =>
               obs.skipper_index !== undefined && obs.skipper_index !== null &&
               obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index]
@@ -433,6 +440,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               existingObservers.length > 0 &&
               existingObservers.length === observersPerHeat &&
               observersRacingInHeat.length === 0 &&
+              observersInNextHeat.length === 0 &&
               observersStillExist.length === existingObservers.length;
 
             if (hasValid) {
@@ -444,7 +452,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 roundNumberToLoad,
                 heat.skipperIndices,
                 skippers,
-                observersPerHeat
+                observersPerHeat,
+                nextHeatIndices
               );
 
               if (observersForThisHeat.length > 0) {

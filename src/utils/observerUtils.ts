@@ -19,6 +19,7 @@ export interface ObserverAssignment {
  * @param racingSkipperIndices - Indices of skippers racing in this heat
  * @param allSkippers - All skippers in the event
  * @param observersNeeded - Number of observers needed
+ * @param nextHeatSkipperIndices - Indices of skippers racing in the next heat (excluded so they can prepare)
  * @returns Array of selected observers
  */
 export async function selectObservers(
@@ -27,15 +28,10 @@ export async function selectObservers(
   raceNumber: number,
   racingSkipperIndices: number[],
   allSkippers: Skipper[],
-  observersNeeded: number
+  observersNeeded: number,
+  nextHeatSkipperIndices?: number[]
 ): Promise<ObserverAssignment[]> {
   try {
-    console.log(`    🔧 selectObservers called for heat ${heatNumber}, race ${raceNumber}`);
-    console.log(`    🚫 Excluding racing skippers (indices):`, racingSkipperIndices);
-    console.log(`    👥 Total skippers available:`, allSkippers.length);
-    console.log(`    🎯 Observers needed:`, observersNeeded);
-
-    // Get observer history for this event
     const { data: existingObservers, error } = await supabase
       .from('heat_observers')
       .select('*')
@@ -47,46 +43,33 @@ export async function selectObservers(
       return [];
     }
 
-    // Create a map of times each skipper has served as observer
     const timesServedMap = new Map<number, number>();
     existingObservers?.forEach(observer => {
       timesServedMap.set(observer.skipper_index, observer.times_served);
     });
 
-    // Filter out skippers who are racing in this heat
+    const excludedSet = new Set(racingSkipperIndices);
+    if (nextHeatSkipperIndices) {
+      nextHeatSkipperIndices.forEach(idx => excludedSet.add(idx));
+    }
+
     const availableSkippers = allSkippers
       .map((skipper, index) => ({
         ...skipper,
         index,
         timesServed: timesServedMap.get(index) || 0
       }))
-      .filter(skipper => {
-        const isRacing = racingSkipperIndices.includes(skipper.index);
-        return !isRacing;
-      });
+      .filter(skipper => !excludedSet.has(skipper.index));
 
-    console.log(`    ✅ Available skippers after filtering:`, availableSkippers.length);
-    console.log(`    📋 Available skipper indices:`, availableSkippers.map(s => s.index).slice(0, 10));
-
-    // Sort by times served (ascending) and then by random to add fairness
-    // Add a small random factor to break ties fairly
     const sortedAvailable = availableSkippers.sort((a, b) => {
       if (a.timesServed !== b.timesServed) {
-        return a.timesServed - b.timesServed; // Prioritize those who have served least
+        return a.timesServed - b.timesServed;
       }
-      // Random tie-breaker for skippers with same times served
       return Math.random() - 0.5;
     });
 
-    // Select the required number of observers
     const selectedObservers = sortedAvailable.slice(0, observersNeeded);
 
-    console.log(`    🎯 Selected ${selectedObservers.length} observers:`);
-    selectedObservers.forEach(obs => {
-      console.log(`       - ${obs.name} (index ${obs.index}, #${obs.sailNo || obs.sailNumber})`);
-    });
-
-    // Map to observer assignments
     const observers: ObserverAssignment[] = selectedObservers.map(skipper => ({
       skipper_index: skipper.index,
       skipper_name: skipper.name,
@@ -291,13 +274,17 @@ export async function preAllocateObserversForAllRounds(
       for (let i = 0; i < sortedHeats.length; i++) {
         const heat = sortedHeats[i];
         const heatNumber = i + 1;
+        const nextHeat = i + 1 < sortedHeats.length ? sortedHeats[i + 1] : null;
+        const nextHeatIndices = nextHeat ? nextHeat.skipperIndices : undefined;
 
         const existing = await getObserverAssignments(eventId, heatNumber, roundData.round);
         if (existing && existing.length === observersPerHeat) {
-          const hasConflict = existing.some(obs =>
-            obs.skipper_index !== undefined && obs.skipper_index !== null &&
-            heat.skipperIndices.includes(obs.skipper_index)
-          );
+          const hasConflict = existing.some(obs => {
+            if (obs.skipper_index === undefined || obs.skipper_index === null) return false;
+            if (heat.skipperIndices.includes(obs.skipper_index)) return true;
+            if (nextHeatIndices && nextHeatIndices.includes(obs.skipper_index)) return true;
+            return false;
+          });
           if (!hasConflict) {
             continue;
           }
@@ -305,7 +292,8 @@ export async function preAllocateObserversForAllRounds(
 
         const observers = await selectObservers(
           eventId, heatNumber, roundData.round,
-          heat.skipperIndices, allSkippers, observersPerHeat
+          heat.skipperIndices, allSkippers, observersPerHeat,
+          nextHeatIndices
         );
 
         if (observers.length > 0) {
