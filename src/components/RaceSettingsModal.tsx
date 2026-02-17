@@ -999,17 +999,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </h3>
             </div>
 
-            {isHeatRacingEnabled && (
-              <div className={`p-3 rounded-lg ${darkMode ? 'bg-amber-900/20 border border-amber-600/30' : 'bg-amber-50 border border-amber-200'}`}>
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={16} className={`flex-shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                  <p className={`text-xs ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
-                    Touch Mode is not available when Heat Racing is enabled. Heat Racing uses a specialized scoring interface.
-                  </p>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2">
               <button
                 type="button"
@@ -1046,11 +1035,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => !isHeatRacingEnabled && handleScoringModeChange('touch')}
-                disabled={isHeatRacingEnabled}
+                onClick={() => handleScoringModeChange('touch')}
                 className={`
                   w-full p-4 rounded-lg transition-all border-2 text-left
-                  ${isHeatRacingEnabled ? 'opacity-50 cursor-not-allowed' : ''}
                   ${scoringMode === 'touch'
                     ? darkMode
                       ? 'bg-blue-900/30 border-blue-600'
@@ -1067,10 +1054,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </div>
                     <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                       Simplified tablet interface with large sail numbers (Tablet)
-                      {isHeatRacingEnabled && ' - Not available with Heat Racing'}
                     </div>
                   </div>
-                  {scoringMode === 'touch' && !isHeatRacingEnabled && (
+                  {scoringMode === 'touch' && (
                     <div className="flex-shrink-0 ml-3">
                       <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
                         <Check size={14} className="text-white" />

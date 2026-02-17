@@ -307,7 +307,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         setTimeout(() => setIsDataFullyLoaded(true), 100);
       }
 
-      // For multi-day events, load ONLY previous days' completed results
+      const eventSkipperCount = currentEvent.skippers?.length || 0;
+
       const targetDay = currentEvent.currentDay || 1;
       if (currentEvent.multiDay && currentEvent.dayResults) {
         console.log('🏁 YachtRaceManager: Loading multi-day results. Target day:', targetDay);
@@ -396,22 +397,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setHasDeterminedInitialHcaps(currentDayData.hasDeterminedInitialHcaps || false);
           setIsManualHandicaps(currentDayData.isManualHandicaps || false);
 
-          // Load heat management data only if it's enabled and skipper count matches
           if (currentDayData.heatManagement && currentDayData.heatManagement.configuration.enabled) {
-            // Validate that stored heat assignments match current skipper count
             const storedSkipperCount = currentDayData.heatManagement.rounds[0]?.heatAssignments
               ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-            if (storedSkipperCount === skippers.length) {
+            if (storedSkipperCount === eventSkipperCount) {
               setHeatManagement(currentDayData.heatManagement);
 
-              // Also load the drop rules from heat management configuration
               if (currentDayData.heatManagement.configuration.scoringSystem) {
                 setCurrentDropRules(currentDayData.heatManagement.configuration.scoringSystem);
               }
             } else {
-              // Skipper count mismatch - clear cached heat data
-              console.warn(`⚠️ Heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
+              console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
               setHeatManagement(null);
             }
           }
@@ -428,19 +425,17 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setIsManualHandicaps(day1Data.isManualHandicaps || false);
 
             if (day1Data.heatManagement && day1Data.heatManagement.configuration.enabled) {
-              // Validate that stored heat assignments match current skipper count
               const storedSkipperCount = day1Data.heatManagement.rounds[0]?.heatAssignments
                 ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-              if (storedSkipperCount === skippers.length) {
+              if (storedSkipperCount === eventSkipperCount) {
                 setHeatManagement(day1Data.heatManagement);
 
-                // Also load the drop rules from heat management configuration
                 if (day1Data.heatManagement.configuration.scoringSystem) {
                   setCurrentDropRules(day1Data.heatManagement.configuration.scoringSystem);
                 }
               } else {
-                console.warn(`⚠️ Day 1 heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
+                console.warn(`Day 1 heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
                 setHeatManagement(null);
               }
             }
@@ -487,13 +482,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         if (currentEvent.isManualHandicaps !== undefined) {
           setIsManualHandicaps(currentEvent.isManualHandicaps);
         }
-        // Load heat management data only if it's enabled and skipper count matches
         if (currentEvent.heatManagement && currentEvent.heatManagement.configuration.enabled) {
-          // Validate that stored heat assignments match current skipper count
           const storedSkipperCount = currentEvent.heatManagement.rounds[0]?.heatAssignments
             ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-          if (storedSkipperCount === skippers.length) {
+          if (storedSkipperCount === eventSkipperCount) {
             let loadedHM = currentEvent.heatManagement;
 
             if (loadedHM.configuration.scoringSystem === 'shrs') {
@@ -519,7 +512,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   console.log('Auto-correcting SHRS heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
                   const numHeats = loadedHM.configuration.numberOfHeats;
                   const qRounds = loadedHM.configuration.shrsQualifyingRounds || 1;
-                  const newAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
+                  const eventSkippers = currentEvent.skippers || [];
+                  const newAssignments = seedSHRSHeatsByIndex(eventSkippers, numHeats);
 
                   let newRounds;
                   if (qRounds > 1) {
@@ -549,12 +543,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
             setHeatManagement(loadedHM);
 
-            // Also load the drop rules from heat management configuration
             if (loadedHM.configuration.scoringSystem) {
               setCurrentDropRules(loadedHM.configuration.scoringSystem);
             }
           } else {
-            console.warn(`⚠️ Event heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
+            console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
             setHeatManagement(null);
           }
         }
