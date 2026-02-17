@@ -270,6 +270,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadObservers = async () => {
       if (!isOpen || !currentEvent?.id) {
         setObserversByHeat(new Map());
@@ -284,8 +286,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           .eq('id', currentEvent.id)
           .maybeSingle();
 
-        if (error) {
-          setObserversByHeat(new Map());
+        if (error || cancelled) {
+          if (!cancelled) setObserversByHeat(new Map());
           return;
         }
 
@@ -295,7 +297,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }
 
         if (!eventData?.enable_observers) {
-          setObserversByHeat(new Map());
+          if (!cancelled) setObserversByHeat(new Map());
           return;
         }
         enableObs = eventData?.enable_observers;
@@ -316,7 +318,6 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
         if (shrsPreAssign && !preAllocationDone.current) {
           preAllocationDone.current = true;
-          console.log('🔄 SHRS pre-allocation: allocating observers for all', rounds.length, 'qualifying rounds');
           await preAllocateObserversForAllRounds(
             currentEvent.id,
             rounds.map(r => ({
@@ -331,6 +332,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           );
         }
 
+        if (cancelled) return;
+
         let roundToLoadObserversFor;
         if (previewRoundIndex !== null && shrsPreAssign) {
           roundToLoadObserversFor = rounds[previewRoundIndex];
@@ -341,7 +344,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }
 
         if (!roundToLoadObserversFor) {
-          setObserversByHeat(new Map());
+          if (!cancelled) setObserversByHeat(new Map());
           return;
         }
 
@@ -354,39 +357,49 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           a.heatDesignation.localeCompare(b.heatDesignation)
         );
 
-        const roundResults = currentRoundData.results || [];
-
-        const heatCompletionStatus = sortedHeats.map((heat, idx) => {
-          const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
-          let isCompleted;
-          if (currentRoundData.completed) {
-            isCompleted = heatResults.some(r => r.position !== null || r.letterScore || r.markedAsUP);
-          } else {
-            isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
-              const result = heatResults.find(r => r.skipperIndex === skipperIdx);
-              return result && (result.position !== null || result.letterScore || result.markedAsUP);
-            });
+        if (shrsPreAssign) {
+          for (let i = 0; i < sortedHeats.length; i++) {
+            if (cancelled) return;
+            const heatNumber = i + 1;
+            const existingObservers = await getObserverAssignments(
+              currentEvent.id,
+              heatNumber,
+              roundNumberToLoad
+            );
+            if (existingObservers && existingObservers.length > 0) {
+              newObserversByHeat.set(heatNumber, existingObservers);
+            }
           }
-          return { heatDesignation: heat.heatDesignation, heatNumber: idx + 1, isCompleted };
-        });
+        } else {
+          const roundResults = currentRoundData.results || [];
 
-        const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
+          const heatCompletionStatus = sortedHeats.map((heat, idx) => {
+            const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
+            let isCompleted;
+            if (currentRoundData.completed) {
+              isCompleted = heatResults.some(r => r.position !== null || r.letterScore || r.markedAsUP);
+            } else {
+              isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
+                const result = heatResults.find(r => r.skipperIndex === skipperIdx);
+                return result && (result.position !== null || result.letterScore || result.markedAsUP);
+              });
+            }
+            return { heatDesignation: heat.heatDesignation, heatNumber: idx + 1, isCompleted };
+          });
 
-        for (let i = 0; i < sortedHeats.length; i++) {
-          const heat = sortedHeats[i];
-          const heatNumber = i + 1;
-          const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
-          const isCompletedHeat = heatCompletionStatus[i].isCompleted;
+          const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
 
-          if (!isSHRSMode && !isNextHeatToScore && !isCompletedHeat) {
-            continue;
-          }
+          for (let i = 0; i < sortedHeats.length; i++) {
+            if (cancelled) return;
+            const heat = sortedHeats[i];
+            const heatNumber = i + 1;
+            const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
+            const isCompletedHeat = heatCompletionStatus[i].isCompleted;
 
-          const needsObserverAssignment = isNextHeatToScore || (isSHRSMode && !isCompletedHeat);
+            if (!isNextHeatToScore && !isCompletedHeat) {
+              continue;
+            }
 
-          let shouldSelectNewObservers = false;
-
-          if (isCompletedHeat || needsObserverAssignment) {
             const existingObservers = await getObserverAssignments(
               currentEvent.id,
               heatNumber,
@@ -397,62 +410,60 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               if (existingObservers && existingObservers.length > 0) {
                 newObserversByHeat.set(heatNumber, existingObservers);
               }
-            } else {
-              const observersRacingInHeat = existingObservers?.filter(obs =>
-                obs.skipper_index !== undefined && obs.skipper_index !== null &&
-                heat.skipperIndices.includes(obs.skipper_index)
-              ) || [];
-
-              const observersStillExist = existingObservers?.filter(obs =>
-                obs.skipper_index !== undefined && obs.skipper_index !== null &&
-                obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index]
-              ) || [];
-
-              const hasValid = existingObservers &&
-                existingObservers.length > 0 &&
-                existingObservers.length === observersPerHeat &&
-                observersRacingInHeat.length === 0 &&
-                observersStillExist.length === existingObservers.length;
-
-              if (hasValid) {
-                newObserversByHeat.set(heatNumber, existingObservers);
-              } else {
-                shouldSelectNewObservers = true;
-              }
+              continue;
             }
-          }
 
-          if (shouldSelectNewObservers) {
-            const observersForThisHeat = await selectObservers(
-              currentEvent.id,
-              heatNumber,
-              roundNumberToLoad,
-              heat.skipperIndices,
-              skippers,
-              observersPerHeat
-            );
+            const observersRacingInHeat = existingObservers?.filter(obs =>
+              obs.skipper_index !== undefined && obs.skipper_index !== null &&
+              heat.skipperIndices.includes(obs.skipper_index)
+            ) || [];
 
-            if (observersForThisHeat.length > 0) {
-              await saveObserverAssignments(
+            const observersStillExist = existingObservers?.filter(obs =>
+              obs.skipper_index !== undefined && obs.skipper_index !== null &&
+              obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index]
+            ) || [];
+
+            const hasValid = existingObservers &&
+              existingObservers.length > 0 &&
+              existingObservers.length === observersPerHeat &&
+              observersRacingInHeat.length === 0 &&
+              observersStillExist.length === existingObservers.length;
+
+            if (hasValid) {
+              newObserversByHeat.set(heatNumber, existingObservers);
+            } else {
+              const observersForThisHeat = await selectObservers(
                 currentEvent.id,
                 heatNumber,
                 roundNumberToLoad,
-                observersForThisHeat
+                heat.skipperIndices,
+                skippers,
+                observersPerHeat
               );
-              newObserversByHeat.set(heatNumber, observersForThisHeat);
+
+              if (observersForThisHeat.length > 0) {
+                await saveObserverAssignments(
+                  currentEvent.id,
+                  heatNumber,
+                  roundNumberToLoad,
+                  observersForThisHeat
+                );
+                newObserversByHeat.set(heatNumber, observersForThisHeat);
+              }
             }
           }
         }
 
-        setObserversByHeat(newObserversByHeat);
+        if (!cancelled) setObserversByHeat(newObserversByHeat);
       } catch (error) {
         console.error('Error loading observers:', error);
       } finally {
-        setLoadingObservers(false);
+        if (!cancelled) setLoadingObservers(false);
       }
     };
 
     loadObservers();
+    return () => { cancelled = true; };
   }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
 
   if (!isOpen) return null;
