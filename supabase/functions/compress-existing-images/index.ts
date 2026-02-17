@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { Image } from "npm:imagescript@1.3.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,6 +95,7 @@ async function compressImageBuffer(
   _ext: string
 ): Promise<{ compressed: Uint8Array; width: number; height: number } | null> {
   try {
+    const { Image } = await import("npm:imagescript@1.3.0");
     let img = await Image.decode(data);
 
     const w = img.width;
