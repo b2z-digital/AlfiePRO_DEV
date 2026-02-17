@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -90,6 +90,9 @@ import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
 import { BackupManagementTab } from './super-admin/BackupManagementTab';
 import { UserManagementTab } from './super-admin/UserManagementTab';
 import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
+import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
+import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
+import { usePlatformTracking } from '../hooks/usePlatformTracking';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -201,6 +204,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
   const { addNotification } = useNotifications();
+
+  const orgType = currentOrganization?.type === 'national_association' ? 'national' : currentOrganization?.type === 'state_association' ? 'state' : null;
+  const { trackPageView } = usePlatformTracking(
+    currentClub?.clubId || null,
+    currentOrganization?.id || null,
+    orgType
+  );
+
+  useEffect(() => {
+    if (location.pathname) {
+      trackPageView(location.pathname);
+    }
+  }, [location.pathname, trackPageView]);
+
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [unreadTasksCount, setUnreadTasksCount] = useState(0);
   const [membershipActionCount, setMembershipActionCount] = useState(0);
@@ -999,6 +1016,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         { id: 'dashboard', label: null, collapsible: false, items: [
           { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' },
           { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
+          { id: 'engagement', label: 'Engagement Analytics', icon: Activity, description: 'Login & usage tracking', path: '/engagement' },
+          { id: 'resources', label: 'Resource & Costs', icon: Server, description: 'Hosting & DB costs', path: '/resources' },
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
           { id: 'integrations', label: 'Platform Integrations', icon: Link, description: 'Manage integrations', path: '/integrations' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
@@ -1577,6 +1596,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/usage" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <UsageStatisticsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/engagement" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <EngagementAnalyticsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/resources" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ResourceCostsTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/billing" element={
