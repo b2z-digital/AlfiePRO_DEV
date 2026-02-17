@@ -397,7 +397,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       // This prevents modals from opening before the race officer has set the number of heats
       return;
     } else if (!enabled) {
-      // Disabling heat racing
+      // Disabling heat racing - COMPLETELY CLEAR all heat management data
       setIsHeatRacingEnabled(false);
 
       // Reset manual overrides so they start fresh when re-enabled
@@ -409,15 +409,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         setCurrentDropRules([4, 8, 16, 24, 32, 40]); // RRS - Appendix A
       }
 
-      if (currentHeatManagement) {
-        // Disable heat management but preserve configuration
-        setCurrentHeatManagement({
-          ...currentHeatManagement,
-          configuration: {
-            ...currentHeatManagement.configuration,
-            enabled: false
-          }
-        });
+      // Completely clear heat management data (don't preserve old assignments)
+      setCurrentHeatManagement(null);
+
+      if (addNotification) {
+        addNotification('info', 'Heat Racing disabled. All heat assignments and configuration cleared.');
       }
     }
   };
