@@ -401,8 +401,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             const heatNumber = i + 1;
             const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
             const isCompletedHeat = heatCompletionStatus[i].isCompleted;
-            const nextHeat = i + 1 < sortedHeats.length ? sortedHeats[i + 1] : null;
-            const nextHeatIndices = nextHeat ? nextHeat.skipperIndices : undefined;
+            const nextHeatToScore = i - 1 >= 0 ? sortedHeats[i - 1] : null;
+            const nextHeatIndices = nextHeatToScore ? nextHeatToScore.skipperIndices : undefined;
 
             if (!isNextHeatToScore && !isCompletedHeat) {
               continue;

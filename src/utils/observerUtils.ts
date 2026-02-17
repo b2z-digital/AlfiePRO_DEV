@@ -274,8 +274,8 @@ export async function preAllocateObserversForAllRounds(
       for (let i = 0; i < sortedHeats.length; i++) {
         const heat = sortedHeats[i];
         const heatNumber = i + 1;
-        const nextHeat = i + 1 < sortedHeats.length ? sortedHeats[i + 1] : null;
-        const nextHeatIndices = nextHeat ? nextHeat.skipperIndices : undefined;
+        const nextHeatToScore = i - 1 >= 0 ? sortedHeats[i - 1] : null;
+        const nextHeatIndices = nextHeatToScore ? nextHeatToScore.skipperIndices : undefined;
 
         const existing = await getObserverAssignments(eventId, heatNumber, roundData.round);
         if (existing && existing.length === observersPerHeat) {
