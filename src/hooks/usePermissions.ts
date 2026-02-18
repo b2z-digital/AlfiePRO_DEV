@@ -154,6 +154,7 @@ export function usePermissions() {
         'minutes.view',
         'tasks.view',
         'finance.view',
+        'dashboard.edit',
       ];
       return memberPermissions.includes(permission);
     }

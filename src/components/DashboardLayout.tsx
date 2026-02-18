@@ -730,14 +730,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/results',
           featureKey: 'results_display'
         },
-        {
+        ...(isSuperAdmin ? [{
           id: 'hms-validator',
           label: 'HMS Validator',
           icon: FileCheck,
           description: 'Validate AlfiePRO results against HMS scoring',
           path: '/hms-validator',
           featureKey: 'hms_validator'
-        },
+        }] : []),
         {
           id: 'yacht-classes',
           label: 'Yacht Classes',
@@ -786,14 +786,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/alfie-tv',
           featureKey: 'alfie_tv'
         },
-        {
+        ...(!isMember ? [{
           id: 'livestream',
           label: 'Livestream',
           icon: Video,
           description: 'Broadcast races to YouTube',
           path: '/livestream',
           featureKey: 'livestream'
-        }
+        }] : [])
       ]
     },
     ...(currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? [{
@@ -880,13 +880,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/membership-dashboard',
           featureKey: 'membership'
         },
-        ...(isMember ? [{
-          id: 'my-boats',
-          label: 'My Boats',
-          icon: Anchor,
-          description: 'Manage your registered boats',
-          path: '/my-boats'
-        }] : []),
         {
           id: 'meetings',
           label: 'Meetings',
@@ -1740,7 +1733,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <WysiwygDocumentBuilder />
               } />
               <Route path="/membership-dashboard" element={<MembershipDashboard darkMode={darkMode} />} />
-              <Route path="/my-boats" element={<MyBoatsPage darkMode={darkMode} />} />
               <Route path="/community" element={<CommunityPage darkMode={darkMode} />} />
               <Route path="/membership/:clubId" element={<MembershipPage />} />
               <Route path="/membership/:clubId/renew/:memberId" element={<MembershipPage />} />

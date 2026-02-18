@@ -402,13 +402,13 @@ const NewsPage: React.FC = () => {
                           : 'bg-blue-500/90 text-white'
                       }`}>
                         {article.event_name && article.event_level === 'national'
-                          ? 'National News'
+                          ? (article.source_name ? `${article.source_name} News` : 'National News')
                           : article.event_name && article.event_level === 'state'
-                          ? 'State News'
+                          ? (article.source_name ? `${article.source_name} News` : 'State News')
                           : article.source_type === 'national'
-                          ? 'National News'
+                          ? (article.source_name ? `${article.source_name} News` : 'National News')
                           : article.source_type === 'state'
-                          ? 'State News'
+                          ? (article.source_name ? `${article.source_name} News` : 'State News')
                           : 'Club News'}
                       </span>
                     </div>
@@ -517,13 +517,13 @@ const NewsPage: React.FC = () => {
                             : 'bg-blue-500/90 text-white'
                         }`}>
                           {article.event_name && article.event_level === 'national'
-                            ? 'National'
+                            ? (article.source_name || 'National')
                             : article.event_name && article.event_level === 'state'
-                            ? 'State'
+                            ? (article.source_name || 'State')
                             : article.source_type === 'national'
-                            ? 'National'
+                            ? (article.source_name || 'National')
                             : article.source_type === 'state'
-                            ? 'State'
+                            ? (article.source_name || 'State')
                             : 'Club'}
                         </span>
                       </div>
