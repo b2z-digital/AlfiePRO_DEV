@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CreditCard,
   Calendar,
@@ -17,8 +17,13 @@ import {
   ChevronRight,
   User,
   Anchor,
-  Heart
+  Heart,
+  Users,
+  TrendingUp,
+  Award,
+  Activity
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -80,6 +85,43 @@ interface PaymentRecord {
 interface MemberMembershipViewProps {
   darkMode: boolean;
 }
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }
+  })
+};
+
+const RenewalRing: React.FC<{ daysLeft: number; totalDays: number }> = ({ daysLeft, totalDays }) => {
+  const progress = Math.max(0, Math.min(1, daysLeft / totalDays));
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - progress);
+  const color = daysLeft > 60 ? '#22c55e' : daysLeft > 30 ? '#eab308' : '#ef4444';
+
+  return (
+    <div className="relative w-24 h-24 flex-shrink-0">
+      <svg className="w-full h-full -rotate-90" viewBox="0 0 88 88">
+        <circle cx="44" cy="44" r={radius} fill="none" stroke="currentColor" strokeWidth="5" className="text-slate-700/50" />
+        <motion.circle
+          cx="44" cy="44" r={radius} fill="none"
+          stroke={color} strokeWidth="5" strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold text-white leading-none">{Math.max(0, daysLeft)}</span>
+        <span className="text-[10px] text-slate-400 leading-tight">days</span>
+      </div>
+    </div>
+  );
+};
 
 export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ darkMode }) => {
   const { currentClub, user } = useAuth();
@@ -173,15 +215,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     }
   };
 
-  const getMembershipStatus = () => {
-    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false };
+  const membershipStatus = useMemo(() => {
+    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, daysLeft: 0 };
 
     if (!memberData.is_financial) {
-      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true };
+      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, daysLeft: 0 };
     }
 
     if (!memberData.renewal_date) {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: 365 };
     }
 
     const renewalDate = new Date(memberData.renewal_date);
@@ -189,13 +231,25 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     const daysUntilRenewal = Math.ceil((renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysUntilRenewal < 0) {
-      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true };
+      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, daysLeft: 0 };
     } else if (daysUntilRenewal <= 30) {
-      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true };
+      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, daysLeft: daysUntilRenewal };
     } else {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: daysUntilRenewal };
     }
-  };
+  }, [memberData]);
+
+  const memberDuration = useMemo(() => {
+    if (!memberData?.date_joined) return null;
+    const joined = new Date(memberData.date_joined);
+    const now = new Date();
+    const months = (now.getFullYear() - joined.getFullYear()) * 12 + (now.getMonth() - joined.getMonth());
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+    if (years > 0 && remainingMonths > 0) return `${years}y ${remainingMonths}m`;
+    if (years > 0) return `${years}y`;
+    return `${remainingMonths}m`;
+  }, [memberData?.date_joined]);
 
   const handleRenewal = async () => {
     if (!memberData || !currentClub || !selectedMembershipType) {
@@ -205,11 +259,8 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
     try {
       setProcessingPayment(true);
-
       const selectedType = membershipTypes.find(t => t.id === selectedMembershipType);
-      if (!selectedType) {
-        throw new Error('Selected membership type not found');
-      }
+      if (!selectedType) throw new Error('Selected membership type not found');
 
       if (selectedPaymentMethod === 'credit_card') {
         const { data, error } = await supabase.functions.invoke('create-stripe-checkout', {
@@ -232,7 +283,6 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         });
 
         if (error) throw error;
-
         if (data?.url) {
           window.location.href = data.url;
         } else {
@@ -252,7 +302,6 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           });
 
         if (renewalError) throw renewalError;
-
         addNotification('success', 'Renewal request submitted! Please complete the bank transfer and notify your club administrator.');
         setShowRenewalModal(false);
         setProcessingPayment(false);
@@ -274,11 +323,25 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   if (loading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="p-8 md:p-16">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-slate-400">Loading your membership...</p>
+        <div className="p-4 sm:p-6 lg:p-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-slate-700/50 animate-pulse" />
+              <div className="space-y-2">
+                <div className="w-48 h-7 rounded-lg bg-slate-700/50 animate-pulse" />
+                <div className="w-64 h-4 rounded bg-slate-700/40 animate-pulse" />
+              </div>
+            </div>
+            <div className="w-full h-24 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse mb-6" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-28 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-48 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse" />
+              ))}
             </div>
           </div>
         </div>
@@ -289,105 +352,213 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   if (error || !memberData) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="p-8 md:p-16">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center max-w-md mx-auto">
-              <AlertCircle size={48} className="mx-auto mb-4 text-yellow-400" />
-              <h2 className="text-xl font-semibold text-white mb-2">No Membership Record Found</h2>
-              <p className="text-slate-400 mb-4">
-                You don't have a membership record yet for {currentClub?.club?.name || 'this club'}.
-              </p>
-              <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 mb-4">
-                <p className="text-sm text-slate-300 mb-2">To get started:</p>
-                <ul className="text-sm text-slate-400 text-left space-y-2">
-                  <li className="flex items-start gap-2"><ChevronRight size={14} className="mt-1 text-blue-400 flex-shrink-0" /> Contact your club administrator to add you as a member</li>
-                  <li className="flex items-start gap-2"><ChevronRight size={14} className="mt-1 text-blue-400 flex-shrink-0" /> Ask them to link your account to your membership record</li>
-                  <li className="flex items-start gap-2"><ChevronRight size={14} className="mt-1 text-blue-400 flex-shrink-0" /> Once linked, you'll be able to manage your membership here</li>
-                </ul>
+        <div className="p-4 sm:p-6 lg:p-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
+                <Users className="text-white" size={32} />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold text-white">My Membership</h1>
+                <p className="text-slate-400 text-lg">Manage your membership, details, and boats</p>
               </div>
             </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center justify-center min-h-[300px]"
+            >
+              <div className="text-center max-w-md mx-auto p-8 rounded-2xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 backdrop-blur-sm">
+                <div className="w-16 h-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle size={28} className="text-yellow-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-white mb-2">No Membership Record Found</h2>
+                <p className="text-slate-400 mb-6">
+                  You don't have a membership record yet for {currentClub?.club?.name || 'this club'}.
+                </p>
+                <div className="space-y-3 text-left">
+                  {['Contact your club administrator to add you as a member', 'Ask them to link your account to your membership record', 'Once linked, you can manage your membership here'].map((step, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-700/20 border border-slate-700/30">
+                      <div className="w-6 h-6 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs font-bold text-blue-400">{i + 1}</span>
+                      </div>
+                      <p className="text-sm text-slate-300">{step}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
     );
   }
 
-  const membershipStatus = getMembershipStatus();
   const fullAddress = [memberData.street, memberData.city, memberData.state, memberData.postcode].filter(Boolean).join(', ');
+
+  const statCards = [
+    {
+      label: 'Status',
+      value: membershipStatus.text,
+      icon: membershipStatus.status === 'active' ? CheckCircle : AlertCircle,
+      gradient: membershipStatus.color === 'green'
+        ? 'from-green-500 to-emerald-600'
+        : membershipStatus.color === 'yellow'
+        ? 'from-yellow-500 to-amber-600'
+        : 'from-red-500 to-rose-600',
+      bg: membershipStatus.color === 'green'
+        ? 'from-green-600/20 to-green-800/20 border-green-500/30'
+        : membershipStatus.color === 'yellow'
+        ? 'from-yellow-600/20 to-yellow-800/20 border-yellow-500/30'
+        : 'from-red-600/20 to-red-800/20 border-red-500/30'
+    },
+    {
+      label: 'Renewal',
+      value: memberData.renewal_date ? formatDate(memberData.renewal_date) : 'N/A',
+      icon: Calendar,
+      gradient: 'from-blue-500 to-cyan-600',
+      bg: 'from-blue-600/20 to-blue-800/20 border-blue-500/30'
+    },
+    {
+      label: 'Boats',
+      value: String(boats.length),
+      icon: Anchor,
+      gradient: 'from-cyan-500 to-teal-600',
+      bg: 'from-cyan-600/20 to-cyan-800/20 border-cyan-500/30'
+    },
+    {
+      label: 'Payments',
+      value: String(payments.length),
+      icon: CreditCard,
+      gradient: 'from-amber-500 to-orange-600',
+      bg: 'from-amber-600/20 to-amber-800/20 border-amber-500/30'
+    }
+  ];
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-8 md:p-16">
+      <div className="p-4 sm:p-6 lg:p-16">
         <div className="max-w-6xl mx-auto space-y-6">
 
-          {/* Header */}
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-white">My Membership</h1>
-              <p className="text-slate-400 mt-1">Manage your membership, details, and boats</p>
+          {/* Page Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex items-center justify-between gap-4 mb-2"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
+                <Users className="text-white" size={32} />
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold text-white">My Membership</h1>
+                <p className="text-lg text-slate-400">Manage your membership, details, and boats</p>
+              </div>
             </div>
             <button
               onClick={() => setShowEditModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
             >
               <Edit2 size={16} />
-              Edit Details
+              <span className="hidden sm:inline">Edit Details</span>
             </button>
-          </div>
+          </motion.div>
 
           {/* Multi-Club Memberships */}
-          <MyClubMembershipsWidget darkMode={darkMode} />
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+          >
+            <MyClubMembershipsWidget darkMode={darkMode} />
+          </motion.div>
 
-          {/* Member Profile Card */}
-          <div className="rounded-2xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm overflow-hidden">
+          {/* Member Profile Hero */}
+          <motion.div
+            custom={1}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="rounded-2xl bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-slate-700/50 backdrop-blur-sm overflow-hidden"
+          >
             <div className="p-6">
-              <div className="flex items-start gap-5">
-                <div className="flex-shrink-0">
+              <div className="flex flex-col sm:flex-row items-start gap-5">
+                <div className="relative flex-shrink-0">
                   <Avatar
                     src={memberData.avatar_url}
                     alt={`${memberData.first_name} ${memberData.last_name}`}
                     size="lg"
-                    className="w-20 h-20 rounded-xl"
+                    className="w-20 h-20 rounded-2xl ring-2 ring-slate-600/50"
                   />
+                  {membershipStatus.status === 'active' && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-slate-800 flex items-center justify-center">
+                      <CheckCircle size={12} className="text-white" />
+                    </div>
+                  )}
                 </div>
+
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div>
-                      <h2 className="text-xl font-bold text-white">
+                      <h2 className="text-2xl font-bold text-white">
                         {memberData.first_name} {memberData.last_name}
                       </h2>
-                      <p className="text-slate-400 text-sm mt-0.5">
-                        {memberData.membership_level_custom || memberData.membership_level || 'Member'}
-                        {memberData.category && ` - ${memberData.category}`}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
+                          <Award size={12} />
+                          {memberData.membership_level_custom || memberData.membership_level || 'Member'}
+                        </span>
+                        {memberData.category && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-700/50 text-slate-300 border border-slate-600/30">
+                            {memberData.category}
+                          </span>
+                        )}
+                        {memberDuration && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-teal-500/15 text-teal-400 border border-teal-500/20">
+                            <Clock size={12} />
+                            {memberDuration}
+                          </span>
+                        )}
+                      </div>
                       {memberData.date_joined && (
-                        <p className="text-slate-500 text-xs mt-1">
+                        <p className="text-slate-500 text-xs mt-2">
                           Member since {formatDate(memberData.date_joined)}
                         </p>
                       )}
                     </div>
-                    <div className={`px-4 py-2 rounded-lg flex items-center gap-2 flex-shrink-0 ${
-                      membershipStatus.color === 'green'
-                        ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-                        : membershipStatus.color === 'yellow'
-                        ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20'
-                        : 'bg-red-500/15 text-red-400 border border-red-500/20'
-                    }`}>
-                      {membershipStatus.status === 'active' && <CheckCircle size={16} />}
-                      {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={16} />}
-                      <span className="text-sm font-semibold">{membershipStatus.text}</span>
+
+                    <div className="flex items-center gap-4">
+                      {memberData.renewal_date && membershipStatus.status !== 'expired' && (
+                        <RenewalRing daysLeft={membershipStatus.daysLeft} totalDays={365} />
+                      )}
+                      <div className={`px-4 py-2 rounded-xl flex items-center gap-2 flex-shrink-0 ${
+                        membershipStatus.color === 'green'
+                          ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                          : membershipStatus.color === 'yellow'
+                          ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20'
+                          : 'bg-red-500/15 text-red-400 border border-red-500/20'
+                      }`}>
+                        {membershipStatus.status === 'active' && <CheckCircle size={16} />}
+                        {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={16} />}
+                        <span className="text-sm font-semibold">{membershipStatus.text}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Renewal Warning */}
               {membershipStatus.needsRenewal && (
-                <div className={`mt-5 p-4 rounded-xl flex items-center justify-between ${
-                  membershipStatus.color === 'yellow'
-                    ? 'bg-yellow-500/10 border border-yellow-500/20'
-                    : 'bg-red-500/10 border border-red-500/20'
-                }`}>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ delay: 0.5 }}
+                  className={`mt-5 p-4 rounded-xl flex items-center justify-between ${
+                    membershipStatus.color === 'yellow'
+                      ? 'bg-yellow-500/10 border border-yellow-500/20'
+                      : 'bg-red-500/10 border border-red-500/20'
+                  }`}
+                >
                   <div className="flex items-center gap-3">
                     <AlertCircle size={20} className={membershipStatus.color === 'yellow' ? 'text-yellow-400' : 'text-red-400'} />
                     <div>
@@ -395,185 +566,243 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                         {membershipStatus.status === 'expiring' ? 'Membership Expiring Soon' : 'Membership Expired'}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        {membershipStatus.status === 'expiring'
-                          ? 'Renew now to maintain your benefits.'
-                          : 'Renew now to continue enjoying club benefits.'}
+                        {membershipStatus.status === 'expiring' ? 'Renew now to maintain your benefits.' : 'Renew now to continue enjoying club benefits.'}
                       </p>
                     </div>
                   </div>
                   <button
                     onClick={() => setShowRenewalModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors flex-shrink-0"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all flex-shrink-0"
                   >
                     <CreditCard size={14} />
                     Renew Now
                   </button>
-                </div>
+                </motion.div>
               )}
             </div>
+          </motion.div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {statCards.map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div
+                  key={stat.label}
+                  custom={i + 2}
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className={`rounded-2xl bg-gradient-to-br ${stat.bg} border backdrop-blur-sm p-4 hover:scale-[1.02] transition-transform duration-200`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg flex-shrink-0`}>
+                      <Icon className="text-white" size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                      <p className="text-base font-bold text-white mt-0.5 truncate">{stat.value}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
+
+          {/* Membership Timeline */}
+          {memberData.date_joined && memberData.renewal_date && (
+            <motion.div
+              custom={6}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 backdrop-blur-sm p-5"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Activity size={16} className="text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-300">Membership Timeline</h3>
+              </div>
+              <div className="relative">
+                <div className="h-2 rounded-full bg-slate-700/50 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(5, Math.min(100, ((365 - membershipStatus.daysLeft) / 365) * 100))}%` }}
+                    transition={{ duration: 1, ease: 'easeOut', delay: 0.5 }}
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-slate-500">Joined {formatDate(memberData.date_joined)}</span>
+                  <span className="text-xs text-slate-500">Renewal {formatDate(memberData.renewal_date)}</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {/* Info Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Contact Details */}
-            <div className="rounded-2xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <User size={16} className="text-blue-400" />
+            <motion.div
+              custom={7}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-800/15 border border-blue-500/25 backdrop-blur-sm p-6"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20">
+                  <User size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Contact Details</h3>
               </div>
-
               <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Mail size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Email</p>
-                    <p className="text-sm text-white mt-0.5">{memberData.email || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Phone size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Phone</p>
-                    <p className="text-sm text-white mt-0.5">{memberData.phone || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <MapPin size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Address</p>
-                    <p className="text-sm text-white mt-0.5">{fullAddress || 'Not provided'}</p>
-                  </div>
-                </div>
+                {[
+                  { icon: Mail, label: 'Email', value: memberData.email },
+                  { icon: Phone, label: 'Phone', value: memberData.phone },
+                  { icon: MapPin, label: 'Address', value: fullAddress }
+                ].map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <div key={item.label} className="flex items-start gap-3 group">
+                      <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/15 flex-shrink-0 mt-0.5">
+                        <ItemIcon size={14} className="text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">{item.label}</p>
+                        <p className="text-sm text-white mt-0.5">{item.value || 'Not provided'}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            </motion.div>
 
             {/* Membership Details */}
-            <div className="rounded-2xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                  <Shield size={16} className="text-green-400" />
+            <motion.div
+              custom={8}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20">
+                  <Shield size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Membership Details</h3>
               </div>
-
               <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <FileText size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Membership Type</p>
-                    <p className="text-sm text-white mt-0.5">
-                      {memberData.membership_level_custom || memberData.membership_level || 'Standard'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Calendar size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Renewal Date</p>
-                    <p className="text-sm text-white mt-0.5">
-                      {memberData.renewal_date ? formatDate(memberData.renewal_date) : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Clock size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Member Since</p>
-                    <p className="text-sm text-white mt-0.5">
-                      {memberData.date_joined ? formatDate(memberData.date_joined) : 'N/A'}
-                    </p>
-                  </div>
-                </div>
+                {[
+                  { icon: FileText, label: 'Membership Type', value: memberData.membership_level_custom || memberData.membership_level || 'Standard' },
+                  { icon: Calendar, label: 'Renewal Date', value: memberData.renewal_date ? formatDate(memberData.renewal_date) : 'N/A' },
+                  { icon: Clock, label: 'Member Since', value: memberData.date_joined ? formatDate(memberData.date_joined) : 'N/A' }
+                ].map((item) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <div key={item.label} className="flex items-start gap-3 group">
+                      <div className="p-1.5 rounded-lg bg-green-500/10 border border-green-500/15 flex-shrink-0 mt-0.5">
+                        <ItemIcon size={14} className="text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">{item.label}</p>
+                        <p className="text-sm text-white mt-0.5">{item.value}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            </motion.div>
 
             {/* Emergency Contact */}
-            <div className="rounded-2xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm p-6">
-              <div className="flex items-center gap-2 mb-5">
-                <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <Heart size={16} className="text-red-400" />
+            <motion.div
+              custom={9}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="rounded-2xl bg-gradient-to-br from-rose-600/15 to-rose-800/15 border border-rose-500/25 backdrop-blur-sm p-6"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-lg shadow-rose-500/20">
+                  <Heart size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Emergency Contact</h3>
               </div>
-
               {memberData.emergency_contact_name ? (
                 <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <User size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-slate-500 uppercase tracking-wider">Name</p>
-                      <p className="text-sm text-white mt-0.5">{memberData.emergency_contact_name}</p>
-                    </div>
-                  </div>
-                  {memberData.emergency_contact_phone && (
-                    <div className="flex items-start gap-3">
-                      <Phone size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider">Phone</p>
-                        <p className="text-sm text-white mt-0.5">{memberData.emergency_contact_phone}</p>
+                  {[
+                    { icon: User, label: 'Name', value: memberData.emergency_contact_name },
+                    ...(memberData.emergency_contact_phone ? [{ icon: Phone, label: 'Phone', value: memberData.emergency_contact_phone }] : []),
+                    ...(memberData.emergency_contact_relationship ? [{ icon: Shield, label: 'Relationship', value: memberData.emergency_contact_relationship }] : [])
+                  ].map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <div key={item.label} className="flex items-start gap-3">
+                        <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/15 flex-shrink-0 mt-0.5">
+                          <ItemIcon size={14} className="text-rose-400" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">{item.label}</p>
+                          <p className="text-sm text-white mt-0.5">{item.value}</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {memberData.emergency_contact_relationship && (
-                    <div className="flex items-start gap-3">
-                      <Shield size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider">Relationship</p>
-                        <p className="text-sm text-white mt-0.5">{memberData.emergency_contact_relationship}</p>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-slate-500">No emergency contact on file</p>
+                <div className="text-center py-6">
+                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/15 flex items-center justify-center mx-auto mb-3">
+                    <Heart size={20} className="text-rose-400/50" />
+                  </div>
+                  <p className="text-sm text-slate-500 mb-2">No emergency contact on file</p>
                   <button
                     onClick={() => setShowEditModal(true)}
-                    className="text-sm text-blue-400 hover:text-blue-300 mt-2 transition-colors"
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
                   >
                     Add emergency contact
                   </button>
                 </div>
               )}
-            </div>
+            </motion.div>
 
             {/* My Boats */}
-            <div className="rounded-2xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm p-6">
+            <motion.div
+              custom={10}
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              className="rounded-2xl bg-gradient-to-br from-cyan-600/15 to-cyan-800/15 border border-cyan-500/25 backdrop-blur-sm p-6"
+            >
               <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                    <Anchor size={16} className="text-cyan-400" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/20">
+                    <Anchor size={16} className="text-white" />
                   </div>
                   <h3 className="text-base font-semibold text-slate-200">My Boats</h3>
                 </div>
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/15"
                 >
                   Manage
                 </button>
               </div>
-
               {boats.length > 0 ? (
                 <div className="space-y-3">
-                  {boats.map(boat => (
-                    <div
+                  {boats.map((boat, idx) => (
+                    <motion.div
                       key={boat.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-700/20 border border-slate-700/30"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.6 + idx * 0.1 }}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/40 border border-slate-700/40 hover:border-cyan-500/30 transition-colors group"
                     >
-                      <div className="p-2 rounded-lg bg-cyan-500/10">
+                      <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/15 group-hover:bg-cyan-500/20 transition-colors">
                         <Sailboat size={16} className="text-cyan-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white truncate">
                           {boat.boat_type}
-                          {boat.boat_name && <span className="text-slate-400 ml-1">- {boat.boat_name}</span>}
+                          {boat.boat_name && <span className="text-slate-400 ml-1.5">- {boat.boat_name}</span>}
                         </p>
                         <p className="text-xs text-slate-500">
                           Sail: {boat.sail_number || 'N/A'}
@@ -581,37 +810,44 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                           {boat.handicap !== undefined && boat.handicap !== null && ` | HC: ${boat.handicap}`}
                         </p>
                       </div>
-                    </div>
+                      <ChevronRight size={14} className="text-slate-600 group-hover:text-cyan-400 transition-colors" />
+                    </motion.div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <Sailboat size={24} className="mx-auto mb-2 text-slate-600" />
-                  <p className="text-sm text-slate-500">No boats registered</p>
+                <div className="text-center py-6">
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/15 flex items-center justify-center mx-auto mb-3">
+                    <Sailboat size={20} className="text-cyan-400/50" />
+                  </div>
+                  <p className="text-sm text-slate-500 mb-2">No boats registered</p>
                   <button
                     onClick={() => setShowEditModal(true)}
-                    className="text-sm text-blue-400 hover:text-blue-300 mt-2 transition-colors"
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
                   >
                     Add a boat
                   </button>
                 </div>
               )}
-            </div>
+            </motion.div>
           </div>
 
           {/* Payment History */}
-          <div className="rounded-2xl bg-slate-800/30 border border-slate-700/50 backdrop-blur-sm p-6">
+          <motion.div
+            custom={11}
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            className="rounded-2xl bg-gradient-to-br from-amber-600/15 to-amber-800/15 border border-amber-500/25 backdrop-blur-sm p-6"
+          >
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <FileText size={16} className="text-amber-400" />
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/20">
+                  <FileText size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Payment History</h3>
               </div>
               {!membershipStatus.needsRenewal && (
-                <button
-                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-300 transition-colors"
-                >
+                <button className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors font-medium px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15">
                   <Download size={14} />
                   Download Invoice
                 </button>
@@ -619,69 +855,76 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             </div>
 
             {payments.length > 0 ? (
-              <div className="overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-700/50">
-                      <th className="text-left pb-3 font-medium">Date</th>
-                      <th className="text-left pb-3 font-medium">Description</th>
-                      <th className="text-left pb-3 font-medium">Method</th>
-                      <th className="text-right pb-3 font-medium">Amount</th>
-                      <th className="text-right pb-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {payments.map(payment => (
-                      <tr key={payment.id} className="text-sm">
-                        <td className="py-3 text-slate-400">{formatDate(payment.payment_date)}</td>
-                        <td className="py-3 text-white">{payment.description || 'Membership Payment'}</td>
-                        <td className="py-3 text-slate-400 capitalize">{payment.payment_method?.replace('_', ' ') || 'N/A'}</td>
-                        <td className="py-3 text-right text-white font-medium">${payment.amount?.toFixed(2)}</td>
-                        <td className="py-3 text-right">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            payment.status === 'paid' || payment.status === 'completed'
-                              ? 'bg-green-500/15 text-green-400'
-                              : payment.status === 'pending'
-                              ? 'bg-yellow-500/15 text-yellow-400'
-                              : 'bg-slate-500/15 text-slate-400'
-                          }`}>
-                            {payment.status === 'paid' || payment.status === 'completed' ? (
-                              <CheckCircle size={10} />
-                            ) : (
-                              <Clock size={10} />
-                            )}
-                            {payment.status || 'N/A'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                {payments.map((payment, idx) => (
+                  <motion.div
+                    key={payment.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.7 + idx * 0.08 }}
+                    className="flex items-center justify-between gap-4 p-3 rounded-xl bg-slate-800/40 border border-slate-700/40"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg ${
+                        payment.status === 'paid' || payment.status === 'completed'
+                          ? 'bg-green-500/10 border border-green-500/15'
+                          : 'bg-yellow-500/10 border border-yellow-500/15'
+                      }`}>
+                        {payment.status === 'paid' || payment.status === 'completed'
+                          ? <CheckCircle size={14} className="text-green-400" />
+                          : <Clock size={14} className="text-yellow-400" />
+                        }
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white truncate">
+                          {payment.description || 'Membership Payment'}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {formatDate(payment.payment_date)} · {payment.payment_method?.replace('_', ' ') || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-white">${payment.amount?.toFixed(2)}</p>
+                      <span className={`text-[10px] font-medium uppercase tracking-wider ${
+                        payment.status === 'paid' || payment.status === 'completed' ? 'text-green-400' : 'text-yellow-400'
+                      }`}>
+                        {payment.status || 'N/A'}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             ) : (
               <div className="text-center py-8">
-                <FileText size={24} className="mx-auto mb-2 text-slate-600" />
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/15 flex items-center justify-center mx-auto mb-3">
+                  <FileText size={20} className="text-amber-400/50" />
+                </div>
                 <p className="text-sm text-slate-500">No payment history available</p>
               </div>
             )}
-          </div>
+          </motion.div>
 
-          {/* Quick Actions */}
+          {/* Renewal CTA */}
           {membershipStatus.needsRenewal && (
-            <div className="flex justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9 }}
+              className="flex justify-center"
+            >
               <button
                 onClick={() => setShowRenewalModal(true)}
-                className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium transition-colors shadow-lg shadow-blue-500/20"
+                className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105 transition-all duration-200"
               >
                 <CreditCard size={18} />
                 Renew Membership
               </button>
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
 
-      {/* Edit Modal - Same as admin flow */}
       {showEditModal && memberData && currentClub?.clubId && (
         <MemberEditModal
           isOpen={showEditModal}
@@ -693,113 +936,124 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         />
       )}
 
-      {/* Renewal Modal */}
-      {showRenewalModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="max-w-2xl w-full rounded-2xl shadow-xl bg-slate-800 border border-slate-700">
-            <div className="p-6 border-b border-slate-700">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold text-white">Renew Your Membership</h3>
-                <button
-                  onClick={() => setShowRenewalModal(false)}
-                  className="p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <p className="text-slate-400 mb-6">
-                Choose your membership type to continue with renewal:
-              </p>
-
-              <div className="space-y-3 mb-6">
-                {membershipTypes.map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => setSelectedMembershipType(type.id)}
-                    className={`w-full p-4 rounded-xl border text-left transition-colors ${
-                      selectedMembershipType === type.id
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-white mb-1">{type.name}</h4>
-                        {type.description && (
-                          <p className="text-sm text-slate-400">{type.description}</p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-white">${type.amount}</p>
-                        <p className="text-xs text-slate-400">{type.currency}</p>
-                      </div>
+      <AnimatePresence>
+        {showRenewalModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={(e) => e.target === e.currentTarget && setShowRenewalModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="max-w-2xl w-full rounded-2xl shadow-2xl bg-slate-800 border border-slate-700"
+            >
+              <div className="p-6 border-b border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600">
+                      <CreditCard size={18} className="text-white" />
                     </div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-3">
-                  Payment Method
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+                    <h3 className="text-xl font-semibold text-white">Renew Your Membership</h3>
+                  </div>
                   <button
-                    onClick={() => setSelectedPaymentMethod('credit_card')}
-                    className={`p-4 rounded-xl border text-left transition-colors ${
-                      selectedPaymentMethod === 'credit_card'
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
+                    onClick={() => setShowRenewalModal(false)}
+                    className="p-2 text-slate-400 hover:text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
                   >
-                    <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
-                    <h4 className="font-medium text-white mb-1">Credit Card</h4>
-                    <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedPaymentMethod('bank_transfer')}
-                    className={`p-4 rounded-xl border text-left transition-colors ${
-                      selectedPaymentMethod === 'bank_transfer'
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <Calendar className={`mb-2 ${selectedPaymentMethod === 'bank_transfer' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
-                    <h4 className="font-medium text-white mb-1">Bank Transfer</h4>
-                    <p className="text-xs text-slate-400">Pay via direct deposit</p>
+                    <X size={20} />
                   </button>
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowRenewalModal(false)}
-                  className="flex-1 px-4 py-2.5 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRenewal}
-                  disabled={!selectedMembershipType || processingPayment}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processingPayment ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Processing...
-                    </div>
-                  ) : (
-                    selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Renewal Request'
-                  )}
-                </button>
+              <div className="p-6">
+                <p className="text-slate-400 mb-6">Choose your membership type to continue with renewal:</p>
+
+                <div className="space-y-3 mb-6">
+                  {membershipTypes.map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => setSelectedMembershipType(type.id)}
+                      className={`w-full p-4 rounded-xl border text-left transition-all duration-200 ${
+                        selectedMembershipType === type.id
+                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-white mb-1">{type.name}</h4>
+                          {type.description && <p className="text-sm text-slate-400">{type.description}</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-white">${type.amount}</p>
+                          <p className="text-xs text-slate-400">{type.currency}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-300 mb-3">Payment Method</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setSelectedPaymentMethod('credit_card')}
+                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${
+                        selectedPaymentMethod === 'credit_card'
+                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                      }`}
+                    >
+                      <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                      <h4 className="font-medium text-white mb-1">Credit Card</h4>
+                      <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
+                    </button>
+                    <button
+                      onClick={() => setSelectedPaymentMethod('bank_transfer')}
+                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${
+                        selectedPaymentMethod === 'bank_transfer'
+                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                      }`}
+                    >
+                      <Calendar className={`mb-2 ${selectedPaymentMethod === 'bank_transfer' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                      <h4 className="font-medium text-white mb-1">Bank Transfer</h4>
+                      <p className="text-xs text-slate-400">Pay via direct deposit</p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowRenewalModal(false)}
+                    className="flex-1 px-4 py-2.5 bg-slate-700 text-slate-200 rounded-xl hover:bg-slate-600 font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRenewal}
+                    disabled={!selectedMembershipType || processingPayment}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {processingPayment ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        Processing...
+                      </div>
+                    ) : (
+                      selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Renewal Request'
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
