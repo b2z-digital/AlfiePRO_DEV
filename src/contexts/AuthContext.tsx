@@ -153,7 +153,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // If super admin, fetch all clubs
         const { data: allClubsData, error: allClubsError } = await supabase
           .from('clubs')
-          .select('id, name, abbreviation, logo');
+          .select('id, name, abbreviation, logo')
+          .order('name');
         
         if (allClubsError) throw allClubsError;
         
@@ -443,11 +444,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             lastName
           };
 
-          // Update ref BEFORE setting state
+          const previousUserId = currentUserIdRef.current;
           currentUserIdRef.current = session.user.id;
+
+          if (previousUserId && previousUserId !== session.user.id) {
+            localStorage.removeItem('currentClubId');
+            localStorage.removeItem('currentOrganization');
+          }
+
           setUser(enhancedUser);
 
-          // Check onboarding status
           const { data: profileData } = await supabase
             .from('profiles')
             .select('onboarding_completed')
@@ -559,8 +565,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 lastName
               };
 
-              // Update ref BEFORE setting state to ensure synchronous check works
+              const prevUserId = currentUserIdRef.current;
               currentUserIdRef.current = session.user.id;
+
+              if (prevUserId && prevUserId !== session.user.id) {
+                localStorage.removeItem('currentClubId');
+                localStorage.removeItem('currentOrganization');
+              }
+
               setUser(enhancedUser);
 
               // Check onboarding status

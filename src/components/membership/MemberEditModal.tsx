@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe } from 'lucide-react';
+import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -67,6 +67,9 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkingAccount, setLinkingAccount] = useState(false);
+  const [linkedUserEmail, setLinkedUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && memberId) {
@@ -102,6 +105,11 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           .single();
 
         member.avatar_url = profile?.avatar_url;
+
+        const { data: linkedUser } = await supabase.rpc('get_user_email_by_id', { p_user_id: member.user_id });
+        setLinkedUserEmail(linkedUser || member.email || null);
+      } else {
+        setLinkedUserEmail(null);
       }
 
       setMemberData(member);
@@ -196,6 +204,54 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
     } finally {
       setUploadingAvatar(false);
       setSelectedImageFile(null);
+    }
+  };
+
+  const handleLinkAccount = async () => {
+    if (!linkEmail.trim() || !memberData) return;
+
+    setLinkingAccount(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_link_member_to_account', {
+        p_member_id: memberId,
+        p_email: linkEmail.trim()
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to link account');
+
+      addNotification('success', data.message);
+      setLinkedUserEmail(linkEmail.trim());
+      setMemberData({ ...memberData, user_id: data.user_id });
+      setLinkEmail('');
+      onSuccess?.();
+    } catch (error: any) {
+      addNotification('error', error.message || 'Failed to link account');
+    } finally {
+      setLinkingAccount(false);
+    }
+  };
+
+  const handleUnlinkAccount = async () => {
+    if (!memberData) return;
+
+    setLinkingAccount(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_unlink_member_from_account', {
+        p_member_id: memberId
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to unlink account');
+
+      addNotification('success', data.message);
+      setLinkedUserEmail(null);
+      setMemberData({ ...memberData, user_id: '' });
+      onSuccess?.();
+    } catch (error: any) {
+      addNotification('error', error.message || 'Failed to unlink account');
+    } finally {
+      setLinkingAccount(false);
     }
   };
 
@@ -797,6 +853,87 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                       </span>
                     )}
                   </div>
+                </div>
+
+                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    <Shield size={20} className="text-blue-400" />
+                    Account Linking
+                  </h3>
+
+                  {memberData.user_id ? (
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <Link size={18} className="text-green-400" />
+                          </div>
+                          <div>
+                            <p className={`font-medium ${darkMode ? 'text-green-300' : 'text-green-800'}`}>
+                              Linked to Account
+                            </p>
+                            <p className={`text-sm ${darkMode ? 'text-green-400/70' : 'text-green-600'}`}>
+                              {linkedUserEmail || 'Loading...'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleUnlinkAccount}
+                          disabled={linkingAccount}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors disabled:opacity-50"
+                        >
+                          {linkingAccount ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                          ) : (
+                            <Unlink size={14} />
+                          )}
+                          Unlink
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className={`p-4 rounded-lg ${darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                        <div className="flex items-start gap-3">
+                          <AlertCircle size={18} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className={`text-sm ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+                              This member is not linked to a login account. They cannot access the app until linked.
+                            </p>
+                            <p className={`text-xs mt-1 ${darkMode ? 'text-amber-400/60' : 'text-amber-600'}`}>
+                              Enter the email address the member registered with (or will register with). If they haven't registered yet, they can sign up and auto-linking will match by email.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={linkEmail}
+                          onChange={(e) => setLinkEmail(e.target.value)}
+                          placeholder="Enter member's account email..."
+                          className={`flex-1 px-4 py-2.5 rounded-lg ${
+                            darkMode ? 'bg-slate-700 text-slate-200 border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-400'
+                          } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleLinkAccount}
+                          disabled={linkingAccount || !linkEmail.trim()}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {linkingAccount ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <Link size={16} />
+                          )}
+                          Link Account
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
