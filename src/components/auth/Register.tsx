@@ -204,10 +204,10 @@ export const Register: React.FC = () => {
               <button
                 onClick={handleGoogleSignUp}
                 disabled={googleLoading}
-                className="w-full flex items-center justify-center gap-3 py-3 bg-white hover:bg-gray-50 disabled:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md disabled:shadow-none mb-6"
+                className="w-full flex items-center justify-center gap-3 py-3 bg-slate-700/60 hover:bg-slate-600/70 disabled:bg-slate-700/40 border border-slate-600/50 hover:border-slate-500/60 text-slate-200 font-medium rounded-xl transition-all duration-200 backdrop-blur-sm disabled:text-slate-500 mb-6"
               >
                 {googleLoading ? (
-                  <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <GoogleIcon />
                 )}
@@ -234,7 +234,7 @@ export const Register: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm"
+                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -249,7 +249,7 @@ export const Register: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm"
+                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     placeholder="••••••••"
                   />
                 </div>
@@ -264,7 +264,7 @@ export const Register: React.FC = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm"
+                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     placeholder="••••••••"
                   />
                 </div>

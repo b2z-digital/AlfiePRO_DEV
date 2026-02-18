@@ -508,12 +508,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           async (event, session) => {
             console.log('Auth state changed:', event, session?.user?.email);
 
-            // Handle token refresh events - DON'T reload clubs (they haven't changed!)
-            // This prevents unnecessary state updates and channel thrashing
             if (event === 'TOKEN_REFRESHED') {
-              console.log('Token refreshed successfully - no action needed');
-              // Token refresh doesn't change user clubs/roles, so skip refresh
-              // This prevents realtime channels from being destroyed and recreated
+              return;
+            }
+
+            if (event === 'PASSWORD_RECOVERY') {
               return;
             }
 

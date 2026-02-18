@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
-import { CheckCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -13,22 +13,49 @@ export const ResetPassword: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
+  const [expired, setExpired] = useState(false);
   const navigate = useNavigate();
+  const sessionReadyRef = useRef(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        sessionReadyRef.current = true;
         setSessionReady(true);
+      } else if (event === 'SIGNED_IN' && !sessionReadyRef.current) {
+        const hash = window.location.hash;
+        if (hash && hash.includes('type=recovery')) {
+          sessionReadyRef.current = true;
+          setSessionReady(true);
+        }
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
+      if (session && !sessionReadyRef.current) {
+        const hash = window.location.hash;
+        if (hash && hash.includes('type=recovery')) {
+          sessionReadyRef.current = true;
+          setSessionReady(true);
+        } else if (session) {
+          sessionReadyRef.current = true;
+          setSessionReady(true);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    timeoutId = setTimeout(() => {
+      if (!sessionReadyRef.current) {
+        setExpired(true);
+      }
+    }, 10000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -51,9 +78,15 @@ export const ResetPassword: React.FC = () => {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
+
+      await supabase.auth.signOut();
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to update password');
+      if (err.message?.includes('session') || err.message?.includes('token')) {
+        setError('Your reset link has expired. Please request a new one.');
+      } else {
+        setError(err.message || 'Failed to update password');
+      }
     } finally {
       setLoading(false);
     }
@@ -91,6 +124,32 @@ export const ResetPassword: React.FC = () => {
                   >
                     Sign In
                   </button>
+                </div>
+              ) : expired ? (
+                <div className="text-center space-y-4">
+                  <div className="flex justify-center mb-4">
+                    <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center">
+                      <AlertTriangle size={32} className="text-amber-400" />
+                    </div>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">Link expired or invalid</h2>
+                  <p className="text-slate-400 text-sm">
+                    This password reset link has expired or is invalid. Please request a new one.
+                  </p>
+                  <div className="flex gap-3 justify-center mt-4">
+                    <button
+                      onClick={() => navigate('/forgot-password')}
+                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200"
+                    >
+                      Request New Link
+                    </button>
+                    <button
+                      onClick={() => navigate('/login')}
+                      className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl transition-all duration-200"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
                 </div>
               ) : !sessionReady ? (
                 <div className="text-center space-y-4">
@@ -141,7 +200,7 @@ export const ResetPassword: React.FC = () => {
                           required
                           minLength={6}
                           autoFocus
-                          className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm"
+                          className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                           placeholder="Minimum 6 characters"
                         />
                         <button
@@ -166,7 +225,7 @@ export const ResetPassword: React.FC = () => {
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           required
                           minLength={6}
-                          className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm"
+                          className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                           placeholder="Confirm your new password"
                         />
                         <button
