@@ -10,7 +10,7 @@ import { Skipper } from '../types';
 import { Member } from '../types/member';
 
 const DB_NAME = 'alfie_pro_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface SyncQueueItem {
   id: string;
@@ -38,7 +38,9 @@ class OfflineStorageManager {
   private listeners: Set<(online: boolean) => void> = new Set();
 
   constructor() {
-    this.initializeDB();
+    this.initializeDB().catch(err => {
+      console.error('IndexedDB initialization failed:', err);
+    });
     this.setupConnectionListeners();
   }
 
@@ -54,9 +56,16 @@ class OfflineStorageManager {
         reject(request.error);
       };
 
+      request.onblocked = () => {
+        console.warn('IndexedDB upgrade blocked - closing stale connections');
+      };
+
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('✅ IndexedDB initialized successfully');
+        this.db.onversionchange = () => {
+          this.db?.close();
+          this.db = null;
+        };
         resolve();
       };
 
@@ -96,7 +105,20 @@ class OfflineStorageManager {
           db.createObjectStore('metadata', { keyPath: 'key' });
         }
 
-        console.log('📦 IndexedDB schema created');
+        if (!db.objectStoreNames.contains('articles')) {
+          const articleStore = db.createObjectStore('articles', { keyPath: 'id' });
+          articleStore.createIndex('clubId', 'club_id', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains('tasks')) {
+          const taskStore = db.createObjectStore('tasks', { keyPath: 'id' });
+          taskStore.createIndex('clubId', 'club_id', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains('meetings')) {
+          const meetingStore = db.createObjectStore('meetings', { keyPath: 'id' });
+          meetingStore.createIndex('clubId', 'club_id', { unique: false });
+        }
       };
     });
   }
@@ -119,9 +141,11 @@ class OfflineStorageManager {
     });
   }
 
-  /**
-   * Check if we're currently online
-   */
+  public async getDB(): Promise<IDBDatabase> {
+    if (!this.db) await this.initializeDB();
+    return this.db!;
+  }
+
   public getOnlineStatus(): boolean {
     return this.isOnline;
   }
