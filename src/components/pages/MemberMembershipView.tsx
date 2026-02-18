@@ -46,8 +46,8 @@ interface MemberData {
   emergency_contact_relationship: string;
   avatar_url?: string;
   country?: string;
-  member_category?: string;
-  joined_date?: string;
+  category?: string;
+  date_joined?: string;
 }
 
 interface BoatData {
@@ -118,7 +118,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             is_financial, renewal_date,
             membership_level, membership_level_custom,
             emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-            avatar_url, country, member_category, joined_date
+            avatar_url, country, category, date_joined
           `)
           .eq('club_id', currentClub?.clubId)
           .eq('user_id', user?.id)
@@ -358,11 +358,11 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                       </h2>
                       <p className="text-slate-400 text-sm mt-0.5">
                         {memberData.membership_level_custom || memberData.membership_level || 'Member'}
-                        {memberData.member_category && ` - ${memberData.member_category}`}
+                        {memberData.category && ` - ${memberData.category}`}
                       </p>
-                      {memberData.joined_date && (
+                      {memberData.date_joined && (
                         <p className="text-slate-500 text-xs mt-1">
-                          Member since {formatDate(memberData.joined_date)}
+                          Member since {formatDate(memberData.date_joined)}
                         </p>
                       )}
                     </div>
@@ -486,7 +486,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   <div>
                     <p className="text-xs text-slate-500 uppercase tracking-wider">Member Since</p>
                     <p className="text-sm text-white mt-0.5">
-                      {memberData.joined_date ? formatDate(memberData.joined_date) : 'N/A'}
+                      {memberData.date_joined ? formatDate(memberData.date_joined) : 'N/A'}
                     </p>
                   </div>
                 </div>
