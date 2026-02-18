@@ -46,6 +46,7 @@ interface HeatScoringTableProps {
   onClearHeatRaceResults?: (heatDesignation: HeatDesignation, round: number, race: number, skipperIndices: number[]) => void;
   onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
+  isFullscreen?: boolean;
 }
 
 export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
@@ -79,7 +80,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onAdvanceToNextRound,
   onClearHeatRaceResults,
   onUpdateHeatAssignments,
-  onSelectHeat
+  onSelectHeat,
+  isFullscreen
 }) => {
   const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
   const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
@@ -839,7 +841,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   }
 
   return (
-    <div className="space-y-6 p-8 no-select">
+    <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
       {/* All Heats Complete - Show Actions (hidden in touch mode as it's shown in the button instead) */}
       {areAllHeatsComplete() && !isRoundComplete && !touchMode && (
           <div className={`mt-4 p-4 rounded-lg ${
@@ -1119,6 +1121,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             currentRace={heatManagement.currentRound}
             numRaces={12}
             isHeatScoring={true}
+            isFullscreen={isFullscreen}
             isScoringLastHeat={isScoringLastHeat()}
             roundLabel={getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
             allSkippers={skippers}

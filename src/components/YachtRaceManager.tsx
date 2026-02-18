@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Home, Settings, Users, Hand, Table2 } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Home, Settings, Users, Hand, Table2, Maximize2, Minimize2 } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -90,7 +90,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [isDataFullyLoaded, setIsDataFullyLoaded] = useState(false);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
-  const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0); // Force re-render when event is updated
+  const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
+  const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const isCalculatingHandicaps = useRef(false);
@@ -2838,15 +2839,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
-      <div className="w-full px-20 py-12">
-        <div className="flex-1 flex flex-col justify-center min-h-[calc(100vh-24rem)]">
-          {getCurrentEvent() && (
+      <div className={`w-full ${isFullscreenScoring ? 'px-4 py-2' : 'px-20 py-12'}`}>
+        <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
+          {getCurrentEvent() && !isFullscreenScoring && (
             <div className="mb-4">
-              <RaceHeader 
-                event={getCurrentEvent()!} 
-                darkMode={darkMode} 
+              <RaceHeader
+                event={getCurrentEvent()!}
+                darkMode={darkMode}
               />
-              
             </div>
           )}
 
@@ -2907,9 +2907,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               </div>
             )}
 
-            {/* Top Right Controls - Only for Touch Mode (Pro mode has its own in RaceTable) */}
-            {scoringMode === 'touch' && (
-              <div className="fixed top-4 right-[5.9375rem] z-30 flex items-center gap-2">
+            {(scoringMode === 'touch' || heatManagement?.configuration.enabled) && (
+              <div className={`fixed ${isFullscreenScoring ? 'top-2 right-4' : 'top-4 right-[5.9375rem]'} z-30 flex items-center gap-2`}>
                 <button
                   type="button"
                   onClick={() => setShowExitConfirm(true)}
@@ -2935,6 +2934,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 >
                   <Settings size={16} />
                   <span className="text-xs font-medium">Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreenScoring(prev => !prev)}
+                  className={`
+                    flex items-center justify-center p-2 rounded-lg transition-colors
+                    ${darkMode
+                      ? 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
+                      : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'}
+                  `}
+                  title={isFullscreenScoring ? 'Exit Fullscreen' : 'Fullscreen Scoring'}
+                >
+                  {isFullscreenScoring ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
                 {lastCompletedRace >= 1 && (
                   <button
@@ -2990,6 +3002,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onClearHeatRaceResults={handleClearHeatRaceResults}
                 onUpdateHeatAssignments={handleUpdateHeatAssignments}
                 onSelectHeat={handleSelectHeat}
+                isFullscreen={isFullscreenScoring}
               />
             ) : scoringMode === 'touch' ? (
               <TouchModeScoring
@@ -3083,6 +3096,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 }}
                 darkMode={darkMode}
                 currentEvent={currentEvent}
+                isFullscreen={isFullscreenScoring}
               />
             ) : raceType === 'handicap' ? (
               <RaceTable

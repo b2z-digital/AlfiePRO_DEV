@@ -31,6 +31,7 @@ interface TouchModeScoringProps {
   roundLabel?: string;
   allSkippers?: Skipper[];
   allRaceResults?: RaceResult[];
+  isFullscreen?: boolean;
 }
 
 interface FinishingEntry {
@@ -59,7 +60,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   heatObservers = [],
   roundLabel,
   allSkippers,
-  allRaceResults
+  allRaceResults,
+  isFullscreen = false
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
   const [finishOrder, setFinishOrder] = useState<FinishingEntry[]>([]);
@@ -803,7 +805,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
 
   return (
-    <div className={`h-[75vh] flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
+    <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
       {/* Header - Race Navigation Only */}
       <div className={`border-b px-4 py-3 flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-4">
