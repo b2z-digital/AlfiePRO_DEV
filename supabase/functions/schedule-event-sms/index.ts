@@ -58,16 +58,17 @@ Deno.serve(async (req: Request) => {
 
         const { data: quickRaces } = await supabase
           .from("quick_races")
-          .select("id, event_name, date, race_class, club_id")
+          .select("id, event_name, race_date, race_class, race_venue, club_id")
           .eq("club_id", clubSettings.club_id)
-          .eq("date", targetDateStr)
+          .eq("race_date", targetDateStr)
           .eq("completed", false)
-          .eq("cancelled", false);
+          .eq("archived", false);
 
         const { data: series } = await supabase
           .from("race_series")
-          .select("id, name, club_id, rounds, boat_class")
-          .eq("club_id", clubSettings.club_id);
+          .select("id, series_name, club_id, rounds, race_class")
+          .eq("club_id", clubSettings.club_id)
+          .eq("completed", false);
 
         const eventsToNotify: Array<{
           event_id: string;
@@ -79,19 +80,12 @@ Deno.serve(async (req: Request) => {
 
         if (quickRaces) {
           for (const race of quickRaces) {
-            const { data: venue } = await supabase
-              .from("venues")
-              .select("name")
-              .eq("club_id", clubSettings.club_id)
-              .limit(1)
-              .maybeSingle();
-
             eventsToNotify.push({
               event_id: race.id,
               event_name: race.event_name || "Club Race",
-              event_date: race.date,
+              event_date: race.race_date,
               boat_class: race.race_class || "",
-              venue: venue?.name || "",
+              venue: race.race_venue || "",
             });
           }
         }
@@ -108,12 +102,12 @@ Deno.serve(async (req: Request) => {
 
             for (const round of rounds) {
               const roundDate = round.date || round.round_date;
-              if (roundDate === targetDateStr && !round.completed && !round.cancelled) {
+              if (roundDate === targetDateStr && !round.completed) {
                 eventsToNotify.push({
                   event_id: `${s.id}__${round.name || round.round_name}`,
-                  event_name: `${s.name} - ${round.name || round.round_name}`,
+                  event_name: `${s.series_name} - ${round.name || round.round_name}`,
                   event_date: roundDate,
-                  boat_class: s.boat_class || "",
+                  boat_class: s.race_class || "",
                   venue: round.venue || "",
                 });
               }

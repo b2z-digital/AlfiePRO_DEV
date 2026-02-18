@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -107,6 +107,10 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [loadingRegistration, setLoadingRegistration] = useState(false);
   const [allRegistrations, setAllRegistrations] = useState<any[]>([]);
   const [loadingAllRegistrations, setLoadingAllRegistrations] = useState(false);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState<{ sent: number; failed: number } | null>(null);
+  const [smsAlreadySent, setSmsAlreadySent] = useState(false);
 
   // Check if event has participants or has been started
   const hasParticipants = event.skippers && event.skippers.length > 0;
@@ -358,6 +362,35 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     checkEventWebsite();
   }, [event.id, event.isPublicEvent]);
 
+  useEffect(() => {
+    const checkSmsStatus = async () => {
+      if (!currentClub?.clubId || !can('manage', 'events')) return;
+      const { data: settings } = await supabase
+        .from('sms_club_settings')
+        .select('is_enabled')
+        .eq('club_id', currentClub.clubId)
+        .maybeSingle();
+      setSmsEnabled(!!settings?.is_enabled);
+
+      if (settings?.is_enabled) {
+        const eventId = event.isSeriesEvent && event.seriesId
+          ? `${extractDbId(event.seriesId)}__${event.roundName}`
+          : extractDbId(event.id);
+        const { data: existingLog } = await supabase
+          .from('sms_event_logs')
+          .select('id, total_sent, status')
+          .eq('club_id', currentClub.clubId)
+          .eq('event_id', eventId)
+          .in('status', ['sending', 'completed'])
+          .maybeSingle();
+        if (existingLog) {
+          setSmsAlreadySent(true);
+          setSmsSent({ sent: existingLog.total_sent || 0, failed: 0 });
+        }
+      }
+    };
+    checkSmsStatus();
+  }, [currentClub?.clubId, event.id]);
 
   // Fetch race report
   useEffect(() => {
@@ -1199,6 +1232,46 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     }
   };
 
+  const handleSendSms = async () => {
+    if (!currentClub?.clubId || smsSending) return;
+    setSmsSending(true);
+    setSmsSent(null);
+    try {
+      const eventId = event.isSeriesEvent && event.seriesId
+        ? `${extractDbId(event.seriesId)}__${event.roundName}`
+        : extractDbId(event.id);
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-event-sms`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          club_id: currentClub.clubId,
+          event_id: eventId,
+          event_name: event.eventName || event.seriesName || 'Club Race',
+          event_date: event.raceDate || '',
+          boat_class: event.raceClass || '',
+          venue: event.raceVenue || '',
+          trigger_type: 'manual',
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Failed to send SMS');
+      }
+      setSmsSent({ sent: result.sent || 0, failed: result.failed || 0 });
+      setSmsAlreadySent(true);
+    } catch (err: any) {
+      setSmsSent({ sent: 0, failed: -1 });
+      console.error('SMS send error:', err.message);
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
   const updateAttendance = async (status: 'yes' | 'no' | 'maybe') => {
     if (!user?.id || !event.id) return;
 
@@ -1948,6 +2021,44 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               )}
             </div>
           </div>
+
+          {smsEnabled && can('manage', 'events') && (
+            <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MessageSquare size={18} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
+                  <div>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                      SMS Attendance
+                    </h4>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {smsAlreadySent
+                        ? `${smsSent?.sent || 0} messages sent`
+                        : 'Send SMS to members with phone numbers'}
+                    </p>
+                  </div>
+                </div>
+                {smsAlreadySent ? (
+                  <div className="flex items-center gap-2 text-green-400">
+                    <CheckCircle size={16} />
+                    <span className="text-xs font-medium">Sent</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleSendSms}
+                    disabled={smsSending}
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors disabled:opacity-50"
+                  >
+                    {smsSending ? (
+                      <><Loader2 size={14} className="animate-spin" /> Sending...</>
+                    ) : (
+                      <><MessageSquare size={14} /> Notify Members</>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

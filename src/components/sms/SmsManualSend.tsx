@@ -54,31 +54,24 @@ export const SmsManualSend: React.FC<SmsManualSendProps> = ({ darkMode = true, c
 
       const { data: quickRaces } = await supabase
         .from('quick_races')
-        .select('id, event_name, date, race_class, club_id')
+        .select('id, event_name, race_date, race_class, race_venue, club_id, archived, completed')
         .eq('club_id', clubId)
-        .gte('date', today)
-        .lte('date', futureDateStr)
+        .gte('race_date', today)
+        .lte('race_date', futureDateStr)
         .eq('completed', false)
-        .eq('cancelled', false)
-        .order('date');
+        .eq('archived', false)
+        .order('race_date');
 
       const upcomingEvents: UpcomingEvent[] = [];
 
       if (quickRaces) {
         for (const race of quickRaces) {
-          const { data: venue } = await supabase
-            .from('venues')
-            .select('name')
-            .eq('club_id', clubId)
-            .limit(1)
-            .maybeSingle();
-
           upcomingEvents.push({
             id: race.id,
             name: race.event_name || 'Club Race',
-            date: race.date,
+            date: race.race_date,
             boat_class: race.race_class || '',
-            venue: venue?.name || '',
+            venue: race.race_venue || '',
             isSeriesRound: false,
           });
         }
@@ -86,8 +79,9 @@ export const SmsManualSend: React.FC<SmsManualSendProps> = ({ darkMode = true, c
 
       const { data: series } = await supabase
         .from('race_series')
-        .select('id, name, club_id, rounds, boat_class')
-        .eq('club_id', clubId);
+        .select('id, series_name, club_id, rounds, race_class')
+        .eq('club_id', clubId)
+        .eq('completed', false);
 
       if (series) {
         for (const s of series) {
@@ -99,12 +93,12 @@ export const SmsManualSend: React.FC<SmsManualSendProps> = ({ darkMode = true, c
 
           for (const round of rounds) {
             const roundDate = round.date || round.round_date;
-            if (roundDate && roundDate >= today && roundDate <= futureDateStr && !round.completed && !round.cancelled) {
+            if (roundDate && roundDate >= today && roundDate <= futureDateStr && !round.completed) {
               upcomingEvents.push({
                 id: `${s.id}__${round.name || round.round_name}`,
-                name: `${s.name} - ${round.name || round.round_name}`,
+                name: `${s.series_name} - ${round.name || round.round_name}`,
                 date: roundDate,
-                boat_class: s.boat_class || '',
+                boat_class: s.race_class || '',
                 venue: round.venue || '',
                 isSeriesRound: true,
               });

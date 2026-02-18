@@ -308,8 +308,6 @@ Deno.serve(async (req: Request) => {
       .eq("id", eventLog.id);
 
     if (sentCount > 0) {
-      await supabase.rpc("", {}).catch(() => {});
-
       await supabase
         .from("sms_token_balances")
         .update({
