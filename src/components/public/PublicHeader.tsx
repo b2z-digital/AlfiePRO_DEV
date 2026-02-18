@@ -32,7 +32,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
               aria-label="Menu"
             >
               {mobileMenuOpen ? (
-                <LogOut className="w-6 h-6 text-gray-700" />
+                <X className="w-6 h-6 text-gray-700" />
               ) : (
                 <>
                   <Menu className="w-6 h-6 text-gray-700" />

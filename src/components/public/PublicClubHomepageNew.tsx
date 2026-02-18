@@ -472,7 +472,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
               aria-label="Menu"
             >
               {mobileMenuOpen ? (
-                <LogOut className="w-6 h-6 text-gray-700" />
+                <X className="w-6 h-6 text-gray-700" />
               ) : (
                 <>
                   <Menu className="w-6 h-6 text-gray-700" />
@@ -780,7 +780,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                     {latestResults.map((result) => (
                       <Link
                         key={result.id}
-                        to={`/club/${clubId}/public/results/${result.id}`}
+                        to={buildPublicUrl(`/results/${result.id}`)}
                         className="block bg-gray-50 rounded-lg p-3 hover:shadow-md hover:bg-gray-100 transition-all min-h-[110px] flex flex-col"
                       >
                         <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{result.name}</h3>
