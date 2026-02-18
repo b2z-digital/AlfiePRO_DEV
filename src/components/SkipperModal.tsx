@@ -310,16 +310,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     }
   }, [isOpen, currentEvent?.raceClass, view, skippers.length, currentEvent?.isInterclub, currentEvent?.otherClubId, currentEvent?.clubId]);
 
-  // Fetch attendance data when modal opens
   useEffect(() => {
     const fetchAttendance = async () => {
       if (!isOpen || !currentEvent?.id) return;
 
       try {
-        // Extract the database UUID from the event ID
-        // For series events like "uuid-round-1" or "uuid-day-2", we need the first 5 parts
+        const eventId = currentEvent.id;
         const dbEventId = (() => {
-          const eventId = currentEvent.id;
           if (eventId.includes('-round-') || eventId.includes('-day-')) {
             const parts = eventId.split('-');
             return parts.slice(0, 5).join('-');
@@ -327,69 +324,86 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           return eventId;
         })();
 
-        console.log('🔍 SkipperModal: Fetching attendance for event:', {
-          originalId: currentEvent.id,
-          dbEventId,
-          eventName: currentEvent.eventName
-        });
+        let query;
 
-        const { data, error } = await supabase
-          .from('event_attendance')
-          .select('user_id, status')
-          .eq('event_id', dbEventId)
-          .eq('status', 'yes');
+        if (currentEvent.isSeriesEvent && currentEvent.seriesId) {
+          const seriesId = (() => {
+            const sid = currentEvent.seriesId!;
+            if (sid.includes('-round-') || sid.includes('-day-')) {
+              const parts = sid.split('-');
+              return parts.slice(0, 5).join('-');
+            }
+            return sid;
+          })();
+
+          if (currentEvent.roundName) {
+            query = supabase
+              .from('event_attendance')
+              .select('user_id, status')
+              .eq('series_id', seriesId)
+              .eq('round_name', currentEvent.roundName)
+              .eq('status', 'yes');
+          } else {
+            query = supabase
+              .from('event_attendance')
+              .select('user_id, status')
+              .eq('series_id', seriesId)
+              .is('round_name', null)
+              .eq('status', 'yes');
+          }
+        } else {
+          query = supabase
+            .from('event_attendance')
+            .select('user_id, status')
+            .eq('event_id', dbEventId)
+            .eq('status', 'yes');
+        }
+
+        const { data, error } = await query;
 
         if (error) {
-          console.error('❌ Error fetching attendance:', error);
+          console.error('Error fetching attendance:', error);
           return;
         }
 
-        console.log('✅ Attendance data fetched:', data);
+        const attendingUserIds = new Set((data || []).map(a => a.user_id));
 
-        // Get user IDs of users who are attending
-        if (data) {
-          const attendingUserIds = data.map(a => a.user_id);
-          console.log('👥 Attending user IDs:', attendingUserIds);
-          setAttendingMembers(attendingUserIds);
+        if (currentEvent.isPaid) {
+          const { data: regData } = await supabase
+            .from('event_registrations')
+            .select('user_id')
+            .eq('event_id', dbEventId)
+            .neq('status', 'cancelled');
+
+          if (regData) {
+            regData.forEach(r => {
+              if (r.user_id) attendingUserIds.add(r.user_id);
+            });
+          }
         }
+
+        setAttendingMembers(Array.from(attendingUserIds));
       } catch (err) {
-        console.error('❌ Error in fetchAttendance:', err);
+        console.error('Error in fetchAttendance:', err);
       }
     };
 
     fetchAttendance();
-  }, [isOpen, currentEvent?.id]);
+  }, [isOpen, currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesId, currentEvent?.roundName]);
 
-  // Auto-select members who marked themselves as attending
   useEffect(() => {
-    console.log('🎯 Auto-selection check:', {
-      isOpen,
-      view,
-      membersCount: members.length,
-      attendingMembersCount: attendingMembers.length,
-      skippersCount: skippers.length,
-      existingSelectionsCount: Object.keys(selectedMemberBoats).length
-    });
-
     if (!isOpen || view !== 'members' || members.length === 0 || attendingMembers.length === 0) {
-      console.log('⏭️ Skipping auto-selection: preconditions not met');
       return;
     }
 
-    // Only auto-select if no skippers exist yet and no selections have been made
     if (skippers.length > 0 || Object.keys(selectedMemberBoats).length > 0) {
-      console.log('⏭️ Skipping auto-selection: skippers or selections already exist');
       return;
     }
 
     const autoSelections: Record<string, MemberBoat> = {};
 
     members.forEach(member => {
-      // Check if this member's user_id is in the attending list
       if (member.user_id && attendingMembers.includes(member.user_id)) {
-        console.log(`✅ Found attending member: ${member.first_name} ${member.last_name} (user_id: ${member.user_id})`);
-
-        // Find a valid boat for this member that matches the event class
         const validBoat = member.boats?.find(boat =>
           boat.boat_type === currentEvent?.raceClass &&
           boat.sail_number &&
@@ -397,28 +411,14 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         );
 
         if (validBoat) {
-          console.log(`  ⛵ Found valid boat: ${validBoat.sail_number} (${validBoat.boat_type})`);
           const key = `${member.id}-${validBoat.id}`;
-          // Check if this sail number isn't already used
           const sailNoInUse = skippers.some(s => s.sailNo === validBoat.sail_number);
           if (!sailNoInUse) {
             autoSelections[key] = validBoat;
-            console.log(`  ✅ Auto-selecting boat ${validBoat.sail_number}`);
-          } else {
-            console.log(`  ⚠️ Sail number ${validBoat.sail_number} already in use`);
           }
-        } else {
-          console.log(`  ❌ No valid boat found for ${member.first_name} ${member.last_name}`);
-          console.log(`     Boats:`, member.boats?.map(b => ({
-            type: b.boat_type,
-            sailNo: b.sail_number,
-            hull: b.hull
-          })));
         }
       }
     });
-
-    console.log('🎯 Auto-selections to apply:', Object.keys(autoSelections).length);
 
     if (Object.keys(autoSelections).length > 0) {
       setSelectedMemberBoats(autoSelections);
