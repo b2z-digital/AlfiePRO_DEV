@@ -79,16 +79,19 @@ export const ResetPassword: React.FC = () => {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
 
-      await supabase.auth.signOut();
       setSuccess(true);
+      setLoading(false);
+
+      try {
+        await supabase.auth.signOut();
+      } catch (_) {}
     } catch (err: any) {
+      setLoading(false);
       if (err.message?.includes('session') || err.message?.includes('token')) {
         setError('Your reset link has expired. Please request a new one.');
       } else {
         setError(err.message || 'Failed to update password');
       }
-    } finally {
-      setLoading(false);
     }
   };
 

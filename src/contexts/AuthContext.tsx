@@ -516,6 +516,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return;
             }
 
+            const isOnResetPage = window.location.pathname === '/reset-password';
+            if (isOnResetPage && (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED')) {
+              return;
+            }
+
             // Handle signed out events
             if (event === 'SIGNED_OUT') {
               console.log('User signed out, clearing state');
