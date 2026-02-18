@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, Mail, Phone, Edit2, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CheckCircle2, X, MapIcon, Save, Trash } from 'lucide-react';
+import { Users, Plus, Search, Filter, Mail, Phone, Edit2, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CheckCircle2, X, MapIcon, Save, Trash, Link, Zap, UserX } from 'lucide-react';
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -56,6 +56,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [memberToInvite, setMemberToInvite] = useState<Member | null>(null);
   const [memberRemittanceStatus, setMemberRemittanceStatus] = useState<Record<string, 'paid' | 'pending' | 'none'>>({});
   const [showMapView, setShowMapView] = useState(false);
+  const [emailMatches, setEmailMatches] = useState<Record<string, string>>({});
+  const [autoLinking, setAutoLinking] = useState(false);
+  const [linkingMemberId, setLinkingMemberId] = useState<string | null>(null);
 
   // Advanced filtering state
   const [showAdvancedFilter, setShowAdvancedFilter] = useState(false);
@@ -72,6 +75,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       fetchMemberInvitations();
       fetchRemittanceStatuses();
       fetchFilterPresets();
+      fetchEmailMatches();
     }
   }, [currentClub, filterStatus]);
 
@@ -137,6 +141,75 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       setMemberInvitations(invitationsMap);
     } catch (err) {
       console.error('Error fetching invitations:', err);
+    }
+  };
+
+  const fetchEmailMatches = async () => {
+    if (!currentClub?.clubId) return;
+    try {
+      const { data, error } = await supabase.rpc('check_member_email_matches', {
+        p_club_id: currentClub.clubId
+      });
+      if (error) throw error;
+      if (data?.success && data.matches) {
+        const matchMap: Record<string, string> = {};
+        data.matches.forEach((m: any) => {
+          matchMap[m.member_id] = m.auth_user_id;
+        });
+        setEmailMatches(matchMap);
+      }
+    } catch (err) {
+      console.error('Error checking email matches:', err);
+    }
+  };
+
+  const handleAutoLinkAll = async () => {
+    if (!currentClub?.clubId) return;
+    setAutoLinking(true);
+    try {
+      const { data, error } = await supabase.rpc('auto_link_all_matching_members', {
+        p_club_id: currentClub.clubId
+      });
+      if (error) throw error;
+      if (data?.success) {
+        const count = data.linked_count || 0;
+        addNotification(count > 0 ? `${count} member${count === 1 ? '' : 's'} linked to their accounts` : 'No new matches to link', 'success');
+        if (count > 0) {
+          await fetchMembers();
+          setEmailMatches({});
+        }
+      }
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to auto-link members', 'error');
+    } finally {
+      setAutoLinking(false);
+    }
+  };
+
+  const handleLinkSingleMember = async (memberId: string) => {
+    const authUserId = emailMatches[memberId];
+    if (!authUserId) return;
+    setLinkingMemberId(memberId);
+    try {
+      const member = members.find(m => m.id === memberId);
+      const { data, error } = await supabase.rpc('admin_link_member_to_account', {
+        p_member_id: memberId,
+        p_email: member?.email || ''
+      });
+      if (error) throw error;
+      if (data?.success) {
+        addNotification('Member linked to their account', 'success');
+        await fetchMembers();
+        const newMatches = { ...emailMatches };
+        delete newMatches[memberId];
+        setEmailMatches(newMatches);
+      } else {
+        addNotification(data?.error || 'Failed to link', 'error');
+      }
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to link member', 'error');
+    } finally {
+      setLinkingMemberId(null);
     }
   };
 
@@ -536,10 +609,34 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <div>
+        <div className="flex items-center gap-4">
           <p className="text-slate-400 text-sm">
             {filteredMembers.filter(m => m.is_financial).length} {filteredMembers.filter(m => m.is_financial).length === 1 ? 'Member' : 'Members'} Active
           </p>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1.5 text-green-400">
+              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              {members.filter(m => m.user_id).length} Connected
+            </span>
+            {Object.keys(emailMatches).length > 0 && (
+              <button
+                onClick={handleAutoLinkAll}
+                disabled={autoLinking}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+              >
+                {autoLinking ? (
+                  <div className="animate-spin h-3 w-3 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+                ) : (
+                  <Zap size={12} />
+                )}
+                Link {Object.keys(emailMatches).length} Match{Object.keys(emailMatches).length === 1 ? '' : 'es'}
+              </button>
+            )}
+            <span className="flex items-center gap-1.5 text-slate-500">
+              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+              {members.filter(m => !m.user_id && !emailMatches[m.id]).length} Unlinked
+            </span>
+          </div>
         </div>
 
         {/* Search and Filter Section */}
@@ -728,17 +825,35 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                     >
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          {(member as any).avatar_url ? (
-                            <img
-                              src={(member as any).avatar_url}
-                              alt={`${member.first_name} ${member.last_name}`}
-                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                          <div className="relative flex-shrink-0">
+                            {(member as any).avatar_url ? (
+                              <img
+                                src={(member as any).avatar_url}
+                                alt={`${member.first_name} ${member.last_name}`}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                                {member.first_name?.[0]}{member.last_name?.[0]}
+                              </div>
+                            )}
+                            <div
+                              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
+                                member.user_id
+                                  ? 'bg-green-500'
+                                  : emailMatches[member.id]
+                                    ? 'bg-amber-500'
+                                    : 'bg-slate-500'
+                              }`}
+                              title={
+                                member.user_id
+                                  ? 'Connected - has login account'
+                                  : emailMatches[member.id]
+                                    ? 'Match found - click to link'
+                                    : 'Not connected'
+                              }
                             />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                              {member.first_name?.[0]}{member.last_name?.[0]}
-                            </div>
-                          )}
+                          </div>
                           <span className="text-white font-medium">
                             {member.first_name} {member.last_name}
                           </span>
@@ -862,14 +977,30 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                             <Eye size={16} />
                           </button>
                           {!member.user_id ? (
-                            memberInvitations[member.id] && memberInvitations[member.id].status === 'pending' ? (
+                            emailMatches[member.id] ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleLinkSingleMember(member.id);
+                                }}
+                                disabled={linkingMemberId === member.id}
+                                className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
+                                title="Account found - click to link"
+                              >
+                                {linkingMemberId === member.id ? (
+                                  <div className="animate-spin h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+                                ) : (
+                                  <Link size={16} />
+                                )}
+                              </button>
+                            ) : memberInvitations[member.id] && memberInvitations[member.id].status === 'pending' ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleViewInvitation(member.id);
                                 }}
                                 className="p-1.5 rounded-lg text-orange-400 hover:bg-orange-900/30 transition-colors"
-                                title="View invitation details"
+                                title="Invitation pending"
                               >
                                 <Clock size={16} />
                               </button>
@@ -880,11 +1011,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                   handleInviteMemberClick(member);
                                 }}
                                 disabled={invitingMemberId === member.id}
-                                className="p-1.5 rounded-lg text-green-400 hover:bg-green-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Invite to platform"
+                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+                                title="Invite to register"
                               >
                                 {invitingMemberId === member.id ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-green-400 border-t-transparent rounded-full"></div>
+                                  <div className="animate-spin h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full"></div>
                                 ) : (
                                   <Send size={16} />
                                 )}
@@ -893,7 +1024,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                           ) : (
                             <div
                               className="p-1.5 rounded-lg text-green-500 bg-green-900/20"
-                              title="Has platform access"
+                              title="Connected - has login account"
                             >
                               <UserCheck size={16} />
                             </div>
