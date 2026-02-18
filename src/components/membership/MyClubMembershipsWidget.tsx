@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, ExternalLink } from 'lucide-react';
+import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, ExternalLink, Star } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { JoinAnotherClubModal } from './JoinAnotherClubModal';
@@ -36,12 +36,45 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
     paid: number;
     pending: number;
   }>({ total: 0, paid: 0, pending: 0 });
+  const [defaultClubId, setDefaultClubId] = useState<string | null>(null);
+  const [settingDefault, setSettingDefault] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchMemberships();
+      fetchDefaultClub();
     }
   }, [user]);
+
+  const fetchDefaultClub = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('default_club_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    setDefaultClubId(data?.default_club_id || null);
+  };
+
+  const handleSetDefault = async (clubId: string) => {
+    if (!user) return;
+
+    setSettingDefault(clubId);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ default_club_id: clubId })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      setDefaultClubId(clubId);
+    } catch (err) {
+      console.error('Error setting default club:', err);
+    } finally {
+      setSettingDefault(null);
+    }
+  };
 
   const fetchMemberships = async () => {
     if (!user) return;
@@ -275,6 +308,33 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
                       )}
                     </div>
                   </div>
+                  {memberships.length > 1 && (
+                    <div className="flex-shrink-0 ml-3">
+                      {defaultClubId === membership.club_id ? (
+                        <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                          <Star className="w-3.5 h-3.5 mr-1 fill-current" />
+                          Default
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSetDefault(membership.club_id)}
+                          disabled={settingDefault === membership.club_id}
+                          className={`inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            darkMode
+                              ? 'text-gray-400 hover:text-amber-400 hover:bg-amber-900/20 border border-gray-700 hover:border-amber-500/30'
+                              : 'text-gray-500 hover:text-amber-700 hover:bg-amber-50 border border-gray-200 hover:border-amber-300'
+                          } disabled:opacity-50`}
+                        >
+                          {settingDefault === membership.club_id ? (
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current mr-1"></div>
+                          ) : (
+                            <Star className="w-3.5 h-3.5 mr-1" />
+                          )}
+                          Set Default
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))

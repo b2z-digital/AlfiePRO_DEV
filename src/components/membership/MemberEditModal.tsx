@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle } from 'lucide-react';
+import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -70,6 +70,9 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [linkEmail, setLinkEmail] = useState('');
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [linkedUserEmail, setLinkedUserEmail] = useState<string | null>(null);
+  const [memberClubs, setMemberClubs] = useState<Array<{ club_id: string; club_name: string }>>([]);
+  const [defaultClubId, setDefaultClubId] = useState<string | null>(null);
+  const [settingDefaultClub, setSettingDefaultClub] = useState(false);
 
   useEffect(() => {
     if (isOpen && memberId) {
@@ -100,16 +103,31 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       if (member.user_id) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('avatar_url')
+          .select('avatar_url, default_club_id')
           .eq('id', member.user_id)
           .single();
 
         member.avatar_url = profile?.avatar_url;
+        setDefaultClubId(profile?.default_club_id || null);
 
         const { data: linkedUser } = await supabase.rpc('get_user_email_by_id', { p_user_id: member.user_id });
         setLinkedUserEmail(linkedUser || member.email || null);
+
+        const { data: clubs } = await supabase
+          .from('user_clubs')
+          .select('club_id, clubs:club_id(name)')
+          .eq('user_id', member.user_id);
+
+        if (clubs) {
+          setMemberClubs(clubs.map((c: any) => ({
+            club_id: c.club_id,
+            club_name: c.clubs?.name || 'Unknown'
+          })));
+        }
       } else {
         setLinkedUserEmail(null);
+        setMemberClubs([]);
+        setDefaultClubId(null);
       }
 
       setMemberData(member);
@@ -229,6 +247,28 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       addNotification('error', error.message || 'Failed to link account');
     } finally {
       setLinkingAccount(false);
+    }
+  };
+
+  const handleSetDefaultClub = async () => {
+    if (!memberData?.user_id) return;
+
+    setSettingDefaultClub(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_set_member_default_club', {
+        p_member_id: memberId,
+        p_club_id: clubId
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to set default club');
+
+      addNotification('success', data.message);
+      setDefaultClubId(clubId);
+    } catch (error: any) {
+      addNotification('error', error.message || 'Failed to set default club');
+    } finally {
+      setSettingDefaultClub(false);
     }
   };
 
@@ -854,6 +894,46 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                     )}
                   </div>
                 </div>
+
+                {memberData.user_id && memberClubs.length > 1 && (
+                  <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                    <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      <Star size={20} className="text-amber-400" />
+                      Default Club
+                    </h3>
+                    <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      This member belongs to {memberClubs.length} clubs. The default club loads automatically when they sign in.
+                    </p>
+                    {defaultClubId === clubId ? (
+                      <div className={`p-4 rounded-lg ${darkMode ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <Star size={18} className="text-amber-400 fill-amber-400" />
+                          <span className={`font-medium ${darkMode ? 'text-amber-300' : 'text-amber-800'}`}>
+                            This is the member's default club
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSetDefaultClub}
+                        disabled={settingDefaultClub}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                          darkMode
+                            ? 'bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
+                        } disabled:opacity-50`}
+                      >
+                        {settingDefaultClub ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                        ) : (
+                          <Star size={16} />
+                        )}
+                        Set This Club as Default
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                   <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
