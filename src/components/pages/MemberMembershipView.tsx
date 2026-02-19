@@ -324,25 +324,23 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     return (
       <div className="h-full overflow-y-auto">
         <div className="p-4 sm:p-6 lg:p-16">
-          <div className="max-w-6xl mx-auto">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-slate-700/50 animate-pulse" />
-              <div className="space-y-2">
-                <div className="w-48 h-7 rounded-lg bg-slate-700/50 animate-pulse" />
-                <div className="w-64 h-4 rounded bg-slate-700/40 animate-pulse" />
-              </div>
+          <div className="mb-8 flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-slate-700/50 animate-pulse" />
+            <div className="space-y-2">
+              <div className="w-48 h-7 rounded-lg bg-slate-700/50 animate-pulse" />
+              <div className="w-64 h-4 rounded bg-slate-700/40 animate-pulse" />
             </div>
-            <div className="w-full h-24 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse mb-6" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-28 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse" />
-              ))}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-48 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse" />
-              ))}
-            </div>
+          </div>
+          <div className="w-full h-24 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse mb-6" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-28 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-48 rounded-2xl bg-slate-800/30 border border-slate-700/50 animate-pulse" />
+            ))}
           </div>
         </div>
       </div>
@@ -353,17 +351,16 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     return (
       <div className="h-full overflow-y-auto">
         <div className="p-4 sm:p-6 lg:p-16">
-          <div className="max-w-6xl mx-auto">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
-                <Users className="text-white" size={32} />
-              </div>
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white">My Membership</h1>
-                <p className="text-slate-400 text-lg">Manage your membership, details, and boats</p>
-              </div>
+          <div className="mb-8 flex items-center gap-4">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
+              <Users className="text-white" size={32} />
             </div>
-            <motion.div
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-white">My Membership</h1>
+              <p className="text-slate-400 text-lg">Manage your membership, details, and boats</p>
+            </div>
+          </div>
+          <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="flex items-center justify-center min-h-[300px]"
@@ -388,7 +385,6 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                 </div>
               </div>
             </motion.div>
-          </div>
         </div>
       </div>
     );
@@ -438,7 +434,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 sm:p-6 lg:p-16">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="space-y-6">
 
           {/* Page Header */}
           <motion.div

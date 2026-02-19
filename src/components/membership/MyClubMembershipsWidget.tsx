@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, ExternalLink, Star } from 'lucide-react';
+import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, Star } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { JoinAnotherClubModal } from './JoinAnotherClubModal';
@@ -95,13 +95,12 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
         `)
         .eq('member_id', user.id)
         .in('status', ['active', 'pending'])
-        .order('relationship_type', { ascending: false }); // Primary first
+        .order('relationship_type', { ascending: false });
 
       if (error) throw error;
 
       setMemberships(data || []);
 
-      // Calculate total fees
       const total = data?.reduce((sum, m) => sum + parseFloat(m.annual_fee_amount || '0'), 0) || 0;
       const paid = data?.filter(m => m.payment_status === 'paid').reduce((sum, m) => sum + parseFloat(m.annual_fee_amount || '0'), 0) || 0;
       const pending = total - paid;
@@ -118,27 +117,27 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
     switch (type) {
       case 'primary':
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/20">
             <Crown className="w-3 h-3 mr-1" />
             Primary
           </span>
         );
       case 'associate':
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/15 text-purple-400 border border-purple-500/20">
             <Users className="w-3 h-3 mr-1" />
             Associate
           </span>
         );
       case 'social':
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/15 text-green-400 border border-green-500/20">
             Social
           </span>
         );
       case 'family':
         return (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-500/15 text-orange-400 border border-orange-500/20">
             Family
           </span>
         );
@@ -151,28 +150,28 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
     switch (status) {
       case 'paid':
         return (
-          <span className="inline-flex items-center text-xs font-medium text-green-600 dark:text-green-400">
-            <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+          <span className="inline-flex items-center text-xs font-medium text-green-400">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></div>
             Paid
           </span>
         );
       case 'unpaid':
         return (
-          <span className="inline-flex items-center text-xs font-medium text-red-600 dark:text-red-400">
-            <div className="w-2 h-2 rounded-full bg-red-500 mr-1"></div>
+          <span className="inline-flex items-center text-xs font-medium text-red-400">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></div>
             Unpaid
           </span>
         );
       case 'partial':
         return (
-          <span className="inline-flex items-center text-xs font-medium text-yellow-600 dark:text-yellow-400">
-            <div className="w-2 h-2 rounded-full bg-yellow-500 mr-1"></div>
+          <span className="inline-flex items-center text-xs font-medium text-yellow-400">
+            <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 mr-1.5"></div>
             Partial
           </span>
         );
       case 'overdue':
         return (
-          <span className="inline-flex items-center text-xs font-medium text-red-600 dark:text-red-400">
+          <span className="inline-flex items-center text-xs font-medium text-red-400">
             <AlertCircle className="w-3 h-3 mr-1" />
             Overdue
           </span>
@@ -184,10 +183,10 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
 
   if (loading) {
     return (
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+      <div className="rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 backdrop-blur-sm p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="h-20 bg-gray-300 dark:bg-gray-700 rounded"></div>
+          <div className="h-4 bg-slate-700/50 rounded w-1/3"></div>
+          <div className="h-20 bg-slate-700/40 rounded-xl"></div>
         </div>
       </div>
     );
@@ -195,24 +194,23 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
 
   return (
     <>
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+      <div className="rounded-2xl bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 backdrop-blur-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-700/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-lg shadow-blue-500/20">
+                <Building2 className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">My Club Memberships</h2>
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <h2 className="text-base font-semibold text-slate-200">My Club Memberships</h2>
+                <p className="text-xs text-slate-500">
                   {memberships.length} {memberships.length === 1 ? 'club' : 'clubs'}
                 </p>
               </div>
             </div>
             <button
               onClick={() => setShowJoinModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
             >
               <Plus className="w-4 h-4" />
               <span>Join Another Club</span>
@@ -220,40 +218,40 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
           </div>
         </div>
 
-        {/* Fee Summary */}
         {totalFees.total > 0 && (
-          <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+          <div className="px-5 py-4 border-b border-slate-700/50 bg-slate-800/20">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Annual Fees</p>
-                <p className="text-xl font-bold">${totalFees.total.toFixed(2)}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Total Annual Fees</p>
+                <p className="text-lg font-bold text-white">${totalFees.total.toFixed(2)}</p>
               </div>
               <div>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Paid</p>
-                <p className="text-xl font-bold text-green-500">${totalFees.paid.toFixed(2)}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Paid</p>
+                <p className="text-lg font-bold text-green-400">${totalFees.paid.toFixed(2)}</p>
               </div>
               <div>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Pending</p>
-                <p className="text-xl font-bold text-orange-500">${totalFees.pending.toFixed(2)}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Pending</p>
+                <p className="text-lg font-bold text-orange-400">${totalFees.pending.toFixed(2)}</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Memberships List */}
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-3">
           {memberships.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className={`w-12 h-12 mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-              <p className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            <div className="text-center py-10">
+              <div className="w-14 h-14 rounded-2xl bg-slate-700/30 border border-slate-600/30 flex items-center justify-center mx-auto mb-4">
+                <Building2 className="w-7 h-7 text-slate-500" />
+              </div>
+              <p className="text-base font-medium text-slate-300 mb-1">
                 No Club Memberships
               </p>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
+              <p className="text-sm text-slate-500 mb-5">
                 Join a club to start racing and tracking your results
               </p>
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Join a Club</span>
@@ -263,45 +261,43 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
             memberships.map((membership) => (
               <div
                 key={membership.id}
-                className={`p-4 rounded-lg border ${
-                  darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-white'
-                } hover:shadow-md transition-shadow`}
+                className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/40 hover:border-slate-600/60 transition-all duration-200"
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3 flex-1">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     {membership.clubs.logo ? (
                       <img
                         src={membership.clubs.logo}
                         alt={membership.clubs.name}
-                        className="w-12 h-12 rounded-lg object-cover"
+                        className="w-11 h-11 rounded-xl object-cover ring-1 ring-slate-600/50 flex-shrink-0"
                       />
                     ) : (
-                      <div className={`w-12 h-12 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
-                        <Building2 className="w-6 h-6" />
+                      <div className="w-11 h-11 rounded-xl bg-slate-700/50 border border-slate-600/30 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-slate-400" />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h3 className="font-semibold truncate">{membership.clubs.name}</h3>
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <h3 className="font-semibold text-white text-sm truncate">{membership.clubs.name}</h3>
                         {getRelationshipBadge(membership.relationship_type)}
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                          <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-slate-400">
                             Joined {new Date(membership.joined_date).toLocaleDateString()}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <CreditCard className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                          <span className="font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="text-slate-300 font-medium">
                             ${parseFloat(membership.annual_fee_amount || '0').toFixed(2)}/year
                           </span>
                         </div>
                         {getPaymentStatusBadge(membership.payment_status)}
                       </div>
                       {!membership.pays_association_fees && membership.relationship_type === 'associate' && (
-                        <div className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <div className="mt-2 text-[11px] text-slate-500">
                           <AlertCircle className="w-3 h-3 inline mr-1" />
                           State & national fees covered by primary membership
                         </div>
@@ -311,7 +307,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
                   {memberships.length > 1 && (
                     <div className="flex-shrink-0 ml-3">
                       {defaultClubId === membership.club_id ? (
-                        <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20">
                           <Star className="w-3.5 h-3.5 mr-1 fill-current" />
                           Default
                         </span>
@@ -319,11 +315,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
                         <button
                           onClick={() => handleSetDefault(membership.club_id)}
                           disabled={settingDefault === membership.club_id}
-                          className={`inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            darkMode
-                              ? 'text-gray-400 hover:text-amber-400 hover:bg-amber-900/20 border border-gray-700 hover:border-amber-500/30'
-                              : 'text-gray-500 hover:text-amber-700 hover:bg-amber-50 border border-gray-200 hover:border-amber-300'
-                          } disabled:opacity-50`}
+                          className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 border border-slate-700/50 hover:border-amber-500/20 transition-colors disabled:opacity-50"
                         >
                           {settingDefault === membership.club_id ? (
                             <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current mr-1"></div>
