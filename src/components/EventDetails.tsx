@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle, Radio } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -17,6 +17,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { WindyWeatherWidget } from './WindyWeatherWidget';
 import { EventRegistrationModal } from './events/EventRegistrationModal';
 import LiveTrackingQRCodeModal from './live-tracking/LiveTrackingQRCodeModal';
+import { getLiveTrackingEvent } from '../utils/liveTrackingStorage';
 import { EventWebsiteSettingsModal } from './events/EventWebsiteSettingsModal';
 import { EventLivestreamModal } from './livestream/EventLivestreamModal';
 
@@ -60,7 +61,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   onViewVenue,
   onEventDataUpdated
 }) => {
-  const { can, currentOrganization } = usePermissions();
+  const { can, currentOrganization, isAdmin, isEditor } = usePermissions();
   const [event, setEvent] = useState<RaceEvent>(initialEvent);
   const eventRef = useRef<RaceEvent>(initialEvent);
 
@@ -111,6 +112,26 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [smsSending, setSmsSending] = useState(false);
   const [smsSent, setSmsSent] = useState<{ sent: number; failed: number } | null>(null);
   const [smsAlreadySent, setSmsAlreadySent] = useState(false);
+  const [loadingSkipperTracking, setLoadingSkipperTracking] = useState(false);
+
+  const handleJoinLiveTracking = async () => {
+    setLoadingSkipperTracking(true);
+    try {
+      const dbId = extractDbId(event.id);
+      const trackingEvent = await getLiveTrackingEvent(dbId);
+      if (trackingEvent?.access_token) {
+        navigate(`/live/${trackingEvent.short_code || trackingEvent.access_token}`);
+      } else if (trackingEvent?.short_code) {
+        navigate(`/live/${trackingEvent.short_code}`);
+      } else {
+        setError('Live tracking is not yet set up for this event. Ask your race officer to enable it.');
+      }
+    } catch {
+      setError('Could not load live tracking details.');
+    } finally {
+      setLoadingSkipperTracking(false);
+    }
+  };
 
   // Check if event has participants or has been started
   const hasParticipants = event.skippers && event.skippers.length > 0;
@@ -2251,7 +2272,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 {hasEventWebsite ? 'Event Website' : 'Create Website'}
               </button>
             )}
-            {event.enableLiveTracking && (event.clubId || event.eventLevel === 'state' || event.eventLevel === 'national') && (
+            {event.enableLiveTracking && (event.clubId || event.eventLevel === 'state' || event.eventLevel === 'national') && (isAdmin || isEditor) && (
               <button
                 onClick={() => setShowLiveTrackingQR(true)}
                 className="
@@ -2260,9 +2281,26 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   hover:from-blue-700 hover:to-blue-600
                   transition-all duration-200
                 "
-                title="Live Skipper Tracking"
+                title="Live Skipper Tracking QR Code"
               >
                 <QrCode size={18} />
+                Live Tracking QR
+              </button>
+            )}
+            {event.enableLiveTracking && user && !isAdmin && !isEditor && (
+              <button
+                onClick={handleJoinLiveTracking}
+                disabled={loadingSkipperTracking}
+                className="
+                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
+                  bg-gradient-to-r from-cyan-600 to-blue-600
+                  hover:from-cyan-700 hover:to-blue-700
+                  transition-all duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                "
+                title="Join Live Tracking"
+              >
+                {loadingSkipperTracking ? <Loader2 size={18} className="animate-spin" /> : <Radio size={18} />}
                 Live Tracking
               </button>
             )}
