@@ -264,33 +264,34 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
         .limit(1)
         .maybeSingle();
 
+      const selectedType = membershipTypes.find(t => t.id === selectedMembershipType);
+
       const applicationData: Record<string, any> = {
         club_id: selectedClub.id,
         user_id: user.id,
         membership_type_id: selectedMembershipType,
+        membership_type_name: selectedType?.name || '',
+        membership_amount: selectedType ? parseFloat(String(selectedType.amount || '0')) : 0,
         status: 'pending',
         is_draft: false,
         first_name: existingMember?.first_name || firstName,
         last_name: existingMember?.last_name || lastName,
         email: user.email,
         phone: existingMember?.phone || '',
-        application_type: 'additional_club',
         payment_method: paymentMethod,
+        street: existingMember?.street || '',
+        city: existingMember?.city || '',
+        state: existingMember?.state || '',
+        postcode: existingMember?.postcode || '',
+        avatar_url: existingMember?.avatar_url || '',
         application_data: {
+          application_type: 'additional_club',
           has_existing_membership: currentMemberships.length > 0,
           should_pay_association_fees: currentMemberships.length === 0,
           relationship_type: currentMemberships.length > 0 ? 'associate' : 'primary',
           fee_breakdown: feeBreakdown,
-          street: existingMember?.street || '',
-          city: existingMember?.city || '',
-          state: existingMember?.state || '',
-          postcode: existingMember?.postcode || '',
         }
       };
-
-      if (existingMember?.avatar_url) {
-        applicationData.avatar_url = existingMember.avatar_url;
-      }
 
       const { error } = await supabase
         .from('membership_applications')
