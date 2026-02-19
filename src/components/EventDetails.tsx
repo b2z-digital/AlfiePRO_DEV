@@ -113,6 +113,24 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [smsSent, setSmsSent] = useState<{ sent: number; failed: number } | null>(null);
   const [smsAlreadySent, setSmsAlreadySent] = useState(false);
   const [loadingSkipperTracking, setLoadingSkipperTracking] = useState(false);
+  const [hasLiveTrackingEvent, setHasLiveTrackingEvent] = useState(false);
+
+  useEffect(() => {
+    const checkLiveTracking = async () => {
+      if (!event.enableLiveTracking) {
+        setHasLiveTrackingEvent(false);
+        return;
+      }
+      try {
+        const dbId = extractDbId(event.id);
+        const trackingEvent = await getLiveTrackingEvent(dbId);
+        setHasLiveTrackingEvent(!!(trackingEvent?.access_token || trackingEvent?.short_code));
+      } catch {
+        setHasLiveTrackingEvent(false);
+      }
+    };
+    checkLiveTracking();
+  }, [event.id, event.enableLiveTracking]);
 
   const handleJoinLiveTracking = async () => {
     setLoadingSkipperTracking(true);
@@ -2287,7 +2305,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 Live Tracking QR
               </button>
             )}
-            {event.enableLiveTracking && user && !isAdmin && !isEditor && (
+            {event.enableLiveTracking && hasLiveTrackingEvent && user && (
               <button
                 onClick={handleJoinLiveTracking}
                 disabled={loadingSkipperTracking}
