@@ -266,36 +266,30 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
 
       const selectedType = membershipTypes.find(t => t.id === selectedMembershipType);
 
-      const applicationData: Record<string, any> = {
-        club_id: selectedClub.id,
-        user_id: user.id,
-        membership_type_id: selectedMembershipType,
-        membership_type_name: selectedType?.name || '',
-        membership_amount: selectedType ? parseFloat(String(selectedType.amount || '0')) : 0,
-        status: 'pending',
-        is_draft: false,
-        first_name: existingMember?.first_name || firstName,
-        last_name: existingMember?.last_name || lastName,
-        email: user.email,
-        phone: existingMember?.phone || '',
-        payment_method: paymentMethod,
-        street: existingMember?.street || '',
-        city: existingMember?.city || '',
-        state: existingMember?.state || '',
-        postcode: existingMember?.postcode || '',
-        avatar_url: existingMember?.avatar_url || '',
-        application_data: {
+      const { error } = await supabase.rpc('submit_membership_application', {
+        p_club_id: selectedClub.id,
+        p_user_id: user.id,
+        p_membership_type_id: selectedMembershipType,
+        p_membership_type_name: selectedType?.name || '',
+        p_membership_amount: selectedType ? parseFloat(String(selectedType.amount || '0')) : 0,
+        p_first_name: existingMember?.first_name || firstName,
+        p_last_name: existingMember?.last_name || lastName,
+        p_email: user.email || '',
+        p_phone: existingMember?.phone || '',
+        p_payment_method: paymentMethod,
+        p_street: existingMember?.street || '',
+        p_city: existingMember?.city || '',
+        p_state: existingMember?.state || '',
+        p_postcode: existingMember?.postcode || '',
+        p_avatar_url: existingMember?.avatar_url || '',
+        p_application_data: {
           application_type: 'additional_club',
           has_existing_membership: currentMemberships.length > 0,
           should_pay_association_fees: currentMemberships.length === 0,
           relationship_type: currentMemberships.length > 0 ? 'associate' : 'primary',
           fee_breakdown: feeBreakdown,
         }
-      };
-
-      const { error } = await supabase
-        .from('membership_applications')
-        .insert(applicationData);
+      });
 
       if (error) throw error;
 

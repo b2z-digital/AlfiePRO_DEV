@@ -100,13 +100,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Execute all role checks and subscription fetch in parallel for better performance
       const [superAdminResult, nationalAdminResult, stateAdminResult, subscriptionResult] = await Promise.all([
-        supabase
-          .from('user_clubs')
-          .select('role')
-          .eq('user_id', effectiveUserId)
-          .eq('role', 'super_admin')
-          .limit(1)
-          .maybeSingle(),
+        supabase.rpc('get_user_club_roles', { p_user_id: effectiveUserId }),
         supabase
           .from('user_national_associations')
           .select('role')
@@ -131,8 +125,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .maybeSingle()
       ]);
 
-      // Check both user metadata AND user_clubs table for super admin
-      const userIsSuperAdmin = isSuperAdminFromMetadata || superAdminResult.data?.role === 'super_admin';
+      const userClubRoles = superAdminResult.data || [];
+      const userIsSuperAdmin = isSuperAdminFromMetadata || (Array.isArray(userClubRoles) && userClubRoles.some((r: any) => r.role === 'super_admin'));
       setIsSuperAdmin(userIsSuperAdmin);
 
       const userIsNationalAdmin = nationalAdminResult.data?.role === 'national_admin';

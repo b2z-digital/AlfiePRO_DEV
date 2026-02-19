@@ -136,16 +136,18 @@ export const getUserClubs = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // First get the user_clubs entries
-    const { data: userClubsData, error: userClubsError } = await supabase
-      .from('user_clubs')
-      .select('id, role, club_id')
-      .eq('user_id', user.id);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_club_roles', { p_user_id: user.id });
 
-    if (userClubsError) {
-      console.error('Error getting user clubs:', userClubsError);
+    if (rpcError) {
+      console.error('Error getting user clubs:', rpcError);
       return [];
     }
+
+    const userClubsData = (rpcData || []).map((r: any) => ({
+      id: `${user.id}_${r.club_id}`,
+      role: r.role,
+      club_id: r.club_id
+    }));
 
     // For each club, get the club details
     const clubDetailsPromises = userClubsData.map(async (uc) => {
