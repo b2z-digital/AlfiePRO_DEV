@@ -461,15 +461,6 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             </button>
           </motion.div>
 
-          {/* Multi-Club Memberships */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.4 }}
-          >
-            <MyClubMembershipsWidget darkMode={darkMode} />
-          </motion.div>
-
           {/* Member Profile Hero */}
           <motion.div
             custom={1}
@@ -576,6 +567,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                 </motion.div>
               )}
             </div>
+          </motion.div>
+
+          {/* Multi-Club Memberships */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+          >
+            <MyClubMembershipsWidget darkMode={darkMode} />
           </motion.div>
 
           {/* Stats Grid */}
