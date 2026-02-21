@@ -115,7 +115,7 @@ function renderRoundPage(
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59);
-  doc.text(`${roundLabel} - ${config.scoringSystem?.toUpperCase() || 'SHRS'} Heat Assignments`, pageWidth / 2, y, { align: 'center' });
+  doc.text(`${roundLabel} - ${config.scoringSystem?.toUpperCase() || 'SHR'} Heat Assignments`, pageWidth / 2, y, { align: 'center' });
   y += 4;
 
   doc.setFontSize(8);

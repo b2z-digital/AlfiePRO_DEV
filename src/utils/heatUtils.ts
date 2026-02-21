@@ -48,7 +48,7 @@ export const updateHeatResult = (
 
 // Function to complete a heat and automatically move to the next heat
 // HMS PROMOTION-BEFORE-RELEGATION: Promotions happen WITHIN the same round
-// SHRS uses different movement rules based on position
+// SHR uses different movement rules based on position
 export const completeHeat = (
   heatManagement: HeatManagement,
   heat: HeatDesignation,
@@ -98,7 +98,7 @@ export const completeHeat = (
   const lowerHeat: HeatDesignation | null = lowerHeatIndex < availableHeats.length ? availableHeats[lowerHeatIndex] : null;
 
   // SCORING SYSTEM SPECIFIC LOGIC
-  console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHRS' : 'HMS'}, Round ${currentRound}`);
+  console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHR' : 'HMS'}, Round ${currentRound}`);
 
   // HMS CRITICAL LOGIC: After a lower heat completes, IMMEDIATELY promote skippers to the HIGHER heat
   // This happens WITHIN the same round, BEFORE the higher heat is scored

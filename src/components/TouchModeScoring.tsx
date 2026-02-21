@@ -761,13 +761,17 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       if (heatScoringSystem === 'hms') {
         return 'HMS Heat System';
       } else if (heatScoringSystem === 'shrs') {
-        return 'SHRS - Simple Heat Racing System';
+        const mode = currentEvent.heatManagement.configuration.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
       }
     }
 
     // Check dropRules string values
     if (typeof dropRules === 'string') {
-      if (dropRules === 'shrs') return 'SHRS - Simple Heat Racing System';
+      if (dropRules === 'shrs') {
+        const mode = currentEvent?.heatManagement?.configuration?.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+      }
       if (dropRules === 'hms') return 'HMS Heat System';
       return dropRules;
     }

@@ -808,14 +808,16 @@ export const RaceTable: React.FC<RaceTableProps> = ({
       if (heatScoringSystem === 'hms') {
         return 'HMS Heat System';
       } else if (heatScoringSystem === 'shrs') {
-        return 'SHRS - Simple Heat Racing System';
+        const mode = currentEvent.heatManagement.configuration.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
       }
     }
 
-    // Check if it's a string (HMS or SHRS)
+    // Check if it's a string (HMS or SHR)
     if (typeof dropRules === 'string') {
       if (dropRules === 'shrs') {
-        return 'SHRS - Simple Heat Racing System';
+        const mode = currentEvent?.heatManagement?.configuration?.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
       } else if (dropRules === 'hms') {
         return 'HMS Heat System';
       }

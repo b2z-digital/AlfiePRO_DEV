@@ -93,7 +93,7 @@ const calculateTotals = (event: RaceEvent, allResults: any[]) => {
   const skippers = event.skippers;
   const skipperGroups: Record<number, any[]> = {};
 
-  // SHRS Rule 5.2: For SHRS, use the number of boats in the largest heat instead of total skippers
+  // SHR Rule 5.2: For SHR, use the number of boats in the largest heat instead of total skippers
   const isSHRS = event.scoringSystem === 'shrs' || event.heatManagement?.configuration?.scoringSystem === 'shrs';
   let largestHeatSize = skippers.length;
 

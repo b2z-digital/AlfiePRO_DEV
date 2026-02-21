@@ -1,11 +1,11 @@
 /**
- * Simple Heat Racing System (SHRS) Implementation
+ * Structured Heat Racing (SHR) Implementation
  * Version 2026-1, 5th February 2026
  *
- * Implements all SHRS rules from the official document:
+ * Implements all SHR rules from the official document:
  * - Section 1: General (Qualifying Series + Final Series)
  * - Section 2: Number and Size of Heats (max 20, as equal as possible)
- * - Section 3: Qualifying Series (Progressive Assignment with Movement Tables)
+ * - Section 3: Qualifying Series (Progressive or Balanced Assignment with Movement Tables)
  * - Section 4: Final Series (Gold, Silver, Bronze, Copper fleets)
  * - Section 5: Scoring (Low Point, largest heat size for penalties, discards)
  * - Heat Movement Tables 1 (numeric) and 2 (alpha) for 2-5 heats
@@ -22,7 +22,7 @@ export interface SHRSConfig {
 }
 
 /**
- * SHRS Rule 3.1.iii / 5.3: Non-finisher ordering for heat assignment and recording.
+ * SHR Rule 3.1.iii / 5.3: Non-finisher ordering for heat assignment and recording.
  * Boats with no finishing position are assigned in this order AFTER all finishers.
  * Rule 5.3 also adds WTH (withdrawn from series) between DNC and UFD.
  */
@@ -79,8 +79,8 @@ const HEAT_MOVEMENT_TABLE_2: Record<number, string[][]> = {
 };
 
 /**
- * SHRS Rule 2.1: The number of heats shall be as few as possible.
- * SHRS Rule 2.3: The maximum number of boats in a heat shall be 20.
+ * SHR Rule 2.1: The number of heats shall be as few as possible.
+ * SHR Rule 2.3: The maximum number of boats in a heat shall be 20.
  * Minimum fleet size target: 12 boats per heat.
  * Maximum: 5 heats.
  */
@@ -95,7 +95,7 @@ export function calculateOptimalHeats(totalSkippers: number): number {
 }
 
 /**
- * SHRS Rule 2.2: The number of boats in each heat shall be as equal as possible.
+ * SHR Rule 2.2: The number of boats in each heat shall be as equal as possible.
  * Extra boats assigned starting from Heat 1/A.
  */
 export function calculateHeatSizes(totalSkippers: number, numberOfHeats: number): number[] {
@@ -109,7 +109,7 @@ export function calculateHeatSizes(totalSkippers: number, numberOfHeats: number)
 }
 
 /**
- * SHRS Rule 3.1.i: Seed skippers for Race 1 of Qualifying Series.
+ * SHR Rule 3.1.i: Seed skippers for Race 1 of Qualifying Series.
  * Assign boats starting from top ranked boat in order 1, 2, 3, 4, 5, 5, 4, 3, 2, 1...
  * If no ranking/seeding list: alphabetical by national letter, then numerical by sail number.
  */
@@ -177,7 +177,7 @@ export function seedInitialHeatsForSHRS(
 }
 
 /**
- * SHRS Rule 3.1.iv: Compare sail numbers alphanumerically.
+ * SHR Rule 3.1.iv: Compare sail numbers alphanumerically.
  * First by national letter(s), then by numerical part of sail number.
  */
 export function compareSailNumbers(a: string, b: string): number {
@@ -190,7 +190,7 @@ export function compareSailNumbers(a: string, b: string): number {
 }
 
 /**
- * SHRS Rule 3.1.ii: Get next heat assignment using Heat Movement Tables.
+ * SHR Rule 3.1.ii: Get next heat assignment using Heat Movement Tables.
  * Position is the boat's finishing position (or virtual position for non-finishers).
  * lastRaceHeat is the heat the boat was in for the last race.
  *
@@ -223,7 +223,7 @@ export function getNextHeat(
 }
 
 /**
- * SHRS Rule 5.2: Get the number of boats in the largest heat for a given round.
+ * SHR Rule 5.2: Get the number of boats in the largest heat for a given round.
  * Used for calculating non-finisher scores (replaces "boats entered in series").
  */
 export function getLargestHeatSize(heatSizes: number[]): number {
@@ -231,7 +231,7 @@ export function getLargestHeatSize(heatSizes: number[]): number {
 }
 
 /**
- * SHRS Rule 5.4: Calculate discards for qualifying and final series separately.
+ * SHR Rule 5.4: Calculate discards for qualifying and final series separately.
  * After 4 races: exclude 1 worst score
  * After 8 races: exclude 2 worst scores
  * +1 additional exclusion for every 8 additional races completed
@@ -243,7 +243,7 @@ export function calculateSHRSDiscards(racesCompleted: number): number {
 }
 
 /**
- * SHRS Rule 5.2: Calculate score for a non-finisher.
+ * SHR Rule 5.2: Calculate score for a non-finisher.
  * Points = number of boats in the largest heat + 1
  */
 export function calculateNonFinisherScore(largestHeatSize: number): number {
@@ -251,7 +251,7 @@ export function calculateNonFinisherScore(largestHeatSize: number): number {
 }
 
 /**
- * SHRS Rule 4.1: Calculate fleet sizes for Final Series.
+ * SHR Rule 4.1: Calculate fleet sizes for Final Series.
  * Same number of fleets as heats in qualifying.
  * Fleet sizes as equal as possible.
  * Silver <= Gold, Bronze <= Silver, Copper <= Bronze.
@@ -268,7 +268,7 @@ export function calculateFinalFleetSizes(totalBoats: number, numberOfFleets: num
 }
 
 /**
- * SHRS Rule 4.2 + 4.3: Assign skippers to Final Series fleets.
+ * SHR Rule 4.2 + 4.3: Assign skippers to Final Series fleets.
  * Best ranked boats to Gold Fleet. Withdrawn boats to lowest fleet.
  * Rule 4.3: If qualifying has 5-7 completed races, temporarily exclude
  * 2nd worst score for the purpose of fleet ranking only.
@@ -340,7 +340,7 @@ export function assignToFinalFleets(
 }
 
 /**
- * SHRS Rule 3.2: Pre-Assignments.
+ * SHR Rule 3.2: Balanced Assignments (table-based).
  * Generate all heat assignments for the entire qualifying series before racing starts.
  * Uses Heat Movement Tables to determine each skipper's heat for every qualifying round.
  * Position within the heat (slot order) determines movement, not race results.
@@ -469,7 +469,7 @@ function updatePairCounts(
 }
 
 /**
- * SHRS Rule 3.2: Pre-Set Assignments.
+ * SHR Rule 3.2: Balanced Assignments.
  * Generates all qualifying round heat assignments before racing using an optimized
  * rotation algorithm that maximizes opponent diversity:
  * 1. Uses coprime cyclic shifts as the base rotation pattern
@@ -584,8 +584,8 @@ export function generatePreSetQualifyingAssignments(
 }
 
 /**
- * SHRS Initial Seeding - Index Based
- * Sorts skippers by sail number, then distributes using SHRS snake pattern.
+ * SHR Initial Seeding - Index Based
+ * Sorts skippers by sail number, then distributes using SHR snake pattern.
  * Explicitly calculates exact heat sizes first, then fills using snake order.
  * First heats (A, B...) get any extra skippers beyond the base size.
  * Example: 50 skippers, 3 heats -> [17, 17, 16]
@@ -651,7 +651,7 @@ export function seedSHRSHeatsByIndex(
     filled[heatIdx]++;
   }
 
-  console.log('SHRS seeding:', sortedIndices.length, 'skippers into', numberOfHeats, 'heats. Sizes:', heatBuckets.map(b => b.length).join(', '));
+  console.log('SHR seeding:', sortedIndices.length, 'skippers into', numberOfHeats, 'heats. Sizes:', heatBuckets.map(b => b.length).join(', '));
 
   return heatBuckets.map((indices, i) => ({
     heatDesignation: heatLabels[i],
@@ -660,7 +660,7 @@ export function seedSHRSHeatsByIndex(
 }
 
 /**
- * Validate SHRS configuration
+ * Validate SHR configuration
  */
 export function validateSHRSConfig(config: SHRSConfig, skipperCount: number): {
   isValid: boolean;
@@ -668,7 +668,7 @@ export function validateSHRSConfig(config: SHRSConfig, skipperCount: number): {
 } {
   const errors: string[] = [];
   if (config.numberOfHeats < 2 || config.numberOfHeats > 5) {
-    errors.push('SHRS requires between 2 and 5 heats.');
+    errors.push('SHR requires between 2 and 5 heats.');
   }
   if (skipperCount < config.numberOfHeats * 2) {
     errors.push(`At least ${config.numberOfHeats * 2} skippers required for ${config.numberOfHeats} heats.`);

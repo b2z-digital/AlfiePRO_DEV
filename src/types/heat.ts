@@ -29,9 +29,9 @@ export interface HeatConfiguration {
   maxHeatSize?: number; // Safety limit
   allowPromotionCountChange?: boolean; // Allow RO to change promotion count mid-event
   scoringSystem?: 'hms' | 'shrs'; // Heat racing scoring system type
-  shrsAssignmentMode?: 'progressive' | 'preset'; // SHRS: qualifying assignment method
-  shrsQualifyingRounds?: number; // SHRS: number of qualifying rounds before finals
-  shrsFinalsStarted?: boolean; // SHRS: whether finals have been initiated
+  shrsAssignmentMode?: 'progressive' | 'preset'; // SHR: qualifying assignment method (Progressive or Balanced)
+  shrsQualifyingRounds?: number; // SHR: number of qualifying rounds before finals
+  shrsFinalsStarted?: boolean; // SHR: whether finals have been initiated
 }
 
 export interface HeatAssignment {
@@ -313,8 +313,8 @@ export const generateNextRoundAssignments = (
   console.log(`Current Round: ${currentRound.round}`);
 
   if (configuration.scoringSystem === 'shrs' && isSHRSTransitionRound(currentRound.round, configuration)) {
-    console.log('SHRS: Transitioning from Qualifying to Finals');
-    console.log('SHRS: Ranking all skippers by cumulative qualifying scores, splitting into fleets');
+    console.log('SHR: Transitioning from Qualifying to Finals');
+    console.log('SHR: Ranking all skippers by cumulative qualifying scores, splitting into fleets');
 
     const allSkipperScores = new Map<number, number>();
     const allSkipperRaceScores = new Map<number, number[]>();
@@ -370,7 +370,7 @@ export const generateNextRoundAssignments = (
       }
     }
 
-    console.log('SHRS Finals fleet assignments:');
+    console.log('SHR Finals fleet assignments:');
     newAssignments.forEach((a, i) => {
       console.log(`  ${heats[i]} (${getSHRSHeatLabel(heats[i], currentRound.round + 1, configuration)}): ${a.skipperIndices.length} skippers`);
     });
@@ -410,20 +410,20 @@ export const generateNextRoundAssignments = (
 
   if (scoringSystem === 'shrs') {
     if (isSHRSFinalsRound(currentRound.round, configuration)) {
-      console.log('SHRS Finals: Keeping same fleet assignments (no movement tables in finals)');
+      console.log('SHR Finals: Keeping same fleet assignments (no movement tables in finals)');
       return currentRound.heatAssignments.map(a => ({
         heatDesignation: a.heatDesignation,
         skipperIndices: [...a.skipperIndices]
       }));
     }
 
-    // SHRS Rule 3.1.ii: Use Heat Movement Tables to assign boats to next race heats.
+    // SHR Rule 3.1.ii: Use Heat Movement Tables to assign boats to next race heats.
     // Each skipper's next heat is determined by their position within their current heat
     // and their current heat designation, looked up in the movement table.
     //
-    // SHRS Rule 3.1.iii: Non-finishers get virtual positions AFTER all finishers,
+    // SHR Rule 3.1.iii: Non-finishers get virtual positions AFTER all finishers,
     // ordered by: DNF, RET, NSC, OCS, DNS, DNC, WTH, UFD, BFD, DSQ.
-    // SHRS Rule 3.1.iv: Tied boats ordered by alphanumerical sail number.
+    // SHR Rule 3.1.iv: Tied boats ordered by alphanumerical sail number.
 
     Object.keys(resultsByHeat).forEach(heat => {
       const heatResults = resultsByHeat[heat as HeatDesignation];
@@ -466,7 +466,7 @@ export const generateNextRoundAssignments = (
       });
     });
 
-    console.log('SHRS: Generated heat assignments using movement tables for next round');
+    console.log('SHR: Generated heat assignments using movement tables for next round');
     return newAssignments;
   } else {
     // Use HMS heat system for all rounds
