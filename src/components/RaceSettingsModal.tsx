@@ -469,6 +469,31 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const handleManualAssignmentConfirm = (assignments: any[]) => {
     console.log('🎯 Manual assignments received:', JSON.stringify(assignments, null, 2));
 
+    let allRounds;
+    if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+      const allQualifyingRounds = generatePreSetQualifyingAssignments(
+        assignments,
+        numHeats,
+        shrsQualifyingRounds
+      );
+      allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+        round: idx + 1,
+        heatAssignments: roundAssignments.map(a => ({
+          heatDesignation: a.heatDesignation as any,
+          skipperIndices: a.skipperIndices
+        })),
+        results: [],
+        completed: false
+      }));
+    } else {
+      allRounds = [{
+        round: 1,
+        heatAssignments: assignments,
+        results: [],
+        completed: false
+      }];
+    }
+
     const finalHeatManagement = {
       configuration: {
         enabled: true,
@@ -481,14 +506,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
-      rounds: [
-        {
-          round: 1,
-          heatAssignments: assignments,
-          results: [],
-          completed: false
-        }
-      ]
+      rounds: allRounds
     };
 
     console.log('🎯 Saving heat management:', JSON.stringify(finalHeatManagement, null, 2));
@@ -506,6 +524,31 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     console.log('🎯 HMS Seeding assignments received:', JSON.stringify(assignments, null, 2));
     console.log('🎯 Ranked skipper indices:', rankedSkipperIndices);
 
+    let allRounds;
+    if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+      const allQualifyingRounds = generatePreSetQualifyingAssignments(
+        assignments,
+        numHeats,
+        shrsQualifyingRounds
+      );
+      allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+        round: idx + 1,
+        heatAssignments: roundAssignments.map(a => ({
+          heatDesignation: a.heatDesignation as any,
+          skipperIndices: a.skipperIndices
+        })),
+        results: [],
+        completed: false
+      }));
+    } else {
+      allRounds = [{
+        round: 1,
+        heatAssignments: assignments,
+        results: [],
+        completed: false
+      }];
+    }
+
     const finalHeatManagement = {
       configuration: {
         enabled: true,
@@ -519,14 +562,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
-      rounds: [
-        {
-          round: 1,
-          heatAssignments: assignments,
-          results: [],
-          completed: false
-        }
-      ]
+      rounds: allRounds
     };
 
     console.log('🎯 Saving HMS Seeding heat management:', JSON.stringify(finalHeatManagement, null, 2));
