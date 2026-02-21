@@ -1,5 +1,12 @@
 import jsPDF from 'jspdf';
 import { HeatManagement, HeatAssignment, HeatConfiguration, getSHRSRoundLabel, getSHRSHeatLabel, getSHRSPhase } from '../types/heat';
+
+function getScoringLabel(config: HeatConfiguration): string {
+  if (config.scoringSystem === 'shrs') {
+    return `SHR-${config.shrsAssignmentMode === 'preset' ? 'B' : 'P'}`;
+  }
+  return config.scoringSystem?.toUpperCase() || 'HMS';
+}
 import { Skipper } from '../types';
 import { getIOCCode } from './countryFlags';
 
@@ -115,7 +122,7 @@ function renderRoundPage(
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59);
-  doc.text(`${roundLabel} - ${config.scoringSystem?.toUpperCase() || 'SHR'} Heat Assignments`, pageWidth / 2, y, { align: 'center' });
+  doc.text(`${roundLabel} - ${getScoringLabel(config)} Heat Assignments`, pageWidth / 2, y, { align: 'center' });
   y += 4;
 
   doc.setFontSize(8);
@@ -254,7 +261,7 @@ function renderRoundPage(
   });
 
   const footerY = pageHeight - 6;
-  const footerText = `${config.scoringSystem?.toUpperCase()} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`;
+  const footerText = `${getScoringLabel(config)} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`;
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'italic');

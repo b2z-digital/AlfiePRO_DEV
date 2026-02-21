@@ -87,7 +87,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `SHRS_Heat_Assignments_All_Qualifying_Rounds.csv`;
+    link.download = `SHR_Heat_Assignments_All_Qualifying_Rounds.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
@@ -681,7 +681,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             <Users className="text-blue-400" size={24} />
             <div>
               <h2 className="text-lg font-bold">
-                {isSHRS ? getSHRSRoundLabel(round, configuration) : `Round ${round}`} - {configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
+                {isSHRS ? getSHRSRoundLabel(round, configuration) : `Round ${round}`} - {configuration.scoringSystem === 'shrs' ? `SHR-${configuration.shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
               </h2>
               <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {isSHRS && shrsPhase ? (
