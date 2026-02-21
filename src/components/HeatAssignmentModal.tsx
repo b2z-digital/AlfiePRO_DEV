@@ -403,8 +403,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             const heatNumber = i + 1;
             const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
             const isCompletedHeat = heatCompletionStatus[i].isCompleted;
-            const nextHeatToScore = i - 1 >= 0 ? sortedHeats[i - 1] : null;
-            const nextHeatIndices = nextHeatToScore ? nextHeatToScore.skipperIndices : undefined;
+            const adjacentHeat = i - 1 >= 0 ? sortedHeats[i - 1] : null;
+            const nextHeatIndices = adjacentHeat ? adjacentHeat.skipperIndices : undefined;
 
             if (!isNextHeatToScore && !isCompletedHeat && !isSHRSMode && !noScoringStarted) {
               continue;
