@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, Printer, FileDown } from 'lucide-react';
+import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -709,8 +709,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               }`}
               title="Export this round as PDF"
             >
-              <Printer size={16} />
-              Print
+              <FileDown size={16} />
+              Export Round Assignments
             </button>
             {shrsHasPreAssignments && (
               <button
@@ -723,7 +723,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 title="Export all qualifying rounds as multi-page PDF"
               >
                 <FileDown size={16} />
-                Export All Rounds
+                Export ALL Assignments
               </button>
             )}
             <button
