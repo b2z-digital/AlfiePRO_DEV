@@ -29,6 +29,7 @@ export interface HeatConfiguration {
   maxHeatSize?: number; // Safety limit
   allowPromotionCountChange?: boolean; // Allow RO to change promotion count mid-event
   scoringSystem?: 'hms' | 'shrs'; // Heat racing scoring system type
+  shrsAssignmentMode?: 'progressive' | 'preset'; // SHRS: qualifying assignment method
   shrsQualifyingRounds?: number; // SHRS: number of qualifying rounds before finals
   shrsFinalsStarted?: boolean; // SHRS: whether finals have been initiated
 }

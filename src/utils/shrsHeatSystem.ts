@@ -403,6 +403,189 @@ export function generateAllSHRSQualifyingRoundAssignments(
   return allRounds;
 }
 
+function gcd(a: number, b: number): number {
+  while (b) { [a, b] = [b, a % b]; }
+  return a;
+}
+
+function getCoprimeOffsets(n: number, count: number): number[] {
+  const offsets: number[] = [];
+  const candidates = [];
+  for (let i = 2; i < n; i++) {
+    if (gcd(i, n) === 1) candidates.push(i);
+  }
+  candidates.sort((a, b) => {
+    const distA = Math.min(Math.abs(a - n / 3), Math.abs(a - n / 2), Math.abs(a - n * 2 / 3));
+    const distB = Math.min(Math.abs(b - n / 3), Math.abs(b - n / 2), Math.abs(b - n * 2 / 3));
+    return distA - distB;
+  });
+  for (const c of candidates) {
+    if (offsets.length >= count) break;
+    let tooClose = false;
+    for (const existing of offsets) {
+      if (Math.abs(c - existing) <= 1 || (c + existing) === n) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) offsets.push(c);
+  }
+  while (offsets.length < count) {
+    offsets.push(candidates[offsets.length % candidates.length] || 1);
+  }
+  return offsets;
+}
+
+function countPairOverlap(
+  assignments: number[][],
+  pairCount: Map<string, number>
+): number {
+  let total = 0;
+  for (const heat of assignments) {
+    for (let i = 0; i < heat.length; i++) {
+      for (let j = i + 1; j < heat.length; j++) {
+        const key = heat[i] < heat[j] ? `${heat[i]}-${heat[j]}` : `${heat[j]}-${heat[i]}`;
+        const count = pairCount.get(key) || 0;
+        if (count > 0) total += count;
+      }
+    }
+  }
+  return total;
+}
+
+function updatePairCounts(
+  assignments: number[][],
+  pairCount: Map<string, number>,
+  delta: number
+): void {
+  for (const heat of assignments) {
+    for (let i = 0; i < heat.length; i++) {
+      for (let j = i + 1; j < heat.length; j++) {
+        const key = heat[i] < heat[j] ? `${heat[i]}-${heat[j]}` : `${heat[j]}-${heat[i]}`;
+        pairCount.set(key, (pairCount.get(key) || 0) + delta);
+      }
+    }
+  }
+}
+
+/**
+ * SHRS Rule 3.2: Pre-Set Assignments.
+ * Generates all qualifying round heat assignments before racing using an optimized
+ * rotation algorithm that maximizes opponent diversity:
+ * 1. Uses coprime cyclic shifts as the base rotation pattern
+ * 2. Tracks opponent overlap and performs greedy swaps to minimize repeated matchups
+ * 3. Every skipper races exactly once per round
+ * 4. Heat sizes remain balanced across all rounds
+ */
+export function generatePreSetQualifyingAssignments(
+  initialAssignments: { heatDesignation: string; skipperIndices: number[] }[],
+  numberOfHeats: number,
+  qualifyingRounds: number
+): { heatDesignation: string; skipperIndices: number[] }[][] {
+  const allSkippers: number[] = [];
+  for (const a of initialAssignments) {
+    allSkippers.push(...a.skipperIndices);
+  }
+  const N = allSkippers.length;
+  const heatLabels = initialAssignments.map(a => a.heatDesignation);
+  const targetSizes = initialAssignments.map(a => a.skipperIndices.length);
+
+  if (qualifyingRounds <= 1 || N < numberOfHeats * 2) {
+    return [initialAssignments.map(a => ({
+      heatDesignation: a.heatDesignation,
+      skipperIndices: [...a.skipperIndices]
+    }))];
+  }
+
+  const pairCount = new Map<string, number>();
+
+  const allRoundsRaw: number[][][] = [];
+
+  const round1: number[][] = initialAssignments.map(a => [...a.skipperIndices]);
+  allRoundsRaw.push(round1);
+  updatePairCounts(round1, pairCount, 1);
+
+  const offsets = getCoprimeOffsets(N, qualifyingRounds - 1);
+
+  for (let r = 1; r < qualifyingRounds; r++) {
+    const offset = offsets[(r - 1) % offsets.length];
+    const shifted = allSkippers.map((_, i) => allSkippers[(i + offset * r) % N]);
+
+    const roundHeats: number[][] = [];
+    let idx = 0;
+    for (let h = 0; h < numberOfHeats; h++) {
+      const heat: number[] = [];
+      for (let s = 0; s < targetSizes[h] && idx < N; s++) {
+        heat.push(shifted[idx]);
+        idx++;
+      }
+      roundHeats.push(heat);
+    }
+
+    const MAX_SWAPS = N * 2;
+    for (let swap = 0; swap < MAX_SWAPS; swap++) {
+      let bestImprovement = 0;
+      let bestH1 = -1, bestI1 = -1, bestH2 = -1, bestI2 = -1;
+
+      for (let h1 = 0; h1 < numberOfHeats; h1++) {
+        for (let h2 = h1 + 1; h2 < numberOfHeats; h2++) {
+          if (roundHeats[h1].length === 0 || roundHeats[h2].length === 0) continue;
+
+          const sampleSize1 = Math.min(roundHeats[h1].length, 8);
+          const sampleSize2 = Math.min(roundHeats[h2].length, 8);
+
+          for (let i1 = 0; i1 < sampleSize1; i1++) {
+            for (let i2 = 0; i2 < sampleSize2; i2++) {
+              const skipperA = roundHeats[h1][i1];
+              const skipperB = roundHeats[h2][i2];
+
+              let currentOverlap = 0;
+              let swappedOverlap = 0;
+
+              for (const other of roundHeats[h1]) {
+                if (other === skipperA) continue;
+                const keyA = skipperA < other ? `${skipperA}-${other}` : `${other}-${skipperA}`;
+                const keyB = skipperB < other ? `${skipperB}-${other}` : `${other}-${skipperB}`;
+                currentOverlap += pairCount.get(keyA) || 0;
+                swappedOverlap += pairCount.get(keyB) || 0;
+              }
+              for (const other of roundHeats[h2]) {
+                if (other === skipperB) continue;
+                const keyB = skipperB < other ? `${skipperB}-${other}` : `${other}-${skipperB}`;
+                const keyA = skipperA < other ? `${skipperA}-${other}` : `${other}-${skipperA}`;
+                currentOverlap += pairCount.get(keyB) || 0;
+                swappedOverlap += pairCount.get(keyA) || 0;
+              }
+
+              const improvement = currentOverlap - swappedOverlap;
+              if (improvement > bestImprovement) {
+                bestImprovement = improvement;
+                bestH1 = h1; bestI1 = i1; bestH2 = h2; bestI2 = i2;
+              }
+            }
+          }
+        }
+      }
+
+      if (bestImprovement <= 0) break;
+
+      const temp = roundHeats[bestH1][bestI1];
+      roundHeats[bestH1][bestI1] = roundHeats[bestH2][bestI2];
+      roundHeats[bestH2][bestI2] = temp;
+    }
+
+    allRoundsRaw.push(roundHeats);
+    updatePairCounts(roundHeats, pairCount, 1);
+  }
+
+  return allRoundsRaw.map(roundHeats =>
+    roundHeats.map((heat, i) => ({
+      heatDesignation: heatLabels[i],
+      skipperIndices: heat
+    }))
+  );
+}
+
 /**
  * SHRS Initial Seeding - Index Based
  * Sorts skippers by sail number, then distributes using SHRS snake pattern.

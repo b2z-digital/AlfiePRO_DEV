@@ -55,6 +55,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   }, [heatManagement.configuration]);
 
   const shrsHasPreAssignments = heatManagement.configuration.scoringSystem === 'shrs' &&
+    heatManagement.configuration.shrsAssignmentMode === 'preset' &&
     heatManagement.rounds.length > 1 &&
     !heatManagement.rounds.some(r => r.results && r.results.length > 0);
 

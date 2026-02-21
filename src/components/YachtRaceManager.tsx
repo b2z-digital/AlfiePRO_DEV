@@ -26,7 +26,7 @@ import { HeatManagement, HeatResult, HeatDesignation } from '../types/heat';
 import { HeatScoringTable } from './HeatScoringTable';
 import { updateHeatResult, completeHeat, convertHeatResultsToRaceResults, clearHeatRaceResults } from '../utils/heatUtils';
 import { HMSConfig } from '../utils/hmsHeatSystem';
-import { seedSHRSHeatsByIndex, generateAllSHRSQualifyingRoundAssignments } from '../utils/shrsHeatSystem';
+import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments } from '../utils/shrsHeatSystem';
 import { SingleEventManagement } from './SingleEventManagement';
 import { TouchModeScoring } from './TouchModeScoring';
 import { calculateHandicaps } from '../utils/handicapCalculator';
@@ -517,8 +517,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   const newAssignments = seedSHRSHeatsByIndex(eventSkippers, numHeats);
 
                   let newRounds;
-                  if (qRounds > 1) {
-                    const allQR = generateAllSHRSQualifyingRoundAssignments(newAssignments, numHeats, qRounds);
+                  const isPreset = loadedHM.configuration.shrsAssignmentMode === 'preset';
+                  if (isPreset && qRounds > 1) {
+                    const allQR = generatePreSetQualifyingAssignments(newAssignments, numHeats, qRounds);
                     newRounds = allQR.map((ra, idx) => ({
                       round: idx + 1,
                       heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
@@ -2384,11 +2385,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     let finalHM = settings.heatManagement;
     if (finalHM && finalHM.configuration.scoringSystem === 'shrs') {
       const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
-      if (qRounds > 1 && finalHM.rounds.length < qRounds) {
-        console.log('⚠️ SHRS safety net: rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
+      const isPreset = finalHM.configuration.shrsAssignmentMode === 'preset';
+      if (isPreset && qRounds > 1 && finalHM.rounds.length < qRounds) {
+        console.log('⚠️ SHRS safety net (preset): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
         const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
         const numHeats = finalHM.configuration.numberOfHeats;
-        const allQR = generateAllSHRSQualifyingRoundAssignments(
+        const allQR = generatePreSetQualifyingAssignments(
           firstRoundAssignments.map(a => ({ heatDesignation: a.heatDesignation as string, skipperIndices: [...a.skipperIndices] })),
           numHeats,
           qRounds
@@ -2401,6 +2403,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             results: [] as any[],
             completed: false
           }))
+        };
+      } else if (!isPreset && finalHM.rounds.length > 1) {
+        console.log('⚠️ SHRS safety net (progressive): trimming to round 1 only');
+        finalHM = {
+          ...finalHM,
+          rounds: [finalHM.rounds[0]]
         };
       }
     }
