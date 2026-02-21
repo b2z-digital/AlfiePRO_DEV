@@ -531,11 +531,8 @@ export function generatePreSetQualifyingAssignments(
         for (let h2 = h1 + 1; h2 < numberOfHeats; h2++) {
           if (roundHeats[h1].length === 0 || roundHeats[h2].length === 0) continue;
 
-          const sampleSize1 = Math.min(roundHeats[h1].length, 8);
-          const sampleSize2 = Math.min(roundHeats[h2].length, 8);
-
-          for (let i1 = 0; i1 < sampleSize1; i1++) {
-            for (let i2 = 0; i2 < sampleSize2; i2++) {
+          for (let i1 = 0; i1 < roundHeats[h1].length; i1++) {
+            for (let i2 = 0; i2 < roundHeats[h2].length; i2++) {
               const skipperA = roundHeats[h1][i1];
               const skipperB = roundHeats[h2][i2];
 
