@@ -1608,8 +1608,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         {isSHRS && (
                           <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-4`}>
                             <div>
-                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
+                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-0.5`}>
                                 Qualifying Assignment Method
+                              </div>
+                              <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} mb-2`}>
+                                Select how qualifying heats will be allocated.
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 <button
@@ -1634,7 +1637,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     Progressive (SHR-P)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Qualifying Round 1 heats are pre-assigned. Subsequent heat assignments are determined after each race based on finishing positions using the official Movement Structure.
+                                    Round 1 heats are assigned prior to racing. Subsequent heat movements are determined after each round based on heat results using structured Movement Tables.
                                   </div>
                                 </button>
                                 <button
@@ -1659,7 +1662,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     Balanced (SHR-B)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Initial qualifying heats are set before racing. After each race, skippers move between heats according to results using the prescribed Movement Tables.
+                                    All qualifying heats for the nominated rounds are pre-assigned before racing. The rotation is structured to balance heat sizes and distribute competitor matchups evenly across the fleet.
                                   </div>
                                 </button>
                               </div>
