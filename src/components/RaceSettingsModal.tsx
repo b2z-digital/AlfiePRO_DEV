@@ -1631,10 +1631,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     ? 'text-blue-500'
                                     : darkMode ? 'text-slate-300' : 'text-slate-700'
                                   }`}>
-                                    Progressive
+                                    Progressive (SHR-P)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    Heat assignments change after each race based on results using Movement Tables
+                                    Qualifying Round 1 heats are pre-assigned. Subsequent heat assignments are determined after each race based on finishing positions using the official Movement Structure.
                                   </div>
                                 </button>
                                 <button
@@ -1656,10 +1656,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                     ? 'text-green-600'
                                     : darkMode ? 'text-slate-300' : 'text-slate-700'
                                   }`}>
-                                    Balanced
+                                    Balanced (SHR-B)
                                   </div>
                                   <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    All heat assignments generated before racing to maximize opponent diversity
+                                    Initial qualifying heats are set before racing. After each race, skippers move between heats according to results using the prescribed Movement Tables.
                                   </div>
                                 </button>
                               </div>
