@@ -466,7 +466,37 @@ export const generateNextRoundAssignments = (
       });
     });
 
+    const totalSkippers = newAssignments.reduce((sum, a) => sum + a.skipperIndices.length, 0);
+    const baseSize = Math.floor(totalSkippers / numberOfHeats);
+    const remainder = totalSkippers % numberOfHeats;
+    const targetSizes = Array.from({ length: numberOfHeats }, (_, i) => baseSize + (i < remainder ? 1 : 0));
+
+    let rebalanced = false;
+    for (let pass = 0; pass < numberOfHeats; pass++) {
+      for (let i = 0; i < newAssignments.length; i++) {
+        while (newAssignments[i].skipperIndices.length > targetSizes[i]) {
+          const overflow = newAssignments[i].skipperIndices.pop()!;
+          const smallestIdx = newAssignments
+            .map((a, idx) => ({ idx, size: a.skipperIndices.length, target: targetSizes[idx] }))
+            .filter(x => x.size < x.target)
+            .sort((a, b) => a.size - b.size)[0]?.idx;
+          if (smallestIdx !== undefined) {
+            newAssignments[smallestIdx].skipperIndices.push(overflow);
+            rebalanced = true;
+          } else {
+            newAssignments[i].skipperIndices.push(overflow);
+            break;
+          }
+        }
+      }
+    }
+
+    if (rebalanced) {
+      console.log('SHR: Rebalanced heat sizes to maintain Rule 2.2 (as equal as possible)');
+    }
+
     console.log('SHR: Generated heat assignments using movement tables for next round');
+    newAssignments.forEach(a => console.log(`  Heat ${a.heatDesignation}: ${a.skipperIndices.length} skippers`));
     return newAssignments;
   } else {
     // Use HMS heat system for all rounds

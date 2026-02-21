@@ -7,6 +7,14 @@ function getScoringLabel(config: HeatConfiguration): string {
   }
   return config.scoringSystem?.toUpperCase() || 'HMS';
 }
+
+function getScoringFullLabel(config: HeatConfiguration): string {
+  if (config.scoringSystem === 'shrs') {
+    const code = config.shrsAssignmentMode === 'preset' ? 'SHR-B' : 'SHR-P';
+    return `${code} | Structured Heat Racing`;
+  }
+  return `${config.scoringSystem?.toUpperCase() || 'HMS'} | Heat Management`;
+}
 import { Skipper } from '../types';
 import { getIOCCode } from './countryFlags';
 
@@ -261,7 +269,7 @@ function renderRoundPage(
   });
 
   const footerY = pageHeight - 6;
-  const footerText = `${getScoringLabel(config)} Scoring  •  Generated ${new Date().toLocaleDateString('en-AU')}`;
+  const footerText = `${getScoringFullLabel(config)}  •  Generated ${new Date().toLocaleDateString('en-AU')}`;
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'italic');

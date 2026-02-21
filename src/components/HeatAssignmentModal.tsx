@@ -395,6 +395,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           });
 
           const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
+          const noScoringStarted = roundResults.length === 0;
 
           for (let i = 0; i < sortedHeats.length; i++) {
             if (cancelled) return;
@@ -405,7 +406,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             const nextHeatToScore = i - 1 >= 0 ? sortedHeats[i - 1] : null;
             const nextHeatIndices = nextHeatToScore ? nextHeatToScore.skipperIndices : undefined;
 
-            if (!isNextHeatToScore && !isCompletedHeat) {
+            if (!isNextHeatToScore && !isCompletedHeat && !isSHRSMode && !noScoringStarted) {
               continue;
             }
 
