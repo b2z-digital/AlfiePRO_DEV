@@ -2379,6 +2379,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       enable_observers?: boolean;
       observers_per_heat?: number;
     };
+    startSequenceId?: string | null;
   }) => {
     console.log('💾 Saving race settings in YachtRaceManager:', JSON.stringify(settings.heatManagement, null, 2));
 
@@ -2440,8 +2441,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         );
         console.log('✅ Heat management saved to database successfully');
 
-        // Save display settings and observer settings if provided
-        if ((settings.displaySettings || settings.observerSettings) && currentEvent.id) {
+        // Save display settings, observer settings, and start sequence if provided
+        if ((settings.displaySettings || settings.observerSettings || settings.startSequenceId !== undefined) && currentEvent.id) {
           const updateData: any = {};
 
           if (settings.displaySettings) {
@@ -2453,6 +2454,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             updateData.enable_observers = settings.observerSettings.enable_observers;
             updateData.observers_per_heat = settings.observerSettings.observers_per_heat;
             console.log('💾 Saving observer settings:', settings.observerSettings);
+          }
+
+          if (settings.startSequenceId !== undefined) {
+            updateData.start_sequence_id = settings.startSequenceId;
           }
 
           console.log('💾 Final update data to save:', updateData);
@@ -2476,6 +2481,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               ...(settings.observerSettings && {
                 enable_observers: settings.observerSettings.enable_observers,
                 observers_per_heat: settings.observerSettings.observers_per_heat
+              }),
+              ...(settings.startSequenceId !== undefined && {
+                start_sequence_id: settings.startSequenceId
               })
             };
             setCurrentEvent(updatedEvent);
@@ -2495,6 +2503,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 ...(settings.observerSettings && {
                   enable_observers: settings.observerSettings.enable_observers,
                   observers_per_heat: settings.observerSettings.observers_per_heat
+                }),
+                ...(settings.startSequenceId !== undefined && {
+                  start_sequence_id: settings.startSequenceId
                 })
               };
               setSelectedEvent(updatedSelectedEvent);

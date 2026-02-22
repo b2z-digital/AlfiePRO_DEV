@@ -12,6 +12,7 @@ import { HandicapChangeBadge } from './touch-mode/HandicapChangeBadge';
 import { HandicapProgressionModal } from './touch-mode/HandicapProgressionModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
+import { StartBoxPanel } from './start-box/StartBoxPanel';
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -810,6 +811,15 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   return (
     <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
+      {/* Digital StartBox Panel */}
+      {currentEvent?.start_sequence_id && (
+        <StartBoxPanel
+          sequenceId={currentEvent.start_sequence_id}
+          clubId={currentEvent.clubId || null}
+          darkMode={darkMode}
+        />
+      )}
+
       {/* Header - Race Navigation Only */}
       <div className={`border-b px-4 py-3 flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-4">

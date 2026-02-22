@@ -8,6 +8,7 @@ import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
 import { supabase } from '../utils/supabase';
+import { StartBoxSequenceSelector } from './start-box/StartBoxSequenceSelector';
 
 interface RaceSettingsModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ interface RaceSettingsModalProps {
       enable_observers?: boolean;
       observers_per_heat?: number;
     };
+    startSequenceId?: string | null;
   }) => void;
   onManageSkippers?: () => void;
   addNotification?: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
@@ -85,6 +87,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
+
+  // Start system
+  const [startSequenceId, setStartSequenceId] = useState<string | null>(currentEvent?.start_sequence_id || null);
 
   // SHRS qualifying/finals structure
   const [shrsQualifyingRounds, setShrsQualifyingRounds] = useState(
@@ -922,7 +927,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       observerSettings: {
         enable_observers: enableObservers,
         observers_per_heat: observersPerHeat
-      }
+      },
+      startSequenceId
     });
 
     if (addNotification) {
@@ -2039,6 +2045,16 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   Control display of country flags and 3-letter codes (e.g., AUS) in scoring tables and touch mode.
                 </p>
               </div>
+            </div>
+
+            {/* Start System */}
+            <div className="space-y-4 pt-4 border-t border-slate-700">
+              <StartBoxSequenceSelector
+                darkMode={darkMode}
+                clubId={currentEvent?.clubId || null}
+                value={startSequenceId}
+                onChange={setStartSequenceId}
+              />
             </div>
           </div>
         </div>

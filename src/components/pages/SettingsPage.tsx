@@ -20,6 +20,7 @@ import { FormBuilderPage } from './FormBuilderPage';
 import { DocumentTemplateBuilder } from './DocumentTemplateBuilder';
 import { BackupRestoreSection } from './BackupRestoreSection';
 import { AdvertisingManagement } from '../advertising/AdvertisingManagement';
+import { StartBoxBuilder } from '../start-box/StartBoxBuilder';
 import { ClubFeaturesAccess } from './ClubFeaturesAccess';
 import { ClubYachtClassesSelector } from '../ClubYachtClassesSelector';
 import { formatDate } from '../../utils/date';
@@ -36,7 +37,7 @@ interface SettingsPageProps {
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
-  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising';
+  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
@@ -795,6 +796,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                         <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Race documents</h3>
                         <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                           Manage race document templates and forms
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Start System Card */}
+                {can('settings.club') && (
+                  <button
+                    onClick={() => setActiveTab('start-system')}
+                    className={`
+                      group p-6 rounded-xl text-left transition-all border
+                      ${activeTab === 'start-system'
+                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                        : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                    `}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
+                        <Zap size={20} className="text-green-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Start system</h3>
+                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                          Configure digital StartBox sounds and sequences
                         </p>
                       </div>
                     </div>
@@ -1757,6 +1785,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'race-documents' && (
             <RaceDocumentsPage darkMode={darkMode} />
+          )}
+
+          {activeTab === 'start-system' && (
+            <StartBoxBuilder darkMode={darkMode} onBack={() => setActiveTab(null)} />
           )}
 
           {activeTab === 'import-export' && (
