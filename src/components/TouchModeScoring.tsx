@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -12,7 +12,8 @@ import { HandicapChangeBadge } from './touch-mode/HandicapChangeBadge';
 import { HandicapProgressionModal } from './touch-mode/HandicapProgressionModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
-import { StartBoxPanel } from './start-box/StartBoxPanel';
+import { StartBoxModal } from './start-box/StartBoxModal';
+import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -80,6 +81,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [showProgressionModal, setShowProgressionModal] = useState(false);
   const [selectedSkipperForProgression, setSelectedSkipperForProgression] = useState<number | null>(null);
   const [isHandicapViewerOpen, setIsHandicapViewerOpen] = useState(false);
+  const [showStartBoxModal, setShowStartBoxModal] = useState(false);
+  const [raceTimerRunning, setRaceTimerRunning] = useState(false);
 
   const { user } = useAuth();
 
@@ -220,13 +223,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   useEffect(() => {
     const previousRace = currentRace;
     setCurrentRace(initialRace);
-    setIsConfirmed(false); // Reset confirmation when changing races
+    setIsConfirmed(false);
+    setRaceTimerRunning(false);
 
-    // Keep handicap viewer open if we just advanced to the next consecutive race
-    // (This happens after confirmation, so race officer can see updated handicaps)
     const isAutoAdvancing = initialRace === previousRace + 1 && isHandicapViewerOpen;
     if (!isAutoAdvancing) {
-      setIsHandicapViewerOpen(false); // Close viewer if manually navigating
+      setIsHandicapViewerOpen(false);
     }
   }, [initialRace]);
 
@@ -600,6 +602,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   // Handler for confirming the finish order
   const handleConfirmResults = () => {
     setIsConfirmed(true);
+    setRaceTimerRunning(false);
     console.log('✅ User confirmed finish order for race', currentRace);
 
     // Check if this is a handicap event - use raceFormat from event if available
@@ -811,17 +814,28 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   return (
     <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
-      {/* Digital StartBox Panel */}
-      {currentEvent?.start_sequence_id && (
-        <StartBoxPanel
-          sequenceId={currentEvent.start_sequence_id}
-          clubId={currentEvent.clubId || null}
-          darkMode={darkMode}
-        />
-      )}
+      {/* Header - Race Navigation with StartBox + Race Timer */}
+      <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className="w-[160px] flex items-center">
+          {currentEvent?.start_sequence_id && (
+            <button
+              onClick={() => setShowStartBoxModal(true)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
+                raceTimerRunning
+                  ? darkMode
+                    ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  : darkMode
+                    ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                    : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+              }`}
+            >
+              <Timer size={16} />
+              StartBox
+            </button>
+          )}
+        </div>
 
-      {/* Header - Race Navigation Only */}
-      <div className={`border-b px-4 py-3 flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigateRace('prev')}
@@ -853,6 +867,16 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           >
             <ChevronRight size={24} />
           </button>
+        </div>
+
+        <div className="w-[160px] flex items-center justify-end">
+          {raceTimerRunning && (
+            <RaceElapsedTimer
+              isRunning={raceTimerRunning}
+              onStop={() => setRaceTimerRunning(false)}
+              darkMode={darkMode}
+            />
+          )}
         </div>
       </div>
 
@@ -1315,6 +1339,18 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           skipperIndex={selectedSkipperForProgression}
           raceResults={raceResults}
           numRaces={numRaces}
+          darkMode={darkMode}
+        />
+      )}
+
+      {/* Digital StartBox Modal */}
+      {currentEvent?.start_sequence_id && (
+        <StartBoxModal
+          isOpen={showStartBoxModal}
+          onClose={() => setShowStartBoxModal(false)}
+          onSequenceComplete={() => setRaceTimerRunning(true)}
+          sequenceId={currentEvent.start_sequence_id}
+          clubId={currentEvent.clubId || null}
           darkMode={darkMode}
         />
       )}
