@@ -664,7 +664,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
   const lastCompletedRace = raceNumbers.length > 0 ? Math.max(...raceNumbers) : 0;
 
-  const MAX_RACES_PER_ROW = 11;
+  const MAX_RACES_PER_ROW = 12;
   const needsTwoRows = isExportMode && raceNumbers.length > MAX_RACES_PER_ROW;
   const row1Races = needsTwoRows ? raceNumbers.slice(0, MAX_RACES_PER_ROW) : raceNumbers;
   const row2Races = needsTwoRows ? raceNumbers.slice(MAX_RACES_PER_ROW) : [];
