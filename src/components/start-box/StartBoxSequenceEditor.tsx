@@ -33,7 +33,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   clubId,
   soundsVersion,
 }) => {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [sequences, setSequences] = useState<StartSequence[]>([]);
   const [sounds, setSounds] = useState<StartBoxSound[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,12 +107,12 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   const handleCreate = async () => {
     if (!formName.trim()) return;
     const result = await createSequence({
-      club_id: clubId,
+      club_id: isSuperAdmin ? null : clubId,
       name: formName.trim(),
       description: formDesc.trim() || undefined,
       sequence_type: formType,
       total_duration_seconds: formDuration,
-      is_system_default: false,
+      is_system_default: isSuperAdmin ? true : false,
       is_active: true,
       race_type_default: (formRaceDefault as 'scratch' | 'handicap') || null,
       sort_order: sequences.length + 1,
@@ -303,7 +303,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
               </div>
 
               <div className="flex items-center gap-1">
-                {!seq.is_system_default && (
+                {(!seq.is_system_default || isSuperAdmin) && (
                   <>
                     <button
                       onClick={e => { e.stopPropagation(); startEdit(seq); setExpandedId(seq.id); }}
@@ -341,7 +341,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
 
             {expandedId === seq.id && (
               <div className={`px-3 pb-3 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                {editingId === seq.id && !seq.is_system_default && (
+                {editingId === seq.id && (!seq.is_system_default || isSuperAdmin) && (
                   <div className={`p-3 mt-3 rounded-lg ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                     <SequenceForm
                       darkMode={darkMode}
@@ -362,7 +362,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
-                {seq.is_system_default && (
+                {seq.is_system_default && !isSuperAdmin && (
                   <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg border ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
                     <Shield size={14} className="text-amber-400 flex-shrink-0" />
                     <span className={`text-xs ${darkMode ? 'text-amber-400/80' : 'text-amber-600'}`}>
@@ -371,7 +371,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
-                {!seq.is_system_default && (
+                {(!seq.is_system_default || isSuperAdmin) && (
                   <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <div className="relative">
@@ -397,7 +397,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
-                {(seq.use_audio_only || !seq.is_system_default) && (
+                {(seq.use_audio_only || !seq.is_system_default || isSuperAdmin) && (
                   <div className={`mt-3 p-4 rounded-lg border ${
                     seq.use_audio_only
                       ? darkMode ? 'bg-slate-800/50 border-green-500/20' : 'bg-green-50/50 border-green-200'
@@ -426,7 +426,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                               </span>
                             </div>
                           </div>
-                          {!seq.is_system_default && (
+                          {(!seq.is_system_default || isSuperAdmin) && (
                             <div className="flex items-center gap-1.5">
                               <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
                                 darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -455,7 +455,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                           )}
                         </div>
 
-                        {seq.use_audio_only && !seq.is_system_default && (
+                        {seq.use_audio_only && (!seq.is_system_default || isSuperAdmin) && (
                           <AudioSyncTool
                             darkMode={darkMode}
                             sequence={seq}
@@ -496,7 +496,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                             <Loader2 size={16} className="animate-spin text-blue-400" />
                             <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Uploading audio file...</span>
                           </div>
-                        ) : !seq.is_system_default ? (
+                        ) : (!seq.is_system_default || isSuperAdmin) ? (
                           <label className={`flex flex-col items-center gap-2 px-6 py-6 rounded-lg border-2 border-dashed cursor-pointer transition-all ${
                             darkMode
                               ? 'border-slate-700 hover:border-green-500/50 text-slate-400 hover:text-green-400'
@@ -535,7 +535,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                       <h4 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         Sound Event Timeline
                       </h4>
-                      {!seq.is_system_default && (
+                      {(!seq.is_system_default || isSuperAdmin) && (
                         <button
                           onClick={() => { setAddingSoundToSeq(seq.id); setNewTriggerTime(seq.total_duration_seconds); }}
                           className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
@@ -628,7 +628,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                                   </span>
                                 )}
                               </div>
-                              {!seq.is_system_default && (
+                              {(!seq.is_system_default || isSuperAdmin) && (
                                 <button
                                   onClick={() => handleRemoveSound(ss.id)}
                                   className="p-1 rounded text-red-400 hover:bg-red-500/20 transition-colors"

@@ -60,7 +60,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
   if (compact) {
     return (
       <div className="flex items-center gap-2">
-        <span className={`font-mono font-bold text-lg tabular-nums ${displayColor} ${shouldPulse ? 'animate-pulse' : ''}`}>
+        <span className={`font-bold text-lg tabular-nums ${displayColor} ${shouldPulse ? 'animate-pulse' : ''}`}>
           {totalSecondsDisplay}
         </span>
       </div>
@@ -91,8 +91,8 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
         {preCountdown && state === 'running' ? (
           <div className="relative flex flex-col items-center justify-center py-4 gap-1">
             <div
-              className="font-mono font-bold tabular-nums tracking-wider text-cyan-400 animate-pulse"
-              style={{ fontSize: '5.5rem', lineHeight: 1, textShadow: '0 0 30px currentColor, 0 0 60px currentColor' }}
+              className="font-extrabold tabular-nums tracking-tight text-cyan-400 animate-pulse"
+              style={{ fontSize: '6rem', lineHeight: 1, textShadow: '0 0 20px currentColor' }}
             >
               {totalSecondsDisplay}
             </div>
@@ -106,8 +106,8 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
         ) : (
           <div className="relative flex items-baseline justify-center py-4">
             <div
-              className={`font-mono font-bold tabular-nums tracking-wider ${displayColor} ${shouldPulse ? 'animate-pulse' : ''}`}
-              style={{ fontSize: '5.5rem', lineHeight: 1, textShadow: '0 0 30px currentColor, 0 0 60px currentColor' }}
+              className={`font-extrabold tabular-nums tracking-tight ${displayColor} ${shouldPulse ? 'animate-pulse' : ''}`}
+              style={{ fontSize: '6rem', lineHeight: 1, textShadow: '0 0 20px currentColor' }}
             >
               {totalSecondsDisplay}
             </div>
