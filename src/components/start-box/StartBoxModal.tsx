@@ -83,11 +83,13 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
           })();
         } else {
           completedRef.current = true;
-          const timer = window.setTimeout(() => {
-            onSequenceComplete();
-            onClose();
-          }, 2000);
-          setAutoCloseTimer(timer);
+          if (!engine.isCountdownAudioPlaying()) {
+            const timer = window.setTimeout(() => {
+              onSequenceComplete();
+              onClose();
+            }, 2000);
+            setAutoCloseTimer(timer);
+          }
         }
       }
     });
@@ -105,7 +107,17 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
       }
     });
 
-    cleanupRef.current = [unsub1, unsub2, unsub3];
+    const unsub4 = engine.onAudioEnded(() => {
+      if (completedRef.current) {
+        const timer = window.setTimeout(() => {
+          onSequenceComplete();
+          onClose();
+        }, 1000);
+        setAutoCloseTimer(timer);
+      }
+    });
+
+    cleanupRef.current = [unsub1, unsub2, unsub3, unsub4];
 
     return () => {
       cleanupRef.current.forEach(fn => fn());
@@ -329,7 +341,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             <div className={`text-center py-2 rounded-lg text-sm font-medium animate-pulse ${
               darkMode ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-600'
             }`}>
-              Race started - closing automatically...
+              Race started - will close when audio finishes...
             </div>
           )}
         </div>

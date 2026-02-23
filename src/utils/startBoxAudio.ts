@@ -14,6 +14,7 @@ export interface TimerTickData {
 type StateChangeCallback = (state: StartBoxState) => void;
 type TickCallback = (data: TimerTickData) => void;
 type SoundFiredCallback = (sound: StartSequenceSound) => void;
+type AudioEndedCallback = () => void;
 
 const TICK_INTERVAL = 50;
 
@@ -37,6 +38,7 @@ class StartBoxAudioEngine {
   private stateCallbacks: StateChangeCallback[] = [];
   private tickCallbacks: TickCallback[] = [];
   private soundFiredCallbacks: SoundFiredCallback[] = [];
+  private audioEndedCallbacks: AudioEndedCallback[] = [];
   private volume = 0.8;
 
   async initialize(): Promise<void> {
@@ -187,6 +189,16 @@ class StartBoxAudioEngine {
               source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
             }
           }
+          source.onended = () => {
+            if (this.countdownAudioSource === source) {
+              this.countdownAudioSource = null;
+              if (this.currentState === 'completed') {
+                for (const cb of this.audioEndedCallbacks) {
+                  try { cb(); } catch {}
+                }
+              }
+            }
+          };
           this.countdownAudioSource = source;
           this.countdownAudioStartCtxTime = this.audioContext.currentTime;
         }
@@ -285,6 +297,17 @@ class StartBoxAudioEngine {
     };
   }
 
+  onAudioEnded(cb: AudioEndedCallback): () => void {
+    this.audioEndedCallbacks.push(cb);
+    return () => {
+      this.audioEndedCallbacks = this.audioEndedCallbacks.filter(c => c !== cb);
+    };
+  }
+
+  isCountdownAudioPlaying(): boolean {
+    return this.countdownAudioSource !== null;
+  }
+
   destroy(): void {
     this.stopTimer();
     this.stopCountdownAudio();
@@ -297,6 +320,7 @@ class StartBoxAudioEngine {
     this.stateCallbacks = [];
     this.tickCallbacks = [];
     this.soundFiredCallbacks = [];
+    this.audioEndedCallbacks = [];
   }
 
   private setState(state: StartBoxState): void {
@@ -337,7 +361,6 @@ class StartBoxAudioEngine {
 
     if (remainingMs <= 0) {
       this.stopTimer();
-      this.stopCountdownAudio();
       this.setState('completed');
       this.emitTick();
     }
