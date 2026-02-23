@@ -29,6 +29,9 @@ class StartBoxAudioEngine {
   private timerHandle: ReturnType<typeof setInterval> | null = null;
   private firedSoundIds: Set<string> = new Set();
 
+  private countdownAudioSource: AudioBufferSourceNode | null = null;
+  private countdownAudioStartCtxTime = 0;
+
   private stateCallbacks: StateChangeCallback[] = [];
   private tickCallbacks: TickCallback[] = [];
   private soundFiredCallbacks: SoundFiredCallback[] = [];
@@ -50,14 +53,19 @@ class StartBoxAudioEngine {
 
   async preloadSequence(sequence: StartSequence): Promise<void> {
     await this.initialize();
-    if (!sequence.sounds?.length) return;
 
     const urls = new Set<string>();
-    for (const ss of sequence.sounds) {
-      const url = ss.sound?.file_url;
-      if (url && !this.audioBuffers.has(url)) {
-        urls.add(url);
+    if (sequence.sounds?.length) {
+      for (const ss of sequence.sounds) {
+        const url = ss.sound?.file_url;
+        if (url && !this.audioBuffers.has(url)) {
+          urls.add(url);
+        }
       }
+    }
+
+    if (sequence.audio_file_url && !this.audioBuffers.has(sequence.audio_file_url)) {
+      urls.add(sequence.audio_file_url);
     }
 
     await Promise.allSettled(
@@ -141,12 +149,35 @@ class StartBoxAudioEngine {
 
   start(): void {
     if (this.currentState === 'armed' || this.currentState === 'paused') {
-      if (this.currentState === 'armed') {
+      const wasArmed = this.currentState === 'armed';
+      if (wasArmed) {
         this.pausedElapsedMs = 0;
       }
       this.startTimestamp = performance.now() - this.pausedElapsedMs;
       this.setState('running');
       this.startTimer();
+
+      if (this.currentSequence?.audio_file_url && this.audioContext && this.gainNode) {
+        this.stopCountdownAudio();
+        const buffer = this.audioBuffers.get(this.currentSequence.audio_file_url);
+        if (buffer) {
+          const source = this.audioContext.createBufferSource();
+          source.buffer = buffer;
+          source.connect(this.gainNode);
+
+          const offsetMs = this.currentSequence.audio_offset_ms || 0;
+          const elapsedSec = this.pausedElapsedMs / 1000;
+          const audioStartSec = elapsedSec + (offsetMs / 1000);
+
+          if (audioStartSec >= 0) {
+            source.start(0, audioStartSec);
+          } else {
+            source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
+          }
+          this.countdownAudioSource = source;
+          this.countdownAudioStartCtxTime = this.audioContext.currentTime;
+        }
+      }
     }
   }
 
@@ -154,6 +185,7 @@ class StartBoxAudioEngine {
     if (this.currentState !== 'running') return;
     this.pausedElapsedMs = performance.now() - this.startTimestamp;
     this.stopTimer();
+    this.stopCountdownAudio();
     this.setState('paused');
     this.emitTick();
   }
@@ -165,6 +197,7 @@ class StartBoxAudioEngine {
 
   stop(): void {
     this.stopTimer();
+    this.stopCountdownAudio();
     this.firedSoundIds.clear();
     this.pausedElapsedMs = 0;
     this.startTimestamp = 0;
@@ -241,6 +274,7 @@ class StartBoxAudioEngine {
 
   destroy(): void {
     this.stopTimer();
+    this.stopCountdownAudio();
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close().catch(() => {});
     }
@@ -271,6 +305,13 @@ class StartBoxAudioEngine {
     }
   }
 
+  private stopCountdownAudio(): void {
+    if (this.countdownAudioSource) {
+      try { this.countdownAudioSource.stop(); } catch {}
+      this.countdownAudioSource = null;
+    }
+  }
+
   private tick(): void {
     if (this.currentState !== 'running') return;
 
@@ -283,6 +324,7 @@ class StartBoxAudioEngine {
 
     if (remainingMs <= 0) {
       this.stopTimer();
+      this.stopCountdownAudio();
       this.setState('completed');
       this.emitTick();
     }

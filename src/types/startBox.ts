@@ -28,6 +28,9 @@ export interface StartSequence {
   is_active: boolean;
   race_type_default?: 'scratch' | 'handicap' | null;
   sort_order: number;
+  audio_file_path?: string | null;
+  audio_file_url?: string | null;
+  audio_offset_ms?: number;
   created_by?: string;
   created_at: string;
   updated_at: string;

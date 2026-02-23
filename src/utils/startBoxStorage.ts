@@ -352,6 +352,75 @@ export async function duplicateSequence(
   }
 }
 
+export async function uploadSequenceAudio(
+  sequenceId: string,
+  clubId: string | null,
+  file: File
+): Promise<{ audio_file_path: string; audio_file_url: string } | null> {
+  try {
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+    const prefix = clubId || 'global';
+    const fileName = `${prefix}/sequences/${sequenceId}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('start-box-sounds')
+      .upload(fileName, file, {
+        contentType: file.type || 'audio/mpeg',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('start-box-sounds')
+      .getPublicUrl(fileName);
+
+    const { error } = await supabase
+      .from('start_sequences')
+      .update({
+        audio_file_path: fileName,
+        audio_file_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sequenceId);
+
+    if (error) throw error;
+    return { audio_file_path: fileName, audio_file_url: publicUrl };
+  } catch (err) {
+    console.error('Error uploading sequence audio:', err);
+    return null;
+  }
+}
+
+export async function removeSequenceAudio(sequenceId: string): Promise<boolean> {
+  try {
+    const { data: seq } = await supabase
+      .from('start_sequences')
+      .select('audio_file_path')
+      .eq('id', sequenceId)
+      .maybeSingle();
+
+    if (seq?.audio_file_path) {
+      await supabase.storage.from('start-box-sounds').remove([seq.audio_file_path]);
+    }
+
+    const { error } = await supabase
+      .from('start_sequences')
+      .update({
+        audio_file_path: null,
+        audio_file_url: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sequenceId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('Error removing sequence audio:', err);
+    return false;
+  }
+}
+
 function getAudioDuration(file: File): Promise<number | null> {
   return new Promise((resolve) => {
     try {

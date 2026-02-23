@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Copy, Edit2, Check, X, ChevronDown, ChevronUp, Play, Clock, Volume2, Shield, ListMusic, Timer } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Copy, Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { StartSequence, StartSequenceSound, StartBoxSound, SequenceType } from '../../types/startBox';
 import {
   getSequences, getSounds, createSequence, updateSequence, deleteSequence,
   addSequenceSound, updateSequenceSound, removeSequenceSound, duplicateSequence,
+  uploadSequenceAudio, removeSequenceAudio,
 } from '../../utils/startBoxStorage';
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
 
@@ -50,8 +51,50 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   const [newSoundId, setNewSoundId] = useState('');
   const [newTriggerTime, setNewTriggerTime] = useState(0);
   const [newLabel, setNewLabel] = useState('');
+  const [uploadingAudioFor, setUploadingAudioFor] = useState<string | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => { loadData(); }, [clubId, soundsVersion]);
+
+  const handleAudioUpload = async (seqId: string, file: File) => {
+    setUploadingAudioFor(seqId);
+    await uploadSequenceAudio(seqId, clubId, file);
+    setUploadingAudioFor(null);
+    await loadData();
+  };
+
+  const handleRemoveAudio = async (seqId: string) => {
+    stopAudioPreview();
+    await removeSequenceAudio(seqId);
+    await loadData();
+  };
+
+  const toggleAudioPreview = (url: string) => {
+    if (audioPreviewUrl === url && audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      audioPreviewRef.current.currentTime = 0;
+      setAudioPreviewUrl(null);
+      return;
+    }
+    stopAudioPreview();
+    const audio = new Audio(url);
+    audio.volume = 0.8;
+    audio.onended = () => setAudioPreviewUrl(null);
+    audio.play();
+    audioPreviewRef.current = audio;
+    setAudioPreviewUrl(url);
+  };
+
+  const stopAudioPreview = () => {
+    if (audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      audioPreviewRef.current.currentTime = 0;
+      audioPreviewRef.current = null;
+    }
+    setAudioPreviewUrl(null);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -311,6 +354,123 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                     </div>
                   </div>
                 )}
+
+                <div className={`mt-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Countdown Audio File
+                    </h4>
+                  </div>
+
+                  {seq.audio_file_url ? (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => toggleAudioPreview(seq.audio_file_url!)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          audioPreviewUrl === seq.audio_file_url
+                            ? 'bg-green-600/20 text-green-400 border border-green-500/30'
+                            : darkMode
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                        }`}
+                      >
+                        {audioPreviewUrl === seq.audio_file_url ? (
+                          <><Square size={14} /> Stop Preview</>
+                        ) : (
+                          <><Play size={14} /> Preview Audio</>
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Music size={14} className={darkMode ? 'text-blue-400' : 'text-blue-500'} />
+                          <span className={`text-sm truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                            {seq.audio_file_path?.split('/').pop() || 'Countdown audio'}
+                          </span>
+                        </div>
+                      </div>
+                      {!seq.is_system_default && (
+                        <div className="flex items-center gap-1">
+                          <label className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+                            darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                          }`}>
+                            <Upload size={12} />
+                            Replace
+                            <input
+                              type="file"
+                              accept="audio/*"
+                              className="hidden"
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleAudioUpload(seq.id, file);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <button
+                            onClick={() => handleRemoveAudio(seq.id)}
+                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+                            title="Remove audio"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      {uploadingAudioFor === seq.id ? (
+                        <div className="flex items-center gap-2 py-2">
+                          <Loader2 size={16} className="animate-spin text-blue-400" />
+                          <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Uploading...</span>
+                        </div>
+                      ) : !seq.is_system_default ? (
+                        <label className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                          darkMode
+                            ? 'border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-300'
+                            : 'border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-600'
+                        }`}>
+                          <Upload size={16} />
+                          <span className="text-sm">Upload MP3 countdown audio file</span>
+                          <input
+                            type="file"
+                            ref={audioFileInputRef}
+                            accept="audio/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) handleAudioUpload(seq.id, file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      ) : (
+                        <p className={`text-xs py-2 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                          No countdown audio attached
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {seq.audio_file_url && (
+                    <div className="mt-2">
+                      <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Audio Offset (ms) - positive delays audio, negative starts audio earlier
+                      </label>
+                      <input
+                        type="number"
+                        value={seq.audio_offset_ms || 0}
+                        onChange={async (e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          await updateSequence(seq.id, { audio_offset_ms: val });
+                          await loadData();
+                        }}
+                        className={`w-32 px-2 py-1.5 rounded text-xs border ${
+                          darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 <div className="mt-3">
                   <div className="flex items-center justify-between mb-2">
