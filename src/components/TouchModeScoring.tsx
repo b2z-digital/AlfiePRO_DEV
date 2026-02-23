@@ -817,23 +817,21 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       {/* Header - Race Navigation with StartBox + Race Timer */}
       <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <div className="w-[160px] flex items-center">
-          {currentEvent?.start_sequence_id && (
-            <button
-              onClick={() => setShowStartBoxModal(true)}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
-                raceTimerRunning
-                  ? darkMode
-                    ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
-                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  : darkMode
-                    ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
-                    : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
-              }`}
-            >
-              <Timer size={16} />
-              StartBox
-            </button>
-          )}
+          <button
+            onClick={() => setShowStartBoxModal(true)}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
+              raceTimerRunning
+                ? darkMode
+                  ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : darkMode
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                  : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+            }`}
+          >
+            <Timer size={16} />
+            StartBox
+          </button>
         </div>
 
         <div className="flex items-center gap-4">
@@ -1344,16 +1342,13 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       )}
 
       {/* Digital StartBox Modal */}
-      {currentEvent?.start_sequence_id && (
-        <StartBoxModal
-          isOpen={showStartBoxModal}
-          onClose={() => setShowStartBoxModal(false)}
-          onSequenceComplete={() => setRaceTimerRunning(true)}
-          sequenceId={currentEvent.start_sequence_id}
-          clubId={currentEvent.clubId || null}
-          darkMode={darkMode}
-        />
-      )}
+      <StartBoxModal
+        isOpen={showStartBoxModal}
+        onClose={() => setShowStartBoxModal(false)}
+        onSequenceComplete={() => setRaceTimerRunning(true)}
+        clubId={currentEvent?.clubId || null}
+        darkMode={darkMode}
+      />
     </div>
   );
 };
