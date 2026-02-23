@@ -7,6 +7,8 @@ export interface TimerTickData {
   totalDurationSeconds: number;
   progress: number;
   lastFiredLabel?: string;
+  audioOnlyPreCountdown?: boolean;
+  preCountdownRemainingMs?: number;
 }
 
 type StateChangeCallback = (state: StartBoxState) => void;
@@ -138,10 +140,13 @@ class StartBoxAudioEngine {
   arm(sequence: StartSequence): void {
     this.stop();
     this.currentSequence = sequence;
-    const effectiveDuration = sequence.use_audio_only && sequence.countdown_start_seconds
-      ? sequence.countdown_start_seconds
-      : sequence.total_duration_seconds;
-    this.totalDurationMs = effectiveDuration * 1000;
+    if (sequence.use_audio_only && sequence.countdown_start_seconds) {
+      const introMs = sequence.audio_offset_ms || 0;
+      const countdownMs = sequence.countdown_start_seconds * 1000;
+      this.totalDurationMs = introMs + countdownMs;
+    } else {
+      this.totalDurationMs = sequence.total_duration_seconds * 1000;
+    }
     this.firedSoundIds.clear();
     this.pausedElapsedMs = 0;
     this.setState('armed');
@@ -168,14 +173,19 @@ class StartBoxAudioEngine {
           source.buffer = buffer;
           source.connect(this.gainNode);
 
-          const offsetMs = this.currentSequence.audio_offset_ms || 0;
-          const elapsedSec = this.pausedElapsedMs / 1000;
-          const audioStartSec = elapsedSec + (offsetMs / 1000);
-
-          if (audioStartSec >= 0) {
-            source.start(0, audioStartSec);
+          if (this.currentSequence.use_audio_only) {
+            const elapsedSec = this.pausedElapsedMs / 1000;
+            source.start(0, elapsedSec);
           } else {
-            source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
+            const offsetMs = this.currentSequence.audio_offset_ms || 0;
+            const elapsedSec = this.pausedElapsedMs / 1000;
+            const audioStartSec = elapsedSec + (offsetMs / 1000);
+
+            if (audioStartSec >= 0) {
+              source.start(0, audioStartSec);
+            } else {
+              source.start(this.audioContext.currentTime + Math.abs(audioStartSec), 0);
+            }
           }
           this.countdownAudioSource = source;
           this.countdownAudioStartCtxTime = this.audioContext.currentTime;
@@ -372,17 +382,36 @@ class StartBoxAudioEngine {
   }
 
   private emitTick(): void {
-    const remaining = this.getRemainingMs();
+    const totalRemainingMs = this.getRemainingMs();
     const seq = this.currentSequence;
-    const effectiveDuration = seq
-      ? (seq.use_audio_only && seq.countdown_start_seconds ? seq.countdown_start_seconds : seq.total_duration_seconds)
-      : 0;
+
+    let displayRemainingMs = totalRemainingMs;
+    let displayTotalSeconds = seq?.total_duration_seconds || 0;
+    let audioOnlyPreCountdown = false;
+    let preCountdownRemainingMs = 0;
+
+    if (seq?.use_audio_only && seq.countdown_start_seconds) {
+      const introMs = seq.audio_offset_ms || 0;
+      const countdownMs = seq.countdown_start_seconds * 1000;
+      displayTotalSeconds = seq.countdown_start_seconds;
+
+      if (totalRemainingMs > countdownMs) {
+        audioOnlyPreCountdown = true;
+        preCountdownRemainingMs = totalRemainingMs - countdownMs;
+        displayRemainingMs = countdownMs;
+      } else {
+        displayRemainingMs = totalRemainingMs;
+      }
+    }
+
     const data: TimerTickData = {
       state: this.currentState,
-      remainingMs: remaining,
-      remainingSeconds: remaining / 1000,
-      totalDurationSeconds: effectiveDuration,
-      progress: this.totalDurationMs > 0 ? 1 - remaining / this.totalDurationMs : 0,
+      remainingMs: displayRemainingMs,
+      remainingSeconds: displayRemainingMs / 1000,
+      totalDurationSeconds: displayTotalSeconds,
+      progress: this.totalDurationMs > 0 ? 1 - totalRemainingMs / this.totalDurationMs : 0,
+      audioOnlyPreCountdown,
+      preCountdownRemainingMs,
     };
 
     for (const cb of this.tickCallbacks) {

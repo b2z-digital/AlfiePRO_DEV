@@ -39,6 +39,8 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   const [showSequenceSelector, setShowSequenceSelector] = useState(false);
   const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
   const [botwPhase, setBotwPhase] = useState(false);
+  const [preCountdown, setPreCountdown] = useState(false);
+  const [preCountdownMs, setPreCountdownMs] = useState(0);
 
   const engineRef = useRef(getStartBoxEngine());
   const cleanupRef = useRef<(() => void)[]>([]);
@@ -79,6 +81,8 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
       setRemainingMs(data.remainingMs);
       setTotalDuration(data.totalDurationSeconds);
       setTimerState(data.state);
+      setPreCountdown(data.audioOnlyPreCountdown || false);
+      setPreCountdownMs(data.preCountdownRemainingMs || 0);
     });
 
     const unsub3 = engine.onSoundFired((ss) => {
@@ -111,11 +115,11 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
     const seq = await getSequence(id);
     if (seq) {
       setCurrentSequence(seq);
-      const effectiveDuration = seq.use_audio_only && seq.countdown_start_seconds
+      const countdownDuration = seq.use_audio_only && seq.countdown_start_seconds
         ? seq.countdown_start_seconds
         : seq.total_duration_seconds;
-      setTotalDuration(effectiveDuration);
-      setRemainingMs(effectiveDuration * 1000);
+      setTotalDuration(countdownDuration);
+      setRemainingMs(countdownDuration * 1000);
 
       const engine = engineRef.current;
       await engine.initialize();
@@ -255,6 +259,8 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
                 remainingMs={remainingMs}
                 totalDurationSeconds={totalDuration}
                 state={timerState}
+                preCountdown={preCountdown}
+                preCountdownMs={preCountdownMs}
               />
 
               <div className="mt-3">

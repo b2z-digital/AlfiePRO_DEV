@@ -877,7 +877,7 @@ const AudioSyncTool: React.FC<{
           {!isPlaying && !elapsedMs && (
             <div className="absolute inset-0 flex items-center justify-center">
               <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                Click Play, then tap "Mark Start" when you hear the first countdown signal
+                Click Play Audio, then tap "Mark Countdown Start" when you hear the first signal (e.g. warning horn)
               </span>
             </div>
           )}
@@ -949,8 +949,7 @@ const AudioSyncTool: React.FC<{
           </div>
           {markedPointMs !== null && (
             <div className={`flex-1 p-2.5 rounded-lg text-xs ${darkMode ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-700'}`}>
-              Audio plays for <strong>{formatTimeMs(markedPointMs)}</strong> before the LED starts counting down from <strong>{formatTime(countdownSeconds)}</strong>.
-              Total audio+countdown: ~{formatTimeMs(markedPointMs + countdownSeconds * 1000)}
+              Your full audio plays from the start. The LED countdown begins at <strong>{formatTimeMs(markedPointMs)}</strong> and counts down from <strong>{formatTime(countdownSeconds)}</strong> to 0:00.
             </div>
           )}
         </div>
