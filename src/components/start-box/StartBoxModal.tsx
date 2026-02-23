@@ -228,7 +228,6 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     const engine = engineRef.current;
     await engine.initialize();
     engine.arm(seq);
-    engine.start();
   }, [autoCloseTimer, currentSequence]);
 
   const handleSelectSequence = (id: string) => {
@@ -360,11 +359,13 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             )}
           </div>
 
-          {botwPhase && timerState === 'running' && startSequenceRef.current && (
+          {botwPhase && startSequenceRef.current && (timerState === 'armed' || timerState === 'running') && (
             <div className={`text-center py-2 rounded-lg text-sm font-medium ${
-              darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+              timerState === 'armed'
+                ? darkMode ? 'bg-cyan-500/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'
+                : darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
             }`}>
-              BOTW in progress — {startSequenceRef.current.name} will start automatically
+              {timerState === 'armed' ? 'BOTW ready' : 'BOTW in progress'} — {startSequenceRef.current.name} will start automatically
             </div>
           )}
 

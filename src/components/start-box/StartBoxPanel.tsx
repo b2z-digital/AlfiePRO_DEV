@@ -182,7 +182,6 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
     const engine = engineRef.current;
     await engine.initialize();
     engine.arm(seq);
-    engine.start();
   }, [currentSequence]);
 
   const handleSelectSequence = (id: string) => {
@@ -312,11 +311,13 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
                 )}
               </div>
 
-              {botwPhase && timerState === 'running' && startSequenceRef.current && (
+              {botwPhase && startSequenceRef.current && (timerState === 'armed' || timerState === 'running') && (
                 <div className={`rounded-lg px-3 py-2 text-xs font-medium ${
-                  darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+                  timerState === 'armed'
+                    ? darkMode ? 'bg-cyan-500/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'
+                    : darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
                 }`}>
-                  BOTW in progress — {startSequenceRef.current.name} will start automatically
+                  {timerState === 'armed' ? 'BOTW ready' : 'BOTW in progress'} — {startSequenceRef.current.name} will start automatically
                 </div>
               )}
 
