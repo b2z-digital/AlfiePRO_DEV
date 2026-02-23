@@ -38,9 +38,12 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   const [lastFiredLabel, setLastFiredLabel] = useState<string | null>(null);
   const [showSequenceSelector, setShowSequenceSelector] = useState(false);
   const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
+  const [botwPhase, setBotwPhase] = useState(false);
 
   const engineRef = useRef(getStartBoxEngine());
   const cleanupRef = useRef<(() => void)[]>([]);
+  const botwPhaseRef = useRef(false);
+  const startSequenceRef = useRef<StartSequence | null>(null);
 
   useEffect(() => {
     loadSequences();
@@ -57,6 +60,19 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
 
     const unsub1 = engine.onStateChange((state) => {
       setTimerState(state);
+      if (state === 'completed' && botwPhaseRef.current && startSequenceRef.current) {
+        botwPhaseRef.current = false;
+        setBotwPhase(false);
+        const seq = startSequenceRef.current;
+        setCurrentSequence(seq);
+        setTotalDuration(seq.total_duration_seconds);
+        setRemainingMs(seq.total_duration_seconds * 1000);
+        (async () => {
+          await engine.initialize();
+          engine.arm(seq);
+          engine.start();
+        })();
+      }
     });
 
     const unsub2 = engine.onTick((data: TimerTickData) => {
@@ -87,7 +103,7 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
 
   const loadSequences = async () => {
     const seqs = await getSequences(clubId || null);
-    setAvailableSequences(seqs);
+    setAvailableSequences(seqs.filter(s => s.sequence_type !== 'botw'));
     setBotwSequences(seqs.filter(s => s.sequence_type === 'botw'));
   };
 
@@ -155,15 +171,19 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   const handlePlayBotw = useCallback(async (seqId: string) => {
     const seq = await getSequence(seqId);
     if (!seq) return;
+
+    startSequenceRef.current = currentSequence;
+    botwPhaseRef.current = true;
+    setBotwPhase(true);
+
     setCurrentSequence(seq);
-    setSelectedSeqId(seqId);
     setTotalDuration(seq.total_duration_seconds);
     setRemainingMs(seq.total_duration_seconds * 1000);
     const engine = engineRef.current;
     await engine.initialize();
     engine.arm(seq);
     engine.start();
-  }, []);
+  }, [currentSequence]);
 
   const handleSelectSequence = (id: string) => {
     setSelectedSeqId(id);
@@ -291,6 +311,14 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
                   </div>
                 )}
               </div>
+
+              {botwPhase && timerState === 'running' && startSequenceRef.current && (
+                <div className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                  darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+                }`}>
+                  BOTW in progress — {startSequenceRef.current.name} will start automatically
+                </div>
+              )}
 
               {currentSequence?.sounds && currentSequence.sounds.length > 0 && (
                 <div className={`rounded-lg p-2 space-y-0.5 text-xs max-h-40 overflow-y-auto ${

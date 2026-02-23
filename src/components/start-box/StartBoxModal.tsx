@@ -41,10 +41,13 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
   const [showSequenceSelector, setShowSequenceSelector] = useState(false);
   const [autoCloseTimer, setAutoCloseTimer] = useState<number | null>(null);
   const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
+  const [botwPhase, setBotwPhase] = useState(false);
 
   const engineRef = useRef(getStartBoxEngine());
   const cleanupRef = useRef<(() => void)[]>([]);
   const completedRef = useRef(false);
+  const botwPhaseRef = useRef(false);
+  const startSequenceRef = useRef<StartSequence | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,12 +70,26 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     const unsub1 = engine.onStateChange((state) => {
       setTimerState(state);
       if (state === 'completed' && !completedRef.current) {
-        completedRef.current = true;
-        const timer = window.setTimeout(() => {
-          onSequenceComplete();
-          onClose();
-        }, 2000);
-        setAutoCloseTimer(timer);
+        if (botwPhaseRef.current && startSequenceRef.current) {
+          botwPhaseRef.current = false;
+          setBotwPhase(false);
+          const seq = startSequenceRef.current;
+          setCurrentSequence(seq);
+          setTotalDuration(seq.total_duration_seconds);
+          setRemainingMs(seq.total_duration_seconds * 1000);
+          (async () => {
+            await engine.initialize();
+            engine.arm(seq);
+            engine.start();
+          })();
+        } else {
+          completedRef.current = true;
+          const timer = window.setTimeout(() => {
+            onSequenceComplete();
+            onClose();
+          }, 2000);
+          setAutoCloseTimer(timer);
+        }
       }
     });
 
@@ -110,7 +127,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
 
   const loadSequences = async () => {
     const seqs = await getSequences(clubId || null);
-    setAvailableSequences(seqs);
+    setAvailableSequences(seqs.filter(s => s.sequence_type !== 'botw'));
     setBotwSequences(seqs.filter(s => s.sequence_type === 'botw'));
   };
 
@@ -200,15 +217,19 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
       setAutoCloseTimer(null);
     }
     completedRef.current = false;
+
+    startSequenceRef.current = currentSequence;
+    botwPhaseRef.current = true;
+    setBotwPhase(true);
+
     setCurrentSequence(seq);
-    setSelectedSeqId(seqId);
     setTotalDuration(seq.total_duration_seconds);
     setRemainingMs(seq.total_duration_seconds * 1000);
     const engine = engineRef.current;
     await engine.initialize();
     engine.arm(seq);
     engine.start();
-  }, [autoCloseTimer]);
+  }, [autoCloseTimer, currentSequence]);
 
   const handleSelectSequence = (id: string) => {
     setSelectedSeqId(id);
@@ -339,7 +360,15 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             )}
           </div>
 
-          {timerState === 'completed' && (
+          {botwPhase && timerState === 'running' && startSequenceRef.current && (
+            <div className={`text-center py-2 rounded-lg text-sm font-medium ${
+              darkMode ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+            }`}>
+              BOTW in progress — {startSequenceRef.current.name} will start automatically
+            </div>
+          )}
+
+          {timerState === 'completed' && !botwPhase && (
             <div className={`text-center py-2 rounded-lg text-sm font-medium animate-pulse ${
               darkMode ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-600'
             }`}>
