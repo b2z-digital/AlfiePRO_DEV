@@ -362,6 +362,15 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
+                {seq.is_system_default && (
+                  <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg border ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+                    <Shield size={14} className="text-amber-400 flex-shrink-0" />
+                    <span className={`text-xs ${darkMode ? 'text-amber-400/80' : 'text-amber-600'}`}>
+                      System sequences are read-only. Click the <strong>Duplicate</strong> button to create your own copy with Audio Only Mode and custom audio file support.
+                    </span>
+                  </div>
+                )}
+
                 {!seq.is_system_default && (
                   <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
                     <label className="flex items-center gap-2 cursor-pointer">
