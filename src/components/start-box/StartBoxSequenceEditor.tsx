@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Copy, Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, Trash2, Copy, Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader2, Crosshair, RotateCcw, Pause } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { StartSequence, StartSequenceSound, StartBoxSound, SequenceType } from '../../types/startBox';
 import {
@@ -418,26 +418,12 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                     {seq.audio_file_url ? (
                       <div className="space-y-3">
                         <div className={`flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}>
-                          <button
-                            onClick={() => toggleAudioPreview(seq.audio_file_url!)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                              audioPreviewUrl === seq.audio_file_url
-                                ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
-                                : 'bg-green-600/10 text-green-400 hover:bg-green-600/20'
-                            }`}
-                          >
-                            {audioPreviewUrl === seq.audio_file_url ? (
-                              <><Square size={16} /> Stop</>
-                            ) : (
-                              <><Play size={16} /> Play</>
-                            )}
-                          </button>
                           <div className="flex-1 min-w-0">
-                            <div className={`text-sm font-medium truncate ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                              {seq.audio_file_path?.split('/').pop() || 'Countdown audio'}
-                            </div>
-                            <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                              MP3 audio file
+                            <div className="flex items-center gap-2">
+                              <Music size={14} className={darkMode ? 'text-blue-400' : 'text-blue-500'} />
+                              <span className={`text-sm font-medium truncate ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                {seq.audio_file_path?.split('/').pop() || 'Countdown audio'}
+                              </span>
                             </div>
                           </div>
                           {!seq.is_system_default && (
@@ -469,74 +455,18 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                           )}
                         </div>
 
-                        {seq.use_audio_only && (
-                          <div className={`p-3 rounded-lg space-y-3 ${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}>
-                            <h5 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                              LED Countdown Sync
-                            </h5>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className={`block text-xs font-medium mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  Countdown Starts From (seconds)
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    min={10}
-                                    max={900}
-                                    value={seq.countdown_start_seconds ?? seq.total_duration_seconds}
-                                    onChange={async (e) => {
-                                      const val = parseInt(e.target.value) || seq.total_duration_seconds;
-                                      await updateSequence(seq.id, { countdown_start_seconds: val });
-                                      await loadData();
-                                    }}
-                                    className={`w-24 px-3 py-2 rounded-lg text-sm border ${
-                                      darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
-                                    }`}
-                                  />
-                                  <span className={`text-sm font-mono ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    = {formatTime(seq.countdown_start_seconds ?? seq.total_duration_seconds)}
-                                  </span>
-                                </div>
-                                <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                                  The LED display counts down from this value
-                                </p>
-                              </div>
-                              <div>
-                                <label className={`block text-xs font-medium mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  Audio Offset (milliseconds)
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    step={100}
-                                    value={seq.audio_offset_ms || 0}
-                                    onChange={async (e) => {
-                                      const val = parseInt(e.target.value) || 0;
-                                      await updateSequence(seq.id, { audio_offset_ms: val });
-                                      await loadData();
-                                    }}
-                                    className={`w-24 px-3 py-2 rounded-lg text-sm border ${
-                                      darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
-                                    }`}
-                                  />
-                                  <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>ms</span>
-                                </div>
-                                <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                                  + delays audio start, - starts audio earlier vs countdown
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className={`flex items-center gap-3 p-2.5 rounded-lg text-xs ${darkMode ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
-                              <Clock size={14} className="flex-shrink-0" />
-                              <span>
-                                Press Start to play your audio file. The LED countdown will display from{' '}
-                                <strong>{formatTime(seq.countdown_start_seconds ?? seq.total_duration_seconds)}</strong>{' '}
-                                down to 0:00. Adjust the offset to fine-tune the sync between your audio and the visual countdown.
-                              </span>
-                            </div>
-                          </div>
+                        {seq.use_audio_only && !seq.is_system_default && (
+                          <AudioSyncTool
+                            darkMode={darkMode}
+                            sequence={seq}
+                            onSave={async (offsetMs, countdownSeconds) => {
+                              await updateSequence(seq.id, {
+                                audio_offset_ms: offsetMs,
+                                countdown_start_seconds: countdownSeconds,
+                              });
+                              await loadData();
+                            }}
+                          />
                         )}
 
                         {!seq.use_audio_only && (
@@ -722,6 +652,325 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
           </div>
         ))}
       </div>
+    </div>
+  );
+};
+
+const formatTimeMs = (ms: number): string => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  const frac = Math.floor((ms % 1000) / 100);
+  return `${m}:${s.toString().padStart(2, '0')}.${frac}`;
+};
+
+const AudioSyncTool: React.FC<{
+  darkMode: boolean;
+  sequence: StartSequence;
+  onSave: (offsetMs: number, countdownSeconds: number) => Promise<void>;
+}> = ({ darkMode, sequence, onSave }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [audioDurationMs, setAudioDurationMs] = useState(0);
+  const [markedPointMs, setMarkedPointMs] = useState<number | null>(
+    sequence.audio_offset_ms ? sequence.audio_offset_ms : null
+  );
+  const [countdownSeconds, setCountdownSeconds] = useState(
+    sequence.countdown_start_seconds ?? sequence.total_duration_seconds
+  );
+  const [saving, setSaving] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rafRef = useRef<number>(0);
+  const startTimeRef = useRef(0);
+  const pausedAtRef = useRef(0);
+
+  const hasUnsavedChanges = markedPointMs !== (sequence.audio_offset_ms || null)
+    || countdownSeconds !== (sequence.countdown_start_seconds ?? sequence.total_duration_seconds);
+
+  const cleanup = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
+    setIsPaused(false);
+  }, []);
+
+  useEffect(() => () => cleanup(), [cleanup]);
+
+  const tick = useCallback(() => {
+    if (audioRef.current && !audioRef.current.paused) {
+      setElapsedMs(Math.round(audioRef.current.currentTime * 1000));
+      rafRef.current = requestAnimationFrame(tick);
+    }
+  }, []);
+
+  const handlePlay = () => {
+    cleanup();
+    const audio = new Audio(sequence.audio_file_url!);
+    audio.volume = 0.8;
+    audioRef.current = audio;
+
+    audio.addEventListener('loadedmetadata', () => {
+      setAudioDurationMs(Math.round(audio.duration * 1000));
+    });
+    audio.addEventListener('ended', () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    });
+
+    audio.play().then(() => {
+      setIsPlaying(true);
+      setIsPaused(false);
+      setElapsedMs(0);
+      startTimeRef.current = performance.now();
+      rafRef.current = requestAnimationFrame(tick);
+    });
+  };
+
+  const handlePause = () => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+      pausedAtRef.current = elapsedMs;
+      setIsPaused(true);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    }
+  };
+
+  const handleResume = () => {
+    if (audioRef.current && audioRef.current.paused && isPaused) {
+      audioRef.current.play().then(() => {
+        setIsPaused(false);
+        rafRef.current = requestAnimationFrame(tick);
+      });
+    }
+  };
+
+  const handleStop = () => {
+    cleanup();
+    setElapsedMs(0);
+  };
+
+  const handleMark = () => {
+    setMarkedPointMs(elapsedMs);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave(markedPointMs || 0, countdownSeconds);
+    setSaving(false);
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !audioDurationMs) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const seekTime = ratio * (audioDurationMs / 1000);
+    audioRef.current.currentTime = seekTime;
+    setElapsedMs(Math.round(seekTime * 1000));
+  };
+
+  const progress = audioDurationMs > 0 ? elapsedMs / audioDurationMs : 0;
+  const markerPosition = markedPointMs && audioDurationMs > 0 ? markedPointMs / audioDurationMs : null;
+
+  return (
+    <div className={`p-4 rounded-lg space-y-4 ${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}>
+      <div className="flex items-center justify-between">
+        <h5 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+          Audio Sync Tool
+        </h5>
+        <span className={`text-xs ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+          Listen to your audio and mark the countdown start point
+        </span>
+      </div>
+
+      <div className={`rounded-lg p-3 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+        <div className="flex items-center gap-3 mb-3">
+          {!isPlaying ? (
+            <button
+              onClick={handlePlay}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+            >
+              <Play size={16} /> Play Audio
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              {isPaused ? (
+                <button
+                  onClick={handleResume}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+                >
+                  <Play size={14} /> Resume
+                </button>
+              ) : (
+                <button
+                  onClick={handlePause}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                >
+                  <Pause size={14} /> Pause
+                </button>
+              )}
+              <button
+                onClick={handleStop}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                }`}
+              >
+                <Square size={14} /> Stop
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 text-right">
+            <span className={`font-mono text-2xl font-bold tabular-nums ${
+              isPlaying && !isPaused ? 'text-green-400' : darkMode ? 'text-slate-300' : 'text-slate-700'
+            }`}>
+              {formatTimeMs(elapsedMs)}
+            </span>
+            {audioDurationMs > 0 && (
+              <span className={`text-xs ml-2 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                / {formatTimeMs(audioDurationMs)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div
+          className={`relative h-8 rounded-lg cursor-pointer overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}
+          onClick={handleSeek}
+        >
+          <div
+            className="absolute inset-y-0 left-0 bg-green-600/30 transition-[width] duration-75"
+            style={{ width: `${progress * 100}%` }}
+          />
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10"
+            style={{ left: `${progress * 100}%` }}
+          />
+
+          {markerPosition !== null && (
+            <>
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20"
+                style={{ left: `${markerPosition * 100}%` }}
+              />
+              <div
+                className="absolute top-0 z-20 -translate-x-1/2"
+                style={{ left: `${markerPosition * 100}%` }}
+              >
+                <div className="w-3 h-3 bg-red-500 rotate-45 transform translate-y-0.5" />
+              </div>
+              <div
+                className="absolute bottom-0.5 z-20 -translate-x-1/2"
+                style={{ left: `${markerPosition * 100}%` }}
+              >
+                <span className="text-[9px] font-mono font-bold text-red-400 whitespace-nowrap bg-slate-900/80 px-1 rounded">
+                  {formatTimeMs(markedPointMs!)}
+                </span>
+              </div>
+            </>
+          )}
+
+          {!isPlaying && !elapsedMs && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                Click Play, then tap "Mark Start" when you hear the first countdown signal
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleMark}
+          disabled={!isPlaying && !isPaused}
+          className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-bold transition-all ${
+            isPlaying && !isPaused
+              ? 'bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/30 animate-pulse'
+              : isPlaying && isPaused
+                ? 'bg-red-600/80 text-white hover:bg-red-700'
+                : darkMode
+                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+          }`}
+        >
+          <Crosshair size={18} />
+          Mark Countdown Start
+        </button>
+
+        {markedPointMs !== null && (
+          <div className="flex items-center gap-3">
+            <div className={`px-3 py-2 rounded-lg ${darkMode ? 'bg-red-500/10' : 'bg-red-50'}`}>
+              <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Start point: </span>
+              <span className="text-sm font-mono font-bold text-red-400">{formatTimeMs(markedPointMs)}</span>
+            </div>
+            <button
+              onClick={() => setMarkedPointMs(null)}
+              className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+              title="Clear marker"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+          <span className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+            LED Countdown
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div>
+            <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Countdown from (seconds)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={10}
+                max={900}
+                value={countdownSeconds}
+                onChange={e => setCountdownSeconds(parseInt(e.target.value) || sequence.total_duration_seconds)}
+                className={`w-20 px-3 py-2 rounded-lg text-sm border ${
+                  darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                }`}
+              />
+              <span className={`text-sm font-mono ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                = {formatTime(countdownSeconds)}
+              </span>
+            </div>
+          </div>
+          {markedPointMs !== null && (
+            <div className={`flex-1 p-2.5 rounded-lg text-xs ${darkMode ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-700'}`}>
+              Audio plays for <strong>{formatTimeMs(markedPointMs)}</strong> before the LED starts counting down from <strong>{formatTime(countdownSeconds)}</strong>.
+              Total audio+countdown: ~{formatTimeMs(markedPointMs + countdownSeconds * 1000)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {hasUnsavedChanges && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            Save Sync Settings
+          </button>
+          <span className={`text-xs ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+            Unsaved changes
+          </span>
+        </div>
+      )}
     </div>
   );
 };
