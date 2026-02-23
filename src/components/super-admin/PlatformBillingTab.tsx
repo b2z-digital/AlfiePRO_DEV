@@ -227,7 +227,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
           }
 
           const annualRate = applicableRate.annual_rate || applicableRate.rate_per_member * 12;
-          const monthlyCharge = parseFloat((memberCount * (annualRate / 12)).toFixed(2));
+          const annualCharge = parseFloat((memberCount * annualRate).toFixed(2));
 
           entities.push({
             id: entity.id,
@@ -235,7 +235,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
             type: targetType,
             memberCount,
             annualRate,
-            monthlyCharge,
+            monthlyCharge: annualCharge,
           });
         }
       }
@@ -556,9 +556,9 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
           <div className={`rounded-2xl border p-6 ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Current Month Forecast</h3>
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Annual Billing Forecast</h3>
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Projected billing based on active member counts and configured rates
+                  Projected annual billing based on active member counts and configured rates
                 </p>
               </div>
               <div className="text-right">
@@ -566,7 +566,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                   {formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0))}
                 </p>
                 <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  projected this month ({forecast.reduce((s, f) => s + f.memberCount, 0)} total members)
+                  annual projection ({forecast.reduce((s, f) => s + f.memberCount, 0)} total members)
                 </p>
               </div>
             </div>
@@ -582,10 +582,8 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                     <tr className={`text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-slate-400 border-b border-slate-700/50' : 'text-slate-500 border-b border-slate-200'}`}>
                       <th className="p-3">Organization</th>
                       <th className="p-3 text-right">Active Members</th>
-                      <th className="p-3 text-right">Annual Rate</th>
-                      <th className="p-3 text-right">Monthly Rate</th>
-                      <th className="p-3 text-right">Monthly Charge</th>
-                      <th className="p-3 text-right">Annual Projection</th>
+                      <th className="p-3 text-right">Rate Per Member</th>
+                      <th className="p-3 text-right">Annual Total</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${darkMode ? 'divide-slate-700/30' : 'divide-slate-100'}`}>
@@ -604,14 +602,8 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         <td className={`p-3 text-right text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                           {formatCurrency(f.annualRate)}/yr
                         </td>
-                        <td className={`p-3 text-right text-sm ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {formatCurrency(f.annualRate / 12)}/mo
-                        </td>
-                        <td className={`p-3 text-right font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <td className={`p-3 text-right font-semibold text-sm ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
                           {formatCurrency(f.monthlyCharge)}
-                        </td>
-                        <td className={`p-3 text-right text-sm ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                          {formatCurrency(f.monthlyCharge * 12)}
                         </td>
                       </tr>
                     ))}
@@ -629,10 +621,8 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         <td className="p-3">Total</td>
                         <td className="p-3 text-right">{forecast.reduce((s, f) => s + f.memberCount, 0)}</td>
                         <td className="p-3"></td>
-                        <td className="p-3"></td>
-                        <td className="p-3 text-right">{formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0))}</td>
                         <td className={`p-3 text-right ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                          {formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0) * 12)}
+                          {formatCurrency(forecast.reduce((s, f) => s + f.monthlyCharge, 0))}
                         </td>
                       </tr>
                     </tfoot>
@@ -788,7 +778,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                   />
                   {rateForm.annual_rate > 0 && (
                     <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Monthly charge per member: {formatCurrency(rateForm.annual_rate / 12)}
+                      Full annual fee charged per member on join/renewal
                     </p>
                   )}
                 </div>
@@ -894,11 +884,10 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
               {rateForm.annual_rate > 0 && (
                 <div className={`mb-4 p-3 rounded-xl ${darkMode ? 'bg-sky-500/10 border border-sky-500/20' : 'bg-sky-50 border border-sky-200'}`}>
                   <p className={`text-sm ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>
-                    Billing calculation: <span className="font-semibold">{formatCurrency(rateForm.annual_rate)}</span> per member/year
-                    = <span className="font-semibold">{formatCurrency(rateForm.annual_rate / 12)}</span> per member/month
+                    Billing: <span className="font-semibold">{formatCurrency(rateForm.annual_rate)}</span> per member/year
                   </p>
                   <p className={`text-xs mt-1 ${darkMode ? 'text-sky-400/70' : 'text-sky-600'}`}>
-                    Each month: total active members x {formatCurrency(rateForm.annual_rate / 12)}
+                    Full annual fee charged per member when they join or renew. New members each month are billed at the full rate.
                   </p>
                 </div>
               )}
@@ -965,7 +954,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
                         {formatCurrency(rate.annual_rate || rate.rate_per_member)}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                        per member/year ({formatCurrency((rate.annual_rate || rate.rate_per_member) / 12)}/mo)
+                        per member/year
                       </p>
                     </div>
                     <button
@@ -1036,7 +1025,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
             </div>
             <p className={`text-xs mt-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
               Billing is automatically generated on the 1st of each month. Use this to manually generate or re-generate a specific month.
-              Formula: active members x (annual rate / 12) = monthly charge.
+              New members each month are billed at the full annual rate per member.
             </p>
 
             {generateMessage && (

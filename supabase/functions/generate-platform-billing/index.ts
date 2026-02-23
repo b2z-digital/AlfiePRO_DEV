@@ -181,86 +181,65 @@ Deno.serve(async (req: Request) => {
 
         let memberCount = 0;
         let newMembersCount = 0;
+        let clubIds: string[] = [];
 
         if (targetType === "club") {
-          const { count } = await adminClient
-            .from("members")
-            .select("id", { count: "exact", head: true })
-            .eq("club_id", entity.id)
-            .eq("membership_status", "active");
-          memberCount = count || 0;
-
-          const { count: newCount } = await adminClient
-            .from("members")
-            .select("id", { count: "exact", head: true })
-            .eq("club_id", entity.id)
-            .eq("membership_status", "active")
-            .gte("created_at", periodStartStr)
-            .lte("created_at", periodEndStr);
-          newMembersCount = newCount || 0;
+          clubIds = [entity.id];
         } else if (targetType === "state_association") {
           const { data: clubs } = await adminClient
             .from("clubs")
             .select("id")
             .eq("state_association_id", entity.id);
-          const clubIds = (clubs || []).map((c: { id: string }) => c.id);
-
-          if (clubIds.length > 0) {
-            const { count } = await adminClient
-              .from("members")
-              .select("id", { count: "exact", head: true })
-              .in("club_id", clubIds)
-              .eq("membership_status", "active");
-            memberCount = count || 0;
-
-            const { count: newCount } = await adminClient
-              .from("members")
-              .select("id", { count: "exact", head: true })
-              .in("club_id", clubIds)
-              .eq("membership_status", "active")
-              .gte("created_at", periodStartStr)
-              .lte("created_at", periodEndStr);
-            newMembersCount = newCount || 0;
-          }
+          clubIds = (clubs || []).map((c: { id: string }) => c.id);
         } else {
           const { data: states } = await adminClient
             .from("state_associations")
             .select("id")
             .eq("national_association_id", entity.id);
           const stateIds = (states || []).map((s: { id: string }) => s.id);
-
           if (stateIds.length > 0) {
             const { data: clubs } = await adminClient
               .from("clubs")
               .select("id")
               .in("state_association_id", stateIds);
-            const clubIds = (clubs || []).map((c: { id: string }) => c.id);
-
-            if (clubIds.length > 0) {
-              const { count } = await adminClient
-                .from("members")
-                .select("id", { count: "exact", head: true })
-                .in("club_id", clubIds)
-                .eq("membership_status", "active");
-              memberCount = count || 0;
-
-              const { count: newCount } = await adminClient
-                .from("members")
-                .select("id", { count: "exact", head: true })
-                .in("club_id", clubIds)
-                .eq("membership_status", "active")
-                .gte("created_at", periodStartStr)
-                .lte("created_at", periodEndStr);
-              newMembersCount = newCount || 0;
-            }
+            clubIds = (clubs || []).map((c: { id: string }) => c.id);
           }
+        }
+
+        if (clubIds.length > 0) {
+          const { count } = await adminClient
+            .from("members")
+            .select("id", { count: "exact", head: true })
+            .in("club_id", clubIds)
+            .eq("membership_status", "active");
+          memberCount = count || 0;
+
+          const { count: newCount } = await adminClient
+            .from("members")
+            .select("id", { count: "exact", head: true })
+            .in("club_id", clubIds)
+            .eq("membership_status", "active")
+            .gte("created_at", periodStartStr)
+            .lte("created_at", periodEndStr);
+          newMembersCount = newCount || 0;
         }
 
         const annualRate =
           applicableRate.annual_rate || applicableRate.rate_per_member * 12;
-        const monthlyRatePerMember = annualRate / 12;
+
+        const { data: priorRecord } = await adminClient
+          .from("platform_billing_records")
+          .select("id")
+          .eq("billing_rate_id", applicableRate.id)
+          .eq("target_id", entity.id)
+          .lt("billing_period_start", periodStartStr)
+          .order("billing_period_start", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const billableMembers = priorRecord ? newMembersCount : memberCount;
         const billingTotal = parseFloat(
-          (memberCount * monthlyRatePerMember).toFixed(2)
+          (billableMembers * annualRate).toFixed(2)
         );
 
         const { data: record } = await adminClient
@@ -274,7 +253,7 @@ Deno.serve(async (req: Request) => {
             billing_period_start: periodStartStr,
             billing_period_end: periodEndStr,
             member_count: memberCount,
-            rate_per_member: parseFloat(monthlyRatePerMember.toFixed(2)),
+            rate_per_member: annualRate,
             annual_rate: annualRate,
             total_amount: billingTotal,
             payment_status: "pending",

@@ -830,7 +830,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             }`}
           >
             <Timer size={16} />
-            StartBox
+            Starter Console
           </button>
         </div>
 

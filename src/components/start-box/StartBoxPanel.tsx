@@ -224,7 +224,7 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
             <div className={`w-2 h-2 rounded-full ${stateIndicatorColor} ${timerState === 'running' ? 'animate-pulse' : ''}`} />
             <Timer size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
             <span className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              StartBox
+              Starter Console
             </span>
           </div>
           {currentSequence && (
