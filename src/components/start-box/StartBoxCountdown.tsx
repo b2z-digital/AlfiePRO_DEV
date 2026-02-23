@@ -18,12 +18,9 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
   preCountdown = false,
   preCountdownMs = 0,
 }) => {
-  const { minutes, seconds, tenths, displayColor, shouldPulse, progressPercent } = useMemo(() => {
+  const { totalSecondsDisplay, displayColor, shouldPulse, progressPercent } = useMemo(() => {
     const totalMs = Math.max(0, remainingMs);
-    const totalSec = totalMs / 1000;
-    const m = Math.floor(totalSec / 60);
-    const s = Math.floor(totalSec % 60);
-    const t = Math.floor((totalMs % 1000) / 100);
+    const totalSec = Math.ceil(totalMs / 1000);
 
     let color = 'text-green-400';
     let pulse = false;
@@ -53,9 +50,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
       : 0;
 
     return {
-      minutes: m,
-      seconds: s,
-      tenths: t,
+      totalSecondsDisplay: totalSec,
       displayColor: color,
       shouldPulse: pulse,
       progressPercent: Math.min(100, Math.max(0, progress)),
@@ -66,7 +61,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
     return (
       <div className="flex items-center gap-2">
         <span className={`font-mono font-bold text-lg tabular-nums ${displayColor} ${shouldPulse ? 'animate-pulse' : ''}`}>
-          {minutes}:{seconds.toString().padStart(2, '0')}.{tenths}
+          {totalSecondsDisplay}
         </span>
       </div>
     );
@@ -94,29 +89,27 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none rounded-2xl" />
 
         {preCountdown && state === 'running' ? (
-          <>
-            <div className="relative flex flex-col items-center justify-center py-4 gap-1">
-              <div
-                className="font-mono font-bold tabular-nums tracking-wider text-cyan-400 animate-pulse"
-                style={{ fontSize: '5.5rem', lineHeight: 1, textShadow: '0 0 30px currentColor, 0 0 60px currentColor' }}
-              >
-                {minutes}:{seconds.toString().padStart(2, '0')}
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-xs text-cyan-400/80 font-semibold uppercase tracking-wider">
-                  Audio Playing — Countdown in {preCountdownSec}s
-                </span>
-              </div>
+          <div className="relative flex flex-col items-center justify-center py-4 gap-1">
+            <div
+              className="font-mono font-bold tabular-nums tracking-wider text-cyan-400 animate-pulse"
+              style={{ fontSize: '5.5rem', lineHeight: 1, textShadow: '0 0 30px currentColor, 0 0 60px currentColor' }}
+            >
+              {totalSecondsDisplay}
             </div>
-          </>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-xs text-cyan-400/80 font-semibold uppercase tracking-wider">
+                Audio Playing — Countdown in {preCountdownSec}s
+              </span>
+            </div>
+          </div>
         ) : (
           <div className="relative flex items-baseline justify-center py-4">
             <div
               className={`font-mono font-bold tabular-nums tracking-wider ${displayColor} ${shouldPulse ? 'animate-pulse' : ''}`}
               style={{ fontSize: '5.5rem', lineHeight: 1, textShadow: '0 0 30px currentColor, 0 0 60px currentColor' }}
             >
-              {minutes}:{seconds.toString().padStart(2, '0')}
+              {totalSecondsDisplay}
             </div>
           </div>
         )}
@@ -142,7 +135,7 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
             </span>
           </div>
           <span className="text-[10px] text-slate-600 font-mono">
-            {Math.floor(totalDurationSeconds / 60)}:{(totalDurationSeconds % 60).toString().padStart(2, '0')} total
+            {totalDurationSeconds}s total
           </span>
         </div>
       </div>
