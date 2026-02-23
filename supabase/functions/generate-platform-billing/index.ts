@@ -226,20 +226,13 @@ Deno.serve(async (req: Request) => {
 
         const annualRate =
           applicableRate.annual_rate || applicableRate.rate_per_member * 12;
+        const monthlyRatePerMember = annualRate / 12;
 
-        const { data: priorRecord } = await adminClient
-          .from("platform_billing_records")
-          .select("id")
-          .eq("billing_rate_id", applicableRate.id)
-          .eq("target_id", entity.id)
-          .lt("billing_period_start", periodStartStr)
-          .order("billing_period_start", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const billableMembers = priorRecord ? newMembersCount : memberCount;
+        const existingMembers = memberCount - newMembersCount;
+        const existingCharge = existingMembers * monthlyRatePerMember;
+        const newMemberCharge = newMembersCount * annualRate;
         const billingTotal = parseFloat(
-          (billableMembers * annualRate).toFixed(2)
+          (existingCharge + newMemberCharge).toFixed(2)
         );
 
         const { data: record } = await adminClient
@@ -253,7 +246,7 @@ Deno.serve(async (req: Request) => {
             billing_period_start: periodStartStr,
             billing_period_end: periodEndStr,
             member_count: memberCount,
-            rate_per_member: annualRate,
+            rate_per_member: parseFloat(monthlyRatePerMember.toFixed(2)),
             annual_rate: annualRate,
             total_amount: billingTotal,
             payment_status: "pending",
