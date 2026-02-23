@@ -291,7 +291,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-5">
           <StartBoxCountdown
             remainingMs={remainingMs}
             totalDurationSeconds={totalDuration}
@@ -313,7 +313,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             onPlayBotw={handlePlayBotw}
           />
 
-          <div className={`flex items-center gap-3 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+          <div className={`flex items-center gap-3 pt-3 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
             <div className="relative flex-1">
               <button
                 onClick={() => setShowSequenceSelector(!showSequenceSelector)}
