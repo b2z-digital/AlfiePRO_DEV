@@ -29,11 +29,12 @@ export async function uploadSound(
   file: File,
   name: string,
   description?: string,
-  userId?: string
+  userId?: string,
+  isSystemDefault?: boolean
 ): Promise<StartBoxSound | null> {
   try {
     const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
-    const prefix = clubId || 'global';
+    const prefix = isSystemDefault ? 'system' : (clubId || 'global');
     const fileName = `${prefix}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
@@ -54,7 +55,7 @@ export async function uploadSound(
     const { data, error } = await supabase
       .from('start_box_sounds')
       .insert({
-        club_id: clubId,
+        club_id: isSystemDefault ? null : clubId,
         name,
         description: description || null,
         file_path: fileName,
@@ -62,7 +63,7 @@ export async function uploadSound(
         file_size: file.size,
         duration_ms: duration,
         mime_type: file.type || 'audio/mpeg',
-        is_system_default: false,
+        is_system_default: isSystemDefault || false,
         created_by: userId || null,
       })
       .select()
@@ -76,7 +77,7 @@ export async function uploadSound(
   }
 }
 
-export async function deleteSound(soundId: string): Promise<boolean> {
+export async function deleteSound(soundId: string, forceSystem?: boolean): Promise<boolean> {
   try {
     const { data: sound } = await supabase
       .from('start_box_sounds')
@@ -84,7 +85,7 @@ export async function deleteSound(soundId: string): Promise<boolean> {
       .eq('id', soundId)
       .maybeSingle();
 
-    if (!sound || sound.is_system_default) return false;
+    if (!sound || (sound.is_system_default && !forceSystem)) return false;
 
     if (sound.file_path && !sound.file_path.startsWith('system/')) {
       await supabase.storage.from('start-box-sounds').remove([sound.file_path]);
