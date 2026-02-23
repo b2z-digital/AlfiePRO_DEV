@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Music, ListMusic } from 'lucide-react';
+import { Music, ListMusic } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { StartBoxSoundLibrary } from './StartBoxSoundLibrary';
 import { StartBoxSequenceEditor } from './StartBoxSequenceEditor';
@@ -25,18 +25,6 @@ export const StartBoxBuilder: React.FC<StartBoxBuilderProps> = ({ darkMode, onBa
 
   return (
     <div className="space-y-4">
-      {onBack && (
-        <button
-          onClick={onBack}
-          className={`flex items-center gap-2 text-sm transition-colors ${
-            darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <ArrowLeft size={16} />
-          Back to Settings
-        </button>
-      )}
-
       <div>
         <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           Start System
