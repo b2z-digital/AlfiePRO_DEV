@@ -291,7 +291,14 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                 <div className={`flex items-center gap-3 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                   <span className="capitalize">{seq.sequence_type}</span>
                   <span>{formatTime(seq.total_duration_seconds)}</span>
-                  <span>{seq.sounds?.length || 0} sounds</span>
+                  {seq.use_audio_only ? (
+                    <span className="flex items-center gap-1">
+                      <Music size={10} />
+                      Audio file
+                    </span>
+                  ) : (
+                    <span>{seq.sounds?.length || 0} sounds</span>
+                  )}
                 </div>
               </div>
 
@@ -355,48 +362,215 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                   </div>
                 )}
 
-                <div className={`mt-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Countdown Audio File
-                    </h4>
-                  </div>
-
-                  {seq.audio_file_url ? (
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => toggleAudioPreview(seq.audio_file_url!)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                          audioPreviewUrl === seq.audio_file_url
-                            ? 'bg-green-600/20 text-green-400 border border-green-500/30'
-                            : darkMode
-                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                        }`}
-                      >
-                        {audioPreviewUrl === seq.audio_file_url ? (
-                          <><Square size={14} /> Stop Preview</>
-                        ) : (
-                          <><Play size={14} /> Preview Audio</>
-                        )}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Music size={14} className={darkMode ? 'text-blue-400' : 'text-blue-500'} />
-                          <span className={`text-sm truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {seq.audio_file_path?.split('/').pop() || 'Countdown audio'}
-                          </span>
-                        </div>
+                {!seq.is_system_default && (
+                  <div className={`mt-3 flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-800/30' : 'bg-slate-50'}`}>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={seq.use_audio_only || false}
+                          onChange={async () => {
+                            await updateSequence(seq.id, { use_audio_only: !seq.use_audio_only });
+                            await loadData();
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 rounded-full transition-colors peer-checked:bg-green-600 ${darkMode ? 'bg-slate-600' : 'bg-slate-300'}`} />
+                        <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
                       </div>
-                      {!seq.is_system_default && (
-                        <div className="flex items-center gap-1">
-                          <label className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-                            darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Audio Only Mode
+                      </span>
+                    </label>
+                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Play a single MP3 file with a visual LED countdown - no individual sound events
+                    </span>
+                  </div>
+                )}
+
+                {(seq.use_audio_only || !seq.is_system_default) && (
+                  <div className={`mt-3 p-4 rounded-lg border ${
+                    seq.use_audio_only
+                      ? darkMode ? 'bg-slate-800/50 border-green-500/20' : 'bg-green-50/50 border-green-200'
+                      : darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Music size={16} className={seq.use_audio_only ? 'text-green-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                      <h4 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {seq.use_audio_only ? 'Countdown Audio File' : 'Optional Audio File'}
+                      </h4>
+                      {seq.use_audio_only && !seq.audio_file_url && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                          Required
+                        </span>
+                      )}
+                    </div>
+
+                    {seq.audio_file_url ? (
+                      <div className="space-y-3">
+                        <div className={`flex items-center gap-3 p-3 rounded-lg ${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}>
+                          <button
+                            onClick={() => toggleAudioPreview(seq.audio_file_url!)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                              audioPreviewUrl === seq.audio_file_url
+                                ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
+                                : 'bg-green-600/10 text-green-400 hover:bg-green-600/20'
+                            }`}
+                          >
+                            {audioPreviewUrl === seq.audio_file_url ? (
+                              <><Square size={16} /> Stop</>
+                            ) : (
+                              <><Play size={16} /> Play</>
+                            )}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium truncate ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                              {seq.audio_file_path?.split('/').pop() || 'Countdown audio'}
+                            </div>
+                            <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              MP3 audio file
+                            </div>
+                          </div>
+                          {!seq.is_system_default && (
+                            <div className="flex items-center gap-1.5">
+                              <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                              }`}>
+                                <Upload size={12} />
+                                Replace
+                                <input
+                                  type="file"
+                                  accept="audio/*"
+                                  className="hidden"
+                                  onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleAudioUpload(seq.id, file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                              <button
+                                onClick={() => handleRemoveAudio(seq.id)}
+                                className="p-2 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
+                                title="Remove audio"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {seq.use_audio_only && (
+                          <div className={`p-3 rounded-lg space-y-3 ${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}>
+                            <h5 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              LED Countdown Sync
+                            </h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className={`block text-xs font-medium mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  Countdown Starts From (seconds)
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min={10}
+                                    max={900}
+                                    value={seq.countdown_start_seconds ?? seq.total_duration_seconds}
+                                    onChange={async (e) => {
+                                      const val = parseInt(e.target.value) || seq.total_duration_seconds;
+                                      await updateSequence(seq.id, { countdown_start_seconds: val });
+                                      await loadData();
+                                    }}
+                                    className={`w-24 px-3 py-2 rounded-lg text-sm border ${
+                                      darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                                    }`}
+                                  />
+                                  <span className={`text-sm font-mono ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    = {formatTime(seq.countdown_start_seconds ?? seq.total_duration_seconds)}
+                                  </span>
+                                </div>
+                                <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  The LED display counts down from this value
+                                </p>
+                              </div>
+                              <div>
+                                <label className={`block text-xs font-medium mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  Audio Offset (milliseconds)
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    step={100}
+                                    value={seq.audio_offset_ms || 0}
+                                    onChange={async (e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      await updateSequence(seq.id, { audio_offset_ms: val });
+                                      await loadData();
+                                    }}
+                                    className={`w-24 px-3 py-2 rounded-lg text-sm border ${
+                                      darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                                    }`}
+                                  />
+                                  <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>ms</span>
+                                </div>
+                                <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                                  + delays audio start, - starts audio earlier vs countdown
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className={`flex items-center gap-3 p-2.5 rounded-lg text-xs ${darkMode ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                              <Clock size={14} className="flex-shrink-0" />
+                              <span>
+                                Press Start to play your audio file. The LED countdown will display from{' '}
+                                <strong>{formatTime(seq.countdown_start_seconds ?? seq.total_duration_seconds)}</strong>{' '}
+                                down to 0:00. Adjust the offset to fine-tune the sync between your audio and the visual countdown.
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {!seq.use_audio_only && (
+                          <div className="mt-1">
+                            <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              Audio Offset (ms)
+                            </label>
+                            <input
+                              type="number"
+                              value={seq.audio_offset_ms || 0}
+                              onChange={async (e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                await updateSequence(seq.id, { audio_offset_ms: val });
+                                await loadData();
+                              }}
+                              className={`w-32 px-2 py-1.5 rounded text-xs border ${
+                                darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        {uploadingAudioFor === seq.id ? (
+                          <div className="flex items-center gap-2 py-3">
+                            <Loader2 size={16} className="animate-spin text-blue-400" />
+                            <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Uploading audio file...</span>
+                          </div>
+                        ) : !seq.is_system_default ? (
+                          <label className={`flex flex-col items-center gap-2 px-6 py-6 rounded-lg border-2 border-dashed cursor-pointer transition-all ${
+                            darkMode
+                              ? 'border-slate-700 hover:border-green-500/50 text-slate-400 hover:text-green-400'
+                              : 'border-slate-300 hover:border-green-400 text-slate-500 hover:text-green-600'
                           }`}>
-                            <Upload size={12} />
-                            Replace
+                            <Upload size={24} />
+                            <span className="text-sm font-medium">Upload MP3 Audio File</span>
+                            <span className={`text-xs ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                              Upload your pre-recorded countdown audio (horns, beeps, announcements, etc.)
+                            </span>
                             <input
                               type="file"
+                              ref={audioFileInputRef}
                               accept="audio/*"
                               className="hidden"
                               onChange={e => {
@@ -406,188 +580,134 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                               }}
                             />
                           </label>
-                          <button
-                            onClick={() => handleRemoveAudio(seq.id)}
-                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
-                            title="Remove audio"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      {uploadingAudioFor === seq.id ? (
-                        <div className="flex items-center gap-2 py-2">
-                          <Loader2 size={16} className="animate-spin text-blue-400" />
-                          <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Uploading...</span>
-                        </div>
-                      ) : !seq.is_system_default ? (
-                        <label className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
-                          darkMode
-                            ? 'border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-300'
-                            : 'border-slate-300 hover:border-slate-400 text-slate-500 hover:text-slate-600'
-                        }`}>
-                          <Upload size={16} />
-                          <span className="text-sm">Upload MP3 countdown audio file</span>
-                          <input
-                            type="file"
-                            ref={audioFileInputRef}
-                            accept="audio/*"
-                            className="hidden"
-                            onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (file) handleAudioUpload(seq.id, file);
-                              e.target.value = '';
-                            }}
-                          />
-                        </label>
-                      ) : (
-                        <p className={`text-xs py-2 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                          No countdown audio attached
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {seq.audio_file_url && (
-                    <div className="mt-2">
-                      <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                        Audio Offset (ms) - positive delays audio, negative starts audio earlier
-                      </label>
-                      <input
-                        type="number"
-                        value={seq.audio_offset_ms || 0}
-                        onChange={async (e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          await updateSequence(seq.id, { audio_offset_ms: val });
-                          await loadData();
-                        }}
-                        className={`w-32 px-2 py-1.5 rounded text-xs border ${
-                          darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'
-                        }`}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Timeline
-                    </h4>
-                    {!seq.is_system_default && (
-                      <button
-                        onClick={() => { setAddingSoundToSeq(seq.id); setNewTriggerTime(seq.total_duration_seconds); }}
-                        className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
-                      >
-                        <Plus size={12} /> Add Sound Event
-                      </button>
+                        ) : (
+                          <p className={`text-xs py-2 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                            No countdown audio attached
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
+                )}
 
-                  {addingSoundToSeq === seq.id && (
-                    <div className={`p-3 mb-2 rounded-lg border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sound</label>
-                          <select
-                            value={newSoundId}
-                            onChange={e => setNewSoundId(e.target.value)}
-                            className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                          >
-                            <option value="">Select...</option>
-                            {sounds.map(s => (
-                              <option key={s.id} value={s.id}>{s.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>At T-{formatTime(newTriggerTime)}</label>
-                          <input
-                            type="number"
-                            min={0}
-                            max={seq.total_duration_seconds}
-                            value={newTriggerTime}
-                            onChange={e => setNewTriggerTime(parseInt(e.target.value) || 0)}
-                            className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                          />
-                        </div>
-                        <div>
-                          <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Label</label>
-                          <input
-                            type="text"
-                            value={newLabel}
-                            onChange={e => setNewLabel(e.target.value)}
-                            placeholder="e.g., Warning"
-                            className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => handleAddSound(seq.id)} disabled={!newSoundId} className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg">Add</button>
-                        <button onClick={() => setAddingSoundToSeq(null)} className={`px-3 py-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cancel</button>
-                      </div>
+                {!seq.use_audio_only && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Sound Event Timeline
+                      </h4>
+                      {!seq.is_system_default && (
+                        <button
+                          onClick={() => { setAddingSoundToSeq(seq.id); setNewTriggerTime(seq.total_duration_seconds); }}
+                          className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          <Plus size={12} /> Add Sound Event
+                        </button>
+                      )}
                     </div>
-                  )}
 
-                  {seq.sounds && seq.sounds.length > 0 ? (
-                    <div className="relative">
-                      <div className={`absolute left-4 top-0 bottom-0 w-px ${darkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
-                      <div className="space-y-1">
-                        {seq.sounds.map(ss => (
-                          <div key={ss.id} className="flex items-center gap-3 pl-2 relative">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 flex-shrink-0 ${
-                              ss.trigger_time_seconds === 0
-                                ? 'border-red-500 bg-red-500/20'
-                                : ss.trigger_time_seconds === seq.total_duration_seconds
-                                  ? 'border-green-500 bg-green-500/20'
-                                  : darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-400 bg-white'
-                            }`}>
-                              <div className={`w-1.5 h-1.5 rounded-full ${
-                                ss.trigger_time_seconds === 0 ? 'bg-red-400' : ss.trigger_time_seconds === seq.total_duration_seconds ? 'bg-green-400' : darkMode ? 'bg-slate-500' : 'bg-slate-400'
-                              }`} />
-                            </div>
-                            <div className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
-                              <span className={`font-mono font-bold w-12 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                T-{formatTime(ss.trigger_time_seconds)}
-                              </span>
-                              <span className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                                ss.trigger_time_seconds === 0 ? 'bg-red-500' : 'bg-blue-500'
-                              }`} />
-                              <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-                                {ss.sound?.name || 'Unknown'}
-                              </span>
-                              {ss.label && (
-                                <span className={`italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  {ss.label}
-                                </span>
-                              )}
-                              {ss.volume_override != null && (
-                                <span className="flex items-center gap-0.5 text-slate-500">
-                                  <Volume2 size={10} /> {Math.round(ss.volume_override * 100)}%
-                                </span>
-                              )}
-                            </div>
-                            {!seq.is_system_default && (
-                              <button
-                                onClick={() => handleRemoveSound(ss.id)}
-                                className="p-1 rounded text-red-400 hover:bg-red-500/20 transition-colors"
-                              >
-                                <X size={12} />
-                              </button>
-                            )}
+                    {addingSoundToSeq === seq.id && (
+                      <div className={`p-3 mb-2 rounded-lg border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sound</label>
+                            <select
+                              value={newSoundId}
+                              onChange={e => setNewSoundId(e.target.value)}
+                              className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                            >
+                              <option value="">Select...</option>
+                              {sounds.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
                           </div>
-                        ))}
+                          <div>
+                            <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>At T-{formatTime(newTriggerTime)}</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={seq.total_duration_seconds}
+                              value={newTriggerTime}
+                              onChange={e => setNewTriggerTime(parseInt(e.target.value) || 0)}
+                              className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                            />
+                          </div>
+                          <div>
+                            <label className={`block text-[10px] font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Label</label>
+                            <input
+                              type="text"
+                              value={newLabel}
+                              onChange={e => setNewLabel(e.target.value)}
+                              placeholder="e.g., Warning"
+                              className={`w-full px-2 py-1.5 rounded text-xs border ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={() => handleAddSound(seq.id)} disabled={!newSoundId} className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg">Add</button>
+                          <button onClick={() => setAddingSoundToSeq(null)} className={`px-3 py-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cancel</button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <p className={`text-xs text-center py-3 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                      No sound events configured
-                    </p>
-                  )}
-                </div>
+                    )}
+
+                    {seq.sounds && seq.sounds.length > 0 ? (
+                      <div className="relative">
+                        <div className={`absolute left-4 top-0 bottom-0 w-px ${darkMode ? 'bg-slate-700' : 'bg-slate-300'}`} />
+                        <div className="space-y-1">
+                          {seq.sounds.map(ss => (
+                            <div key={ss.id} className="flex items-center gap-3 pl-2 relative">
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 flex-shrink-0 ${
+                                ss.trigger_time_seconds === 0
+                                  ? 'border-red-500 bg-red-500/20'
+                                  : ss.trigger_time_seconds === seq.total_duration_seconds
+                                    ? 'border-green-500 bg-green-500/20'
+                                    : darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-400 bg-white'
+                              }`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${
+                                  ss.trigger_time_seconds === 0 ? 'bg-red-400' : ss.trigger_time_seconds === seq.total_duration_seconds ? 'bg-green-400' : darkMode ? 'bg-slate-500' : 'bg-slate-400'
+                                }`} />
+                              </div>
+                              <div className={`flex-1 flex items-center gap-2 py-1.5 px-2 rounded-lg text-xs ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
+                                <span className={`font-mono font-bold w-12 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                  T-{formatTime(ss.trigger_time_seconds)}
+                                </span>
+                                <span className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                                  ss.trigger_time_seconds === 0 ? 'bg-red-500' : 'bg-blue-500'
+                                }`} />
+                                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                                  {ss.sound?.name || 'Unknown'}
+                                </span>
+                                {ss.label && (
+                                  <span className={`italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                    {ss.label}
+                                  </span>
+                                )}
+                                {ss.volume_override != null && (
+                                  <span className="flex items-center gap-0.5 text-slate-500">
+                                    <Volume2 size={10} /> {Math.round(ss.volume_override * 100)}%
+                                  </span>
+                                )}
+                              </div>
+                              {!seq.is_system_default && (
+                                <button
+                                  onClick={() => handleRemoveSound(ss.id)}
+                                  className="p-1 rounded text-red-400 hover:bg-red-500/20 transition-colors"
+                                >
+                                  <X size={12} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className={`text-xs text-center py-3 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                        No sound events configured
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

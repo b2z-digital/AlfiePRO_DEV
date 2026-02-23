@@ -31,6 +31,8 @@ export interface StartSequence {
   audio_file_path?: string | null;
   audio_file_url?: string | null;
   audio_offset_ms?: number;
+  use_audio_only?: boolean;
+  countdown_start_seconds?: number | null;
   created_by?: string;
   created_at: string;
   updated_at: string;

@@ -138,7 +138,10 @@ class StartBoxAudioEngine {
   arm(sequence: StartSequence): void {
     this.stop();
     this.currentSequence = sequence;
-    this.totalDurationMs = sequence.total_duration_seconds * 1000;
+    const effectiveDuration = sequence.use_audio_only && sequence.countdown_start_seconds
+      ? sequence.countdown_start_seconds
+      : sequence.total_duration_seconds;
+    this.totalDurationMs = effectiveDuration * 1000;
     this.firedSoundIds.clear();
     this.pausedElapsedMs = 0;
     this.setState('armed');
@@ -332,6 +335,7 @@ class StartBoxAudioEngine {
 
   private checkSoundTriggers(remainingSeconds: number): void {
     if (!this.currentSequence?.sounds) return;
+    if (this.currentSequence.use_audio_only) return;
 
     for (const ss of this.currentSequence.sounds) {
       if (this.firedSoundIds.has(ss.id)) continue;
@@ -369,11 +373,15 @@ class StartBoxAudioEngine {
 
   private emitTick(): void {
     const remaining = this.getRemainingMs();
+    const seq = this.currentSequence;
+    const effectiveDuration = seq
+      ? (seq.use_audio_only && seq.countdown_start_seconds ? seq.countdown_start_seconds : seq.total_duration_seconds)
+      : 0;
     const data: TimerTickData = {
       state: this.currentState,
       remainingMs: remaining,
       remainingSeconds: remaining / 1000,
-      totalDurationSeconds: this.currentSequence?.total_duration_seconds || 0,
+      totalDurationSeconds: effectiveDuration,
       progress: this.totalDurationMs > 0 ? 1 - remaining / this.totalDurationMs : 0,
     };
 

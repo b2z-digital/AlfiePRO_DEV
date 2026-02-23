@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Timer, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp, Timer, Settings, Music } from 'lucide-react';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import type { TimerTickData } from '../../utils/startBoxAudio';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
@@ -111,8 +111,11 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
     const seq = await getSequence(id);
     if (seq) {
       setCurrentSequence(seq);
-      setTotalDuration(seq.total_duration_seconds);
-      setRemainingMs(seq.total_duration_seconds * 1000);
+      const effectiveDuration = seq.use_audio_only && seq.countdown_start_seconds
+        ? seq.countdown_start_seconds
+        : seq.total_duration_seconds;
+      setTotalDuration(effectiveDuration);
+      setRemainingMs(effectiveDuration * 1000);
 
       const engine = engineRef.current;
       await engine.initialize();
@@ -321,7 +324,19 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
                 </div>
               )}
 
-              {currentSequence?.sounds && currentSequence.sounds.length > 0 && (
+              {currentSequence?.use_audio_only && currentSequence.audio_file_url && (
+                <div className={`rounded-lg p-2.5 text-xs ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                  <div className={`text-[10px] uppercase tracking-wider font-semibold mb-1.5 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                    Audio Only Mode
+                  </div>
+                  <div className={`flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <Music size={12} />
+                    <span className="truncate">{currentSequence.audio_file_path?.split('/').pop() || 'Audio file'}</span>
+                  </div>
+                </div>
+              )}
+
+              {currentSequence && !currentSequence.use_audio_only && currentSequence.sounds && currentSequence.sounds.length > 0 && (
                 <div className={`rounded-lg p-2 space-y-0.5 text-xs max-h-40 overflow-y-auto ${
                   darkMode ? 'bg-slate-800/50' : 'bg-slate-50'
                 }`}>
