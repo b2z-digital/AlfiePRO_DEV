@@ -93,7 +93,6 @@ export const StartBoxCountdown: React.FC<StartBoxCountdownProps> = ({
             style={{ fontSize: '5.5rem', lineHeight: 1, textShadow: '0 0 30px currentColor, 0 0 60px currentColor' }}
           >
             {minutes}:{seconds.toString().padStart(2, '0')}
-            <span style={{ fontSize: '0.45em', opacity: 0.7, marginLeft: '2px' }}>.{tenths}</span>
           </div>
         </div>
 

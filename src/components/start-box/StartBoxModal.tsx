@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Timer, Volume2, VolumeX, Settings } from 'lucide-react';
+import { X, Timer } from 'lucide-react';
 import type { StartSequence, StartBoxState } from '../../types/startBox';
 import type { TimerTickData } from '../../utils/startBoxAudio';
 import { getStartBoxEngine, destroyStartBoxEngine } from '../../utils/startBoxAudio';
@@ -38,7 +38,6 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     return saved ? parseFloat(saved) : 0.8;
   });
   const [lastFiredLabel, setLastFiredLabel] = useState<string | null>(null);
-  const [showSequenceSelector, setShowSequenceSelector] = useState(false);
   const [autoCloseTimer, setAutoCloseTimer] = useState<number | null>(null);
   const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
   const [botwPhase, setBotwPhase] = useState(false);
@@ -232,7 +231,6 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
 
   const handleSelectSequence = (id: string) => {
     setSelectedSeqId(id);
-    setShowSequenceSelector(false);
   };
 
   const handleCloseModal = () => {
@@ -311,53 +309,11 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             onVolumeChange={handleVolumeChange}
             botwSequences={botwSequences}
             onPlayBotw={handlePlayBotw}
+            availableSequences={availableSequences}
+            currentSequenceName={currentSequence?.name}
+            selectedSeqId={selectedSeqId}
+            onSelectSequence={handleSelectSequence}
           />
-
-          <div className={`flex items-center gap-3 pt-3 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-            <div className="relative flex-1">
-              <button
-                onClick={() => setShowSequenceSelector(!showSequenceSelector)}
-                disabled={timerState === 'running'}
-                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm border transition-colors ${
-                  darkMode
-                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600 disabled:opacity-50'
-                    : 'bg-white border-slate-300 text-slate-700 hover:border-slate-400 disabled:opacity-50'
-                }`}
-              >
-                <span className="truncate">{currentSequence?.name || 'Select Sequence...'}</span>
-                <Settings size={14} className="flex-shrink-0" />
-              </button>
-
-              {showSequenceSelector && (
-                <div className={`absolute bottom-full left-0 right-0 mb-1 z-50 rounded-lg border shadow-xl max-h-60 overflow-y-auto ${
-                  darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
-                }`}>
-                  {availableSequences.map(seq => (
-                    <button
-                      key={seq.id}
-                      onClick={() => handleSelectSequence(seq.id)}
-                      className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                        seq.id === selectedSeqId
-                          ? darkMode ? 'bg-blue-600/20 text-blue-400' : 'bg-blue-50 text-blue-600'
-                          : darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="font-medium">{seq.name}</div>
-                      <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {Math.floor(seq.total_duration_seconds / 60)}:{(seq.total_duration_seconds % 60).toString().padStart(2, '0')} - {seq.sequence_type}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {currentSequence?.sounds && currentSequence.sounds.length > 0 && (
-              <div className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                {currentSequence.sounds.length} events
-              </div>
-            )}
-          </div>
 
           {botwPhase && startSequenceRef.current && (timerState === 'armed' || timerState === 'running') && (
             <div className={`text-center py-2 rounded-lg text-sm font-medium ${
