@@ -40,6 +40,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
   const [lastFiredLabel, setLastFiredLabel] = useState<string | null>(null);
   const [showSequenceSelector, setShowSequenceSelector] = useState(false);
   const [autoCloseTimer, setAutoCloseTimer] = useState<number | null>(null);
+  const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
 
   const engineRef = useRef(getStartBoxEngine());
   const cleanupRef = useRef<(() => void)[]>([]);
@@ -110,6 +111,7 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
   const loadSequences = async () => {
     const seqs = await getSequences(clubId || null);
     setAvailableSequences(seqs);
+    setBotwSequences(seqs.filter(s => s.sequence_type === 'botw'));
   };
 
   const loadSequence = async (id: string) => {
@@ -190,6 +192,24 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
     localStorage.setItem('startbox-volume', vol.toString());
   }, []);
 
+  const handlePlayBotw = useCallback(async (seqId: string) => {
+    const seq = await getSequence(seqId);
+    if (!seq) return;
+    if (autoCloseTimer) {
+      clearTimeout(autoCloseTimer);
+      setAutoCloseTimer(null);
+    }
+    completedRef.current = false;
+    setCurrentSequence(seq);
+    setSelectedSeqId(seqId);
+    setTotalDuration(seq.total_duration_seconds);
+    setRemainingMs(seq.total_duration_seconds * 1000);
+    const engine = engineRef.current;
+    await engine.initialize();
+    engine.arm(seq);
+    engine.start();
+  }, [autoCloseTimer]);
+
   const handleSelectSequence = (id: string) => {
     setSelectedSeqId(id);
     setShowSequenceSelector(false);
@@ -269,6 +289,8 @@ export const StartBoxModal: React.FC<StartBoxModalProps> = ({
             onWhistle={handleWhistle}
             onBell={handleBell}
             onVolumeChange={handleVolumeChange}
+            botwSequences={botwSequences}
+            onPlayBotw={handlePlayBotw}
           />
 
           <div className={`flex items-center gap-3 pt-2 border-t ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>

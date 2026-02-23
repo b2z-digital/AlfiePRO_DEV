@@ -37,6 +37,7 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   });
   const [lastFiredLabel, setLastFiredLabel] = useState<string | null>(null);
   const [showSequenceSelector, setShowSequenceSelector] = useState(false);
+  const [botwSequences, setBotwSequences] = useState<StartSequence[]>([]);
 
   const engineRef = useRef(getStartBoxEngine());
   const cleanupRef = useRef<(() => void)[]>([]);
@@ -87,6 +88,7 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
   const loadSequences = async () => {
     const seqs = await getSequences(clubId || null);
     setAvailableSequences(seqs);
+    setBotwSequences(seqs.filter(s => s.sequence_type === 'botw'));
   };
 
   const loadSequence = async (id: string) => {
@@ -148,6 +150,19 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
     setVolume(vol);
     engineRef.current.setVolume(vol);
     localStorage.setItem('startbox-volume', vol.toString());
+  }, []);
+
+  const handlePlayBotw = useCallback(async (seqId: string) => {
+    const seq = await getSequence(seqId);
+    if (!seq) return;
+    setCurrentSequence(seq);
+    setSelectedSeqId(seqId);
+    setTotalDuration(seq.total_duration_seconds);
+    setRemainingMs(seq.total_duration_seconds * 1000);
+    const engine = engineRef.current;
+    await engine.initialize();
+    engine.arm(seq);
+    engine.start();
   }, []);
 
   const handleSelectSequence = (id: string) => {
@@ -232,6 +247,8 @@ export const StartBoxPanel: React.FC<StartBoxPanelProps> = ({
                   onWhistle={handleWhistle}
                   onBell={handleBell}
                   onVolumeChange={handleVolumeChange}
+                  botwSequences={botwSequences}
+                  onPlayBotw={handlePlayBotw}
                 />
               </div>
             </div>
