@@ -45,10 +45,9 @@
 .results-export-container th,
 .results-export-container td {
   border: 0.5px solid #12192a;
-  padding: 0 8px !important;
+  padding: 0 !important;
   margin: 0 !important;
   text-align: center;
-  vertical-align: middle !important;
   line-height: 19px !important;
   height: 19px !important;
   color: #000 !important;
@@ -56,25 +55,6 @@
   font-size: 13px;
   box-sizing: border-box !important;
   overflow: hidden !important;
-}
-
-.results-export-container td > div {
-  line-height: 19px !important;
-  height: 19px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.results-export-container td:nth-child(3) > div {
-  justify-content: flex-start !important;
-}
-
-.results-export-container td > span {
-  line-height: 19px !important;
-  display: inline-block !important;
 }
 
 .results-export-container tbody tr:nth-child(odd) td:not(.dropped-score) {
@@ -90,8 +70,20 @@
   color: white !important;
   font-weight: bold;
   height: 22px !important;
-  padding: 0 8px !important;
+  padding: 0 !important;
   line-height: 22px !important;
+}
+
+.results-export-container th > div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+  line-height: 22px !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .results-export-container tbody tr {
@@ -111,15 +103,6 @@
 
 .results-export-container td:nth-child(3) {
   text-align: left;
-  vertical-align: middle !important;
-}
-
-.results-export-container td * {
-  vertical-align: middle;
-}
-
-.results-export-container td span {
-  line-height: 19px !important;
 }
 
 .results-export-container .event-title {

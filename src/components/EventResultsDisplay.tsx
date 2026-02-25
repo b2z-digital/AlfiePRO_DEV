@@ -858,7 +858,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const tableClass = isExportMode ? 'export-table' : '';
   const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white' } : {};
   const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa' } : {};
-  const exportTdBase: React.CSSProperties = isExportMode ? { height: '19px', lineHeight: '19px', padding: '0 8px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, color: '#000' } : {};
+  const exportTdBase: React.CSSProperties = isExportMode ? { height: '19px', padding: '0', fontSize: '13px', fontWeight: 600, color: '#000' } : {};
+  const exportCellWrap: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '19px', lineHeight: '19px', padding: '0 8px', margin: '0', width: '100%', boxSizing: 'border-box' };
+  const exportThWrap: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '22px', lineHeight: '22px', padding: '0 8px', margin: '0', width: '100%', boxSizing: 'border-box' };
 
   return (
     <div className={`${isExportMode ? 'bg-white text-black' : 'bg-slate-800'} p-6 rounded-lg ${containerClass}`}>
@@ -968,40 +970,40 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         <table className={`text-left ${tableClass}`} style={{ minWidth: '100%', width: 'max-content' }}>
           <thead>
             <tr className={isExportMode ? '' : 'bg-gradient-to-r from-slate-700 to-slate-800 border-b-2 border-blue-500/30'}>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-0 z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Pos</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[60px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '70px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Sail</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[120px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '135px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Skipper</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-0 z-20 ${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>POS</div> : 'Pos'}</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[60px] z-20 ${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '70px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>SAIL</div> : 'Sail'}</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[120px] z-20 ${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '135px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>SKIPPER</div> : 'Skipper'}</th>
               {showClub && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[255px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Club</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[255px] z-20 ${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>CLUB</div> : 'Club'}</th>
               )}
               {showClubState && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>State</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>STATE</div> : 'State'}</th>
               )}
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[330px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '90px', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Design</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[330px] z-20 ${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '90px', boxShadow: isExportMode ? undefined : '2px 0 4px rgba(0,0,0,0.1)', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>DESIGN</div> : 'Design'}</th>
               {showCategory && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Category</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>CATEGORY</div> : 'Category'}</th>
               )}
               {shrsHasFinals && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '50px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Fleet</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '50px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>FLEET</div> : 'Fleet'}</th>
               )}
               {row1Races.map(raceNum => (
-                <th key={raceNum} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${
+                <th key={raceNum} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${
                   isShrsFinalsRace(raceNum)
                     ? isExportMode ? '' : 'text-yellow-300'
                     : isExportMode ? '' : 'text-blue-200'
-                }`} style={{ minWidth: '60px', ...exportThStyle }}>{getShrsRaceLabel(raceNum)}</th>
+                }`} style={{ minWidth: '60px', ...exportThStyle }}>{isExportMode ? <div style={exportThWrap}>{getShrsRaceLabel(raceNum)}</div> : getShrsRaceLabel(raceNum)}</th>
               ))}
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Gross</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Net</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>GROSS</div> : 'Gross'}</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>{isExportMode ? <div style={exportThWrap}>NET</div> : 'Net'}</th>
             </tr>
             {needsTwoRows && (
               <tr className={isExportMode ? '' : 'bg-gradient-to-r from-slate-700 to-slate-800'}>
                 {row2Races.map(raceNum => (
-                  <th key={raceNum} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${
+                  <th key={raceNum} className={`${isExportMode ? '' : 'px-3 py-3'} text-sm font-bold uppercase tracking-wider text-center ${
                     isShrsFinalsRace(raceNum)
                       ? isExportMode ? '' : 'text-yellow-300'
                       : isExportMode ? '' : 'text-blue-200'
-                  }`} style={{ minWidth: '60px', ...exportThStyle }}>{getShrsRaceLabel(raceNum)}</th>
+                  }`} style={{ minWidth: '60px', ...exportThStyle }}>{isExportMode ? <div style={exportThWrap}>{getShrsRaceLabel(raceNum)}</div> : getShrsRaceLabel(raceNum)}</th>
                 ))}
               </tr>
             )}
@@ -1138,7 +1140,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   style={isExportMode ? { ...exportTdBase, textAlign: 'center' } : undefined}
                 >
                   {isExportMode ? (
-                    <div className={shrsHasFinals && isFleetTopThree ? 'text-yellow-500 font-bold' : ''}>
+                    <div style={exportCellWrap} className={shrsHasFinals && isFleetTopThree ? 'text-yellow-500 font-bold' : ''}>
                       {position + 1}
                     </div>
                   ) : (
@@ -1173,14 +1175,18 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   className={`sticky left-[60px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-semibold`}
                   style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap' } : undefined}
                 >
-                  {showCountry && skipper.country ? `${abbreviateCountry(skipper.country)} ` : ''}{skipper.sailNo}
+                  {isExportMode ? (
+                    <div style={exportCellWrap}>{showCountry && skipper.country ? `${abbreviateCountry(skipper.country)} ` : ''}{skipper.sailNo}</div>
+                  ) : (
+                    <>{showCountry && skipper.country ? `${abbreviateCountry(skipper.country)} ` : ''}{skipper.sailNo}</>
+                  )}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`sticky left-[120px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} text-left font-semibold`}
                   style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' } : undefined}
                 >
-                  <div className="flex items-center gap-2">
+                  <div style={isExportMode ? { ...exportCellWrap, justifyContent: 'flex-start' } : undefined} className={isExportMode ? '' : 'flex items-center gap-2'}>
                     {showFlag && skipper.countryCode && (
                       <span className="text-2xl">{getCountryFlag(skipper.countryCode)}</span>
                     )}
@@ -1206,7 +1212,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     className={`sticky left-[255px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-semibold`}
                     style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' } : undefined}
                   >
-                    {getClubAbbreviation(skipper)}
+                    {isExportMode ? <div style={exportCellWrap}>{getClubAbbreviation(skipper)}</div> : getClubAbbreviation(skipper)}
                   </td>
                 )}
                 {showClubState && (
@@ -1215,7 +1221,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     className={`px-3 ${isExportMode ? '' : 'py-1.5'} font-semibold ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
                     style={isExportMode ? { ...exportTdBase } : undefined}
                   >
-                    {skipper.clubState || ''}
+                    {isExportMode ? <div style={exportCellWrap}>{skipper.clubState || ''}</div> : (skipper.clubState || '')}
                   </td>
                 )}
                 <td
@@ -1223,7 +1229,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   className={`sticky left-[330px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} font-semibold ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
                   style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
                 >
-                  {getHullDesign(skipper)}
+                  {isExportMode ? <div style={exportCellWrap}>{getHullDesign(skipper)}</div> : getHullDesign(skipper)}
                 </td>
                 {showCategory && (
                   <td
@@ -1231,7 +1237,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
                     style={isExportMode ? { ...exportTdBase } : undefined}
                   >
-                    {abbreviateCategory(skipper.category)}
+                    {isExportMode ? <div style={exportCellWrap}>{abbreviateCategory(skipper.category)}</div> : abbreviateCategory(skipper.category)}
                   </td>
                 )}
                 {shrsHasFinals && (
@@ -1242,7 +1248,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     }`}
                     style={isExportMode ? { ...exportTdBase, fontSize: '12px', fontWeight: 'bold' } : undefined}
                   >
-                    {skipperFleet === 'A' ? 'G' : skipperFleet === 'B' ? 'S' : skipperFleet === 'C' ? 'B' : skipperFleet}
+                    {isExportMode ? <div style={exportCellWrap}>{skipperFleet === 'A' ? 'G' : skipperFleet === 'B' ? 'S' : skipperFleet === 'C' ? 'B' : skipperFleet}</div> : (skipperFleet === 'A' ? 'G' : skipperFleet === 'B' ? 'S' : skipperFleet === 'C' ? 'B' : skipperFleet)}
                   </td>
                 )}
                 {row1Races.map(raceNum => {
@@ -1287,7 +1293,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                       {letterScore ? (
                         (() => {
                           const points = getLetterScorePointsForRace(letterScore, raceNum, event.raceResults || [], event.skippers || [], skipper.index);
-                          return <span>{points}</span>;
+                          return isExportMode ? <div style={exportCellWrap}>{points}</div> : <span>{points}</span>;
                         })()
                       ) : event.raceFormat === 'handicap' && (position || withdrawnScore) ? (
                         isExportMode ? (
@@ -1373,9 +1379,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           </div>
                         )
                       ) : withdrawnScore ? (
-                        <span>{withdrawnScore}</span>
+                        isExportMode ? <div style={exportCellWrap}>{withdrawnScore}</div> : <span>{withdrawnScore}</span>
                       ) : (
-                        <span>{position || '-'}</span>
+                        isExportMode ? <div style={exportCellWrap}>{position || '-'}</div> : <span>{position || '-'}</span>
                       )}
                     </td>
                   );
@@ -1385,14 +1391,14 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300'}`}
                   style={isExportMode ? { ...exportTdBase } : undefined}
                 >
-                  {totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}
+                  {isExportMode ? <div style={exportCellWrap}>{totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}</div> : (totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0)}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
                   style={isExportMode ? { ...exportTdBase, fontWeight: 'bold' } : undefined}
                 >
-                  {totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}
+                  {isExportMode ? <div style={exportCellWrap}>{totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}</div> : (totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0)}
                 </td>
               </tr>
               {needsTwoRows && (
@@ -1422,7 +1428,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : {})
                         } : undefined}
                       >
-                        <span>{displayVal}</span>
+                        {isExportMode ? <div style={exportCellWrap}>{displayVal}</div> : <span>{displayVal}</span>}
                       </td>
                     );
                   })}
