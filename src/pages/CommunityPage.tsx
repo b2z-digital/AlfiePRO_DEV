@@ -332,26 +332,47 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                 </div>
               </div>
               {connections.length > 0 ? (
-                <div className="flex flex-wrap -space-x-2">
-                  {connections.slice(0, 10).map(connection => (
-                    <div key={connection.id} className="relative group cursor-pointer" onClick={() => setShowConnectionsModal(true)}>
-                      {connection.connected_user?.avatar_url ? (
-                        <img
-                          src={connection.connected_user.avatar_url}
-                          alt={connection.connected_user.full_name}
-                          className={`w-10 h-10 rounded-full border-2 object-cover transition-transform hover:scale-110 ${lightMode ? 'border-white' : 'border-slate-700'}`}
-                          title={connection.connected_user.full_name}
-                        />
-                      ) : (
-                        <div
-                          className={`w-10 h-10 rounded-full border-2 bg-blue-500 flex items-center justify-center text-white text-xs font-bold transition-transform hover:scale-110 ${lightMode ? 'border-white' : 'border-slate-700'}`}
-                          title={connection.connected_user?.full_name}
-                        >
-                          {connection.connected_user?.full_name?.charAt(0)}
+                <div className="space-y-2">
+                  {connections.slice(0, 8).map(connection => {
+                    const connUser = connection.connected_user;
+                    const isOnline = connUser?.last_seen && (Date.now() - new Date(connUser.last_seen).getTime()) < 15 * 60 * 1000;
+                    return (
+                      <div
+                        key={connection.id}
+                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30'}`}
+                        onClick={() => setShowConnectionsModal(true)}
+                      >
+                        <div className="relative flex-shrink-0">
+                          {connUser?.avatar_url ? (
+                            <img
+                              src={connUser.avatar_url}
+                              alt={connUser.full_name}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
+                              {connUser?.full_name?.charAt(0) || '?'}
+                            </div>
+                          )}
+                          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${lightMode ? 'border-white' : 'border-slate-800'} ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="min-w-0 flex-1">
+                          <div className={`text-sm font-medium truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{connUser?.full_name || 'User'}</div>
+                          <div className={`text-xs ${isOnline ? 'text-green-500' : lightMode ? 'text-gray-400' : 'text-slate-500'}`}>
+                            {isOnline ? 'Online' : 'Offline'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {connections.length > 8 && (
+                    <button
+                      onClick={() => setShowConnectionsModal(true)}
+                      className={`w-full text-center text-sm py-2 rounded-lg transition-colors ${lightMode ? 'text-blue-600 hover:bg-blue-50' : 'text-blue-400 hover:bg-slate-700/30'}`}
+                    >
+                      View all {connections.length} connections
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-4">

@@ -373,19 +373,43 @@ export const socialStorage = {
   async getConnections(userId?: string) {
     const { data: { user } } = await supabase.auth.getUser();
     const targetUserId = userId || user?.id;
+    if (!targetUserId) return [];
 
-    const { data, error } = await supabase
-      .from('social_connections')
-      .select(`
-        *,
-        connected_user:profiles(id, full_name, avatar_url)
-      `)
-      .eq('user_id', targetUserId)
-      .eq('status', 'accepted')
-      .order('created_at', { ascending: false });
+    const [outgoing, incoming] = await Promise.all([
+      supabase
+        .from('social_connections')
+        .select(`*, connected_user:profiles!social_connections_connected_user_id_profiles_fkey(id, full_name, avatar_url, last_seen)`)
+        .eq('user_id', targetUserId)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('social_connections')
+        .select(`*, connected_user:profiles!social_connections_user_id_profiles_fkey(id, full_name, avatar_url, last_seen)`)
+        .eq('connected_user_id', targetUserId)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false }),
+    ]);
 
-    if (error) throw error;
-    return data;
+    if (outgoing.error) throw outgoing.error;
+    if (incoming.error) throw incoming.error;
+
+    const seen = new Set<string>();
+    const all: any[] = [];
+    for (const c of (outgoing.data || [])) {
+      const otherId = c.connected_user_id;
+      if (!seen.has(otherId)) {
+        seen.add(otherId);
+        all.push(c);
+      }
+    }
+    for (const c of (incoming.data || [])) {
+      const otherId = c.user_id;
+      if (!seen.has(otherId)) {
+        seen.add(otherId);
+        all.push(c);
+      }
+    }
+    return all;
   },
 
   async sendConnectionRequest(connectedUserId: string, type: 'friend' | 'follow' = 'friend') {
@@ -415,7 +439,7 @@ export const socialStorage = {
       .from('social_connections')
       .select(`
         *,
-        requester:profiles!social_connections_user_id_fkey(id, full_name, avatar_url)
+        requester:profiles!social_connections_user_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .eq('connected_user_id', user.id)
       .eq('status', 'pending')

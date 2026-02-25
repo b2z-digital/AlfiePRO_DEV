@@ -48,12 +48,12 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
           .limit(200),
         supabase
           .from('social_connections')
-          .select(`*, connected_user:profiles!social_connections_connected_user_id_fkey(id, full_name, avatar_url)`)
+          .select(`*, connected_user:profiles!social_connections_connected_user_id_profiles_fkey(id, full_name, avatar_url)`)
           .eq('user_id', user.id)
           .eq('status', 'accepted'),
         supabase
           .from('social_connections')
-          .select(`*, connected_user:profiles!social_connections_user_id_fkey(id, full_name, avatar_url)`)
+          .select(`*, connected_user:profiles!social_connections_user_id_profiles_fkey(id, full_name, avatar_url)`)
           .eq('connected_user_id', user.id)
           .eq('status', 'accepted'),
         socialStorage.getPendingConnectionRequests(),
