@@ -45,26 +45,25 @@
 .results-export-container th,
 .results-export-container td {
   border: 0.5px solid #12192a;
-  padding-top: 4px !important;
-  padding-bottom: 4px !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
+  padding: 0 8px !important;
   text-align: center;
   vertical-align: middle !important;
-  line-height: 1.2 !important;
-  height: auto !important;
+  line-height: 30px !important;
+  height: 30px !important;
   color: #000 !important;
   font-weight: 600;
   font-size: 13px;
 }
 
 .results-export-container td > div {
-  min-height: 0 !important;
+  line-height: 30px !important;
+  height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .results-export-container td:nth-child(3) > div {
-  display: flex !important;
-  align-items: center !important;
   justify-content: flex-start !important;
 }
 
@@ -100,13 +99,12 @@
   vertical-align: middle !important;
 }
 
-/* Ensure nested elements don't interfere with vertical alignment */
-.results-export-container td > div:not(.split-cell-content) {
-  line-height: inherit;
-}
-
 .results-export-container td * {
   vertical-align: middle;
+}
+
+.results-export-container td span {
+  line-height: 30px !important;
 }
 
 .results-export-container .event-title {
