@@ -857,7 +857,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const containerClass = isExportMode ? 'results-export-container' : '';
   const tableClass = isExportMode ? 'export-table' : '';
   const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white' } : {};
-  const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa', height: '28px', lineHeight: '28px' } : {};
+  const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa' } : {};
 
   return (
     <div className={`${isExportMode ? 'bg-white text-black' : 'bg-slate-800'} p-6 rounded-lg ${containerClass}`}>
@@ -967,36 +967,36 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
         <table className={`text-left ${tableClass}`} style={{ minWidth: '100%', width: 'max-content' }}>
           <thead>
             <tr className={isExportMode ? '' : 'bg-gradient-to-r from-slate-700 to-slate-800 border-b-2 border-blue-500/30'}>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-0 z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Pos</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[60px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '70px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Sail</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[120px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '135px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Skipper</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-0 z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Pos</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[60px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '70px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Sail</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[120px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '135px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Skipper</th>
               {showClub && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[255px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Club</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[255px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Club</th>
               )}
               {showClubState && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>State</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '75px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>State</th>
               )}
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[330px] z-20 px-3 py-3 text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '90px', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Design</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`sticky left-[330px] z-20 px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider ${isExportMode ? '' : 'text-blue-200 bg-gradient-to-r from-slate-700 to-slate-800'}`} style={{ minWidth: '90px', boxShadow: '2px 0 4px rgba(0,0,0,0.1)', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Design</th>
               {showCategory && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Category</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Category</th>
               )}
               {shrsHasFinals && (
-                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '50px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Fleet</th>
+                <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '50px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Fleet</th>
               )}
               {row1Races.map(raceNum => (
-                <th key={raceNum} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${
+                <th key={raceNum} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${
                   isShrsFinalsRace(raceNum)
                     ? isExportMode ? '' : 'text-yellow-300'
                     : isExportMode ? '' : 'text-blue-200'
                 }`} style={{ minWidth: '60px', ...exportThStyle }}>{getShrsRaceLabel(raceNum)}</th>
               ))}
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Gross</th>
-              <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Net</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Gross</th>
+              <th rowSpan={needsTwoRows ? 2 : undefined} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${isExportMode ? '' : 'text-blue-200'}`} style={{ minWidth: '60px', ...exportThStyle, ...(needsTwoRows ? { verticalAlign: 'middle' } : {}) }}>Net</th>
             </tr>
             {needsTwoRows && (
               <tr className={isExportMode ? '' : 'bg-gradient-to-r from-slate-700 to-slate-800'}>
                 {row2Races.map(raceNum => (
-                  <th key={raceNum} className={`px-3 py-3 text-sm font-bold uppercase tracking-wider text-center ${
+                  <th key={raceNum} className={`px-3 ${isExportMode ? '' : 'py-3'} text-sm font-bold uppercase tracking-wider text-center ${
                     isShrsFinalsRace(raceNum)
                       ? isExportMode ? '' : 'text-yellow-300'
                       : isExportMode ? '' : 'text-blue-200'

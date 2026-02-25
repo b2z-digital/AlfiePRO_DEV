@@ -46,21 +46,27 @@
 .results-export-container td {
   border: 0.5px solid #12192a;
   padding: 0 8px !important;
+  margin: 0 !important;
   text-align: center;
   vertical-align: middle !important;
-  line-height: 30px !important;
-  height: 30px !important;
+  line-height: 24px !important;
+  height: 24px !important;
+  max-height: 24px !important;
   color: #000 !important;
   font-weight: 600;
   font-size: 13px;
+  box-sizing: border-box !important;
 }
 
 .results-export-container td > div {
-  line-height: 30px !important;
-  height: 30px !important;
+  line-height: 24px !important;
+  height: 24px !important;
+  max-height: 24px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .results-export-container td:nth-child(3) > div {
@@ -79,13 +85,21 @@
   background-color: #12192a !important;
   color: white !important;
   font-weight: bold;
-  height: 32px !important;
+  height: 26px !important;
+  max-height: 26px !important;
   padding: 0 8px !important;
-  line-height: 32px !important;
+  line-height: 26px !important;
 }
 
 .results-export-container tbody tr {
   background-color: transparent !important;
+  height: 24px !important;
+  max-height: 24px !important;
+}
+
+.results-export-container thead tr {
+  height: 26px !important;
+  max-height: 26px !important;
 }
 
 .results-export-container .dropped-score {
@@ -104,7 +118,7 @@
 }
 
 .results-export-container td span {
-  line-height: 30px !important;
+  line-height: 24px !important;
 }
 
 .results-export-container .event-title {
