@@ -858,6 +858,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const tableClass = isExportMode ? 'export-table' : '';
   const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white' } : {};
   const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa' } : {};
+  const exportTdBase: React.CSSProperties = isExportMode ? { height: '19px', lineHeight: '19px', padding: '0 8px', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, color: '#000' } : {};
 
   return (
     <div className={`${isExportMode ? 'bg-white text-black' : 'bg-slate-800'} p-6 rounded-lg ${containerClass}`}>
@@ -1134,7 +1135,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`sticky left-0 z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-semibold`}
-                  style={isExportMode ? { color: '#000', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, textAlign: 'center' } : undefined}
+                  style={isExportMode ? { ...exportTdBase, textAlign: 'center' } : undefined}
                 >
                   {isExportMode ? (
                     <div className={shrsHasFinals && isFleetTopThree ? 'text-yellow-500 font-bold' : ''}>
@@ -1170,14 +1171,14 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`sticky left-[60px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-semibold`}
-                  style={isExportMode ? { color: '#000', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' } : undefined}
+                  style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap' } : undefined}
                 >
                   {showCountry && skipper.country ? `${abbreviateCountry(skipper.country)} ` : ''}{skipper.sailNo}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`sticky left-[120px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-white bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} text-left font-semibold`}
-                  style={isExportMode ? { color: '#000', verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 } : undefined}
+                  style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' } : undefined}
                 >
                   <div className="flex items-center gap-2">
                     {showFlag && skipper.countryCode && (
@@ -1203,7 +1204,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   <td
                     rowSpan={needsTwoRows ? 2 : undefined}
                     className={`sticky left-[255px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'} font-semibold`}
-                    style={isExportMode ? { color: '#000', verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px', fontWeight: 600 } : undefined}
+                    style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' } : undefined}
                   >
                     {getClubAbbreviation(skipper)}
                   </td>
@@ -1212,7 +1213,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   <td
                     rowSpan={needsTwoRows ? 2 : undefined}
                     className={`px-3 ${isExportMode ? '' : 'py-1.5'} font-semibold ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                    style={isExportMode ? { color: '#000', verticalAlign: 'middle', fontWeight: 600 } : undefined}
+                    style={isExportMode ? { ...exportTdBase } : undefined}
                   >
                     {skipper.clubState || ''}
                   </td>
@@ -1220,7 +1221,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`sticky left-[330px] z-10 px-3 ${isExportMode ? '' : 'py-1.5'} font-semibold ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                  style={isExportMode ? { color: '#000', verticalAlign: 'middle', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px', fontWeight: 600 } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
+                  style={isExportMode ? { ...exportTdBase, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px' } : { boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}
                 >
                   {getHullDesign(skipper)}
                 </td>
@@ -1228,7 +1229,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   <td
                     rowSpan={needsTwoRows ? 2 : undefined}
                     className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300 bg-slate-800'} ${position % 2 === 0 ? '' : isExportMode ? '' : 'bg-slate-700/50'}`}
-                    style={isExportMode ? { color: '#000', verticalAlign: 'middle', fontWeight: 600 } : undefined}
+                    style={isExportMode ? { ...exportTdBase } : undefined}
                   >
                     {abbreviateCategory(skipper.category)}
                   </td>
@@ -1239,12 +1240,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                     className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center text-xs font-bold ${
                       SHRS_FLEET_COLORS[skipperFleet!]?.text || (isExportMode ? '' : 'text-slate-400')
                     }`}
-                    style={isExportMode ? {
-                      color: '#000',
-                      verticalAlign: 'middle',
-                      fontSize: '12px',
-                      fontWeight: 'bold'
-                    } : undefined}
+                    style={isExportMode ? { ...exportTdBase, fontSize: '12px', fontWeight: 'bold' } : undefined}
                   >
                     {skipperFleet === 'A' ? 'G' : skipperFleet === 'B' ? 'S' : skipperFleet === 'C' ? 'B' : skipperFleet}
                   </td>
@@ -1284,8 +1280,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           : isExportMode ? '' : 'text-slate-300'
                       } ${event.raceFormat === 'handicap' && !letterScore ? 'split-cell' : ''}`}
                       style={isExportMode ? {
-                        ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : { color: '#000' }),
-                        fontWeight: 600
+                        ...exportTdBase,
+                        ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : {})
                       } : undefined}
                     >
                       {letterScore ? (
@@ -1387,14 +1383,14 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-semibold ${isExportMode ? 'text-black' : 'text-slate-300'}`}
-                  style={isExportMode ? { color: '#000', verticalAlign: 'middle', fontSize: '13px', fontWeight: 600 } : undefined}
+                  style={isExportMode ? { ...exportTdBase } : undefined}
                 >
                   {totals[skipper.index]?.gross ? Number(totals[skipper.index].gross.toFixed(1)) : 0}
                 </td>
                 <td
                   rowSpan={needsTwoRows ? 2 : undefined}
                   className={`px-3 ${isExportMode ? '' : 'py-1.5'} text-center font-bold ${isExportMode ? 'net-total' : 'text-blue-400'}`}
-                  style={isExportMode ? { color: '#000', fontWeight: 'bold', verticalAlign: 'middle', fontSize: '13px' } : undefined}
+                  style={isExportMode ? { ...exportTdBase, fontWeight: 'bold' } : undefined}
                 >
                   {totals[skipper.index]?.net ? Number(totals[skipper.index].net.toFixed(1)) : 0}
                 </td>
@@ -1422,8 +1418,8 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                           isDropped ? isExportMode ? 'dropped-score' : 'text-red-400 line-through' : isExportMode ? '' : 'text-slate-300'
                         }`}
                         style={isExportMode ? {
-                          ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : { color: '#000' }),
-                          fontWeight: 600
+                          ...exportTdBase,
+                          ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : {})
                         } : undefined}
                       >
                         <span>{displayVal}</span>
