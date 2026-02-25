@@ -104,6 +104,14 @@
   text-align: center;
 }
 
+.results-export-container .event-series-name {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-align: center;
+  color: #333;
+}
+
 .results-export-container .event-subtitle {
   font-size: 16px;
   margin-bottom: 5px;

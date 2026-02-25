@@ -17,6 +17,7 @@ interface EventResultsDisplayProps {
   event: RaceEvent;
   darkMode?: boolean;
   isExportMode?: boolean;
+  seriesName?: string;
   onEventUpdate?: (event: RaceEvent) => void;
 }
 
@@ -24,6 +25,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   event,
   darkMode = true,
   isExportMode = false,
+  seriesName,
   onEventUpdate
 }) => {
   const [expandedSkipper, setExpandedSkipper] = useState<number | null>(null);
@@ -864,6 +866,11 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
           <div className="event-title">
             {event.eventName || event.clubName}
           </div>
+          {seriesName && (
+            <div className="event-series-name">
+              {seriesName}
+            </div>
+          )}
           <div className="event-subtitle">
             {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
           </div>

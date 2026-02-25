@@ -885,7 +885,8 @@ export const ResultsPage: React.FC = () => {
         const eventComponent = React.createElement(EventResultsDisplay, {
           event: displayEvent,
           darkMode: false,
-          isExportMode: true
+          isExportMode: true,
+          seriesName: selectedRound?.seriesName
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -961,7 +962,8 @@ export const ResultsPage: React.FC = () => {
         const eventComponent = React.createElement(EventResultsDisplay, {
           event: displayEvent,
           darkMode: false,
-          isExportMode: true
+          isExportMode: true,
+          seriesName: selectedRound?.seriesName
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
