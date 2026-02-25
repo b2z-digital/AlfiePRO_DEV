@@ -866,14 +866,15 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
           <div className="event-title">
             {event.eventName || event.clubName}
           </div>
-          {seriesName && (
+          {seriesName ? (
             <div className="event-series-name">
               {seriesName}
             </div>
+          ) : (
+            <div className="event-subtitle">
+              {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+            </div>
           )}
-          <div className="event-subtitle">
-            {event.raceClass} - {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-          </div>
           <div className="event-details">
             {formatDate(event.date)} - {event.venue}
           </div>
