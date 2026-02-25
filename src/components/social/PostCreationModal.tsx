@@ -307,7 +307,9 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
                           }}
                           className={`w-full flex items-center space-x-3 p-3 transition-colors last:rounded-b-xl ${selectedGroupId === group.id ? (lightMode ? 'bg-blue-50' : 'bg-blue-900/30') : ''} ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
                         >
-                          {group.avatar_url ? (
+                          {(group as any).club?.logo ? (
+                            <img src={(group as any).club.logo} alt={group.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                          ) : group.avatar_url ? (
                             <img src={group.avatar_url} alt={group.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
                           ) : (
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">

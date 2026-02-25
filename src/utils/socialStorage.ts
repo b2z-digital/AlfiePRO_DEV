@@ -295,7 +295,8 @@ export const socialStorage = {
       .from('social_groups')
       .select(`
         *,
-        user_membership:social_group_members!inner(role, status)
+        user_membership:social_group_members!inner(role, status),
+        club:clubs!social_groups_club_id_fkey(id, name, abbreviation, logo)
       `)
       .order('name');
 

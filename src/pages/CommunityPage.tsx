@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
-import { Users, TrendingUp, Award, Camera, UserPlus, Settings, Clock, ArrowLeft } from 'lucide-react';
+import { Users, UserPlus, Settings, Clock, ArrowLeft, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import PostCreationModal from '../components/social/PostCreationModal';
 import ActivityFeed from '../components/social/ActivityFeed';
-import GroupCard from '../components/social/GroupCard';
-import ConnectionCard from '../components/social/ConnectionCard';
 import ConnectionsModal from '../components/social/ConnectionsModal';
 import GroupManagementModal from '../components/social/GroupManagementModal';
 import { socialStorage, SocialGroup, SocialConnection } from '../utils/socialStorage';
@@ -32,6 +30,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const [allGroups, setAllGroups] = useState<SocialGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<SocialGroup | null>(null);
   const [postModalGroupId, setPostModalGroupId] = useState<string | undefined>();
+  const [showAllGroups, setShowAllGroups] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -95,8 +94,16 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const loadGroups = async () => {
     try {
       const data = await socialStorage.getGroups({ userId: user?.id });
-      setAllGroups(data || []);
-      setGroups(data?.slice(0, 5) || []);
+      const defaultClubId = profile?.default_club_id || currentClub?.clubId;
+      const sorted = [...(data || [])].sort((a, b) => {
+        const aIsDefault = a.club_id === defaultClubId && a.group_type === 'club';
+        const bIsDefault = b.club_id === defaultClubId && b.group_type === 'club';
+        if (aIsDefault && !bIsDefault) return -1;
+        if (!aIsDefault && bIsDefault) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      setAllGroups(sorted);
+      setGroups(sorted);
     } catch (error) {
       console.error('Error loading groups:', error);
     }
@@ -234,7 +241,9 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     >
                       <ArrowLeft className="w-5 h-5" />
                     </button>
-                    {selectedGroup.avatar_url ? (
+                    {(selectedGroup as any).club?.logo ? (
+                      <img src={(selectedGroup as any).club.logo} alt={selectedGroup.name} className="w-12 h-12 rounded-lg object-cover" />
+                    ) : selectedGroup.avatar_url ? (
                       <img src={selectedGroup.avatar_url} alt={selectedGroup.name} className="w-12 h-12 rounded-lg object-cover" />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
@@ -302,7 +311,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
           </div>
 
           <div className="lg:col-span-3 space-y-6">
-            {/* My Groups Card - Match Dashboard Card Style */}
+            {/* My Groups Card */}
             <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`font-bold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Groups</h3>
@@ -316,32 +325,59 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                       <Settings className="w-4 h-4" />
                     </button>
                   )}
-                  <button className="text-blue-500 hover:text-blue-600 text-sm font-medium">
-                    See All
-                  </button>
+                  {groups.length > 3 && (
+                    <button
+                      onClick={() => setShowAllGroups(!showAllGroups)}
+                      className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm font-medium transition-colors"
+                    >
+                      <span>{showAllGroups ? 'Show Less' : 'See All'}</span>
+                      {showAllGroups ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                 </div>
               </div>
               {groups.length > 0 ? (
                 <div className="space-y-1">
-                  {groups.map(group => (
-                    <button
-                      key={group.id}
-                      onClick={() => setSelectedGroup(group)}
-                      className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-colors text-left ${selectedGroup?.id === group.id ? (lightMode ? 'bg-blue-50 ring-1 ring-blue-200' : 'bg-blue-900/30 ring-1 ring-blue-700') : (lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30')}`}
-                    >
-                      {group.avatar_url ? (
-                        <img src={group.avatar_url} alt={group.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold flex-shrink-0">
-                          {group.name.charAt(0)}
+                  {(showAllGroups ? groups : groups.slice(0, 3)).map(group => {
+                    const defaultClubId = profile?.default_club_id || currentClub?.clubId;
+                    const isDefaultClub = group.club_id === defaultClubId && group.group_type === 'club';
+                    const clubLogo = (group as any).club?.logo;
+                    return (
+                      <button
+                        key={group.id}
+                        onClick={() => setSelectedGroup(group)}
+                        className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-colors text-left ${selectedGroup?.id === group.id ? (lightMode ? 'bg-blue-50 ring-1 ring-blue-200' : 'bg-blue-900/30 ring-1 ring-blue-700') : (lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30')}`}
+                      >
+                        <div className="relative flex-shrink-0">
+                          {clubLogo ? (
+                            <img src={clubLogo} alt={group.name} className="w-10 h-10 rounded-lg object-cover" />
+                          ) : group.avatar_url ? (
+                            <img src={group.avatar_url} alt={group.name} className="w-10 h-10 rounded-lg object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                              {group.name.charAt(0)}
+                            </div>
+                          )}
+                          {isDefaultClub && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                              <Star className="w-2.5 h-2.5 text-white fill-white" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className={`font-medium truncate text-sm ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</div>
-                        <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count || 0} members</div>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-medium truncate text-sm ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</span>
+                            {isDefaultClub && (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${lightMode ? 'bg-amber-100 text-amber-700' : 'bg-amber-900/40 text-amber-400'}`}>
+                                HOME
+                              </span>
+                            )}
+                          </div>
+                          <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count || 0} members</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className={`text-sm text-center py-4 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>No groups joined yet</p>
