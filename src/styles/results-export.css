@@ -45,14 +45,27 @@
 .results-export-container th,
 .results-export-container td {
   border: 0.5px solid #12192a;
-  padding: 0 8px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
   text-align: center;
   vertical-align: middle !important;
-  line-height: 26px !important;
-  height: 26px !important;
+  line-height: 1.2 !important;
+  height: auto !important;
   color: #000 !important;
   font-weight: 600;
   font-size: 13px;
+}
+
+.results-export-container td > div {
+  min-height: 0 !important;
+}
+
+.results-export-container td:nth-child(3) > div {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
 }
 
 .results-export-container tbody tr:nth-child(odd) td:not(.dropped-score) {
@@ -60,7 +73,7 @@
 }
 
 .results-export-container tbody tr:nth-child(even) td:not(.dropped-score) {
-  background-color: #f5f5f5 !important;
+  background-color: #eaeef3 !important;
 }
 
 .results-export-container th {

@@ -1287,8 +1287,6 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                       } ${event.raceFormat === 'handicap' && !letterScore ? 'split-cell' : ''}`}
                       style={isExportMode ? {
                         ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : { color: '#000' }),
-                        padding: '2px 8px',
-                        verticalAlign: 'middle',
                         fontWeight: 600
                       } : undefined}
                     >
@@ -1427,8 +1425,6 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                         }`}
                         style={isExportMode ? {
                           ...(isDropped ? { backgroundColor: '#848484', color: '#ffffff' } : { color: '#000' }),
-                          padding: '2px 8px',
-                          verticalAlign: 'middle',
                           fontWeight: 600
                         } : undefined}
                       >
