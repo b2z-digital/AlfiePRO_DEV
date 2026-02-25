@@ -18,16 +18,17 @@
 .results-export-container th,
 .results-export-container td {
   border: 0.5px solid #12192a;
-  padding: 0 !important;
+  padding: 0 6px !important;
   margin: 0 !important;
   text-align: center;
   height: 28px !important;
+  line-height: 28px !important;
+  vertical-align: middle !important;
   color: #000 !important;
   font-weight: 600;
   font-size: 13px;
   box-sizing: border-box !important;
   overflow: hidden !important;
-  position: relative !important;
   white-space: nowrap !important;
 }
 
@@ -44,8 +45,8 @@
   color: white !important;
   font-weight: bold;
   height: 30px !important;
-  padding: 0 !important;
-  position: relative !important;
+  line-height: 30px !important;
+  padding: 0 8px !important;
 }
 
 .results-export-container tbody tr {
