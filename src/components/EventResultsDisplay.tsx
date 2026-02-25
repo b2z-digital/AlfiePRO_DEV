@@ -856,7 +856,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
 
   const containerClass = isExportMode ? 'results-export-container' : '';
   const tableClass = isExportMode ? 'export-table' : '';
-  const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white' } : {};
+  const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white', whiteSpace: 'nowrap' } : {};
   const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa' } : {};
   const exportTdBase: React.CSSProperties = isExportMode ? { padding: '0', fontSize: '13px', fontWeight: 600, color: '#000', position: 'relative' } : {};
   const exportCellWrap: React.CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', margin: '0', boxSizing: 'border-box' };

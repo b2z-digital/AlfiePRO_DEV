@@ -13,34 +13,7 @@
   border-collapse: collapse;
   border: 0.5px solid #12192a;
   margin-bottom: 20px;
-  table-layout: fixed;
 }
-
-/* Fixed column widths for export */
-.results-export-container th:nth-child(1),
-.results-export-container td:nth-child(1) { width: 40px; } /* Pos */
-.results-export-container th:nth-child(2),
-.results-export-container td:nth-child(2) { width: 70px; } /* Sail */
-.results-export-container th:nth-child(3),
-.results-export-container td:nth-child(3) { width: 120px; } /* Skipper */
-.results-export-container th:nth-child(4),
-.results-export-container td:nth-child(4) { width: 70px; } /* Club */
-.results-export-container th:nth-child(5),
-.results-export-container td:nth-child(5) { width: 70px; } /* Design */
-
-/* Race columns - fixed 60px width */
-.results-export-container th:nth-child(n+6):not(:nth-last-child(-n+2)),
-.results-export-container td:nth-child(n+6):not(:nth-last-child(-n+2)) {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
-}
-
-/* Gross and Net columns */
-.results-export-container th:nth-last-child(2),
-.results-export-container td:nth-last-child(2) { width: 50px; } /* Gross */
-.results-export-container th:nth-last-child(1),
-.results-export-container td:nth-last-child(1) { width: 50px; } /* Net */
 
 .results-export-container th,
 .results-export-container td {
@@ -55,6 +28,7 @@
   box-sizing: border-box !important;
   overflow: hidden !important;
   position: relative !important;
+  white-space: nowrap !important;
 }
 
 .results-export-container tbody tr:nth-child(odd) td:not(.dropped-score) {
