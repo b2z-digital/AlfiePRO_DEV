@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
-import { Users, TrendingUp, Award, Camera, UserPlus, Settings, Clock } from 'lucide-react';
+import { Users, TrendingUp, Award, Camera, UserPlus, Settings, Clock, ArrowLeft } from 'lucide-react';
 import PostCreationModal from '../components/social/PostCreationModal';
 import ActivityFeed from '../components/social/ActivityFeed';
 import GroupCard from '../components/social/GroupCard';
@@ -29,7 +29,9 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const [activityPoints, setActivityPoints] = useState<any>(null);
   const [clubName, setClubName] = useState<string>('');
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
-  const [defaultGroupId, setDefaultGroupId] = useState<string | undefined>();
+  const [allGroups, setAllGroups] = useState<SocialGroup[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<SocialGroup | null>(null);
+  const [postModalGroupId, setPostModalGroupId] = useState<string | undefined>();
 
   useEffect(() => {
     loadProfile();
@@ -93,16 +95,8 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const loadGroups = async () => {
     try {
       const data = await socialStorage.getGroups({ userId: user?.id });
-      setGroups(data?.slice(0, 3) || []);
-
-      // Find and set the default club group (the one matching current club)
-      const clubId = profile?.default_club_id || currentClub?.clubId;
-      if (clubId) {
-        const clubGroup = data?.find(g => g.club_id === clubId && g.group_type === 'club');
-        if (clubGroup) {
-          setDefaultGroupId(clubGroup.id);
-        }
-      }
+      setAllGroups(data || []);
+      setGroups(data?.slice(0, 5) || []);
     } catch (error) {
       console.error('Error loading groups:', error);
     }
@@ -230,34 +224,81 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
       <div className="p-16">
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           <div className="lg:col-span-7 space-y-6">
-            {/* Create Post Card - Match Dashboard Card Style */}
-            <div
-              className={`rounded-xl p-6 cursor-pointer transition-all hover:scale-[1.01] border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50 hover:shadow-xl' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl hover:border-slate-600/50'}`}
-              onClick={() => setShowPostModal(true)}
-            >
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  {profile?.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.full_name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-                      {profile?.full_name?.charAt(0) || 'U'}
+            {selectedGroup ? (
+              <>
+                <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setSelectedGroup(null)}
+                      className={`p-2 rounded-lg transition-colors ${lightMode ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-slate-700 text-slate-400'}`}
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    {selectedGroup.avatar_url ? (
+                      <img src={selectedGroup.avatar_url} alt={selectedGroup.name} className="w-12 h-12 rounded-lg object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                        {selectedGroup.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h2 className={`text-xl font-bold truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{selectedGroup.name}</h2>
+                      <p className={`text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>
+                        {selectedGroup.member_count || 0} members
+                        {selectedGroup.description && ` - ${selectedGroup.description}`}
+                      </p>
                     </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className={`w-full text-left px-4 py-3 rounded-full transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200' : 'bg-slate-700/50 hover:bg-slate-700/70'}`}>
-                    <span className={lightMode ? 'text-gray-500' : 'text-slate-400'}>What's on your mind?</span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <ActivityFeed darkMode={darkMode} privacy={['public', 'friends', 'group']} />
+                <div
+                  className={`rounded-xl p-6 cursor-pointer transition-all hover:scale-[1.01] border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50 hover:shadow-xl' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl hover:border-slate-600/50'}`}
+                  onClick={() => { setPostModalGroupId(selectedGroup.id); setShowPostModal(true); }}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      {profile?.avatar_url ? (
+                        <img src={profile.avatar_url} alt={profile.full_name} className="w-12 h-12 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                          {profile?.full_name?.charAt(0) || 'U'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`w-full text-left px-4 py-3 rounded-full transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200' : 'bg-slate-700/50 hover:bg-slate-700/70'}`}>
+                        <span className={lightMode ? 'text-gray-500' : 'text-slate-400'}>Post to {selectedGroup.name}...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <ActivityFeed darkMode={darkMode} groupId={selectedGroup.id} privacy={['group']} />
+              </>
+            ) : (
+              <>
+                <div
+                  className={`rounded-xl p-6 cursor-pointer transition-all hover:scale-[1.01] border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50 hover:shadow-xl' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl hover:border-slate-600/50'}`}
+                  onClick={() => { setPostModalGroupId(undefined); setShowPostModal(true); }}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      {profile?.avatar_url ? (
+                        <img src={profile.avatar_url} alt={profile.full_name} className="w-12 h-12 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                          {profile?.full_name?.charAt(0) || 'U'}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className={`w-full text-left px-4 py-3 rounded-full transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200' : 'bg-slate-700/50 hover:bg-slate-700/70'}`}>
+                        <span className={lightMode ? 'text-gray-500' : 'text-slate-400'}>What's on your mind?</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <ActivityFeed darkMode={darkMode} privacy={['public', 'friends', 'group']} />
+              </>
+            )}
           </div>
 
           <div className="lg:col-span-3 space-y-6">
@@ -281,25 +322,25 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                 </div>
               </div>
               {groups.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-1">
                   {groups.map(group => (
-                    <div key={group.id} className={`flex items-center space-x-3 py-2 rounded-lg transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30'}`}>
+                    <button
+                      key={group.id}
+                      onClick={() => setSelectedGroup(group)}
+                      className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-colors text-left ${selectedGroup?.id === group.id ? (lightMode ? 'bg-blue-50 ring-1 ring-blue-200' : 'bg-blue-900/30 ring-1 ring-blue-700') : (lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30')}`}
+                    >
                       {group.avatar_url ? (
-                        <img
-                          src={group.avatar_url}
-                          alt={group.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
+                        <img src={group.avatar_url} alt={group.name} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
                       ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold flex-shrink-0">
                           {group.name.charAt(0)}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className={`font-medium truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</div>
-                        <div className={`text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count} members</div>
+                        <div className={`font-medium truncate text-sm ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</div>
+                        <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count || 0} members</div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -424,7 +465,8 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
       <PostCreationModal
         isOpen={showPostModal}
         onClose={() => setShowPostModal(false)}
-        groupId={defaultGroupId}
+        groupId={postModalGroupId}
+        groups={allGroups}
         onPostCreated={() => {
           setShowPostModal(false);
         }}

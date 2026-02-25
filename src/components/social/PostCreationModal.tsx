@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Image, Video, Link as LinkIcon, MapPin, Smile, Users, Lock, Globe, MessageSquare } from 'lucide-react';
+import { X, Image, Video, Link as LinkIcon, MapPin, Smile, Users, Lock, Globe, MessageSquare, ChevronDown, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { socialStorage } from '../../utils/socialStorage';
+import { socialStorage, SocialGroup } from '../../utils/socialStorage';
 import { supabase } from '../../utils/supabase';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -9,11 +9,12 @@ interface PostCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   groupId?: string;
+  groups?: SocialGroup[];
   onPostCreated?: () => void;
   darkMode?: boolean;
 }
 
-export default function PostCreationModal({ isOpen, onClose, groupId, onPostCreated, darkMode = false }: PostCreationModalProps) {
+export default function PostCreationModal({ isOpen, onClose, groupId, groups: propGroups, onPostCreated, darkMode = false }: PostCreationModalProps) {
   const { user, currentClub } = useAuth();
   const { addNotification } = useNotification();
   const lightMode = !darkMode;
@@ -23,10 +24,12 @@ export default function PostCreationModal({ isOpen, onClose, groupId, onPostCrea
   const [previews, setPreviews] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPrivacyMenu, setShowPrivacyMenu] = useState(false);
+  const [showPostTargetMenu, setShowPostTargetMenu] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | undefined>(groupId);
+  const [userGroups, setUserGroups] = useState<SocialGroup[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // New states for additional features
   const [videoUrl, setVideoUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [linkTitle, setLinkTitle] = useState('');
@@ -40,8 +43,23 @@ export default function PostCreationModal({ isOpen, onClose, groupId, onPostCrea
   useEffect(() => {
     if (isOpen && user) {
       loadProfile();
+      if (propGroups && propGroups.length > 0) {
+        setUserGroups(propGroups);
+      } else {
+        loadUserGroups();
+      }
+      setSelectedGroupId(groupId);
     }
-  }, [isOpen, user]);
+  }, [isOpen, user, groupId]);
+
+  const loadUserGroups = async () => {
+    try {
+      const data = await socialStorage.getGroups({ userId: user?.id });
+      setUserGroups(data || []);
+    } catch (error) {
+      console.error('Error loading groups:', error);
+    }
+  };
 
   const loadProfile = async () => {
     if (!user) return;
@@ -128,8 +146,8 @@ export default function PostCreationModal({ isOpen, onClose, groupId, onPostCrea
 
       const post = await socialStorage.createPost({
         content: content.trim(),
-        privacy: groupId ? 'group' : privacy,
-        group_id: groupId,
+        privacy: selectedGroupId ? 'group' : privacy,
+        group_id: selectedGroupId || undefined,
         club_id: currentClub?.clubId,
         content_type: contentType,
         link_url: linkUrl || undefined,
@@ -238,33 +256,102 @@ export default function PostCreationModal({ isOpen, onClose, groupId, onPostCrea
               <div className={`font-semibold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>
                 {profile?.full_name || 'You'}
               </div>
-              <div className="relative">
-                <button
-                  onClick={() => setShowPrivacyMenu(!showPrivacyMenu)}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'}`}
-                >
-                  {currentPrivacy && <currentPrivacy.icon className="w-4 h-4" />}
-                  <span>{currentPrivacy?.label}</span>
-                </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowPostTargetMenu(!showPostTargetMenu); setShowPrivacyMenu(false); }}
+                    className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'}`}
+                  >
+                    {selectedGroupId ? (
+                      <>
+                        <Users className="w-4 h-4" />
+                        <span className="truncate max-w-[140px]">{userGroups.find(g => g.id === selectedGroupId)?.name || 'Group'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <User className="w-4 h-4" />
+                        <span>My Feed</span>
+                      </>
+                    )}
+                    <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
+                  </button>
 
-                {showPrivacyMenu && (
-                  <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl border z-10 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
-                    {privacyOptions.map(option => (
+                  {showPostTargetMenu && (
+                    <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl border z-20 max-h-64 overflow-y-auto ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
                       <button
-                        key={option.value}
                         onClick={() => {
-                          setPrivacy(option.value as any);
-                          setShowPrivacyMenu(false);
+                          setSelectedGroupId(undefined);
+                          setShowPostTargetMenu(false);
                         }}
-                        className={`w-full flex items-start space-x-3 p-4 transition-colors first:rounded-t-xl last:rounded-b-xl ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                        className={`w-full flex items-center space-x-3 p-3 transition-colors first:rounded-t-xl ${!selectedGroupId ? (lightMode ? 'bg-blue-50' : 'bg-blue-900/30') : ''} ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
                       >
-                        <option.icon className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white flex-shrink-0">
+                          <User className="w-4 h-4" />
+                        </div>
                         <div className="flex-1 text-left">
-                          <div className={`font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>{option.label}</div>
-                          <div className={`text-xs mt-0.5 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{option.description}</div>
+                          <div className={`font-medium text-sm ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Feed</div>
+                          <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>Post to your personal feed</div>
                         </div>
                       </button>
-                    ))}
+                      {userGroups.length > 0 && (
+                        <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ${lightMode ? 'text-gray-400 bg-gray-50' : 'text-slate-500 bg-slate-800'}`}>
+                          My Groups
+                        </div>
+                      )}
+                      {userGroups.map(group => (
+                        <button
+                          key={group.id}
+                          onClick={() => {
+                            setSelectedGroupId(group.id);
+                            setShowPostTargetMenu(false);
+                          }}
+                          className={`w-full flex items-center space-x-3 p-3 transition-colors last:rounded-b-xl ${selectedGroupId === group.id ? (lightMode ? 'bg-blue-50' : 'bg-blue-900/30') : ''} ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                        >
+                          {group.avatar_url ? (
+                            <img src={group.avatar_url} alt={group.name} className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              {group.name.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 text-left min-w-0">
+                            <div className={`font-medium text-sm truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{group.name}</div>
+                            <div className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{group.member_count || 0} members</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {!selectedGroupId && (
+                  <div className="relative">
+                    <button
+                      onClick={() => { setShowPrivacyMenu(!showPrivacyMenu); setShowPostTargetMenu(false); }}
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${lightMode ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'}`}
+                    >
+                      {currentPrivacy && <currentPrivacy.icon className="w-4 h-4" />}
+                      <span>{currentPrivacy?.label}</span>
+                    </button>
+                    {showPrivacyMenu && (
+                      <div className={`absolute top-full left-0 mt-2 w-72 rounded-xl shadow-xl border z-20 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
+                        {privacyOptions.filter(o => o.value !== 'group').map(option => (
+                          <button
+                            key={option.value}
+                            onClick={() => {
+                              setPrivacy(option.value as any);
+                              setShowPrivacyMenu(false);
+                            }}
+                            className={`w-full flex items-start space-x-3 p-4 transition-colors first:rounded-t-xl last:rounded-b-xl ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                          >
+                            <option.icon className="w-5 h-5 mt-0.5 flex-shrink-0 text-blue-500" />
+                            <div className="flex-1 text-left">
+                              <div className={`font-semibold ${lightMode ? 'text-gray-900' : 'text-white'}`}>{option.label}</div>
+                              <div className={`text-xs mt-0.5 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>{option.description}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
