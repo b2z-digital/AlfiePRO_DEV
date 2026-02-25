@@ -407,6 +407,24 @@ export const socialStorage = {
     return data;
   },
 
+  async getPendingConnectionRequests() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('social_connections')
+      .select(`
+        *,
+        requester:profiles!social_connections_user_id_fkey(id, full_name, avatar_url)
+      `)
+      .eq('connected_user_id', user.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
   async acceptConnectionRequest(connectionId: string) {
     const { data, error } = await supabase
       .from('social_connections')
@@ -417,6 +435,47 @@ export const socialStorage = {
       .eq('id', connectionId)
       .select()
       .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async rejectConnectionRequest(connectionId: string) {
+    const { error } = await supabase
+      .from('social_connections')
+      .delete()
+      .eq('id', connectionId);
+
+    if (error) throw error;
+  },
+
+  async updateGroup(groupId: string, updates: Partial<SocialGroup>) {
+    const { data, error } = await supabase
+      .from('social_groups')
+      .update(updates)
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteGroup(groupId: string) {
+    const { error } = await supabase
+      .from('social_groups')
+      .delete()
+      .eq('id', groupId);
+
+    if (error) throw error;
+  },
+
+  async getClubGroups(clubId: string) {
+    const { data, error } = await supabase
+      .from('social_groups')
+      .select('*')
+      .eq('club_id', clubId)
+      .order('name');
 
     if (error) throw error;
     return data;

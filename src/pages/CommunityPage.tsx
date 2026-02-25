@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
-import { Users, TrendingUp, Award, Camera, UserPlus } from 'lucide-react';
+import { Users, TrendingUp, Award, Camera, UserPlus, Settings, Clock } from 'lucide-react';
 import PostCreationModal from '../components/social/PostCreationModal';
 import ActivityFeed from '../components/social/ActivityFeed';
 import GroupCard from '../components/social/GroupCard';
 import ConnectionCard from '../components/social/ConnectionCard';
 import ConnectionsModal from '../components/social/ConnectionsModal';
+import GroupManagementModal from '../components/social/GroupManagementModal';
 import { socialStorage, SocialGroup, SocialConnection } from '../utils/socialStorage';
 
 interface CommunityPageProps {
@@ -21,8 +22,10 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const [coverImagePosition, setCoverImagePosition] = useState({ x: 0, y: 0, scale: 1 });
   const [showPostModal, setShowPostModal] = useState(false);
   const [showConnectionsModal, setShowConnectionsModal] = useState(false);
+  const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [groups, setGroups] = useState<SocialGroup[]>([]);
   const [connections, setConnections] = useState<SocialConnection[]>([]);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [activityPoints, setActivityPoints] = useState<any>(null);
   const [clubName, setClubName] = useState<string>('');
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
@@ -107,12 +110,18 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
 
   const loadConnections = async () => {
     try {
-      const data = await socialStorage.getConnections();
-      setConnections(data?.slice(0, 5) || []);
+      const [connData, pendingData] = await Promise.all([
+        socialStorage.getConnections(),
+        socialStorage.getPendingConnectionRequests(),
+      ]);
+      setConnections(connData?.slice(0, 5) || []);
+      setPendingRequestCount(pendingData?.length || 0);
     } catch (error) {
       console.error('Error loading connections:', error);
     }
   };
+
+  const isClubAdmin = currentClub?.role === 'admin' || currentClub?.role === 'super_admin';
 
   const loadActivityPoints = async () => {
     if (!user) return;
@@ -256,9 +265,20 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
             <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`font-bold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Groups</h3>
-                <button className="text-blue-500 hover:text-blue-600 text-sm font-medium">
-                  See All
-                </button>
+                <div className="flex items-center gap-2">
+                  {isClubAdmin && currentClub?.clubId && (
+                    <button
+                      onClick={() => setShowGroupManagement(true)}
+                      className={`p-1.5 rounded-lg transition-colors ${lightMode ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700' : 'text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                      title="Manage Groups"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button className="text-blue-500 hover:text-blue-600 text-sm font-medium">
+                    See All
+                  </button>
+                </div>
               </div>
               {groups.length > 0 ? (
                 <div className="space-y-3">
@@ -291,13 +311,25 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
             <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`font-bold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Connections</h3>
-                <button
-                  onClick={() => setShowConnectionsModal(true)}
-                  className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 text-sm font-medium transition-colors"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>{connections.length}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {pendingRequestCount > 0 && (
+                    <button
+                      onClick={() => setShowConnectionsModal(true)}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500 text-white text-xs font-bold animate-pulse"
+                      title={`${pendingRequestCount} pending request${pendingRequestCount > 1 ? 's' : ''}`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {pendingRequestCount}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowConnectionsModal(true)}
+                    className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 text-sm font-medium transition-colors"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>{connections.length}</span>
+                  </button>
+                </div>
               </div>
               {connections.length > 0 ? (
                 <div className="flex flex-wrap -space-x-2">
@@ -386,6 +418,16 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
         }}
         darkMode={darkMode}
       />
+
+      {currentClub?.clubId && (
+        <GroupManagementModal
+          isOpen={showGroupManagement}
+          onClose={() => setShowGroupManagement(false)}
+          clubId={currentClub.clubId}
+          darkMode={darkMode}
+          onGroupsChanged={loadGroups}
+        />
+      )}
     </div>
   );
 }
