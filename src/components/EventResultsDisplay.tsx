@@ -858,9 +858,9 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
   const tableClass = isExportMode ? 'export-table' : '';
   const exportThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: 'white' } : {};
   const exportSubThStyle: React.CSSProperties = isExportMode ? { backgroundColor: '#12192a', color: '#aaa' } : {};
-  const exportTdBase: React.CSSProperties = isExportMode ? { height: '19px', padding: '0', fontSize: '13px', fontWeight: 600, color: '#000' } : {};
-  const exportCellWrap: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '19px', lineHeight: '19px', padding: '0 8px', margin: '0', width: '100%', boxSizing: 'border-box' };
-  const exportThWrap: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '22px', lineHeight: '22px', padding: '0 8px', margin: '0', width: '100%', boxSizing: 'border-box' };
+  const exportTdBase: React.CSSProperties = isExportMode ? { padding: '0', fontSize: '13px', fontWeight: 600, color: '#000', position: 'relative' } : {};
+  const exportCellWrap: React.CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', margin: '0', boxSizing: 'border-box' };
+  const exportThWrap: React.CSSProperties = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', margin: '0', boxSizing: 'border-box' };
 
   return (
     <div className={`${isExportMode ? 'bg-white text-black' : 'bg-slate-800'} p-6 rounded-lg ${containerClass}`}>
