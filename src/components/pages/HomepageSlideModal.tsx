@@ -187,7 +187,7 @@ export const HomepageSlideModal: React.FC<HomepageSlideModalProps> = ({
           <div>
             <label className="block text-sm font-medium mb-2">Button URL (Optional)</label>
             <input
-              type="url"
+              type="text"
               value={formData.button_url}
               onChange={(e) => setFormData({ ...formData, button_url: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg border ${
@@ -195,8 +195,11 @@ export const HomepageSlideModal: React.FC<HomepageSlideModalProps> = ({
                   ? 'bg-slate-700 border-slate-600 text-white'
                   : 'bg-white border-gray-300 text-gray-900'
               } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              placeholder="https://..."
+              placeholder="https://... or /page-path"
             />
+            <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+              Use full URLs (https://...) for external links, or page paths (/race-calendar) for internal links
+            </p>
           </div>
 
           {/* Active Toggle */}
