@@ -50,8 +50,6 @@ interface LatestResult {
   winner: string;
   race_class: string;
   type: 'quick_race' | 'series';
-  seriesId?: string;
-  roundIndex?: number;
 }
 
 const DEFAULT_TILES = [
@@ -384,30 +382,24 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         console.error('Error loading completed races:', completedRacesError);
       }
 
-      const completedSeriesRounds: any[] = [];
-      (allSeries || []).forEach((series: any) => {
-        if (series.rounds && Array.isArray(series.rounds)) {
-          series.rounds.forEach((round: any, roundIndex: number) => {
-            const roundDate = round.date;
-            const isPast = roundDate < today;
-            const isCompleted = round.completed;
+      const { data: completedRoundsData } = await supabase
+        .from('race_series_rounds')
+        .select('id, round_name, date, race_class, race_results, skippers, completed, race_series!inner(series_name)')
+        .eq('club_id', clubId)
+        .eq('completed', true)
+        .lt('date', today)
+        .order('date', { ascending: false })
+        .limit(20);
 
-            if (isPast && isCompleted) {
-              completedSeriesRounds.push({
-                id: `${series.id}-round-${roundIndex}`,
-                seriesId: series.id,
-                roundIndex,
-                round_name: round.name,
-                date: roundDate,
-                series_name: series.series_name,
-                race_class: series.race_class,
-                results: round.results || [],
-                skippers: round.skippers || series.skippers || []
-              });
-            }
-          });
-        }
-      });
+      const completedSeriesRounds = (completedRoundsData || []).map((round: any) => ({
+        id: round.id,
+        round_name: round.round_name,
+        date: round.date,
+        series_name: round.race_series?.series_name || '',
+        race_class: round.race_class || '',
+        race_results: round.race_results || [],
+        skippers: round.skippers || []
+      }));
 
       const quickRaceResults: LatestResult[] = (completedQuickRaces || [])
         .map(event => {
@@ -433,15 +425,14 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
           };
         });
 
-      // Map series rounds to results
-      const seriesResults: LatestResult[] = completedSeriesRounds.map(round => {
+      const seriesResults: LatestResult[] = completedSeriesRounds.map((round: any) => {
         let winner = 'No results';
 
-        // Calculate winner from round results
-        if (round.results && Array.isArray(round.results) && round.results.length > 0 && round.skippers && Array.isArray(round.skippers)) {
-          // Group results by skipperIndex and sum positions
+        const raceResults = round.race_results || [];
+        const skippers = round.skippers || [];
+        if (raceResults.length > 0 && skippers.length > 0) {
           const skipperScores: Record<number, number> = {};
-          round.results.forEach((result: any) => {
+          raceResults.forEach((result: any) => {
             const skipperIdx = result.skipperIndex;
             if (skipperIdx !== undefined) {
               if (!skipperScores[skipperIdx]) {
@@ -453,7 +444,6 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             }
           });
 
-          // Find skipper with lowest score (winner)
           let lowestScore = Infinity;
           let winnerIdx = -1;
           Object.entries(skipperScores).forEach(([idx, score]) => {
@@ -463,9 +453,8 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             }
           });
 
-          // Get skipper name from skippers array
-          if (winnerIdx >= 0 && round.skippers[winnerIdx]) {
-            winner = round.skippers[winnerIdx].name || 'Unknown';
+          if (winnerIdx >= 0 && skippers[winnerIdx]) {
+            winner = skippers[winnerIdx].name || 'Unknown';
           }
         }
 
@@ -475,9 +464,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
           date: round.date,
           winner,
           race_class: round.race_class || '',
-          type: 'series' as const,
-          seriesId: round.seriesId,
-          roundIndex: round.roundIndex
+          type: 'series' as const
         };
       });
 
@@ -873,11 +860,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                     {latestResults.map((result) => (
                       <Link
                         key={result.id}
-                        to={buildPublicUrl(
-                          result.type === 'series' && result.seriesId !== undefined
-                            ? `/results/${result.seriesId}?round=${result.roundIndex}`
-                            : `/results/${result.id}`
-                        )}
+                        to={buildPublicUrl(`/results/${result.id}`)}
                         className="block bg-gray-50 rounded-lg p-3 hover:shadow-md hover:bg-gray-100 transition-all min-h-[110px] flex flex-col"
                       >
                         <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{result.name}</h3>
