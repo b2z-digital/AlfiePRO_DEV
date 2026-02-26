@@ -1106,6 +1106,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         clubId={currentClub?.clubId || ''}
         darkMode={darkMode}
         onSuccess={handleMembershipFormSuccess}
+        members={members}
       />
 
       {/* Member Edit Modal */}
