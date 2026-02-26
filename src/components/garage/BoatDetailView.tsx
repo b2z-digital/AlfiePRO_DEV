@@ -66,117 +66,123 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
     fetchStats();
   }, [boat.id]);
 
+  const findBoatSkipperIndex = (skippers: any[]): number[] => {
+    if (!skippers || !Array.isArray(skippers)) return [];
+    const indices: number[] = [];
+    skippers.forEach((skipper: any, idx: number) => {
+      if (skipper.boatId === boat.id ||
+          skipper.sailNo === boat.sail_number ||
+          skipper.sail_number === boat.sail_number) {
+        indices.push(idx);
+      }
+    });
+    return indices;
+  };
+
+  const extractPositions = (raceResults: any[], skipperIndices: number[]) => {
+    if (!raceResults || !Array.isArray(raceResults) || skipperIndices.length === 0) return [];
+    const positions: number[] = [];
+    for (const result of raceResults) {
+      if (skipperIndices.includes(result.skipperIndex)) {
+        const pos = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+        if (pos && !isNaN(pos) && pos > 0) {
+          positions.push(pos);
+        }
+      }
+    }
+    return positions;
+  };
+
   const fetchStats = async () => {
     try {
-      const boatResults = [];
-      const activityItems = [];
+      const boatResults: { position: number; date: string }[] = [];
+      const activityItems: any[] = [];
 
-      // Fetch race results from one-off races
       const { data: raceData } = await supabase
         .from('quick_races')
-        .select(`
-          id,
-          race_date,
-          title,
-          results
-        `)
-        .not('results', 'is', null)
+        .select('id, race_date, event_name, race_results, skippers')
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
         .order('race_date', { ascending: false });
 
       if (raceData) {
         for (const race of raceData) {
-          if (race.results) {
-            const result = race.results.find((r: any) =>
-              r.sail_number === boat.sail_number || r.sailNumber === boat.sail_number
-            );
-            if (result && result.position) {
-              const position = typeof result.position === 'string' ? parseInt(result.position) : result.position;
-              if (!isNaN(position) && position > 0) {
-                boatResults.push({ position, date: race.race_date });
-                activityItems.push({
-                  type: 'race',
-                  date: race.race_date,
-                  title: race.title || 'Race',
-                  position: position,
-                  id: race.id
-                });
-              }
+          const skipperIndices = findBoatSkipperIndex(race.skippers);
+          if (skipperIndices.length === 0) continue;
+
+          const positions = extractPositions(race.race_results, skipperIndices);
+          const raceNumbers = new Set<number>();
+          for (const result of (race.race_results || [])) {
+            if (skipperIndices.includes(result.skipperIndex) && result.race) {
+              raceNumbers.add(result.race);
             }
+          }
+
+          if (raceNumbers.size > 0) {
+            activityItems.push({
+              type: 'race',
+              date: race.race_date,
+              title: race.event_name || 'Race',
+              position: positions.length > 0 ? Math.min(...positions) : null,
+              id: race.id,
+              raceCount: raceNumbers.size
+            });
+          }
+
+          for (const pos of positions) {
+            boatResults.push({ position: pos, date: race.race_date });
           }
         }
       }
 
-      // Fetch series rounds
       const { data: seriesRounds } = await supabase
         .from('race_series_rounds')
         .select(`
-          id,
-          round_date,
-          round_number,
-          results,
-          heat_results,
-          race_series!inner(
-            id,
-            series_name
-          )
+          id, date, round_name, round_index,
+          race_results, skippers,
+          race_series:series_id(id, series_name)
         `)
-        .order('round_date', { ascending: false });
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
+        .order('date', { ascending: false });
 
       if (seriesRounds) {
         for (const round of seriesRounds) {
-          // Check overall round results
-          if (round.results) {
-            const result = round.results.find((r: any) =>
-              r.sail_number === boat.sail_number || r.sailNumber === boat.sail_number
-            );
+          const skipperIndices = findBoatSkipperIndex(round.skippers);
+          if (skipperIndices.length === 0) continue;
 
-            if (result && result.position) {
-              const position = typeof result.position === 'string' ? parseInt(result.position) : result.position;
-
-              if (!isNaN(position) && position > 0) {
-                boatResults.push({ position, date: round.round_date });
-                activityItems.push({
-                  type: 'race',
-                  date: round.round_date,
-                  title: `${round.race_series?.series_name || 'Series'} - Round ${round.round_number}`,
-                  position: position,
-                  id: round.id
-                });
-              }
+          const positions = extractPositions(round.race_results, skipperIndices);
+          const raceNumbers = new Set<number>();
+          for (const result of (round.race_results || [])) {
+            if (skipperIndices.includes(result.skipperIndex) && result.race) {
+              raceNumbers.add(result.race);
             }
           }
 
-          // Check heat results
-          if (round.heat_results) {
-            for (const heat of round.heat_results) {
-              if (heat.results) {
-                const result = heat.results.find((r: any) =>
-                  r.sail_number === boat.sail_number || r.sailNumber === boat.sail_number
-                );
+          const seriesName = Array.isArray(round.race_series)
+            ? round.race_series[0]?.series_name
+            : (round.race_series as any)?.series_name;
+          const roundLabel = round.round_name || `Round ${(round.round_index ?? 0) + 1}`;
 
-                if (result && result.position) {
-                  const position = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+          if (raceNumbers.size > 0) {
+            activityItems.push({
+              type: 'race',
+              date: round.date,
+              title: `${seriesName || 'Series'} - ${roundLabel}`,
+              position: positions.length > 0 ? Math.min(...positions) : null,
+              id: round.id,
+              raceCount: raceNumbers.size
+            });
+          }
 
-                  if (!isNaN(position) && position > 0) {
-                    boatResults.push({ position, date: round.round_date });
-                    activityItems.push({
-                      type: 'race',
-                      date: round.round_date,
-                      title: `${round.race_series?.series_name || 'Series'} - R${round.round_number} H${heat.heat_number || ''}`,
-                      position: position,
-                      id: `${round.id}-heat-${heat.heat_number}`
-                    });
-                  }
-                }
-              }
-            }
+          for (const pos of positions) {
+            boatResults.push({ position: pos, date: round.date });
           }
         }
       }
 
       const positions = boatResults.map(r => r.position).filter(p => p && !isNaN(p));
 
-      // Fetch maintenance stats
       const { count: logsCount } = await supabase
         .from('maintenance_logs')
         .select('*', { count: 'exact', head: true })
@@ -189,13 +195,11 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
         .eq('is_active', true)
         .eq('is_completed', false);
 
-      // Fetch rig count
       const { count: rigsCount } = await supabase
         .from('boat_rigs')
         .select('*', { count: 'exact', head: true })
         .eq('boat_id', boat.id);
 
-      // Fetch recent maintenance
       const { data: maintenanceData } = await supabase
         .from('maintenance_logs')
         .select('*')
@@ -215,7 +219,6 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
         });
       }
 
-      // Sort activity by date
       activityItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setRecentActivity(activityItems.slice(0, 10));
 
