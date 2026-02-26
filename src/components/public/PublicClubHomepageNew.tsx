@@ -50,6 +50,8 @@ interface LatestResult {
   winner: string;
   race_class: string;
   type: 'quick_race' | 'series';
+  seriesId?: string;
+  roundIndex?: number;
 }
 
 const DEFAULT_TILES = [
@@ -259,7 +261,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       // Get all race series and extract upcoming rounds from JSONB
       const { data: allSeries, error: seriesError } = await supabase
         .from('race_series')
-        .select('id, series_name, rounds, race_class')
+        .select('id, series_name, rounds, race_class, skippers')
         .eq('club_id', clubId);
 
       if (seriesError) {
@@ -369,61 +371,57 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       allUpcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setUpcomingEvents(allUpcomingEvents.slice(0, 4));
 
-      // Load latest results (last 4 completed events) - from both quick races and series
-      // Get completed quick races (has results OR marked completed)
       const { data: completedQuickRaces, error: completedRacesError } = await supabase
         .from('quick_races')
-        .select('id, event_name, race_date, race_class, race_results, completed')
+        .select('id, event_name, race_date, race_class, race_results, skippers, completed')
         .eq('club_id', clubId)
+        .eq('completed', true)
         .lt('race_date', today)
         .order('race_date', { ascending: false })
         .limit(20);
 
       if (completedRacesError) {
         console.error('Error loading completed races:', completedRacesError);
-      } else {
-        console.log('Completed quick races loaded:', completedQuickRaces);
       }
 
-      // Extract completed rounds from all series (already loaded above)
       const completedSeriesRounds: any[] = [];
       (allSeries || []).forEach((series: any) => {
         if (series.rounds && Array.isArray(series.rounds)) {
-          series.rounds.forEach((round: any) => {
+          series.rounds.forEach((round: any, roundIndex: number) => {
             const roundDate = round.date;
             const isPast = roundDate < today;
-            const hasResults = round.results && Array.isArray(round.results) && round.results.length > 0;
-            const isCompleted = round.completed || hasResults;
+            const isCompleted = round.completed;
 
             if (isPast && isCompleted) {
               completedSeriesRounds.push({
-                id: `${series.id}-${round.name}`,
+                id: `${series.id}-round-${roundIndex}`,
+                seriesId: series.id,
+                roundIndex,
                 round_name: round.name,
                 date: roundDate,
                 series_name: series.series_name,
                 race_class: series.race_class,
                 results: round.results || [],
-                skippers: round.skippers || []
+                skippers: round.skippers || series.skippers || []
               });
             }
           });
         }
       });
 
-      console.log('Completed series rounds extracted:', completedSeriesRounds);
-
-      // Map quick races to results (filter by: has results OR marked completed, and date is past)
       const quickRaceResults: LatestResult[] = (completedQuickRaces || [])
-        .filter(event => {
-          const isPast = new Date(event.race_date) < new Date(today);
-          const hasResults = event.race_results && Array.isArray(event.race_results) && event.race_results.length > 0;
-          return isPast && (event.completed || hasResults);
-        })
         .map(event => {
           let winner = 'No results';
+          const skippers = event.skippers || [];
           if (event.race_results && Array.isArray(event.race_results) && event.race_results.length > 0) {
             const firstPlace = event.race_results.find((r: any) => r.position === 1);
-            winner = firstPlace?.skipperName || 'No results';
+            if (firstPlace) {
+              if (firstPlace.skipperName) {
+                winner = firstPlace.skipperName;
+              } else if (firstPlace.skipperIndex !== undefined && skippers[firstPlace.skipperIndex]) {
+                winner = skippers[firstPlace.skipperIndex].name || 'Unknown';
+              }
+            }
           }
           return {
             id: event.id,
@@ -477,7 +475,9 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
           date: round.date,
           winner,
           race_class: round.race_class || '',
-          type: 'series' as const
+          type: 'series' as const,
+          seriesId: round.seriesId,
+          roundIndex: round.roundIndex
         };
       });
 
@@ -873,7 +873,11 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                     {latestResults.map((result) => (
                       <Link
                         key={result.id}
-                        to={buildPublicUrl(`/results/${result.id}`)}
+                        to={buildPublicUrl(
+                          result.type === 'series' && result.seriesId !== undefined
+                            ? `/results/${result.seriesId}?round=${result.roundIndex}`
+                            : `/results/${result.id}`
+                        )}
                         className="block bg-gray-50 rounded-lg p-3 hover:shadow-md hover:bg-gray-100 transition-all min-h-[110px] flex flex-col"
                       >
                         <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{result.name}</h3>
