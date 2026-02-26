@@ -16,7 +16,8 @@ import {
   Mail,
   Check,
   AlertTriangle,
-  ClipboardList
+  ClipboardList,
+  Shield
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ import { ModernApplicationsManager } from '../membership/ModernApplicationsManag
 import { ExpiringMembershipsPanel } from '../membership/ExpiringMembershipsPanel';
 import { ClubRemittanceDashboard } from '../membership/ClubRemittanceDashboard';
 import { RecordPaymentModal } from '../membership/RecordPaymentModal';
+import { CommitteeManagement } from './CommitteeManagement';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MemberMembershipView } from './MemberMembershipView';
@@ -35,7 +37,7 @@ import { MemberMembershipView } from './MemberMembershipView';
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 // Define tab types
-type MembershipTab = 'dashboard' | 'members' | 'applications' | 'renewals' | 'remittances';
+type MembershipTab = 'dashboard' | 'members' | 'applications' | 'renewals' | 'remittances' | 'committee';
 
 interface MembershipDashboardProps {
   darkMode: boolean;
@@ -1260,6 +1262,20 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               </div>
             </button>
 
+            <button
+              onClick={() => setActiveTab('committee')}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'committee'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Shield size={16} />
+                <span>Committee</span>
+              </div>
+            </button>
+
           </div>
         </div>
 
@@ -1274,6 +1290,9 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               darkMode={darkMode}
               onRecordPayment={() => setShowPaymentModal(true)}
             />
+          )}
+          {activeTab === 'committee' && (
+            <CommitteeManagement darkMode={darkMode} />
           )}
         </div>
 

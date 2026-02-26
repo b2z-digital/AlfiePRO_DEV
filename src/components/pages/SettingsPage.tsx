@@ -739,9 +739,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                         <Users size={20} className="text-emerald-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Team management</h3>
+                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Committee Management</h3>
                         <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Manage roles and permissions for your team
+                          Manage roles and permissions for your club
                         </p>
                       </div>
                     </div>
