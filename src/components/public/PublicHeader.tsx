@@ -126,7 +126,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
               YACHT CLASSES
             </Link>
             <Link
-              to={buildPublicUrl('/race-calendar')}
+              to={buildPublicUrl('/results')}
               className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'results' ? 'bg-gray-50' : ''}`}
               onClick={() => setMobileMenuOpen(false)}
             >

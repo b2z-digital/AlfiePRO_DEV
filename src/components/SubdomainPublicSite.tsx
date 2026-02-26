@@ -11,6 +11,7 @@ import { PublicContactPage } from './public/PublicContactPage';
 import { PublicYachtClassesPage } from './public/PublicYachtClassesPage';
 import { PublicRaceCalendarPage } from './public/PublicRaceCalendarPage';
 import { PublicResultsPage } from './public/PublicResultsPage';
+import { PublicResultsListPage } from './public/PublicResultsListPage';
 import { PublicEventWebsitePage } from './public/PublicEventWebsitePage';
 
 interface SubdomainPublicSiteProps {
@@ -139,6 +140,7 @@ export const SubdomainPublicSite: React.FC<SubdomainPublicSiteProps> = ({ subdom
           <Route path="/contact" element={<PublicContactPage />} />
           <Route path="/yacht-classes" element={<PublicYachtClassesPage />} />
           <Route path="/race-calendar" element={<PublicRaceCalendarPage />} />
+          <Route path="/results" element={<PublicResultsListPage />} />
           <Route path="/results/:eventId" element={<PublicResultsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

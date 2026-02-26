@@ -25,6 +25,7 @@ import { PublicClubHomepageNew } from './components/public/PublicClubHomepageNew
 import { PublicStateAssociationHomepage } from './components/public/PublicStateAssociationHomepage';
 import { PublicNationalAssociationHomepage } from './components/public/PublicNationalAssociationHomepage';
 import { PublicResultsPage } from './components/public/PublicResultsPage';
+import { PublicResultsListPage } from './components/public/PublicResultsListPage';
 import { PublicYachtClassesPage } from './components/public/PublicYachtClassesPage';
 import { PublicRaceCalendarPage } from './components/public/PublicRaceCalendarPage';
 import { PublicNewsPage } from './components/public/PublicNewsPage';
@@ -198,6 +199,7 @@ function App() {
           <Route path="/club/:clubId/public/terms" element={<PublicTermsOfServicePage />} />
           <Route path="/club/:clubId/public/yacht-classes" element={<PublicYachtClassesPage />} />
           <Route path="/club/:clubId/public/race-calendar" element={<PublicRaceCalendarPage />} />
+          <Route path="/club/:clubId/public/results" element={<PublicResultsListPage />} />
           <Route path="/club/:clubId/public/results/:eventId" element={<PublicResultsPage />} />
 
         {/* Public Event Website Routes */}

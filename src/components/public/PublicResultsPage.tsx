@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, MapPin, Trophy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { GoogleAnalytics } from '../GoogleAnalytics';
+import { PublicHeader } from './PublicHeader';
 import { PublicFooter } from './PublicFooter';
 import { EventResultsDisplay } from '../EventResultsDisplay';
 import { RaceEvent } from '../../types/race';
@@ -15,9 +17,9 @@ export const PublicResultsPage: React.FC = () => {
   const clubId = contextClubId || paramClubId;
   const [searchParams] = useSearchParams();
   const roundParam = searchParams.get('round');
+  const [club, setClub] = useState<Club | null>(null);
   const [raceEvent, setRaceEvent] = useState<RaceEvent | null>(null);
   const [loading, setLoading] = useState(true);
-  const [clubName, setClubName] = useState<string>('');
   const [seriesName, setSeriesName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -32,28 +34,30 @@ export const PublicResultsPage: React.FC = () => {
 
       const { data: clubData } = await supabase
         .from('clubs')
-        .select('name')
+        .select('*')
         .eq('id', clubId)
         .maybeSingle();
 
       if (clubData) {
-        setClubName(clubData.name);
+        setClub(clubData as any);
       }
 
-      const quickRaceEvent = await loadQuickRace(eventId, clubData?.name || '');
+      const clubDisplayName = clubData?.name || '';
+
+      const quickRaceEvent = await loadQuickRace(eventId, clubDisplayName);
       if (quickRaceEvent) {
         setRaceEvent(quickRaceEvent);
         return;
       }
 
-      const roundEvent = await loadSeriesRound(eventId, clubData?.name || '');
+      const roundEvent = await loadSeriesRound(eventId, clubDisplayName);
       if (roundEvent) {
         setRaceEvent(roundEvent);
         return;
       }
 
       if (roundParam !== null) {
-        const seriesRoundEvent = await loadSeriesRoundByIndex(eventId, parseInt(roundParam), clubData?.name || '');
+        const seriesRoundEvent = await loadSeriesRoundByIndex(eventId, parseInt(roundParam), clubDisplayName);
         if (seriesRoundEvent) {
           setRaceEvent(seriesRoundEvent);
           return;
@@ -66,7 +70,7 @@ export const PublicResultsPage: React.FC = () => {
     }
   };
 
-  const loadQuickRace = async (id: string, club: string): Promise<RaceEvent | null> => {
+  const loadQuickRace = async (id: string, clubDisplayName: string): Promise<RaceEvent | null> => {
     const { data } = await supabase
       .from('quick_races')
       .select('*')
@@ -78,7 +82,7 @@ export const PublicResultsPage: React.FC = () => {
     return {
       id: data.id,
       eventName: data.event_name || undefined,
-      clubName: club,
+      clubName: clubDisplayName,
       date: data.race_date,
       venue: data.race_venue || '',
       raceClass: data.race_class || '',
@@ -102,7 +106,7 @@ export const PublicResultsPage: React.FC = () => {
     } as RaceEvent;
   };
 
-  const loadSeriesRound = async (id: string, club: string): Promise<RaceEvent | null> => {
+  const loadSeriesRound = async (id: string, clubDisplayName: string): Promise<RaceEvent | null> => {
     const { data } = await supabase
       .from('race_series_rounds')
       .select('*, race_series!inner(series_name)')
@@ -117,7 +121,7 @@ export const PublicResultsPage: React.FC = () => {
     return {
       id: data.id,
       eventName: `${data.round_name} - ${sName}`,
-      clubName: club,
+      clubName: clubDisplayName,
       date: data.date,
       venue: data.venue || '',
       raceClass: data.race_class || '',
@@ -140,7 +144,7 @@ export const PublicResultsPage: React.FC = () => {
     } as RaceEvent;
   };
 
-  const loadSeriesRoundByIndex = async (seriesId: string, roundIndex: number, club: string): Promise<RaceEvent | null> => {
+  const loadSeriesRoundByIndex = async (seriesId: string, roundIndex: number, clubDisplayName: string): Promise<RaceEvent | null> => {
     const { data } = await supabase
       .from('race_series_rounds')
       .select('*, race_series!inner(series_name)')
@@ -156,7 +160,7 @@ export const PublicResultsPage: React.FC = () => {
     return {
       id: data.id,
       eventName: `${data.round_name} - ${sName}`,
-      clubName: club,
+      clubName: clubDisplayName,
       date: data.date,
       venue: data.venue || '',
       raceClass: data.race_class || '',
@@ -189,16 +193,20 @@ export const PublicResultsPage: React.FC = () => {
 
   if (!raceEvent) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Event not found</p>
-          <Link
-            to={buildPublicUrl('/')}
-            className="text-blue-600 hover:underline"
-          >
-            Back to Homepage
-          </Link>
+      <div className="min-h-screen bg-gray-50">
+        <PublicHeader club={club} activePage="results" />
+        <div className="pt-24 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Event not found</p>
+            <Link
+              to={buildPublicUrl('/')}
+              className="text-blue-600 hover:underline"
+            >
+              Back to Homepage
+            </Link>
+          </div>
         </div>
+        <PublicFooter clubId={clubId} />
       </div>
     );
   }
@@ -206,46 +214,50 @@ export const PublicResultsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <GoogleAnalytics measurementId={null} />
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <Link
-            to={buildPublicUrl('/')}
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to {clubName || 'Club Homepage'}
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {raceEvent.eventName || 'Race Results'}
-          </h1>
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-gray-600">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span>{formatDate(raceEvent.date)}</span>
+      <PublicHeader club={club} activePage="results" />
+
+      <div className="pt-24">
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <Link
+              to={buildPublicUrl('/results')}
+              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              All Results
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {raceEvent.eventName || 'Race Results'}
+            </h1>
+            <div className="flex flex-wrap items-center gap-4 mt-4 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>{formatDate(raceEvent.date)}</span>
+              </div>
+              {raceEvent.venue && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  <span>{raceEvent.venue}</span>
+                </div>
+              )}
+              {raceEvent.raceClass && (
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  <span>Class: {raceEvent.raceClass}</span>
+                </div>
+              )}
             </div>
-            {raceEvent.venue && (
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                <span>{raceEvent.venue}</span>
-              </div>
-            )}
-            {raceEvent.raceClass && (
-              <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4" />
-                <span>Class: {raceEvent.raceClass}</span>
-              </div>
-            )}
           </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <EventResultsDisplay
-          event={raceEvent}
-          darkMode={false}
-          seriesName={seriesName}
-        />
-      </main>
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <EventResultsDisplay
+            event={raceEvent}
+            darkMode={false}
+            seriesName={seriesName}
+          />
+        </main>
+      </div>
 
       <PublicFooter clubId={clubId} />
     </div>
