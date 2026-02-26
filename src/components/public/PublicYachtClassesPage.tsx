@@ -165,7 +165,7 @@ export const PublicYachtClassesPage: React.FC = () => {
         )}
       </div>
 
-      <PublicFooter club={club} />
+      <PublicFooter club={club} clubId={clubId} />
     </div>
   );
 };

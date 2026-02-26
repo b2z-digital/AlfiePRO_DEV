@@ -62,10 +62,26 @@ export const PublicClubHomepage: React.FC = () => {
       }
 
       const today = new Date().toISOString();
+
+      // Build filter to include club events + state/national association events
+      let eventFilter = `club_id.eq.${clubId}`;
+      if (clubData?.state_association_id) {
+        const stateId = clubData.state_association_id;
+        eventFilter += `,state_association_id.eq.${stateId}`;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+        if (stateAssoc?.national_association_id) {
+          eventFilter += `,national_association_id.eq.${stateAssoc.national_association_id}`;
+        }
+      }
+
       const { data: eventsData, error: eventsError } = await supabase
         .from('public_events')
         .select('id, event_name, date, venue, race_class')
-        .eq('club_id', clubId)
+        .or(eventFilter)
         .gte('date', today)
         .order('date', { ascending: true })
         .limit(4);
@@ -76,7 +92,7 @@ export const PublicClubHomepage: React.FC = () => {
       const { data: resultsData, error: resultsError } = await supabase
         .from('public_events')
         .select('id, event_name, date')
-        .eq('club_id', clubId)
+        .or(eventFilter)
         .lt('date', today)
         .order('date', { ascending: false })
         .limit(4);

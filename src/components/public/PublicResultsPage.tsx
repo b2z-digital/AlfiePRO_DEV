@@ -5,6 +5,7 @@ import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { GoogleAnalytics } from '../GoogleAnalytics';
+import { PublicFooter } from './PublicFooter';
 
 interface RaceResult {
   position: number;
@@ -233,6 +234,8 @@ export const PublicResultsPage: React.FC = () => {
           </div>
         )}
       </main>
+
+      <PublicFooter clubId={clubId} />
     </div>
   );
 };

@@ -121,7 +121,7 @@ export const PublicArticleDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <PublicFooter club={club} />
+        <PublicFooter club={club} clubId={clubId} />
       </div>
     );
   }
@@ -144,7 +144,7 @@ export const PublicArticleDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <PublicFooter club={club} />
+        <PublicFooter club={club} clubId={clubId} />
       </div>
     );
   }
@@ -218,7 +218,7 @@ export const PublicArticleDetailPage: React.FC = () => {
         </div>
       </div>
 
-      <PublicFooter club={club} />
+      <PublicFooter club={club} clubId={clubId} />
     </div>
   );
 };

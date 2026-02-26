@@ -63,7 +63,7 @@ export const PublicClassifiedsPage: React.FC = () => {
 
       const [clubRes, classifiedsRes] = await Promise.all([
         supabase.from('clubs').select('*').eq('id', clubId).maybeSingle(),
-        supabase.from('classifieds').select('*').eq('club_id', clubId).eq('status', 'active').order('created_at', { ascending: false })
+        supabase.from('classifieds').select('*').eq('status', 'active').order('created_at', { ascending: false })
       ]);
 
       console.log('Classifieds query result:', { data: classifiedsRes.data, error: classifiedsRes.error });
@@ -236,7 +236,7 @@ export const PublicClassifiedsPage: React.FC = () => {
         )}
       </div>
 
-      <PublicFooter club={club} />
+      <PublicFooter club={club} clubId={clubId} />
       </div>
     </div>
   );

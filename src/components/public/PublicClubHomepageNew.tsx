@@ -279,6 +279,56 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
       console.log('Series rounds extracted:', upcomingSeriesRounds);
 
+      // Fetch state/national association public events
+      const associationEventItems: UpcomingEvent[] = [];
+      const associationResultItems: LatestResult[] = [];
+      if (clubData?.state_association_id) {
+        const stateId = clubData.state_association_id;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+
+        const associationIds = [stateId];
+        if (stateAssoc?.national_association_id) {
+          associationIds.push(stateAssoc.national_association_id);
+        }
+
+        const { data: publicEvents } = await supabase
+          .from('public_events')
+          .select('id, event_name, date, end_date, venue, race_class, state_association_id, national_association_id, approval_status, archived')
+          .or(associationIds.map(id => `state_association_id.eq.${id},national_association_id.eq.${id}`).join(','))
+          .eq('approval_status', 'approved')
+          .neq('archived', true)
+          .order('date', { ascending: true });
+
+        if (publicEvents) {
+          for (const pe of publicEvents) {
+            const eventDate = pe.date || '';
+            if (eventDate >= today) {
+              associationEventItems.push({
+                id: pe.id,
+                name: pe.event_name || 'Event',
+                date: eventDate,
+                venue: pe.venue || '',
+                race_class: pe.race_class || '',
+                type: 'quick_race' as const
+              });
+            } else if (eventDate < today) {
+              associationResultItems.push({
+                id: pe.id,
+                name: pe.event_name || 'Event',
+                date: eventDate,
+                winner: '',
+                race_class: pe.race_class || '',
+                type: 'quick_race' as const
+              });
+            }
+          }
+        }
+      }
+
       // Combine and sort all upcoming events
       const allUpcomingEvents: UpcomingEvent[] = [
         ...(upcomingQuickRaces || [])
@@ -298,13 +348,13 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             venue: round.venue || '',
             race_class: round.race_class || '',
             type: 'series_round' as const
-          }))
+          })),
+        ...associationEventItems
       ];
 
       // Sort by date and take first 4
       allUpcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setUpcomingEvents(allUpcomingEvents.slice(0, 4));
-      console.log('Loaded upcoming events:', allUpcomingEvents.slice(0, 4));
 
       // Load latest results (last 4 completed events) - from both quick races and series
       // Get completed quick races (has results OR marked completed)
@@ -419,10 +469,9 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       });
 
       // Combine and sort all results
-      const allResults = [...quickRaceResults, ...seriesResults];
+      const allResults = [...quickRaceResults, ...seriesResults, ...associationResultItems];
       allResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setLatestResults(allResults.slice(0, 4));
-      console.log('Loaded latest results:', allResults.slice(0, 4));
 
     } catch (error) {
       console.error('Error loading club data:', error);

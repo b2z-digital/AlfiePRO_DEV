@@ -169,9 +169,61 @@ export const PublicRaceCalendarPage: React.FC = () => {
         }
       });
 
-      console.log('Loaded upcoming series rounds:', upcomingSeriesRounds.length);
-      console.log('Loaded past series rounds:', pastSeriesRounds.length);
-      console.log('Club ID:', clubId);
+      // Fetch state/national association public events
+      const upcomingAssociationEvents: RaceEvent[] = [];
+      const pastAssociationEvents: RaceEvent[] = [];
+
+      const { data: clubDetail } = await supabase
+        .from('clubs')
+        .select('state_association_id')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      if (clubDetail?.state_association_id) {
+        const stateId = clubDetail.state_association_id;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+
+        const associationIds = [stateId];
+        if (stateAssoc?.national_association_id) {
+          associationIds.push(stateAssoc.national_association_id);
+        }
+
+        const { data: publicEvents } = await supabase
+          .from('public_events')
+          .select('id, event_name, date, end_date, venue, race_class, race_format, entry_fee, state_association_id, national_association_id, approval_status, archived')
+          .or(associationIds.map(id => `state_association_id.eq.${id},national_association_id.eq.${id}`).join(','))
+          .eq('approval_status', 'approved')
+          .neq('archived', true)
+          .order('date', { ascending: true });
+
+        if (publicEvents) {
+          for (const pe of publicEvents) {
+            const eventDate = pe.date || '';
+            const raceEvent: RaceEvent = {
+              id: pe.id,
+              name: pe.event_name || 'Event',
+              date: eventDate,
+              venue: pe.venue || 'TBA',
+              venue_id: undefined,
+              race_class: pe.race_class || 'Open',
+              race_format: pe.race_format || 'handicap',
+              type: 'single' as const,
+              registered_count: 0,
+              entry_fee: pe.entry_fee,
+              currency: 'AUD'
+            };
+            if (eventDate >= today) {
+              upcomingAssociationEvents.push(raceEvent);
+            } else {
+              pastAssociationEvents.push(raceEvent);
+            }
+          }
+        }
+      }
 
       // Transform and combine data
       const transformedUpcoming: RaceEvent[] = [
@@ -201,7 +253,8 @@ export const PublicRaceCalendarPage: React.FC = () => {
           registered_count: 0,
           entry_fee: round.entry_fee,
           currency: 'AUD'
-        }))
+        })),
+        ...upcomingAssociationEvents
       ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       const transformedPast: RaceEvent[] = [
@@ -231,7 +284,8 @@ export const PublicRaceCalendarPage: React.FC = () => {
           registered_count: 0,
           entry_fee: round.entry_fee,
           currency: 'AUD'
-        }))
+        })),
+        ...pastAssociationEvents
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       console.log('Transformed upcoming events:', transformedUpcoming.length);
@@ -1016,7 +1070,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
         />
       )}
 
-      <PublicFooter club={club} />
+      <PublicFooter club={club} clubId={clubId} />
     </div>
   );
 };

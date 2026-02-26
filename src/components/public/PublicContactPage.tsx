@@ -225,7 +225,7 @@ export const PublicContactPage: React.FC = () => {
         </div>
       </div>
 
-      <PublicFooter club={club} />
+      <PublicFooter club={club} clubId={clubId} />
       </div>
     </div>
   );
