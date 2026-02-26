@@ -196,10 +196,23 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       // Limit to 6 tiles maximum
       setTiles(tilesData ? tilesData.slice(0, 6) : []);
 
+      let newsFilter = `club_id.eq.${clubId}`;
+      if (clubData?.state_association_id) {
+        newsFilter += `,state_association_id.eq.${clubData.state_association_id}`;
+        const { data: stAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', clubData.state_association_id)
+          .maybeSingle();
+        if (stAssoc?.national_association_id) {
+          newsFilter += `,national_association_id.eq.${stAssoc.national_association_id}`;
+        }
+      }
+
       const { data: articlesData, error: articlesError } = await supabase
         .from('articles')
         .select('id, title, excerpt, cover_image, published_at')
-        .eq('club_id', clubId)
+        .or(newsFilter)
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .limit(3);
@@ -958,10 +971,10 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
               <div>
                 <h3 className="text-lg font-bold mb-4">Quick Links</h3>
                 <ul className="space-y-2 text-gray-400 text-sm">
-                  <li><a href="#" className="hover:text-white transition-colors">Membership</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">Racing</a></li>
-                  <li><a href="#news" className="hover:text-white transition-colors">News</a></li>
-                  <li><a href="#contact" className="hover:text-white transition-colors">Contact</a></li>
+                  <li><a href="https://alfiepro.com.au/register" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Membership</a></li>
+                  <li><Link to={buildPublicUrl('/race-calendar')} className="hover:text-white transition-colors">Racing</Link></li>
+                  <li><Link to={buildPublicUrl('/news')} className="hover:text-white transition-colors">News</Link></li>
+                  <li><Link to={buildPublicUrl('/contact')} className="hover:text-white transition-colors">Contact</Link></li>
                 </ul>
               </div>
 

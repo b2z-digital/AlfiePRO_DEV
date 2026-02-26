@@ -103,7 +103,9 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
               HOME
             </Link>
             <a
-              href="#membership"
+              href="https://alfiepro.com.au/register"
+              target="_blank"
+              rel="noopener noreferrer"
               className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -123,13 +125,13 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({ club, activePage = '
             >
               YACHT CLASSES
             </Link>
-            <a
-              href="#results"
-              className="block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200"
+            <Link
+              to={buildPublicUrl('/race-calendar')}
+              className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'results' ? 'bg-gray-50' : ''}`}
               onClick={() => setMobileMenuOpen(false)}
             >
               RESULTS
-            </a>
+            </Link>
             <Link
               to={buildPublicUrl('/venues')}
               className={`block py-4 text-center text-gray-900 font-medium text-sm tracking-[0.15em] hover:text-gray-600 transition-colors border-b border-gray-200 ${activePage === 'venues' ? 'bg-gray-50' : ''}`}

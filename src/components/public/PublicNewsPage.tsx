@@ -88,24 +88,40 @@ export const PublicNewsPage: React.FC = () => {
   const loadArticles = async () => {
     try {
       setLoading(true);
-      console.log('Loading articles for club:', clubId);
+
+      let articleFilter = `club_id.eq.${clubId}`;
+
+      const { data: clubDetail } = await supabase
+        .from('clubs')
+        .select('state_association_id')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      if (clubDetail?.state_association_id) {
+        const stateId = clubDetail.state_association_id;
+        articleFilter += `,state_association_id.eq.${stateId}`;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+        if (stateAssoc?.national_association_id) {
+          articleFilter += `,national_association_id.eq.${stateAssoc.national_association_id}`;
+        }
+      }
 
       const { data, error } = await supabase
         .from('articles')
         .select('*')
-        .eq('club_id', clubId)
+        .or(articleFilter)
         .eq('status', 'published')
         .order('published_at', { ascending: false });
 
-      console.log('Articles query result:', { data, error });
-
       if (error) {
-        console.error('Articles query error:', error);
         throw error;
       }
 
       if (data) {
-        console.log(`Found ${data.length} articles`);
         setArticles(data as any);
 
         const tags = new Set<string>();

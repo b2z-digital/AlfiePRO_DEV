@@ -103,7 +103,7 @@ export const PublicClubHomepage: React.FC = () => {
       const { data: articlesData, error: articlesError } = await supabase
         .from('articles')
         .select('id, title, excerpt, cover_image, published_at')
-        .eq('club_id', clubId)
+        .or(eventFilter)
         .eq('is_published', true)
         .order('published_at', { ascending: false })
         .limit(3);

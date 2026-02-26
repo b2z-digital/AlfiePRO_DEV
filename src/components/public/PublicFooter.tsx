@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { Club } from '../../types/club';
 import { supabase } from '../../utils/supabase';
+import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 
 interface PublicFooterProps {
   club?: Club | null;
@@ -10,6 +11,7 @@ interface PublicFooterProps {
 }
 
 export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, clubId }) => {
+  const { buildPublicUrl } = usePublicNavigation();
   const [defaultVenueAddress, setDefaultVenueAddress] = useState<string>('');
   const [club, setClub] = useState<Club | null>(propClub || null);
 
@@ -83,10 +85,10 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
           <div>
             <h3 className="text-lg font-bold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-gray-400 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Membership</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Racing</a></li>
-              <li><a href="#news" className="hover:text-white transition-colors">News</a></li>
-              <li><a href="#contact" className="hover:text-white transition-colors">Contact</a></li>
+              <li><a href="https://alfiepro.com.au/register" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Membership</a></li>
+              <li><Link to={buildPublicUrl('/race-calendar')} className="hover:text-white transition-colors">Racing</Link></li>
+              <li><Link to={buildPublicUrl('/news')} className="hover:text-white transition-colors">News</Link></li>
+              <li><Link to={buildPublicUrl('/contact')} className="hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>
 
