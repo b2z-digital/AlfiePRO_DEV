@@ -253,7 +253,7 @@ export const PublicResultsPage: React.FC = () => {
         <main className="max-w-7xl mx-auto px-4 py-8">
           <EventResultsDisplay
             event={raceEvent}
-            darkMode={false}
+            darkMode={true}
             seriesName={seriesName}
           />
         </main>
