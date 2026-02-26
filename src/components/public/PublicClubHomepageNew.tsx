@@ -57,43 +57,43 @@ const DEFAULT_TILES = [
     id: 'default-1',
     title: 'Membership',
     description: 'Join our club and become part of our sailing community',
-    image_url: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=800&h=600&fit=crop',
-    link_url: '#membership'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761706687369-3py4vakmj.png',
+    link_url: 'https://alfiepro.com.au/register'
   },
   {
     id: 'default-2',
     title: 'Race Program',
     description: 'View our racing schedule and upcoming events',
-    image_url: 'https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=800&h=600&fit=crop',
-    link_url: '#races'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761706688368-eecpmijqz.png',
+    link_url: '/race-calendar'
   },
   {
     id: 'default-3',
     title: 'Classes',
     description: 'Explore the yacht classes competing at our club',
-    image_url: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop',
-    link_url: '#classes'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761706688951-pbg18pkgm.png',
+    link_url: '/yacht-classes'
   },
   {
     id: 'default-4',
     title: 'Venue',
     description: 'Learn about our facilities and location',
-    image_url: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=600&fit=crop',
-    link_url: '#venue'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761714334371_dgngg6.jpg',
+    link_url: '/venues'
   },
   {
     id: 'default-5',
     title: 'News',
     description: 'Stay up to date with club news and announcements',
-    image_url: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=600&fit=crop',
-    link_url: '#news'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761799093766_43j26l.jpg',
+    link_url: '/news'
   },
   {
     id: 'default-6',
     title: 'Classifieds',
     description: 'Browse boats and equipment for sale',
-    image_url: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&h=600&fit=crop',
-    link_url: '#classifieds'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761714523155_j2g5fj.jpg',
+    link_url: '/classifieds'
   }
 ];
 
@@ -692,12 +692,23 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                         </p>
                       )}
                       {slide.button_text && slide.button_url && (
-                        <a
-                          href={slide.button_url}
-                          className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-                        >
-                          {slide.button_text}
-                        </a>
+                        slide.button_url.startsWith('/') ? (
+                          <Link
+                            to={buildPublicUrl(slide.button_url)}
+                            className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            {slide.button_text}
+                          </Link>
+                        ) : (
+                          <a
+                            href={slide.button_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            {slide.button_text}
+                          </a>
+                        )
                       )}
                     </div>
                   </div>
@@ -758,36 +769,54 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         <section className="py-8 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayTiles.map((tile) => (
-                <a
-                  key={tile.id}
-                  href={tile.link_url}
-                  className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
-                >
-                  <img
-                    src={tile.image_url}
-                    alt={tile.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-                  <div className="absolute inset-0 flex flex-col justify-end p-6">
-                    <h3 className="text-white text-2xl font-bold mb-2">
-                      {tile.title}
-                    </h3>
-                    {tile.description && (
-                      <p className="text-white/90 text-sm mb-4">
-                        {tile.description}
-                      </p>
-                    )}
-                    <div className="flex items-center text-white text-sm font-semibold">
-                      Learn More
-                      <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+              {displayTiles.map((tile) => {
+                const isInternal = tile.link_url.startsWith('/');
+                const tileContent = (
+                  <>
+                    <img
+                      src={tile.image_url}
+                      alt={tile.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                    <div className="absolute inset-0 flex flex-col justify-end p-6">
+                      <h3 className="text-white text-2xl font-bold mb-2">
+                        {tile.title}
+                      </h3>
+                      {tile.description && (
+                        <p className="text-white/90 text-sm mb-4">
+                          {tile.description}
+                        </p>
+                      )}
+                      <div className="flex items-center text-white text-sm font-semibold">
+                        Learn More
+                        <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
                     </div>
-                  </div>
-                </a>
-              ))}
+                  </>
+                );
+                return isInternal ? (
+                  <Link
+                    key={tile.id}
+                    to={buildPublicUrl(tile.link_url)}
+                    className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+                  >
+                    {tileContent}
+                  </Link>
+                ) : (
+                  <a
+                    key={tile.id}
+                    href={tile.link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+                  >
+                    {tileContent}
+                  </a>
+                );
+              })}
             </div>
           </div>
         </section>
