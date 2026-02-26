@@ -480,12 +480,14 @@ export const PublicClubHomepage: React.FC = () => {
               <p className="text-gray-400 leading-relaxed mb-6">
                 {club.club_introduction?.substring(0, 200)}...
               </p>
-              <button
-                onClick={handleJoinClub}
-                className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition-colors font-semibold"
+              <a
+                href="https://alfiepro.com.au"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition-colors font-semibold"
               >
                 Become a Member
-              </button>
+              </a>
             </div>
             <div>
               <h4 className="font-bold text-lg mb-4">Quick Links</h4>
@@ -511,7 +513,7 @@ export const PublicClubHomepage: React.FC = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; {new Date().getFullYear()} {club.name}. All rights reserved. Powered by Alfie.</p>
+            <p>&copy; {new Date().getFullYear()} {club.name}. All rights reserved. Powered by AlfiePRO.</p>
           </div>
         </div>
       </footer>

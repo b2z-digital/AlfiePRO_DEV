@@ -70,12 +70,14 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
             <p className="text-gray-400 text-sm mb-4 line-clamp-3">
               {(club as any).club_introduction || (club as any).description || `Welcome to ${club.name}`}
             </p>
-            <Link
-              to="/login"
+            <a
+              href="https://alfiepro.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
             >
               Become a Member
-            </Link>
+            </a>
           </div>
 
           <div>
@@ -118,7 +120,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
         <div className="pt-8 border-t border-gray-800">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-gray-400 text-xs">
             <p>
-              © {new Date().getFullYear()} {club.name}. All rights reserved. Powered by Alfie
+              © {new Date().getFullYear()} {club.name}. All rights reserved. Powered by AlfiePRO
             </p>
             <div className="flex gap-4">
               <Link
