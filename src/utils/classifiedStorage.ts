@@ -8,13 +8,8 @@ export async function getClassifieds(clubId?: string, includePublic = true) {
       .select('*')
       .eq('status', 'active');
 
-    // If user has a club, show listings from their club OR public listings
-    if (clubId && includePublic) {
-      query = query.or(`club_id.eq.${clubId},is_public.eq.true`);
-    } else if (clubId) {
+    if (!includePublic && clubId) {
       query = query.eq('club_id', clubId);
-    } else if (includePublic) {
-      query = query.eq('is_public', true);
     }
 
     query = query.order('created_at', { ascending: false });
