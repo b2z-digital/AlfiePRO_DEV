@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, UserPlus, Shield, Trash2, Edit2, GripVertical, Plus,
-  Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, LayoutGrid
+  Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown,
+  Globe, LayoutGrid, Check
 } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
@@ -37,6 +38,7 @@ interface PositionDefinition {
   is_executive: boolean;
   dashboard_template_id?: string | null;
   position_priority?: number | null;
+  show_on_website?: boolean;
 }
 
 interface PositionAssignment {
@@ -85,7 +87,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
     try {
       setLoading(true);
 
-      // Fetch position definitions
       const { data: positionsData, error: positionsError } = await supabase
         .from('committee_position_definitions')
         .select('*')
@@ -95,7 +96,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
       if (positionsError) throw positionsError;
       setPositions(positionsData || []);
 
-      // Fetch current assignments
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('committee_positions')
         .select(`
@@ -122,7 +122,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
       setAssignments(formattedAssignments);
 
-      // Fetch members
       const { data: membersData, error: membersError } = await supabase
         .from('members')
         .select('id, first_name, last_name, email, user_id, avatar_url')
@@ -145,7 +144,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
     try {
       if (editingPosition) {
-        // Update existing
         const { error } = await supabase
           .from('committee_position_definitions')
           .update({
@@ -154,6 +152,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             is_executive: positionData.is_executive,
             dashboard_template_id: positionData.dashboard_template_id,
             position_priority: positionData.position_priority,
+            show_on_website: positionData.show_on_website,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingPosition.id);
@@ -161,7 +160,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         if (error) throw error;
         addNotification('success', 'Position updated successfully');
       } else {
-        // Create new
         const maxOrder = positions.length > 0
           ? Math.max(...positions.map(p => p.display_order))
           : 0;
@@ -175,7 +173,8 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             is_executive: false,
             display_order: maxOrder + 1,
             dashboard_template_id: positionData.dashboard_template_id,
-            position_priority: positionData.position_priority
+            position_priority: positionData.position_priority,
+            show_on_website: positionData.show_on_website
           });
 
         if (error) throw error;
@@ -219,7 +218,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
       const member = members.find(m => m.id === memberId);
       if (!member) return;
 
-      // Check if member is already assigned to this position
       const alreadyAssigned = assignments.some(
         a => a.position_definition_id === positionDefId && a.member_id === memberId
       );
@@ -229,7 +227,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         return;
       }
 
-      // Create new assignment
       const { error } = await supabase
         .from('committee_positions')
         .insert({
@@ -283,7 +280,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
     const reorderedPositions = arrayMove(positions, oldIndex, newIndex);
     setPositions(reorderedPositions);
 
-    // Update display_order in database
     try {
       const updates = reorderedPositions.map((pos, index) =>
         supabase
@@ -297,7 +293,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
     } catch (error) {
       console.error('Error updating position order:', error);
       addNotification('error', 'Failed to update position order');
-      fetchData(); // Revert on error
+      fetchData();
     }
   };
 
@@ -329,7 +325,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Committee Management</h2>
@@ -337,7 +332,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-700">
         <button
           onClick={() => setActiveTab('assignments')}
@@ -369,7 +363,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         )}
       </div>
 
-      {/* Content */}
       {activeTab === 'assignments' && (
         <div className="space-y-4">
           {positions.length === 0 ? (
@@ -423,7 +416,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
       {activeTab === 'positions' && canManage && (
         <div className="space-y-4">
-          {/* Add Position Button */}
           {!showPositionForm && (
             <button
               onClick={() => {
@@ -437,7 +429,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             </button>
           )}
 
-          {/* Position Form */}
           {showPositionForm && (
             <PositionForm
               position={editingPosition}
@@ -449,7 +440,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             />
           )}
 
-          {/* Positions List */}
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -514,36 +504,42 @@ const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-slate-800/30 rounded-lg border border-slate-700/50 p-4 flex items-start justify-between"
+      className="bg-slate-800/30 rounded-xl border border-slate-700/50 px-4 py-3 flex items-center gap-3"
     >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing pt-1 mr-3">
-        <GripVertical size={20} className="text-slate-500" />
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-600 hover:text-slate-400 transition-colors">
+        <GripVertical size={18} />
       </div>
 
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
-          <h3 className="font-semibold text-white">{position.position_name}</h3>
-        </div>
+      <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
+
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-white text-sm">{position.position_name}</p>
         {position.description && (
-          <p className="text-sm text-slate-400">{position.description}</p>
+          <p className="text-xs text-slate-500 truncate">{position.description}</p>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      {position.show_on_website && (
+        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
+          <Globe size={11} className="text-green-400" />
+          <span className="text-xs text-green-400">Website</span>
+        </div>
+      )}
+
+      <div className="flex items-center gap-1">
         <button
           onClick={onEdit}
-          className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
+          className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-700 rounded-lg transition-colors"
           title="Edit position"
         >
-          <Edit2 size={16} />
+          <Edit2 size={15} />
         </button>
         <button
           onClick={onDelete}
-          className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors"
           title="Delete position"
         >
-          <Trash2 size={16} />
+          <Trash2 size={15} />
         </button>
       </div>
     </div>
@@ -564,15 +560,33 @@ interface DashboardTemplate {
 }
 
 const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel }) => {
-  const { currentClub } = useAuth();
+  const isPresident = (name: string) => /president/i.test(name);
+  const isSecretary = (name: string) => /secretary/i.test(name);
+
+  const defaultWebsite = position
+    ? (position.show_on_website ?? false)
+    : false;
+
   const [formData, setFormData] = useState({
     position_name: position?.position_name || '',
     description: position?.description || '',
-    dashboard_template_id: position?.dashboard_template_id || null,
-    position_priority: position?.position_priority || 50
+    dashboard_template_id: position?.dashboard_template_id || null as string | null,
+    position_priority: position?.position_priority ?? 50,
+    show_on_website: defaultWebsite,
   });
   const [templates, setTemplates] = useState<DashboardTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+
+  // Auto-set show_on_website when name changes to president/secretary (new positions only)
+  useEffect(() => {
+    if (!position) {
+      const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
+      if (shouldShow !== formData.show_on_website) {
+        setFormData(prev => ({ ...prev, show_on_website: shouldShow }));
+      }
+    }
+  }, [formData.position_name]);
 
   useEffect(() => {
     fetchTemplates();
@@ -595,127 +609,222 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
     }
   };
 
+  const selectedTemplate = templates.find(t => t.id === formData.dashboard_template_id);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-800/30 rounded-lg border border-slate-700/50 p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">
-          {position ? 'Edit Position' : 'Add Position'}
+    <form onSubmit={handleSubmit} className="bg-slate-800/40 rounded-xl border border-slate-700/50 overflow-hidden">
+      {/* Form header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
+        <h3 className="font-semibold text-white">
+          {position ? 'Edit Position' : 'New Position'}
         </h3>
         <button
           type="button"
           onClick={onCancel}
-          className="text-slate-400 hover:text-white transition-colors"
+          className="p-1 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-700"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Position Name *
-        </label>
-        <input
-          type="text"
-          value={formData.position_name}
-          onChange={(e) => setFormData({ ...formData, position_name: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          placeholder="e.g., Commodore, Treasurer, Race Officer"
-          required
-        />
-      </div>
+      <div className="p-5 space-y-5">
+        {/* Position Name */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            Position Name *
+          </label>
+          <input
+            type="text"
+            value={formData.position_name}
+            onChange={(e) => setFormData({ ...formData, position_name: e.target.value })}
+            className="w-full px-3 py-2.5 bg-slate-700/60 border border-slate-600/60 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-700 text-sm transition-colors"
+            placeholder="e.g., Commodore, Treasurer, Race Officer"
+            required
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Description
-        </label>
-        <textarea
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-          placeholder="Brief description of the role and responsibilities"
-          rows={2}
-        />
-      </div>
+        {/* Description */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            Description
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="w-full px-3 py-2.5 bg-slate-700/60 border border-slate-600/60 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-700 text-sm transition-colors resize-none"
+            placeholder="Brief description of the role"
+            rows={2}
+          />
+        </div>
 
-      <div>
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-          <LayoutGrid size={16} />
-          Dashboard Template
-        </label>
-        <p className="text-xs text-slate-400 mb-2">
-          Members with this position will see this dashboard layout by default
-        </p>
-        {loadingTemplates ? (
-          <div className="text-slate-400 text-sm">Loading templates...</div>
-        ) : (
-          <select
-            value={formData.dashboard_template_id || ''}
-            onChange={(e) => setFormData({ ...formData, dashboard_template_id: e.target.value || null })}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+        {/* Show on Website toggle */}
+        <div className="flex items-center justify-between py-3 px-4 bg-slate-700/30 rounded-xl border border-slate-600/30">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+              <Globe size={15} className="text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-white">Show on Club Website</p>
+              <p className="text-xs text-slate-500">Display this position on the public contact page</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFormData(prev => ({ ...prev, show_on_website: !prev.show_on_website }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              formData.show_on_website ? 'bg-green-500' : 'bg-slate-600'
+            }`}
           >
-            <option value="">No template (use club default)</option>
-            {templates.map(template => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-                {template.description && ` - ${template.description}`}
-              </option>
-            ))}
-          </select>
-        )}
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                formData.show_on_website ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Dashboard Template — visual card picker */}
+        <div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <LayoutGrid size={13} />
+            Dashboard Template
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Members with this position will see this dashboard layout by default
+          </p>
+
+          {loadingTemplates ? (
+            <div className="text-slate-500 text-sm">Loading templates...</div>
+          ) : (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-700/60 border border-slate-600/60 rounded-lg text-sm transition-colors hover:bg-slate-700 focus:outline-none focus:border-blue-500"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <LayoutGrid size={14} className="text-blue-400 flex-shrink-0" />
+                  <span className={`truncate ${formData.dashboard_template_id ? 'text-white' : 'text-slate-500'}`}>
+                    {selectedTemplate ? selectedTemplate.name : 'No template (use club default)'}
+                  </span>
+                </div>
+                <ChevronDown size={14} className={`text-slate-400 flex-shrink-0 transition-transform ${showTemplateDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showTemplateDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl z-20 overflow-hidden">
+                  <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, dashboard_template_id: null });
+                        setShowTemplateDropdown(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                        !formData.dashboard_template_id
+                          ? 'bg-blue-600/20 border border-blue-500/30'
+                          : 'hover:bg-slate-700'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-md bg-slate-700 flex items-center justify-center flex-shrink-0">
+                        <LayoutGrid size={14} className="text-slate-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white">Club Default</p>
+                        <p className="text-xs text-slate-500">Use the club's default dashboard</p>
+                      </div>
+                      {!formData.dashboard_template_id && (
+                        <Check size={14} className="text-blue-400 flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {templates.map(template => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, dashboard_template_id: template.id });
+                          setShowTemplateDropdown(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          formData.dashboard_template_id === template.id
+                            ? 'bg-blue-600/20 border border-blue-500/30'
+                            : 'hover:bg-slate-700'
+                        }`}
+                      >
+                        <div className="w-7 h-7 rounded-md bg-blue-600/20 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
+                          <LayoutGrid size={14} className="text-blue-400" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-white">{template.name}</p>
+                          {template.description && (
+                            <p className="text-xs text-slate-500 truncate">{template.description}</p>
+                          )}
+                        </div>
+                        {formData.dashboard_template_id === template.id && (
+                          <Check size={14} className="text-blue-400 flex-shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Position Priority — compact number input */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            Position Priority
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            When a member holds multiple positions, the highest priority determines their dashboard (0–100)
+          </p>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={formData.position_priority}
+              onChange={(e) => setFormData({ ...formData, position_priority: parseInt(e.target.value) })}
+              className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${formData.position_priority}%, #334155 ${formData.position_priority}%, #334155 100%)`
+              }}
+            />
+            <div className="w-14 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-center">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={formData.position_priority}
+                onChange={(e) => setFormData({ ...formData, position_priority: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                className="w-full bg-transparent text-white text-sm text-center focus:outline-none"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div>
-        <label className="flex items-center justify-between text-sm font-medium text-slate-300 mb-2">
-          <span>Position Priority</span>
-          <span className="text-blue-400 font-semibold">{formData.position_priority}</span>
-        </label>
-        <p className="text-xs text-slate-400 mb-3">
-          When a member has multiple positions, the highest priority determines their dashboard (0-100)
-        </p>
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="5"
-            value={formData.position_priority}
-            onChange={(e) => setFormData({ ...formData, position_priority: parseInt(e.target.value) })}
-            className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
-            style={{
-              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${formData.position_priority}%, #334155 ${formData.position_priority}%, #334155 100%)`
-            }}
-          />
-          <input
-            type="number"
-            min="0"
-            max="100"
-            value={formData.position_priority}
-            onChange={(e) => setFormData({ ...formData, position_priority: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
-            className="w-20 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-center text-sm focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        <div className="flex justify-between text-xs text-slate-500 mt-1">
-          <span>Lower priority</span>
-          <span>Higher priority</span>
-        </div>
-      </div>
-
-      <div className="pt-4 border-t border-slate-700 flex gap-3">
+      {/* Footer actions */}
+      <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700/50 bg-slate-800/20">
         <button
           type="submit"
-          className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
         >
           {position ? 'Save Changes' : 'Create Position'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+          className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg font-medium text-sm transition-colors"
         >
           Cancel
         </button>
@@ -763,7 +872,7 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-slate-800/30 rounded-lg border border-slate-700/50 p-4 relative"
+      className="bg-slate-800/30 rounded-xl border border-slate-700/50 p-4 relative"
     >
       <div className="flex items-start justify-between gap-4">
         {canManage && (
@@ -776,12 +885,17 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
           <div className="flex items-center gap-2 mb-1">
             <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
             <h3 className="font-semibold text-white">{position.position_name}</h3>
+            {position.show_on_website && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
+                <Globe size={10} className="text-green-400" />
+                <span className="text-xs text-green-400">Website</span>
+              </span>
+            )}
           </div>
           {position.description && (
             <p className="text-sm text-slate-400 mb-3">{position.description}</p>
           )}
 
-          {/* Assigned Members */}
           <div className="space-y-2">
             {positionAssignments.length === 0 ? (
               <div className="text-slate-500 italic text-sm mb-3">No members assigned</div>
@@ -814,7 +928,6 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
             )}
           </div>
 
-          {/* Add Member Section */}
           {canManage && showAddMember && (
             <div className="mt-3">
               <MemberSelector
@@ -830,7 +943,6 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
           )}
         </div>
 
-        {/* Add Member Button - Only show when members are assigned */}
         {canManage && positionAssignments.length > 0 && !showAddMember && (
           <button
             onClick={() => setShowAddMember(true)}
@@ -842,7 +954,6 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
         )}
       </div>
 
-      {/* Show inline selector when no members assigned */}
       {canManage && positionAssignments.length === 0 && !showAddMember && (
         <div className="mt-3">
           <button
