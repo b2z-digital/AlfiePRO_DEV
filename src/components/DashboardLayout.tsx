@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -36,6 +36,8 @@ import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
 import { useFeatureAccess } from '../hooks/useFeatureAccess';
 import { YachtClassesRouter } from '../pages/YachtClassesRouter';
+import { BugReportButton } from './bug-report/BugReportButton';
+import { BugReportDashboard } from './bug-report/BugReportDashboard';
 
 // Import Website section components
 import WebsiteOverview from './pages/WebsiteOverview';
@@ -1016,6 +1018,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
+          { id: 'bug-reports', label: 'Bug Reports', icon: Bug, description: 'View and manage bug reports', path: '/bug-reports' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1626,6 +1629,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <UserManagementTab darkMode={true} />
                 </div></div>
               } />
+              <Route path="/bug-reports" element={
+                <BugReportDashboard darkMode={darkMode} />
+              } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
@@ -1852,6 +1858,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           associationType={currentOrganization.type as 'state' | 'national'}
           associationName={currentOrganization.name}
         />
+      )}
+
+      {(isSuperAdmin || can('membership.manage')) && (
+        <BugReportButton darkMode={darkMode} />
       )}
     </div>
   );

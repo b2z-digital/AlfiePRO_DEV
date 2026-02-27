@@ -227,9 +227,9 @@ function App() {
           isAuthenticated ? <EventCommandCenterPage /> : <Navigate to="/login" />
         } />
 
-        {/* HMS Validator Route */}
+        {/* HMS Validator Route - Super Admin Only */}
         <Route path="/hms-validator" element={
-          isAuthenticated ? <HMSValidatorPage /> : <Navigate to="/login" />
+          isAuthenticated && user?.user_metadata?.is_super_admin ? <HMSValidatorPage /> : <Navigate to="/" />
         } />
 
         {/* Legal Pages Editor Routes - Super Admin Only - MUST be before catch-all */}
