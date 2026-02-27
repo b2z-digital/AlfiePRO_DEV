@@ -96,6 +96,20 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
     loadStats();
   }, [statusFilter, severityFilter, sortBy, typeFilter, categoryFilter, activeTab]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('bug_reports_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bug_reports' }, () => {
+        loadReports();
+        loadStats();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [statusFilter, severityFilter, sortBy, typeFilter, categoryFilter, activeTab]);
+
   const loadStats = async () => {
     const { data } = await supabase.from('bug_reports').select('status, severity, report_type, category');
     if (data) {
@@ -252,24 +266,20 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
   );
 
   return (
-    <div className="h-full flex flex-col">
-      <div className={`px-6 py-5 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-500/20 to-teal-500/20 flex items-center justify-center">
-              <Bug className="w-5 h-5 text-red-400" />
-            </div>
-            <div>
-              <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                Feedback Hub
-              </h1>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Bug reports and feature requests from beta testers
-              </p>
-            </div>
+    <div className="space-y-8">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-red-500 to-orange-600">
+            <Bug size={24} className="text-white" />
+          </div>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-white">Feedback Hub</h1>
+            <p className="text-sm text-slate-400">Bug reports and feature requests from beta testers</p>
           </div>
         </div>
+      </div>
 
+      <div>
         <div className="flex gap-1 mb-5">
           {[
             { key: 'overview', label: 'Overview' },
@@ -377,7 +387,7 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
       </div>
 
       {activeTab === 'overview' ? (
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className={`rounded-xl border p-5 ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center gap-2 mb-4">
@@ -431,7 +441,7 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className={`flex mt-6 rounded-xl border overflow-hidden ${darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`} style={{ minHeight: '500px' }}>
           <div className={`w-full ${selectedReport ? 'lg:w-[45%]' : ''} overflow-y-auto ${
             selectedReport ? `border-r ${darkMode ? 'border-slate-700' : 'border-slate-200'}` : ''
           }`}>

@@ -1018,7 +1018,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
-          { id: 'bug-reports', label: 'Bug Reports', icon: Bug, description: 'View and manage bug reports', path: '/bug-reports' },
+          { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1630,7 +1630,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </div></div>
               } />
               <Route path="/bug-reports" element={
-                <BugReportDashboard darkMode={darkMode} />
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <BugReportDashboard darkMode={true} />
+                </div></div>
               } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
