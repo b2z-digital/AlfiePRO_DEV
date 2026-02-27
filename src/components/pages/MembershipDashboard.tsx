@@ -695,27 +695,6 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
           }
         });
 
-        // 3. Fetch public_events that were copied to this club
-        const { data: publicEvents } = await supabase
-          .from('public_events')
-          .select('results')
-          .eq('club_id', currentClub.clubId);
-
-        publicEvents?.forEach(event => {
-          if (event.results && Array.isArray(event.results)) {
-            event.results.forEach((result: any, idx: number) => {
-              const skipperName = result.skipper || result.name;
-              if (!skipperName) return;
-
-              if (!skipperStats[skipperName]) {
-                skipperStats[skipperName] = { wins: 0, races: 0 };
-              }
-              skipperStats[skipperName].races++;
-              if (idx === 0) skipperStats[skipperName].wins++;
-            });
-          }
-        });
-
         // Convert to array and sort by wins, then by total races
         const sortedSkippers = Object.entries(skipperStats)
           .map(([name, stats]) => ({ name, ...stats }))
