@@ -60,9 +60,7 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({ boatId, sailNumb
     if (!skippers || !Array.isArray(skippers)) return [];
     const indices: number[] = [];
     skippers.forEach((skipper: any, idx: number) => {
-      if (skipper.boatId === boatId ||
-          skipper.sailNo === sailNumber ||
-          skipper.sail_number === sailNumber) {
+      if (skipper.boatId === boatId) {
         indices.push(idx);
       }
     });

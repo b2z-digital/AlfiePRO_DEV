@@ -70,9 +70,7 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
     if (!skippers || !Array.isArray(skippers)) return [];
     const indices: number[] = [];
     skippers.forEach((skipper: any, idx: number) => {
-      if (skipper.boatId === boat.id ||
-          skipper.sailNo === boat.sail_number ||
-          skipper.sail_number === boat.sail_number) {
+      if (skipper.boatId === boat.id) {
         indices.push(idx);
       }
     });
