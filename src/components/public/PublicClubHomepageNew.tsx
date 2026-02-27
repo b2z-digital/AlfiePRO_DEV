@@ -536,11 +536,11 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                   <img
                     src={club.logo}
                     alt={club.name}
-                    className="h-14 w-auto object-contain"
+                    className="h-16 w-auto object-contain max-w-[200px]"
                   />
                 ) : (
                   <div className="flex flex-col items-center">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg">
                       <span className="text-white font-bold text-sm">{clubInitials}</span>
                     </div>
                     <span className="text-xs text-gray-600 mt-1 font-medium">{club.abbreviation || clubInitials}</span>
