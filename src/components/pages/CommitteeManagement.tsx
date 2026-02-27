@@ -189,7 +189,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
       fetchData();
     } catch (error: any) {
       console.error('Error saving position:', error);
-      addNotification('error', 'Failed to save position');
+      addNotification('error', error?.message || 'Failed to save position');
     }
   };
 
