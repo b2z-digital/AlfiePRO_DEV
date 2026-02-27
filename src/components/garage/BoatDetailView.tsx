@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Camera, Settings, Clock, TrendingUp, Wrench,
   Plus, Calendar, Wind, Droplets, Award, Share2, Edit2,
-  Trash2, Upload, Image as ImageIcon, Activity, FileText, ExternalLink
+  Trash2, Upload, Image as ImageIcon, Activity, FileText, ExternalLink, ChevronRight
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -42,12 +43,32 @@ interface BoatDetailViewProps {
 
 type Tab = 'overview' | 'gallery' | 'maintenance' | 'rig-tuning' | 'performance';
 
+const calcRoundPosition = (raceResults: any[], skipperIndices: number[]): number | null => {
+  if (!raceResults || !Array.isArray(raceResults) || skipperIndices.length === 0) return null;
+  const totals: Record<number, number> = {};
+  for (const result of raceResults) {
+    const idx = result.skipperIndex;
+    if (typeof idx !== 'number') continue;
+    const pos = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+    if (!isNaN(pos) && pos > 0) {
+      totals[idx] = (totals[idx] || 0) + pos;
+    }
+  }
+  const allIndices = Object.keys(totals).map(Number);
+  if (allIndices.length === 0) return null;
+  allIndices.sort((a, b) => totals[a] - totals[b]);
+  const boatIdx = skipperIndices[0];
+  const rank = allIndices.indexOf(boatIdx) + 1;
+  return rank > 0 ? rank : null;
+};
+
 export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
   boat: initialBoat,
   darkMode,
   onClose
 }) => {
   const { addNotification } = useNotifications();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [boat, setBoat] = useState(initialBoat);
   const [stats, setStats] = useState({
@@ -109,6 +130,7 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
           if (skipperIndices.length === 0) continue;
 
           const positions = extractPositions(race.race_results, skipperIndices);
+          const roundPosition = calcRoundPosition(race.race_results, skipperIndices);
           const raceNumbers = new Set<number>();
           for (const result of (race.race_results || [])) {
             if (skipperIndices.includes(result.skipperIndex) && result.race) {
@@ -121,8 +143,8 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
               type: 'race',
               date: race.race_date,
               title: race.event_name || 'Race',
-              position: positions.length > 0 ? Math.min(...positions) : null,
-              id: race.id,
+              position: roundPosition,
+              resultId: race.id,
               raceCount: raceNumbers.size
             });
           }
@@ -150,6 +172,7 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
           if (skipperIndices.length === 0) continue;
 
           const positions = extractPositions(round.race_results, skipperIndices);
+          const roundPosition = calcRoundPosition(round.race_results, skipperIndices);
           const raceNumbers = new Set<number>();
           for (const result of (round.race_results || [])) {
             if (skipperIndices.includes(result.skipperIndex) && result.race) {
@@ -157,9 +180,11 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
             }
           }
 
-          const seriesName = Array.isArray(round.race_series)
-            ? round.race_series[0]?.series_name
-            : (round.race_series as any)?.series_name;
+          const seriesInfo = Array.isArray(round.race_series)
+            ? round.race_series[0]
+            : (round.race_series as any);
+          const seriesName = seriesInfo?.series_name;
+          const seriesId = seriesInfo?.id;
           const roundLabel = round.round_name || `Round ${(round.round_index ?? 0) + 1}`;
 
           if (raceNumbers.size > 0) {
@@ -167,8 +192,8 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
               type: 'race',
               date: round.date,
               title: `${seriesName || 'Series'} - ${roundLabel}`,
-              position: positions.length > 0 ? Math.min(...positions) : null,
-              id: round.id,
+              position: roundPosition,
+              resultId: seriesId || round.id,
               raceCount: raceNumbers.size
             });
           }
@@ -540,10 +565,18 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
                     <div className="space-y-3">
                       {recentActivity.slice(0, 5).map((activity, index) => (
                         <div
-                          key={`${activity.type}-${activity.id}-${index}`}
+                          key={`${activity.type}-${activity.resultId}-${index}`}
+                          onClick={() => activity.type === 'race' && activity.resultId && navigate(`/results/${activity.resultId}`)}
                           className={`
-                            p-3 rounded-xl border
-                            ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}
+                            p-3 rounded-xl border transition-colors
+                            ${activity.type === 'race' && activity.resultId
+                              ? darkMode
+                                ? 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 cursor-pointer'
+                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 cursor-pointer'
+                              : darkMode
+                                ? 'bg-slate-700/50 border-slate-600'
+                                : 'bg-slate-50 border-slate-200'
+                            }
                           `}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -558,9 +591,9 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
                                   {activity.title}
                                 </p>
                               </div>
-                              {activity.position && (
-                                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                  Position: {activity.position}
+                              {activity.position != null && (
+                                <p className={`text-xs font-medium ${darkMode ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                                  Finished {activity.position}{activity.position === 1 ? 'st' : activity.position === 2 ? 'nd' : activity.position === 3 ? 'rd' : 'th'}
                                 </p>
                               )}
                               {activity.description && (
@@ -569,8 +602,13 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
                                 </p>
                               )}
                             </div>
-                            <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'} whitespace-nowrap`}>
-                              {new Date(activity.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            <div className="flex items-center gap-2">
+                              <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-600'} whitespace-nowrap`}>
+                                {new Date(activity.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </div>
+                              {activity.type === 'race' && activity.resultId && (
+                                <ChevronRight size={14} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                              )}
                             </div>
                           </div>
                         </div>
