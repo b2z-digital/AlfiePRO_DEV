@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CheckCircle, Grid, List, Eye, UserPlus, DollarSign, AlertCircle, MapPin as MapPinIcon, Edit2, Trash2, MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, XCircle, Check, X } from 'lucide-react';
+import { Building, Plus, Users, CheckCircle, Grid, List, Eye, UserPlus, DollarSign, AlertCircle, MapPin as MapPinIcon, Edit2, Trash2, MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, XCircle, Check, X, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
+import { ManageClubAdminsModal } from './ManageClubAdminsModal';
 import { useNavigate } from 'react-router-dom';
 import { loadGoogleMaps } from '../../utils/googleMaps';
 
@@ -77,6 +78,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [pendingClubs, setPendingClubs] = useState<PendingClub[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
+  const [manageAdminsClub, setManageAdminsClub] = useState<{ id: string; name: string } | null>(null);
   const { addNotification } = useNotification();
 
   useEffect(() => {
@@ -1065,6 +1067,20 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                             : 'bg-white border-slate-200'
                         }`}>
                           <button
+                            onClick={() => {
+                              setManageAdminsClub({ id: club.id, name: club.name });
+                              setOpenMenuId(null);
+                            }}
+                            className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                              darkMode
+                                ? 'text-amber-300 hover:bg-slate-700'
+                                : 'text-amber-700 hover:bg-amber-50'
+                            }`}
+                          >
+                            <Shield size={14} />
+                            Manage Admins
+                          </button>
+                          <button
                             onClick={() => handleEditClub(club.id)}
                             className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                               darkMode
@@ -1379,6 +1395,20 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                               : 'bg-white border-slate-200'
                           }`}>
                             <button
+                              onClick={() => {
+                                setManageAdminsClub({ id: club.id, name: club.name });
+                                setOpenMenuId(null);
+                              }}
+                              className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                                darkMode
+                                  ? 'text-amber-300 hover:bg-slate-700'
+                                  : 'text-amber-700 hover:bg-amber-50'
+                              }`}
+                            >
+                              <Shield size={14} />
+                              Manage Admins
+                            </button>
+                            <button
                               onClick={() => handleEditClub(club.id)}
                               className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                                 darkMode
@@ -1442,6 +1472,16 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       )}
 
       {/* Delete Confirmation Modal */}
+      {manageAdminsClub && (
+        <ManageClubAdminsModal
+          isOpen={!!manageAdminsClub}
+          onClose={() => setManageAdminsClub(null)}
+          clubId={manageAdminsClub.id}
+          clubName={manageAdminsClub.name}
+          darkMode={darkMode}
+        />
+      )}
+
       {showDeleteConfirm && clubToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`w-full max-w-md rounded-xl shadow-2xl ${
