@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Mail, Phone, Send, CheckCircle, User } from 'lucide-react';
+import { Send, CheckCircle, User } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Club } from '../../types/club';
 import { PublicHeader } from './PublicHeader';
@@ -204,24 +204,6 @@ export const PublicContactPage: React.FC = () => {
                           </p>
                           {member.member_name && (
                             <p className="font-semibold text-gray-900 text-sm">{member.member_name}</p>
-                          )}
-                          {member.email && (
-                            <a
-                              href={`mailto:${member.email}`}
-                              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-700 transition-colors mt-1"
-                            >
-                              <Mail className="w-3.5 h-3.5" />
-                              {member.email}
-                            </a>
-                          )}
-                          {member.phone && (
-                            <a
-                              href={`tel:${member.phone}`}
-                              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-700 transition-colors mt-0.5"
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                              {member.phone}
-                            </a>
                           )}
                         </div>
                       </div>
