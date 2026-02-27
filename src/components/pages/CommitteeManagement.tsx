@@ -8,6 +8,7 @@ import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import {
   DndContext,
   closestCenter,
@@ -64,6 +65,7 @@ interface Member {
 export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode }) => {
   const { currentClub } = useAuth();
   const { addNotification } = useNotifications();
+  const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<'positions' | 'assignments'>('assignments');
   const [positions, setPositions] = useState<PositionDefinition[]>([]);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
@@ -72,9 +74,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   const [editingPosition, setEditingPosition] = useState<PositionDefinition | null>(null);
   const [showPositionForm, setShowPositionForm] = useState(false);
 
-  const isAdmin = currentClub?.role === 'admin';
-  const isEditor = currentClub?.role === 'editor';
-  const canManage = isAdmin || isEditor;
+  const canManage = isAdmin || isEditor || isStateAdmin || isNationalAdmin;
 
   useEffect(() => {
     if (currentClub) {

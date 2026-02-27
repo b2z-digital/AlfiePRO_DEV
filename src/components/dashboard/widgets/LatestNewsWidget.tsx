@@ -41,20 +41,33 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
         .select('id, title, created_at, status')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(5);
 
       if (orgType === 'state') {
-        query = query.or(`state_association_id.eq.${orgId},national_association_id.not.is.null`);
+        query = query.eq('state_association_id', orgId);
       } else if (orgType === 'national') {
         query = query.eq('national_association_id', orgId);
       } else {
-        query = query.eq('club_id', orgId || clubId);
+        const effectiveClubId = orgId || clubId;
+        if (effectiveClubId) {
+          const { data: clubData } = await supabase
+            .from('clubs')
+            .select('state_association_id')
+            .eq('id', effectiveClubId)
+            .maybeSingle();
+
+          if (clubData?.state_association_id) {
+            query = query.or(`club_id.eq.${effectiveClubId},state_association_id.eq.${clubData.state_association_id}`);
+          } else {
+            query = query.eq('club_id', effectiveClubId);
+          }
+        }
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      setArticles(data || []);
+      setArticles((data || []).slice(0, 3));
     } catch (error) {
       console.error('Error loading articles:', error);
     } finally {
