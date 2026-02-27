@@ -578,15 +578,23 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
 
-  // Auto-set show_on_website when name changes to president/secretary (new positions only)
+  // Auto-set show_on_website and dashboard template when name changes (new positions only)
   useEffect(() => {
-    if (!position) {
+    if (!position && templates.length > 0) {
+      const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
+      const autoTemplate = getDefaultTemplateForPosition(formData.position_name);
+      setFormData(prev => ({
+        ...prev,
+        show_on_website: shouldShow,
+        dashboard_template_id: autoTemplate,
+      }));
+    } else if (!position) {
       const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
       if (shouldShow !== formData.show_on_website) {
         setFormData(prev => ({ ...prev, show_on_website: shouldShow }));
       }
     }
-  }, [formData.position_name]);
+  }, [formData.position_name, templates]);
 
   useEffect(() => {
     fetchTemplates();
@@ -597,16 +605,42 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
       const { data, error } = await supabase
         .from('dashboard_templates')
         .select('id, name, description')
-        .eq('is_system_template', true)
+        .or('is_system_template.eq.true,is_public.eq.true,club_id.is.null')
         .order('name');
 
       if (error) throw error;
-      setTemplates(data || []);
+      const seen = new Set<string>();
+      const unique = (data || []).filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+      setTemplates(unique);
     } catch (error) {
       console.error('Error fetching templates:', error);
     } finally {
       setLoadingTemplates(false);
     }
+  };
+
+  const getDefaultTemplateForPosition = (name: string): string | null => {
+    const n = name.toLowerCase();
+    if (/treasurer|finance/.test(n)) {
+      return templates.find(t => /finance/i.test(t.name))?.id || null;
+    }
+    if (/president|vice.?president|commodore|vice.?commodore/.test(n)) {
+      return templates.find(t => /full.?overview/i.test(t.name))?.id || null;
+    }
+    if (/secretary/.test(n)) {
+      return templates.find(t => /secretary/i.test(t.name))?.id || null;
+    }
+    if (/membership|registrar/.test(n)) {
+      return templates.find(t => /membership/i.test(t.name))?.id || null;
+    }
+    if (/race.?officer|race.?manager/.test(n)) {
+      return templates.find(t => /race/i.test(t.name))?.id || null;
+    }
+    return null;
   };
 
   const selectedTemplate = templates.find(t => t.id === formData.dashboard_template_id);
