@@ -4,6 +4,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface TotalExpensesWidgetProps {
   widgetId: string;
@@ -21,20 +22,17 @@ export const TotalExpensesWidget: React.FC<TotalExpensesWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const { type, stateAssociationId, nationalAssociationId } = useOrganizationContext();
   const [loading, setLoading] = useState(true);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [changePercent, setChangePercent] = useState(0);
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadTotalExpenses();
-    }
-  }, [currentClub]);
+    loadTotalExpenses();
+  }, [currentClub, type, stateAssociationId, nationalAssociationId]);
 
   const loadTotalExpenses = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -42,23 +40,72 @@ export const TotalExpensesWidget: React.FC<TotalExpensesWidgetProps> = ({
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      const { data: currentPeriod } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('club_id', currentClub.clubId)
-        .eq('type', 'expense')
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+      let currentTotal = 0;
+      let previousTotal = 0;
 
-      const { data: previousPeriod } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('club_id', currentClub.clubId)
-        .eq('type', 'expense')
-        .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
-        .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+      if (type === 'state' && stateAssociationId) {
+        const { data: currentPeriod } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
 
-      const currentTotal = currentPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const previousTotal = previousPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        const { data: previousPeriod } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        currentTotal = currentPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousTotal = previousPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      } else if (type === 'national' && nationalAssociationId) {
+        const { data: currentPeriod } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousPeriod } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        currentTotal = currentPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousTotal = previousPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      } else if (currentClub?.clubId) {
+        const { data: currentPeriod } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('club_id', currentClub.clubId)
+          .eq('type', 'expense')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousPeriod } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('club_id', currentClub.clubId)
+          .eq('type', 'expense')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        currentTotal = currentPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousTotal = previousPeriod?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      }
 
       setTotalExpenses(currentTotal);
 

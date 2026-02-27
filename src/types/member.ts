@@ -37,6 +37,9 @@ export interface Member {
   emergency_contact_phone?: string | null;
   emergency_contact_relationship?: string | null;
   avatar_url?: string | null;
+  country?: string | null;
+  country_code?: string | null;
+  category?: string | null;
 }
 
 export interface MemberFormData {
@@ -63,6 +66,9 @@ export interface MemberFormData {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   emergency_contact_relationship: string;
+  country?: string;
+  country_code?: string;
+  category?: string;
 }
 
 export interface ImportedMember {

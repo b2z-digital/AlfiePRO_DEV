@@ -159,6 +159,7 @@ export interface RaceEvent {
   show_country?: boolean;
   show_club_state?: boolean;
   show_category?: boolean;
+  start_sequence_id?: string;
 }
 
 export interface PublicEvent {

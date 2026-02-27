@@ -7,6 +7,76 @@ interface OrganizationContext {
   nationalAssociationId?: string | null;
 }
 
+async function cleanupDuplicateLayouts(
+  userId: string,
+  context: OrganizationContext
+): Promise<void> {
+  try {
+    console.log('🧹 Cleaning up duplicate layouts');
+
+    // Build query to find all matching layouts
+    let query = supabase
+      .from('user_dashboard_layouts')
+      .select('id, created_at')
+      .eq('user_id', userId)
+      .eq('is_default', true);
+
+    // Apply organization filters
+    if (context.clubId) {
+      query = query.eq('club_id', context.clubId)
+        .is('state_association_id', null)
+        .is('national_association_id', null);
+    } else if (context.stateAssociationId) {
+      query = query.eq('state_association_id', context.stateAssociationId)
+        .is('club_id', null)
+        .is('national_association_id', null);
+    } else if (context.nationalAssociationId) {
+      query = query.eq('national_association_id', context.nationalAssociationId)
+        .is('club_id', null)
+        .is('state_association_id', null);
+    } else {
+      query = query.is('club_id', null)
+        .is('state_association_id', null)
+        .is('national_association_id', null);
+    }
+
+    const { data: duplicates, error } = await query;
+
+    if (error) {
+      console.error('Error checking for duplicates:', error);
+      return;
+    }
+
+    if (duplicates && duplicates.length > 1) {
+      console.log(`⚠️ Found ${duplicates.length} duplicate layouts, keeping newest`);
+
+      // Sort by created_at descending, keep the newest
+      const sorted = duplicates.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      // Delete all but the newest
+      const idsToDelete = sorted.slice(1).map(d => d.id);
+
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('user_dashboard_layouts')
+          .delete()
+          .in('id', idsToDelete);
+
+        if (deleteError) {
+          console.error('Error deleting duplicates:', deleteError);
+        } else {
+          console.log(`✅ Deleted ${idsToDelete.length} duplicate layouts`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Exception during cleanup:', error);
+    // Don't throw - cleanup is best-effort
+  }
+}
+
 export async function saveDashboardLayout(
   userId: string,
   context: OrganizationContext,
@@ -64,6 +134,10 @@ export async function saveDashboardLayout(
       updated_at: new Date().toISOString()
     };
 
+    // Before saving, clean up any duplicate layouts that might exist
+    // This handles cases where the unique constraint wasn't always enforced
+    await cleanupDuplicateLayouts(userId, context);
+
     let result;
     if (existing) {
       // Update existing layout
@@ -73,12 +147,18 @@ export async function saveDashboardLayout(
         .update(layoutData)
         .eq('id', existing.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error updating dashboard layout:', error);
         throw error;
       }
+
+      if (!data) {
+        console.error('❌ Update returned no rows - layout may have been deleted');
+        throw new Error('Layout not found after update');
+      }
+
       result = data;
     } else {
       // Insert new layout
@@ -87,12 +167,18 @@ export async function saveDashboardLayout(
         .from('user_dashboard_layouts')
         .insert(layoutData)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error inserting dashboard layout:', error);
         throw error;
       }
+
+      if (!data) {
+        console.error('❌ Insert returned no rows');
+        throw new Error('Failed to create layout');
+      }
+
       result = data;
     }
 
@@ -262,7 +348,7 @@ export function getDefaultLayout(): DashboardLayout {
       }
     ],
     rows: [
-      { id: 'row-1', columns: 3, widgetIds: ['event-count-1', 'members-count-1', 'tasks-count-1'], order: 0 },
+      { id: 'row-1', columns: 3, widgetIds: ['event-count-1', 'members-count-1', 'tasks-count-1'], order: 0, height: 'compact' },
       { id: 'row-2', columns: 2, widgetIds: ['upcoming-events-1', 'recent-results-1'], order: 1 },
       { id: 'row-3', columns: 3, widgetIds: ['financial-health-1', 'weather-1', 'membership-status-1'], order: 2 }
     ],

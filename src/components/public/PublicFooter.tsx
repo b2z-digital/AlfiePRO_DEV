@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { Club } from '../../types/club';
 import { supabase } from '../../utils/supabase';
+import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 
 interface PublicFooterProps {
   club?: Club | null;
@@ -10,6 +11,7 @@ interface PublicFooterProps {
 }
 
 export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, clubId }) => {
+  const { buildPublicUrl } = usePublicNavigation();
   const [defaultVenueAddress, setDefaultVenueAddress] = useState<string>('');
   const [club, setClub] = useState<Club | null>(propClub || null);
 
@@ -70,21 +72,23 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
             <p className="text-gray-400 text-sm mb-4 line-clamp-3">
               {(club as any).club_introduction || (club as any).description || `Welcome to ${club.name}`}
             </p>
-            <Link
-              to="/login"
+            <a
+              href="https://alfiepro.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
             >
               Become a Member
-            </Link>
+            </a>
           </div>
 
           <div>
             <h3 className="text-lg font-bold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-gray-400 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Membership</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Racing</a></li>
-              <li><a href="#news" className="hover:text-white transition-colors">News</a></li>
-              <li><a href="#contact" className="hover:text-white transition-colors">Contact</a></li>
+              <li><a href="https://alfiepro.com.au/register" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Membership</a></li>
+              <li><Link to={buildPublicUrl('/race-calendar')} className="hover:text-white transition-colors">Racing</Link></li>
+              <li><Link to={buildPublicUrl('/news')} className="hover:text-white transition-colors">News</Link></li>
+              <li><Link to={buildPublicUrl('/contact')} className="hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>
 
@@ -118,7 +122,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ club: propClub, club
         <div className="pt-8 border-t border-gray-800">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-gray-400 text-xs">
             <p>
-              © {new Date().getFullYear()} {club.name}. All rights reserved. Powered by Alfie
+              © {new Date().getFullYear()} {club.name}. All rights reserved. Powered by AlfiePRO
             </p>
             <div className="flex gap-4">
               <Link

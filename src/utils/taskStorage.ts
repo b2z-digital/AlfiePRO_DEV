@@ -175,12 +175,18 @@ export const createTask = async (clubId: string, userId: string, taskData: TaskF
     // Handle attachments if any
     if (attachments && attachments.length > 0) {
       await Promise.all(attachments.map(async (file) => {
-        const fileExt = file.name.split('.').pop();
+        let uploadFile: File = file;
+        if (file.type.startsWith('image/')) {
+          const { compressImage } = await import('./imageCompression');
+          uploadFile = await compressImage(file, 'photo');
+        }
+
+        const fileExt = uploadFile.name.split('.').pop();
         const fileName = `tasks/${taskId}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('event-media')
-          .upload(fileName, file, {
+          .upload(fileName, uploadFile, {
             cacheControl: '3600',
             upsert: false
           });
@@ -241,12 +247,18 @@ export const updateTask = async (taskId: string, updates: Partial<TaskFormData>)
     // Handle attachments if any
     if (attachments && attachments.length > 0) {
       await Promise.all(attachments.map(async (file) => {
-        const fileExt = file.name.split('.').pop();
+        let uploadFile: File = file;
+        if (file.type.startsWith('image/')) {
+          const { compressImage } = await import('./imageCompression');
+          uploadFile = await compressImage(file, 'photo');
+        }
+
+        const fileExt = uploadFile.name.split('.').pop();
         const fileName = `tasks/${taskId}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('event-media')
-          .upload(fileName, file, {
+          .upload(fileName, uploadFile, {
             cacheControl: '3600',
             upsert: false
           });

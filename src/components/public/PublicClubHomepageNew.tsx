@@ -57,43 +57,43 @@ const DEFAULT_TILES = [
     id: 'default-1',
     title: 'Membership',
     description: 'Join our club and become part of our sailing community',
-    image_url: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=800&h=600&fit=crop',
-    link_url: '#membership'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761706687369-3py4vakmj.png',
+    link_url: 'https://alfiepro.com.au/register'
   },
   {
     id: 'default-2',
     title: 'Race Program',
     description: 'View our racing schedule and upcoming events',
-    image_url: 'https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=800&h=600&fit=crop',
-    link_url: '#races'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761706688368-eecpmijqz.png',
+    link_url: '/race-calendar'
   },
   {
     id: 'default-3',
     title: 'Classes',
     description: 'Explore the yacht classes competing at our club',
-    image_url: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=600&fit=crop',
-    link_url: '#classes'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761706688951-pbg18pkgm.png',
+    link_url: '/yacht-classes'
   },
   {
     id: 'default-4',
     title: 'Venue',
     description: 'Learn about our facilities and location',
-    image_url: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=600&fit=crop',
-    link_url: '#venue'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761714334371_dgngg6.jpg',
+    link_url: '/venues'
   },
   {
     id: 'default-5',
     title: 'News',
     description: 'Stay up to date with club news and announcements',
-    image_url: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&h=600&fit=crop',
-    link_url: '#news'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761799093766_43j26l.jpg',
+    link_url: '/news'
   },
   {
     id: 'default-6',
     title: 'Classifieds',
     description: 'Browse boats and equipment for sale',
-    image_url: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&h=600&fit=crop',
-    link_url: '#classifieds'
+    image_url: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/event-media/bafdff76-ebe7-4890-b7fa-20aa9bb37491/1761714523155_j2g5fj.jpg',
+    link_url: '/classifieds'
   }
 ];
 
@@ -135,7 +135,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    }, 8000);
 
     return () => clearInterval(timer);
   }, [slides.length]);
@@ -196,10 +196,23 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       // Limit to 6 tiles maximum
       setTiles(tilesData ? tilesData.slice(0, 6) : []);
 
+      let newsFilter = `club_id.eq.${clubId}`;
+      if (clubData?.state_association_id) {
+        newsFilter += `,state_association_id.eq.${clubData.state_association_id}`;
+        const { data: stAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', clubData.state_association_id)
+          .maybeSingle();
+        if (stAssoc?.national_association_id) {
+          newsFilter += `,national_association_id.eq.${stAssoc.national_association_id}`;
+        }
+      }
+
       const { data: articlesData, error: articlesError } = await supabase
         .from('articles')
         .select('id, title, excerpt, cover_image, published_at')
-        .eq('club_id', clubId)
+        .or(newsFilter)
         .eq('status', 'published')
         .order('published_at', { ascending: false })
         .limit(3);
@@ -246,7 +259,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       // Get all race series and extract upcoming rounds from JSONB
       const { data: allSeries, error: seriesError } = await supabase
         .from('race_series')
-        .select('id, series_name, rounds, race_class')
+        .select('id, series_name, rounds, race_class, skippers')
         .eq('club_id', clubId);
 
       if (seriesError) {
@@ -279,6 +292,56 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
       console.log('Series rounds extracted:', upcomingSeriesRounds);
 
+      // Fetch state/national association public events
+      const associationEventItems: UpcomingEvent[] = [];
+      const associationResultItems: LatestResult[] = [];
+      if (clubData?.state_association_id) {
+        const stateId = clubData.state_association_id;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+
+        const associationIds = [stateId];
+        if (stateAssoc?.national_association_id) {
+          associationIds.push(stateAssoc.national_association_id);
+        }
+
+        const { data: publicEvents } = await supabase
+          .from('public_events')
+          .select('id, event_name, date, end_date, venue, race_class, state_association_id, national_association_id, approval_status, archived')
+          .or(associationIds.map(id => `state_association_id.eq.${id},national_association_id.eq.${id}`).join(','))
+          .eq('approval_status', 'approved')
+          .neq('archived', true)
+          .order('date', { ascending: true });
+
+        if (publicEvents) {
+          for (const pe of publicEvents) {
+            const eventDate = pe.date || '';
+            if (eventDate >= today) {
+              associationEventItems.push({
+                id: pe.id,
+                name: pe.event_name || 'Event',
+                date: eventDate,
+                venue: pe.venue || '',
+                race_class: pe.race_class || '',
+                type: 'quick_race' as const
+              });
+            } else if (eventDate < today) {
+              associationResultItems.push({
+                id: pe.id,
+                name: pe.event_name || 'Event',
+                date: eventDate,
+                winner: '',
+                race_class: pe.race_class || '',
+                type: 'quick_race' as const
+              });
+            }
+          }
+        }
+      }
+
       // Combine and sort all upcoming events
       const allUpcomingEvents: UpcomingEvent[] = [
         ...(upcomingQuickRaces || [])
@@ -298,69 +361,59 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             venue: round.venue || '',
             race_class: round.race_class || '',
             type: 'series_round' as const
-          }))
+          })),
+        ...associationEventItems
       ];
 
       // Sort by date and take first 4
       allUpcomingEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       setUpcomingEvents(allUpcomingEvents.slice(0, 4));
-      console.log('Loaded upcoming events:', allUpcomingEvents.slice(0, 4));
 
-      // Load latest results (last 4 completed events) - from both quick races and series
-      // Get completed quick races (has results OR marked completed)
       const { data: completedQuickRaces, error: completedRacesError } = await supabase
         .from('quick_races')
-        .select('id, event_name, race_date, race_class, race_results, completed')
+        .select('id, event_name, race_date, race_class, race_results, skippers, completed')
         .eq('club_id', clubId)
+        .eq('completed', true)
         .lt('race_date', today)
         .order('race_date', { ascending: false })
         .limit(20);
 
       if (completedRacesError) {
         console.error('Error loading completed races:', completedRacesError);
-      } else {
-        console.log('Completed quick races loaded:', completedQuickRaces);
       }
 
-      // Extract completed rounds from all series (already loaded above)
-      const completedSeriesRounds: any[] = [];
-      (allSeries || []).forEach((series: any) => {
-        if (series.rounds && Array.isArray(series.rounds)) {
-          series.rounds.forEach((round: any) => {
-            const roundDate = round.date;
-            const isPast = roundDate < today;
-            const hasResults = round.results && Array.isArray(round.results) && round.results.length > 0;
-            const isCompleted = round.completed || hasResults;
+      const { data: completedRoundsData } = await supabase
+        .from('race_series_rounds')
+        .select('id, round_name, date, race_class, race_results, skippers, completed, race_series!inner(series_name)')
+        .eq('club_id', clubId)
+        .eq('completed', true)
+        .lt('date', today)
+        .order('date', { ascending: false })
+        .limit(20);
 
-            if (isPast && isCompleted) {
-              completedSeriesRounds.push({
-                id: `${series.id}-${round.name}`,
-                round_name: round.name,
-                date: roundDate,
-                series_name: series.series_name,
-                race_class: series.race_class,
-                results: round.results || [],
-                skippers: round.skippers || []
-              });
-            }
-          });
-        }
-      });
+      const completedSeriesRounds = (completedRoundsData || []).map((round: any) => ({
+        id: round.id,
+        round_name: round.round_name,
+        date: round.date,
+        series_name: round.race_series?.series_name || '',
+        race_class: round.race_class || '',
+        race_results: round.race_results || [],
+        skippers: round.skippers || []
+      }));
 
-      console.log('Completed series rounds extracted:', completedSeriesRounds);
-
-      // Map quick races to results (filter by: has results OR marked completed, and date is past)
       const quickRaceResults: LatestResult[] = (completedQuickRaces || [])
-        .filter(event => {
-          const isPast = new Date(event.race_date) < new Date(today);
-          const hasResults = event.race_results && Array.isArray(event.race_results) && event.race_results.length > 0;
-          return isPast && (event.completed || hasResults);
-        })
         .map(event => {
           let winner = 'No results';
+          const skippers = event.skippers || [];
           if (event.race_results && Array.isArray(event.race_results) && event.race_results.length > 0) {
             const firstPlace = event.race_results.find((r: any) => r.position === 1);
-            winner = firstPlace?.skipperName || 'No results';
+            if (firstPlace) {
+              if (firstPlace.skipperName) {
+                winner = firstPlace.skipperName;
+              } else if (firstPlace.skipperIndex !== undefined && skippers[firstPlace.skipperIndex]) {
+                winner = skippers[firstPlace.skipperIndex].name || 'Unknown';
+              }
+            }
           }
           return {
             id: event.id,
@@ -372,15 +425,14 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
           };
         });
 
-      // Map series rounds to results
-      const seriesResults: LatestResult[] = completedSeriesRounds.map(round => {
+      const seriesResults: LatestResult[] = completedSeriesRounds.map((round: any) => {
         let winner = 'No results';
 
-        // Calculate winner from round results
-        if (round.results && Array.isArray(round.results) && round.results.length > 0 && round.skippers && Array.isArray(round.skippers)) {
-          // Group results by skipperIndex and sum positions
+        const raceResults = round.race_results || [];
+        const skippers = round.skippers || [];
+        if (raceResults.length > 0 && skippers.length > 0) {
           const skipperScores: Record<number, number> = {};
-          round.results.forEach((result: any) => {
+          raceResults.forEach((result: any) => {
             const skipperIdx = result.skipperIndex;
             if (skipperIdx !== undefined) {
               if (!skipperScores[skipperIdx]) {
@@ -392,7 +444,6 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             }
           });
 
-          // Find skipper with lowest score (winner)
           let lowestScore = Infinity;
           let winnerIdx = -1;
           Object.entries(skipperScores).forEach(([idx, score]) => {
@@ -402,9 +453,8 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             }
           });
 
-          // Get skipper name from skippers array
-          if (winnerIdx >= 0 && round.skippers[winnerIdx]) {
-            winner = round.skippers[winnerIdx].name || 'Unknown';
+          if (winnerIdx >= 0 && skippers[winnerIdx]) {
+            winner = skippers[winnerIdx].name || 'Unknown';
           }
         }
 
@@ -419,10 +469,9 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
       });
 
       // Combine and sort all results
-      const allResults = [...quickRaceResults, ...seriesResults];
+      const allResults = [...quickRaceResults, ...seriesResults, ...associationResultItems];
       allResults.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setLatestResults(allResults.slice(0, 4));
-      console.log('Loaded latest results:', allResults.slice(0, 4));
 
     } catch (error) {
       console.error('Error loading club data:', error);
@@ -472,7 +521,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
               aria-label="Menu"
             >
               {mobileMenuOpen ? (
-                <LogOut className="w-6 h-6 text-gray-700" />
+                <X className="w-6 h-6 text-gray-700" />
               ) : (
                 <>
                   <Menu className="w-6 h-6 text-gray-700" />
@@ -482,28 +531,32 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             </button>
 
             <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-              {club.logo ? (
-                <img
-                  src={club.logo}
-                  alt={club.name}
-                  className="h-14 w-auto object-contain"
-                />
-              ) : (
-                <div className="flex flex-col items-center">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-sm">{clubInitials}</span>
+              <Link to={buildPublicUrl('/')} className="flex flex-col items-center">
+                {club.logo ? (
+                  <img
+                    src={club.logo}
+                    alt={club.name}
+                    className="h-16 w-auto object-contain max-w-[200px]"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-lg">
+                      <span className="text-white font-bold text-sm">{clubInitials}</span>
+                    </div>
+                    <span className="text-xs text-gray-600 mt-1 font-medium">{club.abbreviation || clubInitials}</span>
                   </div>
-                  <span className="text-xs text-gray-600 mt-1 font-medium">{club.abbreviation || clubInitials}</span>
-                </div>
-              )}
+                )}
+              </Link>
             </div>
 
-            <Link
-              to={`/login`}
+            <a
+              href="https://alfiepro.com.au"
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
             >
               MEMBERS
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -605,8 +658,8 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
             {slides.map((slide, index) => (
               <div
                 key={slide.id}
-                className={`absolute inset-0 transition-opacity duration-1000 ${
-                  index === currentSlide ? 'opacity-100' : 'opacity-0'
+                className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${
+                  index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
                 }`}
               >
                 <img
@@ -628,12 +681,23 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                         </p>
                       )}
                       {slide.button_text && slide.button_url && (
-                        <a
-                          href={slide.button_url}
-                          className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
-                        >
-                          {slide.button_text}
-                        </a>
+                        slide.button_url.startsWith('/') ? (
+                          <Link
+                            to={buildPublicUrl(slide.button_url)}
+                            className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            {slide.button_text}
+                          </Link>
+                        ) : (
+                          <a
+                            href={slide.button_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-6 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            {slide.button_text}
+                          </a>
+                        )
                       )}
                     </div>
                   </div>
@@ -645,18 +709,18 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
               <>
                 <button
                   onClick={prevSlide}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white bg-opacity-50 hover:bg-opacity-75 rounded-full transition-all"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/30 hover:bg-white/60 backdrop-blur-sm rounded-full transition-all"
                 >
-                  <ChevronLeft className="w-6 h-6 text-gray-900" />
+                  <ChevronLeft className="w-6 h-6 text-white drop-shadow-md" />
                 </button>
                 <button
                   onClick={nextSlide}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white bg-opacity-50 hover:bg-opacity-75 rounded-full transition-all"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/30 hover:bg-white/60 backdrop-blur-sm rounded-full transition-all"
                 >
-                  <ChevronRight className="w-6 h-6 text-gray-900" />
+                  <ChevronRight className="w-6 h-6 text-white drop-shadow-md" />
                 </button>
 
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
                   {slides.map((_, index) => (
                     <button
                       key={index}
@@ -664,7 +728,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                       className={`h-2 rounded-full transition-all ${
                         index === currentSlide
                           ? 'bg-white w-6'
-                          : 'bg-white bg-opacity-50 hover:bg-opacity-75 w-2'
+                          : 'bg-white/50 hover:bg-white/75 w-2'
                       }`}
                     />
                   ))}
@@ -694,36 +758,54 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
         <section className="py-8 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayTiles.map((tile) => (
-                <a
-                  key={tile.id}
-                  href={tile.link_url}
-                  className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
-                >
-                  <img
-                    src={tile.image_url}
-                    alt={tile.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
-                  <div className="absolute inset-0 flex flex-col justify-end p-6">
-                    <h3 className="text-white text-2xl font-bold mb-2">
-                      {tile.title}
-                    </h3>
-                    {tile.description && (
-                      <p className="text-white/90 text-sm mb-4">
-                        {tile.description}
-                      </p>
-                    )}
-                    <div className="flex items-center text-white text-sm font-semibold">
-                      Learn More
-                      <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+              {displayTiles.map((tile) => {
+                const isInternal = tile.link_url.startsWith('/');
+                const tileContent = (
+                  <>
+                    <img
+                      src={tile.image_url}
+                      alt={tile.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                    <div className="absolute inset-0 flex flex-col justify-end p-6">
+                      <h3 className="text-white text-2xl font-bold mb-2">
+                        {tile.title}
+                      </h3>
+                      {tile.description && (
+                        <p className="text-white/90 text-sm mb-4">
+                          {tile.description}
+                        </p>
+                      )}
+                      <div className="flex items-center text-white text-sm font-semibold">
+                        Learn More
+                        <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
                     </div>
-                  </div>
-                </a>
-              ))}
+                  </>
+                );
+                return isInternal ? (
+                  <Link
+                    key={tile.id}
+                    to={buildPublicUrl(tile.link_url)}
+                    className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+                  >
+                    {tileContent}
+                  </Link>
+                ) : (
+                  <a
+                    key={tile.id}
+                    href={tile.link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group relative h-72 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+                  >
+                    {tileContent}
+                  </a>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -780,7 +862,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                     {latestResults.map((result) => (
                       <Link
                         key={result.id}
-                        to={`/club/${clubId}/public/results/${result.id}`}
+                        to={buildPublicUrl(`/results/${result.id}`)}
                         className="block bg-gray-50 rounded-lg p-3 hover:shadow-md hover:bg-gray-100 transition-all min-h-[110px] flex flex-col"
                       >
                         <h3 className="font-semibold text-gray-900 mb-1.5 text-sm">{result.name}</h3>
@@ -894,21 +976,23 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
                 <p className="text-gray-400 text-sm mb-4 line-clamp-3">
                   {club.club_introduction || club.description}
                 </p>
-                <Link
-                  to={`/login`}
+                <a
+                  href="https://alfiepro.com.au"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-block px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors text-sm"
                 >
                   Become a Member
-                </Link>
+                </a>
               </div>
 
               <div>
                 <h3 className="text-lg font-bold mb-4">Quick Links</h3>
                 <ul className="space-y-2 text-gray-400 text-sm">
-                  <li><a href="#" className="hover:text-white transition-colors">Membership</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">Racing</a></li>
-                  <li><a href="#news" className="hover:text-white transition-colors">News</a></li>
-                  <li><a href="#contact" className="hover:text-white transition-colors">Contact</a></li>
+                  <li><a href="https://alfiepro.com.au/register" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Membership</a></li>
+                  <li><Link to={buildPublicUrl('/race-calendar')} className="hover:text-white transition-colors">Racing</Link></li>
+                  <li><Link to={buildPublicUrl('/news')} className="hover:text-white transition-colors">News</Link></li>
+                  <li><Link to={buildPublicUrl('/contact')} className="hover:text-white transition-colors">Contact</Link></li>
                 </ul>
               </div>
 
@@ -941,7 +1025,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
 
             <div className="pt-8 border-t border-gray-800 text-center text-gray-400 text-xs">
               <p>
-                © {new Date().getFullYear()} {club.name}. All rights reserved. Powered by Alfie
+                © {new Date().getFullYear()} {club.name}. All rights reserved. Powered by AlfiePRO
               </p>
             </div>
           </div>

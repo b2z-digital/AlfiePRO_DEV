@@ -16,7 +16,8 @@ import {
   Mail,
   Check,
   AlertTriangle,
-  ClipboardList
+  ClipboardList,
+  Shield
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ import { ModernApplicationsManager } from '../membership/ModernApplicationsManag
 import { ExpiringMembershipsPanel } from '../membership/ExpiringMembershipsPanel';
 import { ClubRemittanceDashboard } from '../membership/ClubRemittanceDashboard';
 import { RecordPaymentModal } from '../membership/RecordPaymentModal';
+import { CommitteeManagement } from './CommitteeManagement';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MemberMembershipView } from './MemberMembershipView';
@@ -35,7 +37,7 @@ import { MemberMembershipView } from './MemberMembershipView';
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 // Define tab types
-type MembershipTab = 'dashboard' | 'members' | 'applications' | 'renewals' | 'remittances';
+type MembershipTab = 'dashboard' | 'members' | 'applications' | 'renewals' | 'remittances' | 'committee';
 
 interface MembershipDashboardProps {
   darkMode: boolean;
@@ -110,6 +112,12 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
       fetchActionCounts();
     }
   }, [currentClub, timeRange]);
+
+  useEffect(() => {
+    if (currentClub?.clubId) {
+      fetchActionCounts();
+    }
+  }, [activeTab]);
 
   // Subscribe to realtime changes for action counts
   useEffect(() => {
@@ -669,33 +677,12 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
         // 2. Fetch race_series (all series types)
         const { data: raceSeries } = await supabase
           .from('race_series')
-          .select('standings')
-          .eq('club_id', currentClub.clubId);
-
-        raceSeries?.forEach(series => {
-          if (series.standings && Array.isArray(series.standings)) {
-            series.standings.forEach((result: any, idx: number) => {
-              const skipperName = result.skipper || result.name;
-              if (!skipperName) return;
-
-              if (!skipperStats[skipperName]) {
-                skipperStats[skipperName] = { wins: 0, races: 0 };
-              }
-              skipperStats[skipperName].races++;
-              if (idx === 0) skipperStats[skipperName].wins++;
-            });
-          }
-        });
-
-        // 3. Fetch public_events that were copied to this club
-        const { data: publicEvents } = await supabase
-          .from('public_events')
           .select('results')
           .eq('club_id', currentClub.clubId);
 
-        publicEvents?.forEach(event => {
-          if (event.results && Array.isArray(event.results)) {
-            event.results.forEach((result: any, idx: number) => {
+        raceSeries?.forEach(series => {
+          if (series.results && Array.isArray(series.results)) {
+            series.results.forEach((result: any, idx: number) => {
               const skipperName = result.skipper || result.name;
               if (!skipperName) return;
 
@@ -1254,6 +1241,20 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               </div>
             </button>
 
+            <button
+              onClick={() => setActiveTab('committee')}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === 'committee'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Shield size={16} />
+                <span>Committee</span>
+              </div>
+            </button>
+
           </div>
         </div>
 
@@ -1268,6 +1269,9 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               darkMode={darkMode}
               onRecordPayment={() => setShowPaymentModal(true)}
             />
+          )}
+          {activeTab === 'committee' && (
+            <CommitteeManagement darkMode={darkMode} />
           )}
         </div>
 

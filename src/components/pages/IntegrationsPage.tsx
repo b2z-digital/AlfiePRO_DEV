@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, Facebook, Check, AlertTriangle, RefreshCw, ExternalLink, Youtube, Loader, Instagram, CreditCard, DollarSign, BarChart3, X, Save, HardDrive } from 'lucide-react';
+import { Globe, Facebook, Check, AlertTriangle, RefreshCw, ExternalLink, Youtube, Loader, Instagram, CreditCard, DollarSign, BarChart3, X, Save, HardDrive, MessageSquare, ArrowLeft, Settings } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { PublishToMetaModal } from '../PublishToMetaModal';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { SmsManagementPage } from '../sms/SmsManagementPage';
 
 interface IntegrationsPageProps {
   darkMode: boolean;
@@ -36,6 +37,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   const { addNotification } = useNotifications();
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showSmsManagement, setShowSmsManagement] = useState(false);
 
   // Configuration states
   const [googleAnalyticsId, setGoogleAnalyticsId] = useState('');
@@ -159,6 +161,16 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       connected: false,
       enabled: false,
     },
+    {
+      id: 'sms',
+      name: 'SMS Attendance',
+      description: 'Automated SMS notifications for event attendance with YES/NO/MAYBE replies.',
+      icon: <MessageSquare size={32} />,
+      iconBg: 'bg-teal-600/20',
+      iconColor: 'text-teal-400',
+      connected: false,
+      enabled: false,
+    },
   ]);
 
   useEffect(() => {
@@ -180,6 +192,26 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         fetchIntegrationStatus();
         setSuccess(null);
       }, 2000);
+      return;
+    }
+
+    if (urlParams.get('youtube_connected') === 'true') {
+      const channelName = urlParams.get('channel_name') || 'YouTube';
+      setSuccess(`YouTube connected successfully: ${channelName}`);
+      addNotification('success', `Connected to YouTube channel: ${channelName}`);
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => {
+        fetchIntegrationStatus();
+        setSuccess(null);
+      }, 3000);
+      return;
+    }
+
+    if (urlParams.get('youtube_error')) {
+      const ytError = urlParams.get('youtube_error');
+      setError(`YouTube connection failed: ${ytError}`);
+      addNotification('error', `YouTube connection failed: ${ytError}`);
+      window.history.replaceState({}, '', window.location.pathname);
       return;
     }
 
@@ -236,6 +268,13 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       if (error) throw error;
 
       console.log('Fetched integrations:', data);
+
+      const orgId = currentClub?.clubId || currentOrganization?.id;
+      const { data: smsSettings } = await supabase
+        .from('sms_club_settings')
+        .select('is_enabled')
+        .eq('club_id', orgId)
+        .maybeSingle();
 
       setIntegrations(prev => prev.map(integration => {
         const dbIntegration = data?.find(i => i.platform === integration.id);
@@ -313,7 +352,22 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
           };
         }
 
-        // Check Stripe from clubs table
+        if (integration.id === 'sms') {
+          const smsData = data?.find(i => i.platform === 'sms');
+          if ((smsData && smsData.is_active) || smsSettings?.is_enabled) {
+            return {
+              ...integration,
+              connected: true,
+              enabled: true,
+              connectedInfo: {
+                label: 'SMS Attendance',
+                value: 'Active',
+              }
+            };
+          }
+          return integration;
+        }
+
         if (integration.id === 'stripe' && currentClub?.stripe_account_id) {
           return {
             ...integration,
@@ -368,6 +422,9 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
           setSelectedIntegration('paypal');
           setShowConfigModal(true);
           break;
+        case 'sms':
+          setShowSmsManagement(true);
+          break;
         default:
           addNotification('info', `${integration.name} integration coming soon!`);
       }
@@ -385,6 +442,9 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       case 'google-analytics':
       case 'paypal':
         await handleDisconnectIntegration(integrationId);
+        break;
+      case 'sms':
+        setShowSmsManagement(true);
         break;
       case 'stripe':
         await handleDisconnectStripe();
@@ -441,8 +501,15 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   const handleConnectYoutube = async () => {
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '230273275079-723coi1ukfg2vngapur5djnug1cer6hd.apps.googleusercontent.com';
-      const redirectUri = `${window.location.origin}/settings`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const redirectUri = `${supabaseUrl}/functions/v1/youtube-oauth-callback`;
       const scope = 'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload';
+
+      const stateData = {
+        clubId: currentClub?.clubId,
+        integration: 'youtube',
+        origin: window.location.origin,
+      };
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(clientId)}&` +
@@ -451,7 +518,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         `response_type=code&` +
         `access_type=offline&` +
         `prompt=consent&` +
-        `state=${encodeURIComponent(JSON.stringify({ clubId: currentClub?.clubId, integration: 'youtube' }))}`;
+        `state=${encodeURIComponent(JSON.stringify(stateData))}`;
 
       window.location.href = authUrl;
     } catch (err) {
@@ -1006,6 +1073,22 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     }
   };
 
+  if (showSmsManagement) {
+    const clubId = currentClub?.clubId || currentOrganization?.id || '';
+    return (
+      <div className="space-y-6">
+        <button
+          onClick={() => setShowSmsManagement(false)}
+          className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to Integrations
+        </button>
+        <SmsManagementPage darkMode={darkMode} clubId={clubId} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {error && (
@@ -1095,7 +1178,15 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                       <p className="text-xs text-slate-400 mb-1">{integration.connectedInfo.label}</p>
                       <p className="text-sm font-medium text-white">{integration.connectedInfo.value}</p>
                     </div>
-                    {integration.connectedInfo.url && (
+                    {integration.id === 'sms' ? (
+                      <button
+                        onClick={() => setShowSmsManagement(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                      >
+                        <Settings size={14} />
+                        Manage
+                      </button>
+                    ) : integration.connectedInfo.url ? (
                       <a
                         href={integration.connectedInfo.url}
                         target="_blank"
@@ -1104,7 +1195,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                       >
                         <ExternalLink size={14} />
                       </a>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )}

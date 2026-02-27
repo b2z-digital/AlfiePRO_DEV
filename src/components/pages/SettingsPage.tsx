@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { updateUserProfile } from '../../utils/auth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { ClubSettings } from './ClubSettings';
 import { ClubProfileSettings } from './ClubProfileSettings';
 import { AssociationProfileSettings } from './AssociationProfileSettings';
+import { AssociationUsersManagement } from './AssociationUsersManagement';
+import { StateAssociationFeeSettings } from '../membership/StateAssociationFeeSettings';
+import { NationalAssociationFeeSettings } from '../membership/NationalAssociationFeeSettings';
 import { CommitteeManagement } from './CommitteeManagement';
 import { DashboardTemplateManager } from './DashboardTemplateManager';
 import { IntegrationsPage } from './IntegrationsPage';
@@ -17,6 +20,8 @@ import { FormBuilderPage } from './FormBuilderPage';
 import { DocumentTemplateBuilder } from './DocumentTemplateBuilder';
 import { BackupRestoreSection } from './BackupRestoreSection';
 import { AdvertisingManagement } from '../advertising/AdvertisingManagement';
+import { StartBoxBuilder } from '../start-box/StartBoxBuilder';
+import { ClubFeaturesAccess } from './ClubFeaturesAccess';
 import { ClubYachtClassesSelector } from '../ClubYachtClassesSelector';
 import { formatDate } from '../../utils/date';
 import { supabase } from '../../utils/supabase';
@@ -29,10 +34,10 @@ interface SettingsPageProps {
   darkMode: boolean;
 }
 
-type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'team' | 'subscriptions' | 'integrations' |
+type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
   'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
-  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising';
+  'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
@@ -253,15 +258,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
     try {
       setIsUploadingAvatar(true);
-      
-      // Create a unique file path
-      const fileExt = avatarFile.name.split('.').pop();
+
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(avatarFile, 'avatar');
+
+      const fileExt = compressed.name.split('.').pop();
       const filePath = `${user.id}/${user.id}-${Date.now()}.${fileExt}`;
-      
-      // Upload the file to Supabase Storage
+
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, avatarFile, { upsert: true });
+        .upload(filePath, compressed, { upsert: true });
       
       if (uploadError) throw uploadError;
       
@@ -554,6 +560,64 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 </div>
               </button>
 
+              {/* Association Users Card - only show for association admins */}
+              {currentOrganization && can('users.manage') && (
+                <button
+                  onClick={() => setActiveTab('association-users')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'association-users'
+                      ? lightMode
+                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
+                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-cyan-50' : 'bg-cyan-500/20'}`}>
+                      <Users size={20} className="text-cyan-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Users</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Manage admin and editor access to this association
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* Club Features Access Card - only for state/national association admins */}
+              {currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national') && can('users.manage') && (
+                <button
+                  onClick={() => setActiveTab('club-features')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'club-features'
+                      ? lightMode
+                        ? 'bg-white border-blue-500 shadow-lg shadow-blue-500/10'
+                        : 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
+                      <Zap size={20} className="text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Club Features Access</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Control which features are available for your clubs
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
+
               {/* PWA Install Card */}
               {!isInstalled && deferredPrompt && (
                 <button
@@ -675,9 +739,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                         <Users size={20} className="text-emerald-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Team management</h3>
+                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Committee Management</h3>
                         <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                          Manage roles and permissions for your team
+                          Manage roles and permissions for your club
                         </p>
                       </div>
                     </div>
@@ -732,6 +796,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                         <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Race documents</h3>
                         <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                           Manage race document templates and forms
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Start System Card */}
+                {can('settings.club') && (
+                  <button
+                    onClick={() => setActiveTab('start-system')}
+                    className={`
+                      group p-6 rounded-xl text-left transition-all border
+                      ${activeTab === 'start-system'
+                        ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                        : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                    `}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
+                        <Zap size={20} className="text-green-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Start system</h3>
+                        <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                          Configure digital StartBox sounds and sequences
                         </p>
                       </div>
                     </div>
@@ -847,7 +938,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
-                {/* Payment Setup Card */}
+                {/* Association Fees Card */}
                 <button
                   onClick={() => setActiveTab('finance-payment')}
                   className={`
@@ -864,9 +955,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       <DollarSign size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Setup</h3>
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association Fees</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure Stripe integration and payment methods
+                        Set membership fees and payment methods
                       </p>
                     </div>
                   </div>
@@ -1045,8 +1136,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
             </div>
           )}
 
-          {/* Association Settings Section */}
-          {currentOrganization && (
+          {/* Association Settings Section - admin only */}
+          {currentOrganization && can('settings.club') && (
             <div>
               <h2 className={`text-lg font-semibold mb-4 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association settings</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1077,6 +1168,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                     </div>
                   </div>
                 </button>
+
 
               </div>
             </div>
@@ -1627,6 +1719,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
             <AssociationProfileSettings darkMode={darkMode} />
           )}
 
+          {activeTab === 'association-users' && currentOrganization && (
+            <AssociationUsersManagement darkMode={darkMode} />
+          )}
+
+          {activeTab === 'club-features' && currentOrganization && (
+            <ClubFeaturesAccess darkMode={darkMode} />
+          )}
+
           {activeTab === 'team' && (
             <CommitteeManagement darkMode={darkMode} />
           )}
@@ -1648,43 +1748,47 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-tax' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="taxes" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="taxes" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'finance-categories' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'finance-documents' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'finance-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-types' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="types" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="types" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-renewals' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-emails' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="emails" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="emails" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-conduct' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" />
+            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'race-documents' && (
             <RaceDocumentsPage darkMode={darkMode} />
+          )}
+
+          {activeTab === 'start-system' && (
+            <StartBoxBuilder darkMode={darkMode} onBack={() => setActiveTab(null)} />
           )}
 
           {activeTab === 'import-export' && (

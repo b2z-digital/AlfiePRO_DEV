@@ -116,18 +116,12 @@ export const SkipperPerformanceInsights: React.FC<SkipperPerformanceInsightsProp
     });
     const grossScore = allRacePoints.reduce((sum, p) => sum + p, 0);
 
-    // Calculate net score with drops
     let netScore = grossScore;
-    console.log('Drop calculation for skipper:', {
-      skipperIdx,
-      event_dropRules: event.dropRules,
-      skipperResults_length: skipperResults.length,
-      allRacePoints,
-      grossScore
-    });
+    const dropRules = (event.dropRules && event.dropRules.length > 0)
+      ? event.dropRules
+      : [4, 8, 16, 24, 32, 40];
 
-    if (event.dropRules && event.dropRules.length > 0 && skipperResults.length > 0) {
-      const dropRules = event.dropRules;
+    if (skipperResults.length > 0) {
       let racesToDrop = 0;
       // Use total number of races (skipperResults.length) not just completed races (positions.length)
       for (const threshold of dropRules) {
@@ -138,17 +132,13 @@ export const SkipperPerformanceInsights: React.FC<SkipperPerformanceInsightsProp
         }
       }
 
-      console.log('Drop rules applied:', { racesToDrop, dropRules });
-
       if (racesToDrop > 0) {
         const sortedPoints = [...allRacePoints].sort((a, b) => b - a);
         const droppedPoints = sortedPoints.slice(0, racesToDrop).reduce((sum, p) => sum + p, 0);
         netScore = grossScore - droppedPoints;
-        console.log('After drops:', { sortedPoints, droppedPoints, netScore });
       }
     }
     const raceDropImpact = grossScore - netScore;
-    console.log('Final drop impact:', raceDropImpact);
 
     const dnfDns = skipperResults.filter(r =>
       r.letterScore === 'DNF' || r.letterScore === 'DNS' || r.letterScore === 'DNC'
@@ -165,7 +155,7 @@ export const SkipperPerformanceInsights: React.FC<SkipperPerformanceInsightsProp
       winPercentage: Math.round(winPercentage * 10) / 10,
       avgFinish: Math.round(avgFinish * 10) / 10,
       top3Finishes: top3,
-      consistencyScore: Math.round(stdDev * 10) / 10,
+      consistencyScore: Math.round((iqr + coefficientOfVariation) * 10) / 10,
       consistencyIQR: Math.round(iqr * 10) / 10,
       coefficientOfVariation: Math.round(coefficientOfVariation * 100) / 100,
       dnfDnsPercentage: Math.round(dnfDnsPercentage),

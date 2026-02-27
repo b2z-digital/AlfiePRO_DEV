@@ -91,7 +91,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
           assignee:members!assignee_id (
             first_name,
             last_name,
-            avatar_url
+            avatar_url,
+            user_id
           ),
           clubs!club_id (
             name
@@ -624,12 +625,11 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
           onSubmit={async (taskData) => {
             try {
               if (editingTask) {
-                // Update existing task
-                const { attachments, ...taskDataWithoutAttachments } = taskData;
+                const { attachments, created_by, club_id, state_association_id, national_association_id, ...updateFields } = taskData;
 
                 const { error } = await supabase
                   .from('club_tasks')
-                  .update(taskDataWithoutAttachments)
+                  .update(updateFields)
                   .eq('id', editingTask.id);
 
                 if (error) throw error;

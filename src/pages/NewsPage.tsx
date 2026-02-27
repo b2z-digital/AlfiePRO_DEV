@@ -10,6 +10,25 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import { usePermissions } from '../hooks/usePermissions';
 
 const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const FALLBACK_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
+
+const getArticleImageUrl = (coverImage?: string): string => {
+  if (!coverImage) return DEFAULT_COVER_IMAGE;
+
+  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    return coverImage;
+  }
+
+  if (coverImage.startsWith('/')) {
+    return coverImage;
+  }
+
+  const { data } = supabase.storage
+    .from('article-images')
+    .getPublicUrl(coverImage);
+
+  return data.publicUrl || DEFAULT_COVER_IMAGE;
+};
 
 const NewsPage: React.FC = () => {
   const { currentClub, currentOrganization, user } = useAuth();
@@ -359,11 +378,12 @@ const NewsPage: React.FC = () => {
                 className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden transition-all hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-900/10 cursor-pointer group h-[500px] flex flex-col"
                 onClick={() => handleReadMore(article.id)}
               >
-                <div className="relative h-48 overflow-hidden">
+                <div className="relative h-48 overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
                   <img
-                    src={article.cover_image || DEFAULT_COVER_IMAGE}
+                    src={getArticleImageUrl(article.cover_image)}
                     alt={article.title}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
 
@@ -382,13 +402,13 @@ const NewsPage: React.FC = () => {
                           : 'bg-blue-500/90 text-white'
                       }`}>
                         {article.event_name && article.event_level === 'national'
-                          ? 'National News'
+                          ? (article.source_name ? `${article.source_name} News` : 'National News')
                           : article.event_name && article.event_level === 'state'
-                          ? 'State News'
+                          ? (article.source_name ? `${article.source_name} News` : 'State News')
                           : article.source_type === 'national'
-                          ? 'National News'
+                          ? (article.source_name ? `${article.source_name} News` : 'National News')
                           : article.source_type === 'state'
-                          ? 'State News'
+                          ? (article.source_name ? `${article.source_name} News` : 'State News')
                           : 'Club News'}
                       </span>
                     </div>
@@ -475,11 +495,12 @@ const NewsPage: React.FC = () => {
                 onClick={() => handleReadMore(article.id)}
               >
                 <div className="flex items-center gap-4 p-4">
-                  <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden">
+                  <div className="relative w-48 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
                     <img
-                      src={article.cover_image || DEFAULT_COVER_IMAGE}
+                      src={getArticleImageUrl(article.cover_image)}
                       alt={article.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
                     />
                     {/* Source Label for List View */}
                     {(article.source_type || article.event_name) && (
@@ -496,13 +517,13 @@ const NewsPage: React.FC = () => {
                             : 'bg-blue-500/90 text-white'
                         }`}>
                           {article.event_name && article.event_level === 'national'
-                            ? 'National'
+                            ? (article.source_name || 'National')
                             : article.event_name && article.event_level === 'state'
-                            ? 'State'
+                            ? (article.source_name || 'State')
                             : article.source_type === 'national'
-                            ? 'National'
+                            ? (article.source_name || 'National')
                             : article.source_type === 'state'
-                            ? 'State'
+                            ? (article.source_name || 'State')
                             : 'Club'}
                         </span>
                       </div>

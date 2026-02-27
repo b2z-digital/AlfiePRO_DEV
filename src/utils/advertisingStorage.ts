@@ -683,15 +683,17 @@ export const advertisingStorage = {
     };
   },
 
-  // Upload banner image
   async uploadBannerImage(file: File): Promise<string> {
-    const fileExt = file.name.split('.').pop();
+    const { compressImage } = await import('./imageCompression');
+    const compressed = await compressImage(file, 'banner');
+
+    const fileExt = compressed.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from('ad-banners')
-      .upload(filePath, file);
+      .upload(filePath, compressed);
 
     if (uploadError) throw uploadError;
 

@@ -1,44 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, MapPin, Trophy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
+import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { GoogleAnalytics } from '../GoogleAnalytics';
-
-interface RaceResult {
-  position: number;
-  skipperName: string;
-  sailNumber: string;
-  points: number;
-}
-
-interface Race {
-  raceNumber: number;
-  results: RaceResult[];
-}
-
-interface EventData {
-  id: string;
-  name: string;
-  date: string;
-  venue: string;
-  race_class: string;
-  races: Race[];
-}
+import { PublicHeader } from './PublicHeader';
+import { PublicFooter } from './PublicFooter';
+import { EventResultsDisplay } from '../EventResultsDisplay';
+import { RaceEvent } from '../../types/race';
 
 export const PublicResultsPage: React.FC = () => {
   const { clubId: paramClubId, eventId } = useParams<{ clubId: string; eventId: string }>();
-  const { clubId: contextClubId } = usePublicNavigation();
+  const { clubId: contextClubId, buildPublicUrl } = usePublicNavigation();
   const clubId = contextClubId || paramClubId;
-  const [event, setEvent] = useState<EventData | null>(null);
+  const [searchParams] = useSearchParams();
+  const roundParam = searchParams.get('round');
+  const [club, setClub] = useState<Club | null>(null);
+  const [raceEvent, setRaceEvent] = useState<RaceEvent | null>(null);
   const [loading, setLoading] = useState(true);
-  const [clubName, setClubName] = useState<string>('');
-  const [isSeries, setIsSeries] = useState(false);
+  const [seriesName, setSeriesName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     loadEventData();
-  }, [eventId]);
+  }, [eventId, roundParam, clubId]);
 
   const loadEventData = async () => {
     if (!eventId || !clubId) return;
@@ -46,52 +32,35 @@ export const PublicResultsPage: React.FC = () => {
     try {
       setLoading(true);
 
-      // Load club name
       const { data: clubData } = await supabase
         .from('clubs')
-        .select('name')
+        .select('*')
         .eq('id', clubId)
         .maybeSingle();
 
       if (clubData) {
-        setClubName(clubData.name);
+        setClub(clubData as any);
       }
 
-      // Try to load as quick race first
-      const { data: quickRaceData } = await supabase
-        .from('quick_races')
-        .select('id, name, date, venue, race_class, races')
-        .eq('id', eventId)
-        .maybeSingle();
+      const clubDisplayName = clubData?.name || '';
 
-      if (quickRaceData) {
-        setEvent(quickRaceData as EventData);
-        setIsSeries(false);
-      } else {
-        // Try to load as series
-        const { data: seriesData } = await supabase
-          .from('race_series')
-          .select('id, series_name, created_at, race_class, results')
-          .eq('id', eventId)
-          .maybeSingle();
+      const quickRaceEvent = await loadQuickRace(eventId, clubDisplayName);
+      if (quickRaceEvent) {
+        setRaceEvent(quickRaceEvent);
+        return;
+      }
 
-        if (seriesData) {
-          // Convert series results format to match event format
-          const seriesResults = seriesData.results || [];
-          const races = seriesResults.length > 0 ? [{
-            raceNumber: 1,
-            results: seriesResults
-          }] : [];
+      const roundEvent = await loadSeriesRound(eventId, clubDisplayName);
+      if (roundEvent) {
+        setRaceEvent(roundEvent);
+        return;
+      }
 
-          setEvent({
-            id: seriesData.id,
-            name: seriesData.series_name,
-            date: seriesData.created_at,
-            venue: '',
-            race_class: seriesData.race_class || '',
-            races: races
-          } as EventData);
-          setIsSeries(true);
+      if (roundParam !== null) {
+        const seriesRoundEvent = await loadSeriesRoundByIndex(eventId, parseInt(roundParam), clubDisplayName);
+        if (seriesRoundEvent) {
+          setRaceEvent(seriesRoundEvent);
+          return;
         }
       }
     } catch (error) {
@@ -99,6 +68,119 @@ export const PublicResultsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadQuickRace = async (id: string, clubDisplayName: string): Promise<RaceEvent | null> => {
+    const { data } = await supabase
+      .from('quick_races')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      eventName: data.event_name || undefined,
+      clubName: clubDisplayName,
+      date: data.race_date,
+      venue: data.race_venue || '',
+      raceClass: data.race_class || '',
+      raceFormat: data.race_format || 'handicap',
+      skippers: data.skippers || [],
+      raceResults: data.race_results || [],
+      lastCompletedRace: data.last_completed_race || 0,
+      hasDeterminedInitialHcaps: data.has_determined_initial_hcaps || false,
+      isManualHandicaps: data.is_manual_handicaps || false,
+      completed: data.completed || false,
+      numRaces: data.num_races || undefined,
+      dropRules: data.drop_rules || undefined,
+      clubId: data.club_id || clubId,
+      heatManagement: data.heat_management || undefined,
+      multiDay: data.multi_day || false,
+      dayResults: data.day_results || {},
+      show_flag: data.show_flag ?? true,
+      show_country: data.show_country ?? true,
+      show_club_state: data.show_club_state ?? false,
+      show_category: data.show_category ?? false,
+    } as RaceEvent;
+  };
+
+  const loadSeriesRound = async (id: string, clubDisplayName: string): Promise<RaceEvent | null> => {
+    const { data } = await supabase
+      .from('race_series_rounds')
+      .select('*, race_series!inner(series_name)')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!data) return null;
+
+    const sName = (data as any).race_series?.series_name || '';
+    setSeriesName(sName);
+
+    return {
+      id: data.id,
+      eventName: `${data.round_name} - ${sName}`,
+      clubName: clubDisplayName,
+      date: data.date,
+      venue: data.venue || '',
+      raceClass: data.race_class || '',
+      raceFormat: data.race_format || 'handicap',
+      skippers: data.skippers || [],
+      raceResults: data.race_results || [],
+      lastCompletedRace: data.last_completed_race || 0,
+      hasDeterminedInitialHcaps: data.has_determined_initial_hcaps || false,
+      isManualHandicaps: data.is_manual_handicaps || false,
+      completed: data.completed || false,
+      numRaces: data.num_races || undefined,
+      dropRules: data.drop_rules || undefined,
+      clubId: data.club_id || clubId,
+      heatManagement: data.heat_management || undefined,
+      multiDay: data.multi_day || false,
+      dayResults: data.day_results || {},
+      isSeriesEvent: true,
+      seriesId: data.series_id,
+      roundName: data.round_name,
+    } as RaceEvent;
+  };
+
+  const loadSeriesRoundByIndex = async (seriesId: string, roundIndex: number, clubDisplayName: string): Promise<RaceEvent | null> => {
+    const { data } = await supabase
+      .from('race_series_rounds')
+      .select('*, race_series!inner(series_name)')
+      .eq('series_id', seriesId)
+      .eq('round_index', roundIndex)
+      .maybeSingle();
+
+    if (!data) return null;
+
+    const sName = (data as any).race_series?.series_name || '';
+    setSeriesName(sName);
+
+    return {
+      id: data.id,
+      eventName: `${data.round_name} - ${sName}`,
+      clubName: clubDisplayName,
+      date: data.date,
+      venue: data.venue || '',
+      raceClass: data.race_class || '',
+      raceFormat: data.race_format || 'handicap',
+      skippers: data.skippers || [],
+      raceResults: data.race_results || [],
+      lastCompletedRace: data.last_completed_race || 0,
+      hasDeterminedInitialHcaps: data.has_determined_initial_hcaps || false,
+      isManualHandicaps: data.is_manual_handicaps || false,
+      completed: data.completed || false,
+      numRaces: data.num_races || undefined,
+      dropRules: data.drop_rules || undefined,
+      clubId: data.club_id || clubId,
+      heatManagement: data.heat_management || undefined,
+      multiDay: data.multi_day || false,
+      dayResults: data.day_results || {},
+      isSeriesEvent: true,
+      seriesId: data.series_id,
+      roundName: data.round_name,
+    } as RaceEvent;
   };
 
   if (loading) {
@@ -109,18 +191,22 @@ export const PublicResultsPage: React.FC = () => {
     );
   }
 
-  if (!event) {
+  if (!raceEvent) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Event not found</p>
-          <Link
-            to={`/club/${clubId}/public`}
-            className="text-blue-600 hover:underline"
-          >
-            Back to Homepage
-          </Link>
+      <div className="min-h-screen bg-gray-50">
+        <PublicHeader club={club} activePage="results" />
+        <div className="pt-24 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Event not found</p>
+            <Link
+              to={buildPublicUrl('/')}
+              className="text-blue-600 hover:underline"
+            >
+              Back to Homepage
+            </Link>
+          </div>
         </div>
+        <PublicFooter clubId={clubId} />
       </div>
     );
   }
@@ -128,111 +214,52 @@ export const PublicResultsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <GoogleAnalytics measurementId={null} />
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <Link
-            to={`/club/${clubId}/public`}
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to {clubName || 'Club Homepage'}
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">{event.name}</h1>
-          <div className="flex flex-wrap items-center gap-4 mt-4 text-gray-600">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span>{formatDate(event.date)}</span>
+      <PublicHeader club={club} activePage="results" />
+
+      <div className="pt-24">
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <Link
+              to={buildPublicUrl('/results')}
+              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              All Results
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {raceEvent.eventName || 'Race Results'}
+            </h1>
+            <div className="flex flex-wrap items-center gap-4 mt-4 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>{formatDate(raceEvent.date)}</span>
+              </div>
+              {raceEvent.venue && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  <span>{raceEvent.venue}</span>
+                </div>
+              )}
+              {raceEvent.raceClass && (
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  <span>Class: {raceEvent.raceClass}</span>
+                </div>
+              )}
             </div>
-            {event.venue && (
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                <span>{event.venue}</span>
-              </div>
-            )}
-            {event.race_class && (
-              <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4" />
-                <span>Class: {event.race_class}</span>
-              </div>
-            )}
           </div>
         </div>
-      </header>
 
-      {/* Results */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {event.races && event.races.length > 0 ? (
-          <div className="space-y-8">
-            {event.races.map((race, index) => (
-              <div key={index} className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="bg-gray-900 text-white px-6 py-4">
-                  <h2 className="text-xl font-semibold">
-                    {isSeries ? 'Series Standings' : `Race ${race.raceNumber}`}
-                  </h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Position
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Skipper
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Sail Number
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                          Points
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {race.results && race.results.length > 0 ? (
-                        race.results.map((result, resultIndex) => (
-                          <tr key={resultIndex} className={result.position === 1 ? 'bg-yellow-50' : ''}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                {result.position === 1 && (
-                                  <Trophy className="w-4 h-4 text-yellow-600" />
-                                )}
-                                <span className="text-sm font-medium text-gray-900">
-                                  {result.position}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{result.skipperName}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-600">{result.sailNumber}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{result.points}</div>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                            No results recorded for this race
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-gray-500">No race results available</p>
-          </div>
-        )}
-      </main>
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <EventResultsDisplay
+            event={raceEvent}
+            darkMode={true}
+            seriesName={seriesName}
+          />
+        </main>
+      </div>
+
+      <PublicFooter clubId={clubId} />
     </div>
   );
 };

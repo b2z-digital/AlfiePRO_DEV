@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Users, Shuffle, Trash2, UserPlus, Edit2 } from 'lucide-react';
+import { X, Users, Shuffle, Trash2, UserPlus, Edit2, Trophy } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatDesignation } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -24,6 +24,7 @@ interface ManualHeatAssignmentModalProps {
   onAddSkipper?: () => void;
   onEditSkipper?: (skipperIndex: number) => void;
   onSaveSkipper?: (skipperIndex: number, updatedSkipper: Skipper) => void;
+  onRankingAssignment?: () => void;
 }
 
 const adjustIndicesAfterDeletion = (indices: number[], deletedIndex: number): number[] => {
@@ -44,7 +45,8 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
   onDeleteSkipper,
   onAddSkipper,
   onEditSkipper,
-  onSaveSkipper
+  onSaveSkipper,
+  onRankingAssignment
 }) => {
   const [draggedSkipperIndex, setDraggedSkipperIndex] = useState<number | null>(null);
   const [assignments, setAssignments] = useState<HeatAssignment[]>([]);
@@ -77,17 +79,21 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
     const allSkipperIndices = skippers.map((_, idx) => idx);
     const shuffled = [...allSkipperIndices].sort(() => Math.random() - 0.5);
 
-    // Calculate base size and remainder
     const baseSize = Math.floor(shuffled.length / numHeats);
     const remainder = shuffled.length % numHeats;
 
-    // Assign skippers to heats, with Heat A (last in array) getting the extras
-    let skipperIdx = 0;
-    const newAssignments = availableHeats.map((heat, heatIdx) => {
-      // Heat A is at the end of availableHeats array and should get extra boats
-      const isHeatA = heatIdx === availableHeats.length - 1;
-      const heatSize = isHeatA ? baseSize + remainder : baseSize;
+    // Sort heats so A comes first for size calculation
+    const sortedHeats = [...availableHeats].sort();
 
+    // First N heats (A, B, C...) get baseSize + 1, rest get baseSize
+    const heatSizes = new Map<HeatDesignation, number>();
+    sortedHeats.forEach((heat, i) => {
+      heatSizes.set(heat, baseSize + (i < remainder ? 1 : 0));
+    });
+
+    let skipperIdx = 0;
+    const newAssignments = availableHeats.map((heat) => {
+      const heatSize = heatSizes.get(heat) || baseSize;
       const skipperIndices = shuffled.slice(skipperIdx, skipperIdx + heatSize);
       skipperIdx += heatSize;
 
@@ -226,6 +232,15 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
               >
                 <UserPlus size={16} />
                 Add Skipper
+              </button>
+            )}
+            {onRankingAssignment && (
+              <button
+                onClick={onRankingAssignment}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-2"
+              >
+                <Trophy size={16} />
+                Ranking Assignment
               </button>
             )}
             <button

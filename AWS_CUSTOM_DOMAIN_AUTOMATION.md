@@ -182,7 +182,7 @@ SELECT cron.schedule(
 
    Type: CNAME
    Host: www
-   Value: d205ctqm5i025u.cloudfront.net
+   Value: d3jmzkpreoudd5.cloudfront.net
    ```
 
 5. **AWS verifies and provisions SSL**

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Home, Settings, Users, Hand, Table2 } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Home, Settings, Users, Hand, Table2, Maximize2, Minimize2 } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -26,6 +26,7 @@ import { HeatManagement, HeatResult, HeatDesignation } from '../types/heat';
 import { HeatScoringTable } from './HeatScoringTable';
 import { updateHeatResult, completeHeat, convertHeatResultsToRaceResults, clearHeatRaceResults } from '../utils/heatUtils';
 import { HMSConfig } from '../utils/hmsHeatSystem';
+import { seedSHRSHeatsByIndex, generatePreSetQualifyingAssignments } from '../utils/shrsHeatSystem';
 import { SingleEventManagement } from './SingleEventManagement';
 import { TouchModeScoring } from './TouchModeScoring';
 import { calculateHandicaps } from '../utils/handicapCalculator';
@@ -78,6 +79,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [currentDay, setCurrentDay] = useState(1);
   const [showRaceSettingsModal, setShowRaceSettingsModal] = useState(false);
+  const [autoEnableHeatRacing, setAutoEnableHeatRacing] = useState(false);
+  const [showHeatRacingRecommendation, setShowHeatRacingRecommendation] = useState(false);
   const [heatManagement, setHeatManagement] = useState<HeatManagement | null>(null);
   const [selectedVenueName, setSelectedVenueName] = useState<string | null>(null);
   const [currentNumRaces, setCurrentNumRaces] = useState(12);
@@ -87,7 +90,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const [isDataFullyLoaded, setIsDataFullyLoaded] = useState(false);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
   const [touchModeCurrentRace, setTouchModeCurrentRace] = useState<number>(1);
-  const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0); // Force re-render when event is updated
+  const [isFullscreenScoring, setIsFullscreenScoring] = useState(false);
+  const [eventUpdateTrigger, setEventUpdateTrigger] = useState(0);
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const isCalculatingHandicaps = useRef(false);
@@ -304,7 +308,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         setTimeout(() => setIsDataFullyLoaded(true), 100);
       }
 
-      // For multi-day events, load ONLY previous days' completed results
+      const eventSkipperCount = currentEvent.skippers?.length || 0;
+
       const targetDay = currentEvent.currentDay || 1;
       if (currentEvent.multiDay && currentEvent.dayResults) {
         console.log('🏁 YachtRaceManager: Loading multi-day results. Target day:', targetDay);
@@ -393,13 +398,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setHasDeterminedInitialHcaps(currentDayData.hasDeterminedInitialHcaps || false);
           setIsManualHandicaps(currentDayData.isManualHandicaps || false);
 
-          // Load heat management data only if it's enabled
           if (currentDayData.heatManagement && currentDayData.heatManagement.configuration.enabled) {
-            setHeatManagement(currentDayData.heatManagement);
+            const storedSkipperCount = currentDayData.heatManagement.rounds[0]?.heatAssignments
+              ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-            // Also load the drop rules from heat management configuration
-            if (currentDayData.heatManagement.configuration.scoringSystem) {
-              setCurrentDropRules(currentDayData.heatManagement.configuration.scoringSystem);
+            if (storedSkipperCount === eventSkipperCount) {
+              setHeatManagement(currentDayData.heatManagement);
+
+              if (currentDayData.heatManagement.configuration.scoringSystem) {
+                setCurrentDropRules(currentDayData.heatManagement.configuration.scoringSystem);
+              }
+            } else {
+              console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
+              setHeatManagement(null);
             }
           }
 
@@ -415,11 +426,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             setIsManualHandicaps(day1Data.isManualHandicaps || false);
 
             if (day1Data.heatManagement && day1Data.heatManagement.configuration.enabled) {
-              setHeatManagement(day1Data.heatManagement);
+              const storedSkipperCount = day1Data.heatManagement.rounds[0]?.heatAssignments
+                ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-              // Also load the drop rules from heat management configuration
-              if (day1Data.heatManagement.configuration.scoringSystem) {
-                setCurrentDropRules(day1Data.heatManagement.configuration.scoringSystem);
+              if (storedSkipperCount === eventSkipperCount) {
+                setHeatManagement(day1Data.heatManagement);
+
+                if (day1Data.heatManagement.configuration.scoringSystem) {
+                  setCurrentDropRules(day1Data.heatManagement.configuration.scoringSystem);
+                }
+              } else {
+                console.warn(`Day 1 heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
+                setHeatManagement(null);
               }
             }
 
@@ -465,13 +483,74 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         if (currentEvent.isManualHandicaps !== undefined) {
           setIsManualHandicaps(currentEvent.isManualHandicaps);
         }
-        // Load heat management data only if it's enabled
         if (currentEvent.heatManagement && currentEvent.heatManagement.configuration.enabled) {
-          setHeatManagement(currentEvent.heatManagement);
+          const storedSkipperCount = currentEvent.heatManagement.rounds[0]?.heatAssignments
+            ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
 
-          // Also load the drop rules from heat management configuration
-          if (currentEvent.heatManagement.configuration.scoringSystem) {
-            setCurrentDropRules(currentEvent.heatManagement.configuration.scoringSystem);
+          if (storedSkipperCount === eventSkipperCount) {
+            let loadedHM = currentEvent.heatManagement;
+
+            if (loadedHM.configuration.scoringSystem === 'shrs') {
+              const hasResults = loadedHM.rounds.some(r => r.results && r.results.length > 0);
+              if (!hasResults) {
+                const r1Sizes = loadedHM.rounds[0]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+                const maxS = Math.max(...r1Sizes);
+                const minS = Math.min(...r1Sizes);
+                const unbalancedR1 = r1Sizes.length > 0 && maxS - minS > 1;
+
+                let inconsistentAcrossRounds = false;
+                if (loadedHM.rounds.length > 1) {
+                  for (let ri = 1; ri < loadedHM.rounds.length; ri++) {
+                    const rSizes = loadedHM.rounds[ri]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+                    if (rSizes.length === r1Sizes.length && rSizes.some((s, i) => s !== r1Sizes[i])) {
+                      inconsistentAcrossRounds = true;
+                      break;
+                    }
+                  }
+                }
+
+                if (unbalancedR1 || inconsistentAcrossRounds) {
+                  console.log('Auto-correcting SHR heats:', unbalancedR1 ? 'unbalanced R1' : 'inconsistent across rounds');
+                  const numHeats = loadedHM.configuration.numberOfHeats;
+                  const qRounds = loadedHM.configuration.shrsQualifyingRounds || 1;
+                  const eventSkippers = currentEvent.skippers || [];
+                  const newAssignments = seedSHRSHeatsByIndex(eventSkippers, numHeats);
+
+                  let newRounds;
+                  const isPreset = loadedHM.configuration.shrsAssignmentMode === 'preset';
+                  if (isPreset && qRounds > 1) {
+                    const allQR = generatePreSetQualifyingAssignments(newAssignments, numHeats, qRounds);
+                    newRounds = allQR.map((ra, idx) => ({
+                      round: idx + 1,
+                      heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
+                      results: [] as any[],
+                      completed: false
+                    }));
+                  } else {
+                    newRounds = [{ round: 1, heatAssignments: newAssignments.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })), results: [] as any[], completed: false }];
+                  }
+
+                  loadedHM = { ...loadedHM, rounds: newRounds };
+                  console.log('Corrected SHR heats:', newAssignments.map(a => a.skipperIndices.length).join(', '));
+
+                  const eventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
+                  if (eventId) {
+                    supabase.from('quick_races').update({ heat_management: loadedHM }).eq('id', eventId).then(() => {
+                      console.log('Saved corrected SHR heat assignments to database');
+                    });
+                  }
+                }
+              }
+            }
+
+            setHeatManagement(loadedHM);
+
+            if (loadedHM.configuration.scoringSystem) {
+              setCurrentDropRules(loadedHM.configuration.scoringSystem);
+            }
+          } else {
+            console.warn(`Heat management cached for ${storedSkipperCount} skippers but event has ${eventSkipperCount} skippers. Clearing cached assignments.`);
+            setHeatManagement(null);
           }
         }
 
@@ -808,7 +887,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       };
 
       setHeatManagement(resetHeatManagement);
-      addNotification('success', 'Heat racing results cleared. Heat configuration preserved.');
     } else {
       // No heat management, just clear everything
       setHeatManagement(null);
@@ -1069,10 +1147,25 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       // addNotification('info', `${newlyAddedSkippers.length} new skipper${newlyAddedSkippers.length > 1 ? 's' : ''} added with DNS scores for ${lastCompletedRace} completed race${lastCompletedRace > 1 ? 's' : ''}.`);
     }
 
-    // If heat management is enabled, we need to reset it
-    // Skip opening the modal if requested (e.g., when editing from ManualHeatAssignmentModal)
+    if (
+      newlyAddedSkippers.length > 0 &&
+      uniqueSkippers.length >= 20 &&
+      !heatManagement?.configuration.enabled &&
+      !options?.skipRaceSettingsModal
+    ) {
+      setShowHeatRacingRecommendation(true);
+      return;
+    }
+
     if (heatManagement?.configuration.enabled && !options?.skipRaceSettingsModal) {
+      // If skippers changed and heat racing is enabled, open settings to reconfigure
       setShowRaceSettingsModal(true);
+
+      // If skippers were removed, clear heat management data
+      if (uniqueSkippers.length < skippers.length) {
+        setHeatManagement(null);
+        addNotification('info', 'Skippers removed. Heat Racing assignments cleared. Please reconfigure in Race Settings.');
+      }
     } else if (newlyAddedSkippers.length === 0 && uniqueSkippers.length < skippers.length) {
       // Only clear results if skippers were removed and no new ones added
       setRaceResults([]);
@@ -1081,6 +1174,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       setIsManualHandicaps(false);
       setLastUpdateTime(null);
       setEditingRace(null);
+
+      // Also clear heat management if it exists
+      if (heatManagement?.configuration.enabled) {
+        setHeatManagement(null);
+        addNotification('info', 'Skippers removed. Heat Racing assignments cleared.');
+      }
     }
   };
 
@@ -1888,11 +1987,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
         // Show success notification
         if (currentEvent.multiDay && !isComplete) {
-          addNotification('success', `Day ${currentDay} scoring completed! ${totalDays - currentDay} day(s) remaining.`);
-          // Update localStorage with next day
           setCurrentEvent(currentEvent);
-        } else {
-          addNotification('success', 'Results published successfully!');
         }
       }
 
@@ -2024,9 +2119,17 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setHasDeterminedInitialHcaps(dayData.hasDeterminedInitialHcaps || false);
           setIsManualHandicaps(dayData.isManualHandicaps || false);
           
-          // Load heat management data if available
-          if (dayData.heatManagement) {
-            setHeatManagement(dayData.heatManagement);
+          // Load heat management data if available and valid
+          if (dayData.heatManagement && dayData.heatManagement.configuration.enabled) {
+            const storedSkipperCount = dayData.heatManagement.rounds[0]?.heatAssignments
+              ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
+
+            if (storedSkipperCount === skippers.length) {
+              setHeatManagement(dayData.heatManagement);
+            } else {
+              console.warn(`⚠️ Day ${targetDay} heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
+              setHeatManagement(null);
+            }
           } else {
             setHeatManagement(null);
           }
@@ -2066,8 +2169,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           setIsManualHandicaps(selectedEvent.isManualHandicaps);
         }
         
-        if (selectedEvent.heatManagement) {
-          setHeatManagement(selectedEvent.heatManagement);
+        if (selectedEvent.heatManagement && selectedEvent.heatManagement.configuration.enabled) {
+          const storedSkipperCount = selectedEvent.heatManagement.rounds[0]?.heatAssignments
+            ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
+
+          if (storedSkipperCount === skippers.length) {
+            setHeatManagement(selectedEvent.heatManagement);
+          } else {
+            console.warn(`⚠️ Event heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
+            setHeatManagement(null);
+          }
         } else {
           setHeatManagement(null);
         }
@@ -2209,9 +2320,17 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         setHasDeterminedInitialHcaps(currentEvent.dayResults[day].hasDeterminedInitialHcaps || false);
         setIsManualHandicaps(currentEvent.dayResults[day].isManualHandicaps || false);
         
-        // Load heat management data if available
-        if (currentEvent.dayResults[day].heatManagement) {
-          setHeatManagement(currentEvent.dayResults[day].heatManagement);
+        // Load heat management data if available and valid
+        if (currentEvent.dayResults[day].heatManagement && currentEvent.dayResults[day].heatManagement.configuration.enabled) {
+          const storedSkipperCount = currentEvent.dayResults[day].heatManagement.rounds[0]?.heatAssignments
+            ?.reduce((sum, heat) => sum + heat.skipperIndices.length, 0) || 0;
+
+          if (storedSkipperCount === skippers.length) {
+            setHeatManagement(currentEvent.dayResults[day].heatManagement);
+          } else {
+            console.warn(`⚠️ Day ${day} heat management cached for ${storedSkipperCount} skippers but event has ${skippers.length} skippers. Clearing cached assignments.`);
+            setHeatManagement(null);
+          }
         } else {
           setHeatManagement(null);
         }
@@ -2263,9 +2382,40 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   }) => {
     console.log('💾 Saving race settings in YachtRaceManager:', JSON.stringify(settings.heatManagement, null, 2));
 
+    let finalHM = settings.heatManagement;
+    if (finalHM && finalHM.configuration.scoringSystem === 'shrs') {
+      const qRounds = finalHM.configuration.shrsQualifyingRounds || 1;
+      const isPreset = finalHM.configuration.shrsAssignmentMode === 'preset';
+      if (isPreset && qRounds > 1 && finalHM.rounds.length < qRounds) {
+        console.log('⚠️ SHR safety net (balanced): rounds.length', finalHM.rounds.length, 'but need', qRounds, '- regenerating');
+        const firstRoundAssignments = finalHM.rounds[0]?.heatAssignments || [];
+        const numHeats = finalHM.configuration.numberOfHeats;
+        const allQR = generatePreSetQualifyingAssignments(
+          firstRoundAssignments.map(a => ({ heatDesignation: a.heatDesignation as string, skipperIndices: [...a.skipperIndices] })),
+          numHeats,
+          qRounds
+        );
+        finalHM = {
+          ...finalHM,
+          rounds: allQR.map((ra, idx) => ({
+            round: idx + 1,
+            heatAssignments: ra.map(a => ({ heatDesignation: a.heatDesignation as any, skipperIndices: a.skipperIndices })),
+            results: [] as any[],
+            completed: false
+          }))
+        };
+      } else if (!isPreset && finalHM.rounds.length > 1) {
+        console.log('⚠️ SHR safety net (progressive): trimming to round 1 only');
+        finalHM = {
+          ...finalHM,
+          rounds: [finalHM.rounds[0]]
+        };
+      }
+    }
+
     setCurrentNumRaces(settings.numRaces);
     setCurrentDropRules(settings.dropRules);
-    setHeatManagement(settings.heatManagement);
+    setHeatManagement(finalHM);
 
     console.log('💾 Heat management state updated');
 
@@ -2284,13 +2434,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           isManualHandicaps,
           false, // not completed
           currentDay,
-          settings.heatManagement, // Use the new heat management from settings
+          finalHM, // Use the new heat management (with safety-net rounds if needed)
           settings.numRaces,
           settings.dropRules as number[]
         );
         console.log('✅ Heat management saved to database successfully');
 
-        // Save display settings and observer settings if provided
+        // Save display settings, observer settings, and start sequence if provided
         if ((settings.displaySettings || settings.observerSettings) && currentEvent.id) {
           const updateData: any = {};
 
@@ -2375,10 +2525,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
     }
 
-    // If heat racing was just enabled, show success notification
-    if (settings.heatManagement?.configuration.enabled && !heatManagement?.configuration.enabled) {
-      addNotification('success', '🏁 Heat Racing has been configured! The race table now shows heat-based scoring.');
-    }
   };
 
   const handleRaceSettingsChange = (settings: { numRaces: number; dropRules: number[] | string }) => {
@@ -2429,11 +2575,10 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
           // Determine scoring system message
           const scoringSystem = updatedHeatManagement.configuration.scoringSystem || 'hms';
-          const systemName = scoringSystem === 'shrs' ? 'SHRS' : 'HMS';
+          const mode = updatedHeatManagement.configuration.shrsAssignmentMode;
+          const systemName = scoringSystem === 'shrs' ? `SHR-${mode === 'preset' ? 'B' : 'P'}` : 'HMS';
 
-          addNotification('success', `Round ${nextRoundNumber - 1} complete! Advancing to Round ${nextRoundNumber} with ${systemName} heat assignments.`);
         } else {
-          addNotification('success', `Round ${updatedHeatManagement.currentRound} complete! Final round finished.`);
         }
       } else {
         // Round not completed yet - set to highest completed round
@@ -2473,7 +2618,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     if (!heatManagement) return;
 
     // First complete the current heat to generate next round assignments
-    const updatedHeatManagement = completeHeat(heatManagement, currentHeat);
+    const updatedHeatManagement = completeHeat(heatManagement, currentHeat, currentDropRules);
 
     // Find the newly created next round
     const nextRoundNumber = updatedHeatManagement.currentRound + 1;
@@ -2501,36 +2646,45 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     // Update lastCompletedRace to the previous round (now that we've advanced)
     setLastCompletedRace(nextRoundNumber - 1);
 
-    addNotification('success', `Advanced to Round ${nextRoundNumber}! Heat assignments ready for scoring.`);
   };
 
   const handleGoToRound = (roundNumber: number) => {
     if (!heatManagement || roundNumber < 1) return;
 
-    // Use functional state update to get the latest state
-    // This is important because onCompleteHeat may have just been called
     setHeatManagement(prevHeatManagement => {
       if (!prevHeatManagement) return prevHeatManagement;
 
-      // Check if the round exists in the LATEST state
       if (roundNumber > prevHeatManagement.rounds.length) {
         console.warn(`Cannot advance to round ${roundNumber} - only ${prevHeatManagement.rounds.length} rounds exist`);
         return prevHeatManagement;
       }
 
-      // Jump to the specified round
+      const allPriorComplete = prevHeatManagement.rounds
+        .filter(r => r.round < roundNumber)
+        .every(r => r.completed);
+
+      if (!allPriorComplete && roundNumber > prevHeatManagement.currentRound) {
+        console.warn(`Cannot skip to round ${roundNumber} - prior rounds not completed`);
+        const firstIncomplete = prevHeatManagement.rounds.find(r => !r.completed);
+        if (firstIncomplete) {
+          return {
+            ...prevHeatManagement,
+            currentRound: firstIncomplete.round
+          };
+        }
+        return prevHeatManagement;
+      }
+
       const updatedHeatManagement = {
         ...prevHeatManagement,
         currentRound: roundNumber
       };
 
-      // When advancing to a new round, update lastCompletedRace to enable the column
       const previousRound = updatedHeatManagement.rounds.find(r => r.round === roundNumber - 1);
       if (previousRound?.completed) {
         setLastCompletedRace(roundNumber - 1);
       }
 
-      // Removed notification - heat operations should be silent
       return updatedHeatManagement;
     });
   };
@@ -2545,32 +2699,66 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   };
 
   // Handler to update heat assignments for next round with manual overrides
-  const handleUpdateHeatAssignments = (updatedAssignments: any[]) => {
+  const handleUpdateHeatAssignments = async (updatedAssignments: any[], targetRound?: number) => {
     if (!heatManagement) return;
 
-    // Find the next round to update
+    console.log('🔧 handleUpdateHeatAssignments called with:', {
+      assignmentsCount: updatedAssignments.length,
+      targetRound,
+      currentRound: heatManagement.currentRound
+    });
+
     const currentRoundNumber = heatManagement.currentRound;
-    const nextRoundNumber = currentRoundNumber + 1;
+    const currentRound = heatManagement.rounds.find(r => r.round === currentRoundNumber);
 
-    // Check if next round exists
-    let nextRoundIndex = heatManagement.rounds.findIndex(r => r.round === nextRoundNumber);
+    // Determine which round to update
+    let roundNumberToUpdate: number;
 
+    if (targetRound) {
+      // Explicit target round specified by caller
+      roundNumberToUpdate = targetRound;
+    } else {
+      // Auto-detect: if current round is not complete, update current round (mid-round edit)
+      // Otherwise, update next round (between-round edit)
+      if (currentRound && !currentRound.completed) {
+        // Mid-round: check if any heats have results
+        const hasAnyResults = currentRound.results && currentRound.results.length > 0;
+        if (hasAnyResults) {
+          // Mid-round edit: update CURRENT round
+          roundNumberToUpdate = currentRoundNumber;
+          console.log('   → Mid-round edit detected, updating current round', currentRoundNumber);
+        } else {
+          // No results yet, create next round
+          roundNumberToUpdate = currentRoundNumber + 1;
+          console.log('   → No results yet, creating next round', roundNumberToUpdate);
+        }
+      } else {
+        // Between rounds: update next round
+        roundNumberToUpdate = currentRoundNumber + 1;
+        console.log('   → Between rounds, updating next round', roundNumberToUpdate);
+      }
+    }
+
+    // Find or create the target round
+    let targetRoundIndex = heatManagement.rounds.findIndex(r => r.round === roundNumberToUpdate);
     const updatedRounds = [...heatManagement.rounds];
 
-    if (nextRoundIndex === -1) {
-      // Next round doesn't exist yet - create it
+    if (targetRoundIndex === -1) {
+      // Round doesn't exist yet - create it
+      console.log('   → Creating new round', roundNumberToUpdate);
       const newRound = {
-        round: nextRoundNumber,
+        round: roundNumberToUpdate,
         heatAssignments: updatedAssignments,
         results: [],
         completed: false
       };
       updatedRounds.push(newRound);
-      nextRoundIndex = updatedRounds.length - 1;
+      targetRoundIndex = updatedRounds.length - 1;
     } else {
       // Update existing round
-      updatedRounds[nextRoundIndex] = {
-        ...updatedRounds[nextRoundIndex],
+      console.log('   → Updating existing round', roundNumberToUpdate);
+      updatedRounds[targetRoundIndex] = {
+        ...updatedRounds[targetRoundIndex],
         heatAssignments: updatedAssignments
       };
     }
@@ -2580,8 +2768,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       rounds: updatedRounds
     };
 
+    console.log('✅ Heat assignments updated for round', roundNumberToUpdate);
     setHeatManagement(updatedHeatManagement);
-    // Removed notification - heat operations should be silent
+
+    const event = getCurrentEvent();
+    if (event?.id) {
+      try {
+        await supabase
+          .from('quick_races')
+          .update({ heat_management: updatedHeatManagement })
+          .eq('id', event.isSeriesEvent ? event.seriesId : event.id);
+      } catch (err) {
+        console.error('Error saving heat assignments:', err);
+      }
+    }
   };
 
   const showHandicapOptions = !hasDeterminedInitialHcaps && !isManualHandicaps && 
@@ -2594,7 +2794,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     !skippers.some(s => s.startHcap > 0);
 
   // Get the current event to check if it's multi-day
-  const currentEvent = getCurrentEvent();
+  // Use selectedEvent state to ensure component re-renders when event is updated
+  const currentEvent = selectedEvent || getCurrentEvent();
   const isMultiDayEvent = currentEvent?.multiDay || false;
   const totalDays = currentEvent?.numberOfDays || 1;
 
@@ -2647,15 +2848,14 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
-      <div className="w-full px-20 py-12">
-        <div className="flex-1 flex flex-col justify-center min-h-[calc(100vh-24rem)]">
-          {getCurrentEvent() && (
+      <div className={`w-full ${isFullscreenScoring ? 'px-4 py-2' : 'px-20 py-12'}`}>
+        <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
+          {getCurrentEvent() && !isFullscreenScoring && (
             <div className="mb-4">
-              <RaceHeader 
-                event={getCurrentEvent()!} 
-                darkMode={darkMode} 
+              <RaceHeader
+                event={getCurrentEvent()!}
+                darkMode={darkMode}
               />
-              
             </div>
           )}
 
@@ -2716,9 +2916,8 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
               </div>
             )}
 
-            {/* Top Right Controls - Only for Touch Mode (Pro mode has its own in RaceTable) */}
-            {scoringMode === 'touch' && (
-              <div className="fixed top-4 right-[5.9375rem] z-30 flex items-center gap-2">
+            {(scoringMode === 'touch' || heatManagement?.configuration.enabled) && (
+              <div className={`fixed ${isFullscreenScoring ? 'top-2 right-4' : 'top-4 right-[5.9375rem]'} z-30 flex items-center gap-2`}>
                 <button
                   type="button"
                   onClick={() => setShowExitConfirm(true)}
@@ -2744,6 +2943,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 >
                   <Settings size={16} />
                   <span className="text-xs font-medium">Settings</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreenScoring(prev => !prev)}
+                  className={`
+                    flex items-center justify-center p-2 rounded-lg transition-colors
+                    ${darkMode
+                      ? 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
+                      : 'text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 border border-slate-200'}
+                  `}
+                  title={isFullscreenScoring ? 'Exit Fullscreen' : 'Fullscreen Scoring'}
+                >
+                  {isFullscreenScoring ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
                 {lastCompletedRace >= 1 && (
                   <button
@@ -2799,6 +3011,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onClearHeatRaceResults={handleClearHeatRaceResults}
                 onUpdateHeatAssignments={handleUpdateHeatAssignments}
                 onSelectHeat={handleSelectHeat}
+                isFullscreen={isFullscreenScoring}
               />
             ) : scoringMode === 'touch' ? (
               <TouchModeScoring
@@ -2892,6 +3105,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 }}
                 darkMode={darkMode}
                 currentEvent={currentEvent}
+                isFullscreen={isFullscreenScoring}
               />
             ) : raceType === 'handicap' ? (
               <RaceTable
@@ -2966,22 +3180,43 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           darkMode={darkMode}
         />
         
+        <ConfirmationModal
+          isOpen={showHeatRacingRecommendation}
+          onClose={() => setShowHeatRacingRecommendation(false)}
+          onConfirm={() => {
+            setShowHeatRacingRecommendation(false);
+            setAutoEnableHeatRacing(true);
+            setShowRaceSettingsModal(true);
+          }}
+          title="Heat Racing Recommended"
+          message={`With ${skippers.length} skippers competing, AlfiePRO recommends enabling Heat Racing. Skippers will be divided into heats using either the HMS or SHR scoring systems. Would you like to enable Heat Racing?`}
+          confirmText="Yes, Enable Heat Racing"
+          cancelText="No Thanks"
+          darkMode={darkMode}
+        />
+
         <RaceSettingsModal
           isOpen={showRaceSettingsModal}
-          onClose={() => setShowRaceSettingsModal(false)}
+          onClose={() => {
+            setShowRaceSettingsModal(false);
+            setAutoEnableHeatRacing(false);
+          }}
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           skippers={skippers}
           initialHeatManagement={heatManagement}
           initialNumRaces={currentNumRaces}
           initialDropRules={currentDropRules}
-          currentEvent={selectedEvent}
+          currentEvent={getCurrentEvent()}
+          autoEnableHeatRacing={autoEnableHeatRacing}
           onSaveSettings={async (settings) => {
             await handleSaveRaceSettings(settings);
             setShowRaceSettingsModal(false);
+            setAutoEnableHeatRacing(false);
           }}
           onManageSkippers={() => {
             setShowRaceSettingsModal(false);
+            setAutoEnableHeatRacing(false);
             setIsSkipperModalOpen(true);
           }}
           addNotification={addNotification}

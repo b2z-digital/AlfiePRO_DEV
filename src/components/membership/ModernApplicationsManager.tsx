@@ -17,6 +17,7 @@ import {
   X,
   Check,
   MessageSquare,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -139,54 +140,84 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
     setProcessing(application.id);
 
     try {
-      // Determine financial status based on payment method
-      // Bank transfer = financial but payment pending confirmation
-      // Other methods would be handled by payment processor
-      const isFinancial = application.payment_method === 'bank_transfer';
-      const paymentStatus = application.payment_method === 'bank_transfer' ? 'pending' : 'paid';
+      // Determine payment status based on payment method
+      const paymentStatus = application.payment_method === 'bank_transfer' ? 'unpaid' : 'paid';
 
-      const memberData = {
-        club_id: application.club_id,
-        user_id: application.user_id,
-        first_name: application.first_name,
-        last_name: application.last_name,
-        email: application.email,
-        phone: application.phone,
-        street: application.street,
-        city: application.city,
-        state: application.state,
-        postcode: application.postcode,
-        membership_level: application.membership_type_name,
-        emergency_contact_name: application.emergency_contact_name,
-        emergency_contact_phone: application.emergency_contact_phone,
-        emergency_contact_relationship: application.emergency_contact_relationship,
-        is_financial: isFinancial,
-        payment_status: paymentStatus,
-        payment_method: application.payment_method,
-        date_joined: new Date().toISOString().split('T')[0], // date field expects YYYY-MM-DD format
-        renewal_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0], // 1 year from now
-      };
+      // Update profile with member details (full_name is auto-generated)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: application.first_name,
+          last_name: application.last_name,
+          avatar_url: application.avatar_url,
+          primary_club_id: application.club_id,
+        })
+        .eq('id', application.user_id);
 
-      const { data: newMember, error: memberError } = await supabase
-        .from('members')
-        .insert(memberData)
+      if (profileError) throw profileError;
+
+      // Get membership type to calculate expiry
+      const { data: membershipType } = await supabase
+        .from('membership_types')
+        .select('amount')
+        .eq('id', application.membership_type_id)
+        .single();
+
+      // Determine if this member should pay association fees
+      // Check application_data for the recommendation
+      let shouldPayAssociationFees = true; // Default to true
+
+      if (application.application_data && typeof application.application_data === 'object') {
+        const appData = application.application_data as any;
+        if (typeof appData.should_pay_association_fees === 'boolean') {
+          shouldPayAssociationFees = appData.should_pay_association_fees;
+        }
+      }
+
+      // If not in application data, call the smart function to determine
+      if (application.application_data && (application.application_data as any).should_pay_association_fees === undefined) {
+        const { data: feeData, error: feeError } = await supabase
+          .rpc('should_pay_association_fees', {
+            p_member_id: application.user_id,
+            p_club_id: application.club_id,
+            p_relationship_type: 'primary'
+          });
+
+        if (!feeError && typeof feeData === 'boolean') {
+          shouldPayAssociationFees = feeData;
+        }
+      }
+
+      // Create or update club membership record (upsert to handle duplicates)
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+      const { data: newMembership, error: membershipError } = await supabase
+        .from('club_memberships')
+        .upsert({
+          member_id: application.user_id,
+          club_id: application.club_id,
+          membership_type_id: application.membership_type_id,
+          relationship_type: 'primary',
+          status: 'active',
+          joined_date: new Date().toISOString(),
+          expiry_date: expiryDate.toISOString(),
+          payment_status: paymentStatus,
+          annual_fee_amount: parseFloat(application.membership_amount || membershipType?.amount || '0'),
+          pays_association_fees: shouldPayAssociationFees,
+        }, {
+          onConflict: 'member_id,club_id',
+          ignoreDuplicates: false
+        })
         .select()
         .single();
 
-      if (memberError) throw memberError;
-
-      // Update profile avatar if provided
-      if (application.avatar_url && application.user_id) {
-        await supabase
-          .from('profiles')
-          .update({ avatar_url: application.avatar_url })
-          .eq('id', application.user_id);
-      }
+      if (membershipError) throw membershipError;
 
       // Create boat records if boats were provided
       if (application.boats && application.boats.length > 0) {
         const boatRecords = application.boats.map(boat => ({
-          member_id: newMember.id,
+          member_id: application.user_id, // Use user_id as member_id in member_boats
           boat_type: boat.type,
           sail_number: boat.sailNumber,
           hull: boat.hullName || null,
@@ -202,6 +233,7 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
         }
       }
 
+      // Ensure user_clubs link exists (may already exist from registration)
       const { error: linkError } = await supabase
         .from('user_clubs')
         .insert({
@@ -211,14 +243,15 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
         });
 
       if (linkError && linkError.code !== '23505') {
-        throw linkError;
+        // Ignore duplicate errors
+        console.log('User club link:', linkError);
       }
 
+      // Update application status (don't set member_id - it references old members table)
       const { error: updateError } = await supabase
         .from('membership_applications')
         .update({
           status: 'approved',
-          member_id: newMember.id,
           reviewed_at: new Date().toISOString(),
         })
         .eq('id', application.id);
@@ -229,7 +262,7 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
       const transactionResult = await createMembershipTransaction(
         {
           clubId: application.club_id,
-          memberId: newMember.id,
+          memberId: application.user_id, // Use user_id as member ID
           membershipTypeId: application.membership_type_id,
           memberName: `${application.first_name} ${application.last_name}`,
           membershipTypeName: application.membership_type_name,
@@ -281,6 +314,35 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
     } catch (error) {
       console.error('Error rejecting application:', error);
       addNotification('error', 'Failed to reject application');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleDelete = async (application: Application) => {
+    if (!confirm('Are you sure you want to permanently delete this application? This will remove the application and the associated user account from the system, allowing the email to be reused for testing.')) {
+      return;
+    }
+
+    setProcessing(application.id);
+
+    try {
+      // Call the delete function which handles cleanup
+      const { data, error } = await supabase.rpc('delete_membership_application', {
+        application_id: application.id
+      });
+
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
+
+      addNotification('success', 'Application and user account deleted successfully');
+      fetchApplications();
+      setSelectedApplication(null);
+    } catch (error: any) {
+      console.error('Error deleting application:', error);
+      addNotification('error', `Failed to delete application: ${error.message || 'Unknown error'}`);
     } finally {
       setProcessing(null);
     }
@@ -511,6 +573,16 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
                             >
                               <X size={16} />
                               Reject
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(application)}
+                              disabled={processing === application.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors disabled:opacity-50"
+                              title="Permanently delete application and user account (for testing)"
+                            >
+                              <Trash2 size={16} />
+                              Delete
                             </button>
                           </>
                         )}

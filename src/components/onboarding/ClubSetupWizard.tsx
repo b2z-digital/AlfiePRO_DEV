@@ -7,9 +7,10 @@ import { ClubInformationStep } from './steps/ClubInformationStep';
 import { ClubContactStep } from './steps/ClubContactStep';
 import { ClubVenueStep } from './steps/ClubVenueStep';
 import { ClubFinancialStep } from './steps/ClubFinancialStep';
+import { ClubYachtClassesStep } from './steps/ClubYachtClassesStep';
 import { ClubSubscriptionStep } from './steps/ClubSubscriptionStep';
 import { ClubReviewStep } from './steps/ClubReviewStep';
-import { Check, LogOut, Building2, Mail, MapPin, DollarSign, CreditCard, FileCheck } from 'lucide-react';
+import { Check, LogOut, Building2, Mail, MapPin, Sailboat, DollarSign, CreditCard, FileCheck } from 'lucide-react';
 
 interface ClubSetupWizardProps {
   onComplete: () => void;
@@ -51,6 +52,7 @@ export interface ClubSetupData {
     taxId?: string;
     currency?: string;
   };
+  selectedBoatClassIds: string[];
   subscriptionPlan?: string;
 }
 
@@ -59,9 +61,10 @@ const STEPS = [
   { id: 1, key: 'club-info', name: 'Club Info', icon: Building2 },
   { id: 2, key: 'contact', name: 'Contact', icon: Mail },
   { id: 3, key: 'venue', name: 'Venue', icon: MapPin },
-  { id: 4, key: 'financial', name: 'Financial', icon: DollarSign },
-  { id: 5, key: 'subscription', name: 'Plan', icon: CreditCard },
-  { id: 6, key: 'review', name: 'Review', icon: FileCheck },
+  { id: 4, key: 'yacht-classes', name: 'Classes', icon: Sailboat },
+  { id: 5, key: 'financial', name: 'Financial', icon: DollarSign },
+  { id: 6, key: 'subscription', name: 'Plan', icon: CreditCard },
+  { id: 7, key: 'review', name: 'Review', icon: FileCheck },
 ] as const;
 
 type StepType = typeof STEPS[number]['key'];
@@ -86,6 +89,7 @@ export const ClubSetupWizard: React.FC<ClubSetupWizardProps> = ({
       name: '',
     },
     financialInfo: {},
+    selectedBoatClassIds: [],
   });
 
   useEffect(() => {
@@ -136,6 +140,7 @@ export const ClubSetupWizard: React.FC<ClubSetupWizardProps> = ({
           contactInfo: existing.contact_info || data.contactInfo,
           primaryVenue: existing.primary_venue || data.primaryVenue,
           financialInfo: existing.financial_info || data.financialInfo,
+          selectedBoatClassIds: existing.selected_boat_class_ids || [],
           subscriptionPlan: existing.subscription_plan,
         });
 
@@ -185,6 +190,7 @@ export const ClubSetupWizard: React.FC<ClubSetupWizardProps> = ({
           contact_info: data.contactInfo,
           primary_venue: data.primaryVenue,
           financial_info: data.financialInfo,
+          selected_boat_class_ids: data.selectedBoatClassIds,
           subscription_plan: data.subscriptionPlan,
         })
         .eq('id', applicationId);
@@ -352,6 +358,16 @@ export const ClubSetupWizard: React.FC<ClubSetupWizardProps> = ({
               <ClubVenueStep
                 data={data.primaryVenue}
                 onUpdate={(newData) => updateData('primaryVenue', newData)}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            </div>
+          )}
+          {currentStep === 'yacht-classes' && (
+            <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl p-6 sm:p-8 lg:p-12">
+              <ClubYachtClassesStep
+                selectedIds={data.selectedBoatClassIds}
+                onUpdate={(ids) => setData({ ...data, selectedBoatClassIds: ids })}
                 onNext={handleNext}
                 onBack={handleBack}
               />

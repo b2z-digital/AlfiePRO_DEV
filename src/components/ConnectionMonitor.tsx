@@ -126,18 +126,15 @@ export const ConnectionMonitor: React.FC = () => {
       }
     };
 
-    // Track user activity
     const activityHandler = () => {
       lastActivityRef.current = Date.now();
       setShowStaleWarning(false);
-      setConnectionTested(false); // Allow re-testing after activity
     };
 
-    window.addEventListener('click', activityHandler);
-    window.addEventListener('keydown', activityHandler);
+    window.addEventListener('click', activityHandler, { passive: true });
+    window.addEventListener('keydown', activityHandler, { passive: true });
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Run initial connection test after component mounts
     setTimeout(testConnection, 1000);
 
     return () => {
@@ -152,7 +149,7 @@ export const ConnectionMonitor: React.FC = () => {
         clearTimeout(reconnectTimeout);
       }
     };
-  }, [isOnline, wasOffline, connectionTested]);
+  }, [isOnline, wasOffline]);
 
   const handleRefresh = () => {
     window.location.reload();

@@ -151,13 +151,16 @@ const ArticleEditorPage: React.FC = () => {
       setUploadingImage(true);
       setError(null);
 
-      const fileExt = file.name.split('.').pop();
-      const organizationId = currentOrganization?.id || currentClub?.clubId;
-      const fileName = `${organizationId}/${uuidv4()}-${Date.now()}.${fileExt}`;
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(file, 'cover');
+
+      const fileExt = compressed.name.split('.').pop();
+      const orgId = currentOrganization?.id || currentClub?.clubId;
+      const fileName = `${orgId}/${uuidv4()}-${Date.now()}.${fileExt}`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('article-images')
-        .upload(fileName, file, {
+        .upload(fileName, compressed, {
           cacheControl: '3600',
           upsert: false
         });

@@ -144,79 +144,67 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
 
       setUpcomingReminders(remindersData || []);
 
-      // Fetch performance stats for each boat from actual race results
+      // Fetch performance stats for each boat using skipper+boatId matching
       const stats: Record<string, PerformanceStats> = {};
 
-      // Query both quick_races and race_series for complete race data
-      // Get all unique club IDs from the boats' member data
-      const clubIds = [...new Set(boatsData?.map((b: any) => b.members?.club_id).filter(Boolean))];
-
-      // Fetch races from all clubs where the user has boats
-      const { data: quickRaces } = clubIds.length > 0 ? await supabase
+      const { data: quickRaces } = await supabase
         .from('quick_races')
-        .select('race_results, created_at')
-        .in('club_id', clubIds)
-        .order('created_at', { ascending: false }) : { data: null };
+        .select('race_date, race_results, skippers')
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
+        .order('race_date', { ascending: false });
 
-      const { data: seriesRaces } = clubIds.length > 0 ? await supabase
-        .from('race_series')
-        .select('race_results, created_at')
-        .in('club_id', clubIds)
-        .order('created_at', { ascending: false }) : { data: null };
+      const { data: seriesRounds } = await supabase
+        .from('race_series_rounds')
+        .select('date, race_results, skippers')
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
+        .order('date', { ascending: false });
 
-      const allRaces = [...(quickRaces || []), ...(seriesRaces || [])];
+      const findSkipperIndices = (skippers: any[], boatId: string): number[] => {
+        if (!skippers || !Array.isArray(skippers)) return [];
+        const indices: number[] = [];
+        skippers.forEach((skipper: any, idx: number) => {
+          if (skipper.boatId === boatId) {
+            indices.push(idx);
+          }
+        });
+        return indices;
+      };
 
-      for (const boat of boatsWithImages as Boat[]) {
-        const boatResults = [];
-
-        // Search through all race results
-        for (const race of allRaces) {
-          if (race.race_results && Array.isArray(race.race_results)) {
-            // race_results is an array of race rounds
-            for (const raceRound of race.race_results) {
-              if (raceRound && Array.isArray(raceRound)) {
-                // Each round contains skipper results
-                const result = raceRound.find((r: any) => {
-                  // Match by boat_type (class) AND sail number
-                  const sailNoMatch = (r.sailNo || r.sailNumber) === boat.sail_number;
-                  const classMatch = (r.type || r.boat || r.boat_type) === boat.boat_type;
-
-                  // Also check hull name as fallback
-                  const hullMatch = boat.hull && (r.hull === boat.hull || r.boat === boat.hull);
-
-                  return (sailNoMatch && classMatch) || hullMatch;
-                });
-
-                if (result && result.position) {
-                  const pos = typeof result.position === 'string' ? parseInt(result.position) : result.position;
-                  if (!isNaN(pos) && pos > 0) {
-                    boatResults.push({
-                      position: pos,
-                      date: race.created_at
-                    });
-                  }
-                }
-              }
-            }
+      const extractPositions = (raceResults: any[], skipperIndices: number[]): number[] => {
+        if (!raceResults || !Array.isArray(raceResults) || skipperIndices.length === 0) return [];
+        const positions: number[] = [];
+        for (const result of raceResults) {
+          if (skipperIndices.includes(result.skipperIndex)) {
+            const pos = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+            if (pos && !isNaN(pos) && pos > 0) positions.push(pos);
           }
         }
+        return positions;
+      };
 
-        if (boatResults.length > 0) {
-          const positions = boatResults.map(r => r.position).filter(p => p && !isNaN(p));
-          stats[boat.id] = {
-            total_races: positions.length,
-            best_position: positions.length > 0 ? Math.min(...positions) : null,
-            avg_position: positions.length > 0 ? Math.round(positions.reduce((a, b) => a + b, 0) / positions.length) : null,
-            recent_trend: calculateTrend(positions)
-          };
-        } else {
-          stats[boat.id] = {
-            total_races: 0,
-            best_position: null,
-            avg_position: null,
-            recent_trend: null
-          };
+      for (const boat of boatsWithImages as Boat[]) {
+        const allPositions: number[] = [];
+
+        for (const race of (quickRaces || [])) {
+          const indices = findSkipperIndices(race.skippers, boat.id);
+          if (indices.length === 0) continue;
+          allPositions.push(...extractPositions(race.race_results, indices));
         }
+
+        for (const round of (seriesRounds || [])) {
+          const indices = findSkipperIndices(round.skippers, boat.id);
+          if (indices.length === 0) continue;
+          allPositions.push(...extractPositions(round.race_results, indices));
+        }
+
+        stats[boat.id] = {
+          total_races: allPositions.length,
+          best_position: allPositions.length > 0 ? Math.min(...allPositions) : null,
+          avg_position: allPositions.length > 0 ? Math.round(allPositions.reduce((a, b) => a + b, 0) / allPositions.length) : null,
+          recent_trend: calculateTrend(allPositions)
+        };
       }
       setPerformanceStats(stats);
 
@@ -249,7 +237,9 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
 
   const handleImageUploadWithPosition = async (boatId: string, file: File, position: { x: number; y: number; scale: number }) => {
     try {
-      // Get the club_id from the boat's member record
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(file, 'photo');
+
       const { data: boatData } = await supabase
         .from('member_boats')
         .select('member_id, members!inner(club_id)')
@@ -258,13 +248,13 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
 
       const clubId = boatData?.members?.club_id || currentClub?.clubId || 'default';
 
-      const fileExt = file.name.split('.').pop();
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `${boatId}-${Date.now()}.${fileExt}`;
       const filePath = `${clubId}/boats/${fileName}`;
 
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('media')
-        .upload(filePath, file, {
+        .upload(filePath, compressed, {
           cacheControl: '3600',
           upsert: true
         });

@@ -651,11 +651,12 @@ export function calculateOptimalHeats(totalSkippers: number): {
   heatSizes: number[];
   promotionCount: number;
 } {
-  const BOATS_PER_HEAT = 8;
-  const MIN_PROMOTION = 4; // Default to HMS standard
+  const MIN_FLEET_SIZE = 12;
+  const MAX_FLEET_SIZE = 20;
+  const MAX_HEATS = 5;
+  const MIN_PROMOTION = 4;
 
-  // Minimum skippers needed for heat racing
-  if (totalSkippers < 12) {
+  if (totalSkippers < 16) {
     return {
       numberOfHeats: 0,
       heatSizes: [],
@@ -663,31 +664,30 @@ export function calculateOptimalHeats(totalSkippers: number): {
     };
   }
 
-  // Calculate base number of heats (assuming 8 per heat)
-  let numberOfHeats = Math.floor(totalSkippers / BOATS_PER_HEAT);
-
-  // Ensure minimum of 2 heats for heat racing
-  if (numberOfHeats < 2) {
-    numberOfHeats = 2;
+  let numberOfHeats = 2;
+  for (let h = 2; h <= MAX_HEATS; h++) {
+    const avgSize = Math.ceil(totalSkippers / h);
+    if (avgSize <= MAX_FLEET_SIZE && avgSize >= MIN_FLEET_SIZE) {
+      numberOfHeats = h;
+      break;
+    }
+    if (avgSize > MAX_FLEET_SIZE) {
+      numberOfHeats = h + 1;
+    }
   }
 
-  // Cap at 6 heats maximum
-  const cappedHeats = Math.min(numberOfHeats, 6);
+  numberOfHeats = Math.max(2, Math.min(numberOfHeats, MAX_HEATS));
 
-  // Calculate heat sizes by distributing skippers evenly
-  const baseSize = Math.floor(totalSkippers / cappedHeats);
-  const remainder = totalSkippers % cappedHeats;
+  const baseSize = Math.floor(totalSkippers / numberOfHeats);
+  const remainder = totalSkippers % numberOfHeats;
+  const heatSizes = new Array(numberOfHeats).fill(baseSize);
 
-  // Create heat sizes array with base size
-  const heatSizes = new Array(cappedHeats).fill(baseSize);
-
-  // Add remainder boats to the FIRST heat (Heat A - top heat)
   if (remainder > 0) {
     heatSizes[0] += remainder;
   }
 
   return {
-    numberOfHeats: cappedHeats,
+    numberOfHeats,
     heatSizes,
     promotionCount: MIN_PROMOTION
   };

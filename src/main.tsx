@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import MobileStreamPage from './pages/MobileStreamPage';
 import { registerServiceWorker } from './utils/registerServiceWorker';
@@ -22,9 +23,10 @@ if (lastReload) {
   console.log('[Main] Time since last reload:', Math.round(timeSinceReload / 1000), 'seconds');
 }
 
-if ('serviceWorker' in navigator) {
-  registerServiceWorker();
-}
+// Register service worker only in supported environments
+registerServiceWorker().catch(() => {
+  // Silently handle any registration errors
+});
 
 function Root() {
   const isMobileStreamRoute = window.location.pathname.startsWith('/mobile-stream/');
@@ -40,13 +42,15 @@ function Root() {
   }
 
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </NotificationProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

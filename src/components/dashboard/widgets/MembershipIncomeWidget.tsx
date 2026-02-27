@@ -4,6 +4,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { ThemedWidgetWrapper } from './ThemedWidgetWrapper';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface MembershipIncomeWidgetProps {
   widgetId: string;
@@ -21,34 +22,78 @@ export const MembershipIncomeWidget: React.FC<MembershipIncomeWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const { type, stateAssociationId, nationalAssociationId } = useOrganizationContext();
   const [loading, setLoading] = useState(true);
   const [membershipIncome, setMembershipIncome] = useState(0);
   const [pendingPayments, setPendingPayments] = useState(0);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadMembershipIncome();
-    }
-  }, [currentClub]);
+    loadMembershipIncome();
+  }, [currentClub, type, stateAssociationId, nationalAssociationId]);
 
   const loadMembershipIncome = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
-      const { data: paidMembers } = await supabase
-        .from('members')
-        .select('membership_fee')
-        .eq('club_id', currentClub.clubId)
-        .eq('payment_status', 'paid');
+      let totalIncome = 0;
+      let totalPending = 0;
 
-      const { data: unpaidMembers } = await supabase
-        .from('members')
-        .select('membership_fee')
-        .eq('club_id', currentClub.clubId)
-        .in('payment_status', ['unpaid', 'pending']);
+      if (type === 'state' && stateAssociationId) {
+        const { data: incomeData } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'income')
+          .eq('payment_status', 'completed')
+          .ilike('description', '%membership%');
 
-      const totalIncome = paidMembers?.reduce((sum, m) => sum + (m.membership_fee || 0), 0) || 0;
-      const totalPending = unpaidMembers?.reduce((sum, m) => sum + (m.membership_fee || 0), 0) || 0;
+        const { data: pendingData } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'income')
+          .in('payment_status', ['pending', 'unpaid'])
+          .ilike('description', '%membership%');
+
+        totalIncome = incomeData?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        totalPending = pendingData?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      } else if (type === 'national' && nationalAssociationId) {
+        const { data: incomeData } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'income')
+          .eq('payment_status', 'completed')
+          .ilike('description', '%membership%');
+
+        const { data: pendingData } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'income')
+          .in('payment_status', ['pending', 'unpaid'])
+          .ilike('description', '%membership%');
+
+        totalIncome = incomeData?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        totalPending = pendingData?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      } else if (currentClub?.clubId) {
+        const { data: paidMembers } = await supabase
+          .from('members')
+          .select('membership_fee')
+          .eq('club_id', currentClub.clubId)
+          .eq('payment_status', 'paid');
+
+        const { data: unpaidMembers } = await supabase
+          .from('members')
+          .select('membership_fee')
+          .eq('club_id', currentClub.clubId)
+          .in('payment_status', ['unpaid', 'pending']);
+
+        totalIncome = paidMembers?.reduce((sum, m) => sum + (m.membership_fee || 0), 0) || 0;
+        totalPending = unpaidMembers?.reduce((sum, m) => sum + (m.membership_fee || 0), 0) || 0;
+      }
 
       setMembershipIncome(totalIncome);
       setPendingPayments(totalPending);

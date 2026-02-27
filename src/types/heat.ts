@@ -1,6 +1,8 @@
 import { Skipper } from './index';
 import { LetterScore } from './letterScores';
 import { generateHeatAssignmentsForNextRace, HMSConfig } from '../utils/hmsHeatSystem';
+import { getNextHeat, getNonFinisherPriority, compareSailNumbers } from '../utils/shrsHeatSystem';
+import { LetterScore } from './letterScores';
 
 export type HeatDesignation = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -27,6 +29,9 @@ export interface HeatConfiguration {
   maxHeatSize?: number; // Safety limit
   allowPromotionCountChange?: boolean; // Allow RO to change promotion count mid-event
   scoringSystem?: 'hms' | 'shrs'; // Heat racing scoring system type
+  shrsAssignmentMode?: 'progressive' | 'preset'; // SHR: qualifying assignment method (Progressive or Balanced)
+  shrsQualifyingRounds?: number; // SHR: number of qualifying rounds before finals
+  shrsFinalsStarted?: boolean; // SHR: whether finals have been initiated
 }
 
 export interface HeatAssignment {
@@ -245,6 +250,49 @@ export const calculateOverallPositions = (
   return overallPositions;
 };
 
+export type SHRSPhase = 'qualifying' | 'finals';
+
+export const getSHRSPhase = (round: number, config: HeatConfiguration): SHRSPhase => {
+  if (config.scoringSystem !== 'shrs') return 'qualifying';
+  const qualifyingRounds = config.shrsQualifyingRounds || 0;
+  if (qualifyingRounds <= 0) return 'qualifying';
+  return round <= qualifyingRounds ? 'qualifying' : 'finals';
+};
+
+export const isSHRSFinalsRound = (round: number, config: HeatConfiguration): boolean => {
+  return getSHRSPhase(round, config) === 'finals';
+};
+
+export const isSHRSTransitionRound = (round: number, config: HeatConfiguration): boolean => {
+  if (config.scoringSystem !== 'shrs') return false;
+  const qualifyingRounds = config.shrsQualifyingRounds || 0;
+  return qualifyingRounds > 0 && round === qualifyingRounds;
+};
+
+export const getSHRSHeatLabel = (heat: HeatDesignation, round: number, config: HeatConfiguration): string => {
+  const phase = getSHRSPhase(round, config);
+  if (phase === 'finals') {
+    const fleetNames: Record<string, string> = {
+      'A': 'Gold Fleet',
+      'B': 'Silver Fleet',
+      'C': 'Bronze Fleet',
+      'D': 'Copper Fleet',
+      'E': 'Fleet E',
+      'F': 'Fleet F'
+    };
+    return fleetNames[heat] || `Fleet ${heat}`;
+  }
+  return `Heat ${heat}`;
+};
+
+export const getSHRSRoundLabel = (round: number, config: HeatConfiguration): string => {
+  if (config.scoringSystem !== 'shrs') return `R${round}`;
+  const qualifyingRounds = config.shrsQualifyingRounds || 0;
+  if (qualifyingRounds <= 0) return `R${round}`;
+  if (round <= qualifyingRounds) return `Q${round}`;
+  return `F${round - qualifyingRounds}`;
+};
+
 // Function to generate heat assignments for the next round based on results
 // HMS: This handles the STARTING lineup for the next round (after relegations from current round)
 export const generateNextRoundAssignments = (
@@ -263,6 +311,72 @@ export const generateNextRoundAssignments = (
   console.log('\n========================================');
   console.log('=== GENERATING NEXT ROUND ASSIGNMENTS ===');
   console.log(`Current Round: ${currentRound.round}`);
+
+  if (configuration.scoringSystem === 'shrs' && isSHRSTransitionRound(currentRound.round, configuration)) {
+    console.log('SHR: Transitioning from Qualifying to Finals');
+    console.log('SHR: Ranking all skippers by cumulative qualifying scores, splitting into fleets');
+
+    const allSkipperScores = new Map<number, number>();
+    const allSkipperRaceScores = new Map<number, number[]>();
+
+    for (const r of heatManagement.rounds) {
+      if (r.round > currentRound.round) continue;
+      for (const result of r.results) {
+        if (!allSkipperScores.has(result.skipperIndex)) {
+          allSkipperScores.set(result.skipperIndex, 0);
+          allSkipperRaceScores.set(result.skipperIndex, []);
+        }
+        const score = result.letterScore
+          ? (Math.max(...heats.map((_, i) => {
+              const ha = r.heatAssignments.find(a => a.heatDesignation === heats[i]);
+              return ha ? ha.skipperIndices.length : 0;
+            })) + 1)
+          : (result.position || 999);
+        allSkipperRaceScores.get(result.skipperIndex)!.push(score);
+      }
+    }
+
+    const qualRacesCompleted = currentRound.round;
+    const numDiscards = qualRacesCompleted < 4 ? 0 : qualRacesCompleted < 8 ? 1 : 2 + Math.floor((qualRacesCompleted - 8) / 8);
+    const fleetRankingDiscards = (qualRacesCompleted > 5 && qualRacesCompleted < 8) ? numDiscards + 1 : numDiscards;
+
+    allSkipperRaceScores.forEach((scores, idx) => {
+      const sorted = [...scores].sort((a, b) => b - a);
+      const kept = sorted.slice(fleetRankingDiscards);
+      allSkipperScores.set(idx, kept.reduce((sum, s) => sum + s, 0));
+    });
+
+    const rankedSkippers = Array.from(allSkipperScores.entries())
+      .sort(([, scoreA], [, scoreB]) => scoreA - scoreB);
+
+    const fleetSizes: number[] = [];
+    const totalSkippers = rankedSkippers.length;
+    const baseSize = Math.floor(totalSkippers / numberOfHeats);
+    const remainder = totalSkippers % numberOfHeats;
+    for (let i = 0; i < numberOfHeats; i++) {
+      fleetSizes.push(baseSize + (i < remainder ? 1 : 0));
+    }
+
+    const newAssignments: HeatAssignment[] = heats.map(heat => ({
+      heatDesignation: heat,
+      skipperIndices: []
+    }));
+
+    let skipperIdx = 0;
+    for (let fleetIdx = 0; fleetIdx < numberOfHeats; fleetIdx++) {
+      for (let i = 0; i < fleetSizes[fleetIdx] && skipperIdx < rankedSkippers.length; i++) {
+        newAssignments[fleetIdx].skipperIndices.push(rankedSkippers[skipperIdx][0]);
+        skipperIdx++;
+      }
+    }
+
+    console.log('SHR Finals fleet assignments:');
+    newAssignments.forEach((a, i) => {
+      console.log(`  ${heats[i]} (${getSHRSHeatLabel(heats[i], currentRound.round + 1, configuration)}): ${a.skipperIndices.length} skippers`);
+    });
+
+    return newAssignments;
+  }
 
   // Group results by heat
   const resultsByHeat = currentRound.results.reduce((acc, result) => {
@@ -295,47 +409,94 @@ export const generateNextRoundAssignments = (
   console.log(`Using ${scoringSystem.toUpperCase()} heat system for Round ${currentRound.round} → Round ${currentRound.round + 1}`);
 
   if (scoringSystem === 'shrs') {
-    // SHRS uses heat movement tables instead of promotion/relegation
-    console.log('SHRS: Using heat movement tables');
+    if (isSHRSFinalsRound(currentRound.round, configuration)) {
+      console.log('SHR Finals: Keeping same fleet assignments (no movement tables in finals)');
+      return currentRound.heatAssignments.map(a => ({
+        heatDesignation: a.heatDesignation,
+        skipperIndices: [...a.skipperIndices]
+      }));
+    }
 
-    // Import SHRS function dynamically
-    const { getNextHeat } = require('../utils/shrsHeatSystem');
+    // SHR Rule 3.1.ii: Use Heat Movement Tables to assign boats to next race heats.
+    // Each skipper's next heat is determined by their position within their current heat
+    // and their current heat designation, looked up in the movement table.
+    //
+    // SHR Rule 3.1.iii: Non-finishers get virtual positions AFTER all finishers,
+    // ordered by: DNF, RET, NSC, OCS, DNS, DNC, WTH, UFD, BFD, DSQ.
+    // SHR Rule 3.1.iv: Tied boats ordered by alphanumerical sail number.
 
-    // For SHRS, each skipper's next heat is determined by their position and current heat
-    // using the heat movement tables
     Object.keys(resultsByHeat).forEach(heat => {
       const heatResults = resultsByHeat[heat as HeatDesignation];
 
-      heatResults.forEach(result => {
-        if (result.position && result.position > 0) {
-          // Get the numeric heat index (A=1, B=2, C=3, D=4, E=5, F=6)
-          const currentHeatIndex = heats.indexOf(result.heatDesignation) + 1;
+      const finishers = heatResults
+        .filter(r => r.position !== null && r.position > 0 && !r.letterScore)
+        .sort((a, b) => (a.position || 999) - (b.position || 999));
 
-          // Use SHRS movement table to determine next heat
-          // SHRS uses alpha labels (A, B, C, D)
-          const nextHeatLabel = getNextHeat(
-            result.position,
-            result.heatDesignation, // Pass the heat designation directly
-            numberOfHeats,
-            true // Use Table 2 (alpha labeling: A, B, C, D)
-          );
+      const nonFinishers = heatResults
+        .filter(r => r.letterScore && r.letterScore !== 'RDG' && r.letterScore !== 'DPI')
+        .sort((a, b) => {
+          const priorityA = getNonFinisherPriority(a.letterScore as LetterScore);
+          const priorityB = getNonFinisherPriority(b.letterScore as LetterScore);
+          if (priorityA !== priorityB) return priorityA - priorityB;
+          return a.skipperIndex - b.skipperIndex;
+        });
 
-          // Find the heat assignment for this next heat
-          const nextHeatIndex = heats.indexOf(nextHeatLabel as HeatDesignation);
-          if (nextHeatIndex >= 0) {
+      const rdgDpiResults = heatResults
+        .filter(r => r.letterScore === 'RDG' || r.letterScore === 'DPI')
+        .filter(r => r.position !== null && r.position > 0);
+
+      const allOrdered = [...finishers, ...rdgDpiResults.filter(r => !finishers.some(f => f.skipperIndex === r.skipperIndex)), ...nonFinishers];
+
+      allOrdered.forEach((result, idx) => {
+        const virtualPosition = result.position && result.position > 0 ? result.position : finishers.length + rdgDpiResults.filter(r => !finishers.some(f => f.skipperIndex === r.skipperIndex)).length + nonFinishers.indexOf(result) + 1;
+
+        const nextHeatLabel = getNextHeat(
+          virtualPosition,
+          result.heatDesignation,
+          numberOfHeats,
+          true
+        );
+
+        const nextHeatIndex = heats.indexOf(nextHeatLabel as HeatDesignation);
+        if (nextHeatIndex >= 0) {
+          if (!newAssignments[nextHeatIndex].skipperIndices.includes(result.skipperIndex)) {
             newAssignments[nextHeatIndex].skipperIndices.push(result.skipperIndex);
-          }
-        } else {
-          // No valid position, keep in same heat
-          const heatIndex = heats.indexOf(result.heatDesignation);
-          if (heatIndex >= 0) {
-            newAssignments[heatIndex].skipperIndices.push(result.skipperIndex);
           }
         }
       });
     });
 
-    console.log('✅ Successfully generated SHRS heat assignments for next round');
+    const totalSkippers = newAssignments.reduce((sum, a) => sum + a.skipperIndices.length, 0);
+    const baseSize = Math.floor(totalSkippers / numberOfHeats);
+    const remainder = totalSkippers % numberOfHeats;
+    const targetSizes = Array.from({ length: numberOfHeats }, (_, i) => baseSize + (i < remainder ? 1 : 0));
+
+    let rebalanced = false;
+    for (let pass = 0; pass < numberOfHeats; pass++) {
+      for (let i = 0; i < newAssignments.length; i++) {
+        while (newAssignments[i].skipperIndices.length > targetSizes[i]) {
+          const overflow = newAssignments[i].skipperIndices.pop()!;
+          const smallestIdx = newAssignments
+            .map((a, idx) => ({ idx, size: a.skipperIndices.length, target: targetSizes[idx] }))
+            .filter(x => x.size < x.target)
+            .sort((a, b) => a.size - b.size)[0]?.idx;
+          if (smallestIdx !== undefined) {
+            newAssignments[smallestIdx].skipperIndices.push(overflow);
+            rebalanced = true;
+          } else {
+            newAssignments[i].skipperIndices.push(overflow);
+            break;
+          }
+        }
+      }
+    }
+
+    if (rebalanced) {
+      console.log('SHR: Rebalanced heat sizes to maintain Rule 2.2 (as equal as possible)');
+    }
+
+    console.log('SHR: Generated heat assignments using movement tables for next round');
+    newAssignments.forEach(a => console.log(`  Heat ${a.heatDesignation}: ${a.skipperIndices.length} skippers`));
     return newAssignments;
   } else {
     // Use HMS heat system for all rounds

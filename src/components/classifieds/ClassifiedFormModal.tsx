@@ -119,16 +119,18 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
   const uploadImages = async (files: File[]) => {
     setUploading(true);
     const newImages: string[] = [];
+    const { compressImage } = await import('../../utils/imageCompression');
 
     try {
       for (const file of files) {
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImage(file, 'photo');
+        const fileExt = compressed.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${user?.id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('media')
-          .upload(filePath, file);
+          .upload(filePath, compressed);
 
         if (uploadError) {
           console.error('Upload error:', uploadError);

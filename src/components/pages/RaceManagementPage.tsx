@@ -623,22 +623,25 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
         enrichedRaces = standaloneRaces;
       }
 
-      try {
-        console.log('🚀 [fetchRaces] About to call enrichSeriesWithAttendance');
-        enrichedSeries = await enrichSeriesWithAttendance(raceSeries);
-        console.log('✅ [fetchRaces] enrichSeriesWithAttendance completed successfully');
-      } catch (err) {
-        console.error('❌ [fetchRaces] Error enriching series with attendance, using base data:', err);
-        enrichedSeries = raceSeries;
-      }
+      // Only enrich series if not an association (enrichedSeries will be empty array for associations)
+      if (enrichedSeries.length > 0) {
+        try {
+          console.log('🚀 [fetchRaces] About to call enrichSeriesWithAttendance');
+          enrichedSeries = await enrichSeriesWithAttendance(enrichedSeries);
+          console.log('✅ [fetchRaces] enrichSeriesWithAttendance completed successfully');
+        } catch (err) {
+          console.error('❌ [fetchRaces] Error enriching series with attendance, using base data:', err);
+          // Keep enrichedSeries as is (already filtered)
+        }
 
-      try {
-        console.log('🚀 [fetchRaces] About to call enrichSeriesWithSkippers');
-        enrichedSeries = await enrichSeriesWithSkippers(enrichedSeries);
-        console.log('✅ [fetchRaces] enrichSeriesWithSkippers completed successfully');
-      } catch (err) {
-        console.error('❌ [fetchRaces] Error enriching series with skippers, using base data:', err);
-        enrichedSeries = enrichedSeries;
+        try {
+          console.log('🚀 [fetchRaces] About to call enrichSeriesWithSkippers');
+          enrichedSeries = await enrichSeriesWithSkippers(enrichedSeries);
+          console.log('✅ [fetchRaces] enrichSeriesWithSkippers completed successfully');
+        } catch (err) {
+          console.error('❌ [fetchRaces] Error enriching series with skippers, using base data:', err);
+          // Keep enrichedSeries as is (already filtered)
+        }
       }
 
       setQuickRaces(enrichedRaces);
@@ -656,11 +659,15 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
 
         // Filter out series events from quickRaces
         const standaloneRaces = cachedEvents.filter(event => !event.isSeriesEvent);
+        // For state/national associations, don't show club series
+        const filteredSeries = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
+          ? []
+          : cachedSeries;
 
-        if (standaloneRaces.length > 0 || cachedSeries.length > 0) {
-          console.log(`✓ Loaded ${standaloneRaces.length} cached events and ${cachedSeries.length} cached series`);
+        if (standaloneRaces.length > 0 || filteredSeries.length > 0) {
+          console.log(`✓ Loaded ${standaloneRaces.length} cached events and ${filteredSeries.length} cached series`);
           setQuickRaces(standaloneRaces);
-          setSeries(cachedSeries);
+          setSeries(filteredSeries);
           setVenues([]); // No venues in cache fallback
           setUsingCachedData(true);
 
@@ -1385,7 +1392,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
         {/* Event Content */}
         <div className="p-4">
           {/* Action Buttons */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
             <div className="flex gap-2">
               <button
                 onClick={(e) => {
@@ -1663,7 +1670,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
         {/* Series Content */}
         <div className="p-4" onClick={() => toggleSeriesExpansion(s.id)}>
           {/* Action Buttons */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 touch-show transition-opacity">
             <div className="flex gap-2">
               <button
                 onClick={(e) => {

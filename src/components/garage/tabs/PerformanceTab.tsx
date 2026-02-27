@@ -56,38 +56,43 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({ boatId, sailNumb
     fetchPerformanceData();
   }, [boatId, sailNumber]);
 
+  const findBoatSkipperIndex = (skippers: any[]): number[] => {
+    if (!skippers || !Array.isArray(skippers)) return [];
+    const indices: number[] = [];
+    skippers.forEach((skipper: any, idx: number) => {
+      if (skipper.boatId === boatId) {
+        indices.push(idx);
+      }
+    });
+    return indices;
+  };
+
   const fetchPerformanceData = async () => {
     try {
       const results: RaceResult[] = [];
 
-      // Fetch one-off races from quick_races
       const { data: raceData } = await supabase
         .from('quick_races')
-        .select(`
-          id,
-          race_date,
-          title,
-          results
-        `)
-        .not('results', 'is', null)
+        .select('id, race_date, event_name, race_results, skippers')
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
         .order('race_date', { ascending: false });
 
       if (raceData) {
         for (const race of raceData) {
-          if (race.results) {
-            const result = race.results.find((r: any) =>
-              r.sail_number === sailNumber || r.sailNumber === sailNumber
-            );
+          const skipperIndices = findBoatSkipperIndex(race.skippers);
+          if (skipperIndices.length === 0) continue;
 
-            if (result && result.position) {
-              const position = typeof result.position === 'string' ? parseInt(result.position) : result.position;
-
-              if (!isNaN(position) && position > 0) {
+          const totalCompetitors = (race.skippers || []).length;
+          for (const result of (race.race_results || [])) {
+            if (skipperIndices.includes(result.skipperIndex)) {
+              const pos = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+              if (pos && !isNaN(pos) && pos > 0) {
                 results.push({
-                  position,
+                  position: pos,
                   date: race.race_date,
-                  title: race.title || 'Race',
-                  totalCompetitors: race.results.length
+                  title: `${race.event_name || 'Race'} - Race ${result.race || ''}`,
+                  totalCompetitors
                 });
               }
             }
@@ -95,89 +100,62 @@ export const PerformanceTab: React.FC<PerformanceTabProps> = ({ boatId, sailNumb
         }
       }
 
-      // Fetch series rounds
       const { data: seriesRounds } = await supabase
         .from('race_series_rounds')
         .select(`
-          id,
-          round_date,
-          round_number,
-          results,
-          heat_results,
-          race_series!inner(
-            id,
-            series_name
-          )
+          id, date, round_name, round_index,
+          race_results, skippers,
+          race_series:series_id(id, series_name)
         `)
-        .order('round_date', { ascending: false });
+        .not('race_results', 'is', null)
+        .not('skippers', 'is', null)
+        .order('date', { ascending: false });
 
       if (seriesRounds) {
         for (const round of seriesRounds) {
-          // Check overall round results
-          if (round.results) {
-            const result = round.results.find((r: any) =>
-              r.sail_number === sailNumber || r.sailNumber === sailNumber
-            );
+          const skipperIndices = findBoatSkipperIndex(round.skippers);
+          if (skipperIndices.length === 0) continue;
 
-            if (result && result.position) {
-              const position = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+          const totalCompetitors = (round.skippers || []).length;
+          const seriesName = Array.isArray(round.race_series)
+            ? round.race_series[0]?.series_name
+            : (round.race_series as any)?.series_name;
+          const roundLabel = round.round_name || `Round ${(round.round_index ?? 0) + 1}`;
 
-              if (!isNaN(position) && position > 0) {
+          for (const result of (round.race_results || [])) {
+            if (skipperIndices.includes(result.skipperIndex)) {
+              const pos = typeof result.position === 'string' ? parseInt(result.position) : result.position;
+              if (pos && !isNaN(pos) && pos > 0) {
                 results.push({
-                  position,
-                  date: round.round_date,
-                  title: `${round.race_series?.series_name || 'Series'} - Round ${round.round_number}`,
-                  totalCompetitors: round.results.length
+                  position: pos,
+                  date: round.date,
+                  title: `${seriesName || 'Series'} - ${roundLabel} R${result.race || ''}`,
+                  totalCompetitors
                 });
-              }
-            }
-          }
-
-          // Check heat results
-          if (round.heat_results) {
-            for (const heat of round.heat_results) {
-              if (heat.results) {
-                const result = heat.results.find((r: any) =>
-                  r.sail_number === sailNumber || r.sailNumber === sailNumber
-                );
-
-                if (result && result.position) {
-                  const position = typeof result.position === 'string' ? parseInt(result.position) : result.position;
-
-                  if (!isNaN(position) && position > 0) {
-                    results.push({
-                      position,
-                      date: round.round_date,
-                      title: `${round.race_series?.series_name || 'Series'} - Round ${round.round_number} Heat ${heat.heat_number || ''}`,
-                      totalCompetitors: heat.results.length
-                    });
-                  }
-                }
               }
             }
           }
         }
       }
 
-      // Sort all results by date (most recent first)
       results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
       setRaceResults(results);
 
       if (results.length > 0) {
         const positions = results.map(r => r.position);
         const avgPos = positions.reduce((a, b) => a + b, 0) / positions.length;
-
         const podiumCount = positions.filter(p => p <= 3).length;
         const top5Count = positions.filter(p => p <= 5).length;
 
         let trend: 'improving' | 'declining' | 'neutral' = 'neutral';
         if (results.length >= 5) {
           const recentAvg = results.slice(0, 5).reduce((sum, r) => sum + r.position, 0) / 5;
-          const olderAvg = results.slice(5, 10).reduce((sum, r) => sum + r.position, 0) / Math.min(5, results.length - 5);
-
-          if (recentAvg < olderAvg - 1) trend = 'improving';
-          else if (recentAvg > olderAvg + 1) trend = 'declining';
+          const olderResults = results.slice(5, 10);
+          if (olderResults.length > 0) {
+            const olderAvg = olderResults.reduce((sum, r) => sum + r.position, 0) / olderResults.length;
+            if (recentAvg < olderAvg - 1) trend = 'improving';
+            else if (recentAvg > olderAvg + 1) trend = 'declining';
+          }
         }
 
         setStats({

@@ -18,6 +18,7 @@ export type Permission =
   | 'tasks.create'
   | 'tasks.view'
   | 'finance.manage'
+  | 'finance.view'
   | 'website.manage'
   | 'settings.club'
   | 'settings.team'
@@ -26,6 +27,9 @@ export type Permission =
   | 'settings.finance'
   | 'settings.documents'
   | 'settings.import'
+  | 'settings.membership'
+  | 'dashboard.edit'
+  | 'users.manage'
   | 'state.manage'
   | 'national.manage'
   | 'platform.manage';
@@ -33,31 +37,62 @@ export type Permission =
 export function usePermissions() {
   const { currentClub, currentOrganization, isSuperAdmin } = useAuth();
   const userRole = currentOrganization?.role || currentClub?.role || 'member';
+  const isAssociationContext = !!currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national');
 
   const hasPermission = (permission: Permission): boolean => {
-    // Super admins have all permissions
     if (isSuperAdmin) return true;
 
-    // National admins have all permissions across all clubs
     if (userRole === 'national_admin') return true;
 
-    // State admins have all permissions within their state
     if (userRole === 'state_admin') {
-      // State admins can't manage platform-level settings
       if (permission === 'platform.manage') return false;
       return true;
     }
 
-    // Club admins have all permissions within their club
+    if (isAssociationContext && userRole === 'editor') {
+      const assocEditorPermissions: Permission[] = [
+        'races.manage',
+        'races.score',
+        'races.view',
+        'reports.create',
+        'venues.create',
+        'venues.view',
+        'articles.create',
+        'articles.view',
+        'membership.view',
+        'meetings.create',
+        'meetings.view',
+        'minutes.create',
+        'minutes.view',
+        'tasks.create',
+        'tasks.view',
+        'finance.view',
+        'dashboard.edit',
+      ];
+      return assocEditorPermissions.includes(permission);
+    }
+
+    if (isAssociationContext && userRole === 'member') {
+      const assocViewerPermissions: Permission[] = [
+        'races.view',
+        'venues.view',
+        'articles.view',
+        'membership.view',
+        'meetings.view',
+        'minutes.view',
+        'tasks.view',
+        'finance.view',
+      ];
+      return assocViewerPermissions.includes(permission);
+    }
+
     if (userRole === 'admin') {
-      // Club admins can't manage state/national/platform level
       if (permission === 'state.manage') return false;
       if (permission === 'national.manage') return false;
       if (permission === 'platform.manage') return false;
       return true;
     }
 
-    // Editor permissions
     if (userRole === 'editor') {
       const editorPermissions: Permission[] = [
         'races.manage',
@@ -77,19 +112,21 @@ export function usePermissions() {
         'tasks.create',
         'tasks.view',
         'finance.manage',
+        'finance.view',
         'website.manage',
+        'dashboard.edit',
         'settings.club',
         'settings.team',
         'settings.subscriptions',
         'settings.integrations',
         'settings.finance',
         'settings.documents',
-        'settings.import'
+        'settings.import',
+        'settings.membership'
       ];
       return editorPermissions.includes(permission);
     }
 
-    // PRO (Principal Race Officer) permissions - Race management and reporting
     if (userRole === 'pro') {
       const proPermissions: Permission[] = [
         'races.manage',
@@ -101,12 +138,12 @@ export function usePermissions() {
         'membership.view',
         'meetings.view',
         'minutes.view',
-        'tasks.view'
+        'tasks.view',
+        'dashboard.edit',
       ];
       return proPermissions.includes(permission);
     }
 
-    // Member permissions (view-only for most features)
     if (userRole === 'member') {
       const memberPermissions: Permission[] = [
         'races.view',
@@ -115,7 +152,9 @@ export function usePermissions() {
         'membership.view',
         'meetings.view',
         'minutes.view',
-        'tasks.view'
+        'tasks.view',
+        'finance.view',
+        'dashboard.edit',
       ];
       return memberPermissions.includes(permission);
     }
@@ -132,6 +171,9 @@ export function usePermissions() {
   const isAdmin = userRole === 'admin' || isSuperAdmin;
   const isStateAdmin = userRole === 'state_admin' || userRole === 'national_admin' || isSuperAdmin;
   const isNationalAdmin = userRole === 'national_admin' || isSuperAdmin;
+  const isAssociationEditor = isAssociationContext && userRole === 'editor';
+  const isAssociationViewer = isAssociationContext && userRole === 'member';
+  const canEditDashboard = can('dashboard.edit');
 
   return {
     can,
@@ -143,6 +185,10 @@ export function usePermissions() {
     isAdmin,
     isStateAdmin,
     isNationalAdmin,
+    isAssociationEditor,
+    isAssociationViewer,
+    isAssociationContext,
+    canEditDashboard,
     userRole
   };
 }

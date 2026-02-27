@@ -879,7 +879,48 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
 
       const feeColumnName = associationType === 'state' ? 'state_fee_per_member' : 'national_fee_per_member';
       const tableName = associationType === 'state' ? 'state_associations' : 'national_associations';
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
+      // Use the correct table based on association type
+      const feeStructureTable = associationType === 'state'
+        ? 'state_association_club_fees'
+        : 'national_association_state_fees';
+
+      const associationIdColumn = associationType === 'state'
+        ? 'state_association_id'
+        : 'national_association_id';
+
+      const feeAmountColumn = associationType === 'state'
+        ? 'club_fee_amount'
+        : 'state_fee_amount';
+
+      // Step 1: Close out any existing active fee structures by setting effective_to to yesterday
+      const { error: closeError } = await supabase
+        .from(feeStructureTable)
+        .update({ effective_to: yesterday })
+        .eq(associationIdColumn, associationId)
+        .is('effective_to', null);
+
+      if (closeError) {
+        console.error('Error closing previous fee structures:', closeError);
+        // Continue anyway - this is not critical
+      }
+
+      // Step 2: Create a new fee structure record effective from today
+      const { error: feeStructureError } = await supabase
+        .from(feeStructureTable)
+        .insert({
+          [associationIdColumn]: associationId,
+          [feeAmountColumn]: membershipFeePerMember,
+          effective_from: today,
+          effective_to: null,
+          notes: `Fee updated to $${membershipFeePerMember} on ${today}`
+        });
+
+      if (feeStructureError) throw feeStructureError;
+
+      // Step 3: Update the association's fee column for backward compatibility
       const { error } = await supabase
         .from(tableName)
         .update({ [feeColumnName]: membershipFeePerMember })
@@ -887,10 +928,12 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
 
       if (error) throw error;
 
-      addNotification('success', 'Membership fee settings saved successfully');
+      addNotification('success', `Membership fee updated to $${membershipFeePerMember}. This rate will apply to all new renewals from today forward.`);
     } catch (err) {
       console.error('Error saving membership fee:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save membership fee');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save membership fee';
+      setError(errorMessage);
+      addNotification('error', `Failed to save: ${errorMessage}`);
     } finally {
       setSavingMembership(false);
     }

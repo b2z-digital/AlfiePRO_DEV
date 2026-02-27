@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Plus, Trash2, User, Phone, Mail } from 'lucide-react';
+import { X, Upload, Plus, Trash2, User, Phone, Mail, Building2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -35,6 +35,30 @@ interface Member {
   email: string;
   phone: string;
 }
+
+const inputClasses = `
+  w-full px-4 py-3 rounded-xl text-sm text-slate-200 placeholder-slate-500
+  bg-slate-800/80 border border-slate-700/60
+  focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50
+  transition-all
+`;
+
+const inputWithIconClasses = `
+  w-full pl-11 pr-4 py-3 rounded-xl text-sm text-slate-200 placeholder-slate-500
+  bg-slate-800/80 border border-slate-700/60
+  focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50
+  transition-all
+`;
+
+const selectClasses = `
+  w-full px-4 py-3 rounded-xl text-sm text-slate-200
+  bg-slate-800/80 border border-slate-700/60 appearance-none
+  focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50
+  transition-all
+`;
+
+const labelClasses = 'block text-sm font-medium mb-2 text-slate-300';
+const sublabelClasses = 'block text-xs font-medium mb-1.5 text-slate-400';
 
 export const ClubEditModal: React.FC<ClubEditModalProps> = ({
   isOpen,
@@ -168,7 +192,6 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
       setSaving(true);
       setError(null);
 
-      // Update club data
       const { error: clubError } = await supabase
         .from('clubs')
         .update({
@@ -180,7 +203,6 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
 
       if (clubError) throw clubError;
 
-      // Delete existing committee positions
       const { error: deleteError } = await supabase
         .from('committee_positions')
         .delete()
@@ -188,7 +210,6 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
 
       if (deleteError) throw deleteError;
 
-      // Insert new committee positions
       if (committeePositions.length > 0) {
         const positionsToInsert = committeePositions
           .filter(pos => pos.title && pos.name)
@@ -209,7 +230,6 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
         }
       }
 
-      // Refresh user clubs to update the UI
       await refreshUserClubs();
 
       addNotification('success', 'Club details updated successfully');
@@ -226,26 +246,21 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className={`
-        w-full max-w-4xl rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col
-        ${darkMode ? 'bg-slate-800' : 'bg-white'}
-      `}>
-        <div className={`
-          flex items-center justify-between p-6 border-b
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
-          <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-            Edit Club Details
-          </h2>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] border border-slate-700/50">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/15 rounded-xl">
+              <Building2 size={22} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Edit Club Details</h2>
+              <p className="text-sm text-blue-100 mt-0.5">Update your club information</p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className={`
-              rounded-full p-2 transition-colors
-              ${darkMode 
-                ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-            `}
+            className="text-white/80 hover:text-white hover:bg-white/15 p-2 rounded-xl transition"
           >
             <X size={20} />
           </button>
@@ -259,69 +274,49 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
           ) : clubData ? (
             <div className="space-y-6">
               {error && (
-                <div className="p-4 rounded-lg bg-red-900/20 border border-red-900/30">
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
                   <p className="text-red-400 text-sm">{error}</p>
                 </div>
               )}
 
-              {/* Club Basic Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Club Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={clubData.name}
-                    onChange={(e) => setClubData({ ...clubData, name: e.target.value })}
-                    className={`
-                      w-full px-3 py-2 rounded-lg border
-                      ${darkMode 
-                        ? 'bg-slate-700 border-slate-600 text-white' 
-                        : 'bg-white border-slate-300 text-slate-900'}
-                    `}
-                    placeholder="Enter club name"
-                  />
+                  <label className={labelClasses}>Club Name *</label>
+                  <div className="relative">
+                    <Building2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      value={clubData.name}
+                      onChange={(e) => setClubData({ ...clubData, name: e.target.value })}
+                      className={inputWithIconClasses}
+                      placeholder="Enter club name"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Abbreviated Name *
-                  </label>
+                  <label className={labelClasses}>Abbreviated Name *</label>
                   <input
                     type="text"
                     value={clubData.abbreviation}
                     onChange={(e) => setClubData({ ...clubData, abbreviation: e.target.value })}
-                    className={`
-                      w-full px-3 py-2 rounded-lg border
-                      ${darkMode 
-                        ? 'bg-slate-700 border-slate-600 text-white' 
-                        : 'bg-white border-slate-300 text-slate-900'}
-                    `}
+                    className={inputClasses}
                     placeholder="Enter abbreviated name"
                   />
                 </div>
               </div>
 
-              {/* Club Logo */}
               <div>
-                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Club Logo
-                </label>
+                <label className={labelClasses}>Club Logo</label>
                 <div className="flex items-center gap-4">
                   {clubData.logo && (
-                    <img 
-                      src={clubData.logo} 
-                      alt="Club logo" 
-                      className="w-16 h-16 object-contain rounded-lg"
+                    <img
+                      src={clubData.logo}
+                      alt="Club logo"
+                      className="w-16 h-16 object-contain rounded-xl border border-slate-700/60"
                     />
                   )}
-                  <label className={`
-                    flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-colors
-                    ${darkMode 
-                      ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' 
-                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'}
-                  `}>
+                  <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-colors bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60">
                     <Upload size={18} />
                     Upload Logo
                     <input
@@ -334,16 +329,13 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
                 </div>
               </div>
 
-              {/* Committee Positions */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Committee Positions
-                  </label>
+                  <label className={labelClasses.replace('mb-2', 'mb-0')}>Committee Positions</label>
                   <button
                     type="button"
                     onClick={handleAddPosition}
-                    className="flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                   >
                     <Plus size={14} />
                     Add Position
@@ -354,18 +346,15 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
                   {committeePositions.map((position, index) => (
                     <div
                       key={index}
-                      className={`
-                        p-4 rounded-lg border
-                        ${darkMode ? 'bg-slate-700/50 border-slate-600' : 'bg-slate-50 border-slate-200'}
-                      `}
+                      className="p-4 rounded-xl border bg-slate-800/50 border-slate-700/50"
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <h4 className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <h4 className="text-sm font-medium text-slate-300">
                           Position {index + 1}
                         </h4>
                         <button
                           onClick={() => handleRemovePosition(index)}
-                          className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                          className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -373,108 +362,76 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Position Title
-                          </label>
+                          <label className={sublabelClasses}>Position Title</label>
                           <input
                             type="text"
                             value={position.title}
                             onChange={(e) => handlePositionChange(index, 'title', e.target.value)}
-                            className={`
-                              w-full px-3 py-2 text-sm rounded-lg border
-                              ${darkMode 
-                                ? 'bg-slate-700 border-slate-600 text-white' 
-                                : 'bg-white border-slate-300 text-slate-900'}
-                            `}
+                            className={inputClasses}
                             placeholder="e.g., Commodore, Secretary"
                           />
                         </div>
 
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Select Member
-                          </label>
-                          <select
-                            onChange={(e) => {
-                              const member = members.find(m => m.id === e.target.value);
-                              if (member) handleSelectMember(index, member);
-                            }}
-                            className={`
-                              w-full px-3 py-2 text-sm rounded-lg border
-                              ${darkMode 
-                                ? 'bg-slate-700 border-slate-600 text-white' 
-                                : 'bg-white border-slate-300 text-slate-900'}
-                            `}
-                          >
-                            <option value="">Select a member</option>
-                            {members.map(member => (
-                              <option key={member.id} value={member.id}>
-                                {member.first_name} {member.last_name}
-                              </option>
-                            ))}
-                          </select>
+                          <label className={sublabelClasses}>Select Member</label>
+                          <div className="relative">
+                            <select
+                              onChange={(e) => {
+                                const member = members.find(m => m.id === e.target.value);
+                                if (member) handleSelectMember(index, member);
+                              }}
+                              className={selectClasses}
+                            >
+                              <option value="">Select a member</option>
+                              {members.map(member => (
+                                <option key={member.id} value={member.id}>
+                                  {member.first_name} {member.last_name}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                          </div>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Name
-                          </label>
+                          <label className={sublabelClasses}>Name</label>
                           <div className="relative">
-                            <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                             <input
                               type="text"
                               value={position.name}
                               onChange={(e) => handlePositionChange(index, 'name', e.target.value)}
-                              className={`
-                                w-full pl-10 pr-3 py-2 text-sm rounded-lg border
-                                ${darkMode 
-                                  ? 'bg-slate-700 border-slate-600 text-white' 
-                                  : 'bg-white border-slate-300 text-slate-900'}
-                              `}
+                              className={inputWithIconClasses}
                               placeholder="Full name"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Email
-                          </label>
+                          <label className={sublabelClasses}>Email</label>
                           <div className="relative">
-                            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                             <input
                               type="email"
                               value={position.email}
                               onChange={(e) => handlePositionChange(index, 'email', e.target.value)}
-                              className={`
-                                w-full pl-10 pr-3 py-2 text-sm rounded-lg border
-                                ${darkMode 
-                                  ? 'bg-slate-700 border-slate-600 text-white' 
-                                  : 'bg-white border-slate-300 text-slate-900'}
-                              `}
+                              className={inputWithIconClasses}
                               placeholder="email@example.com"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Phone
-                          </label>
+                          <label className={sublabelClasses}>Phone</label>
                           <div className="relative">
-                            <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <Phone size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                             <input
                               type="tel"
                               value={position.phone}
                               onChange={(e) => handlePositionChange(index, 'phone', e.target.value)}
-                              className={`
-                                w-full pl-10 pr-3 py-2 text-sm rounded-lg border
-                                ${darkMode 
-                                  ? 'bg-slate-700 border-slate-600 text-white' 
-                                  : 'bg-white border-slate-300 text-slate-900'}
-                              `}
+                              className={inputWithIconClasses}
                               placeholder="Phone number"
                             />
                           </div>
@@ -484,14 +441,11 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
                   ))}
 
                   {committeePositions.length === 0 && (
-                    <div className={`
-                      text-center py-8 rounded-lg border-2 border-dashed
-                      ${darkMode ? 'border-slate-600 text-slate-400' : 'border-slate-300 text-slate-500'}
-                    `}>
+                    <div className="text-center py-10 rounded-xl border-2 border-dashed border-slate-700/50 text-slate-500">
                       <p className="mb-2">No committee positions added yet</p>
                       <button
                         onClick={handleAddPosition}
-                        className="text-blue-400 hover:text-blue-300 text-sm"
+                        className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
                       >
                         Add your first position
                       </button>
@@ -507,18 +461,12 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
           )}
         </div>
 
-        <div className={`
-          flex justify-end gap-3 p-6 border-t
-          ${darkMode ? 'border-slate-700' : 'border-slate-200'}
-        `}>
+        <div className="flex justify-end gap-3 p-6 border-t border-slate-700/50">
           <button
             onClick={onClose}
             disabled={saving}
             className={`
-              px-4 py-2 rounded-lg font-medium transition-colors
-              ${darkMode
-                ? 'text-slate-300 hover:text-slate-100 hover:bg-slate-700'
-                : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'}
+              px-5 py-2.5 rounded-xl font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800
               ${saving ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
@@ -528,7 +476,7 @@ export const ClubEditModal: React.FC<ClubEditModalProps> = ({
             onClick={handleSave}
             disabled={saving || !clubData?.name || !clubData?.abbreviation}
             className={`
-              px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors
+              px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 font-medium transition-colors
               ${(saving || !clubData?.name || !clubData?.abbreviation) ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >

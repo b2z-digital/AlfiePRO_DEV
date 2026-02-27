@@ -9,7 +9,7 @@ interface YachtClassesRouterProps {
 }
 
 export const YachtClassesRouter: React.FC<YachtClassesRouterProps> = ({ darkMode }) => {
-  const { user, isNationalOrgAdmin, isStateOrgAdmin, currentClub, isSuperAdmin } = useAuth();
+  const { user, isNationalOrgAdmin, isStateOrgAdmin, currentClub, currentOrganization, isSuperAdmin } = useAuth();
   const [nationalAssociationId, setNationalAssociationId] = useState<string | null>(null);
   const [nationalAssociationName, setNationalAssociationName] = useState<string | null>(null);
   const [stateAssociationId, setStateAssociationId] = useState<string | null>(null);
@@ -26,6 +26,7 @@ export const YachtClassesRouter: React.FC<YachtClassesRouterProps> = ({ darkMode
       isNationalOrgAdmin,
       isStateOrgAdmin,
       currentClub: currentClub?.clubName,
+      currentOrganization: currentOrganization,
       currentClubOrgType: currentClub?.organization_type
     });
 
@@ -38,7 +39,24 @@ export const YachtClassesRouter: React.FC<YachtClassesRouterProps> = ({ darkMode
     try {
       setLoading(true);
 
-      // First check if the current club IS a national or state association
+      // Check currentOrganization first - this is set when viewing an association dashboard
+      if (currentOrganization) {
+        if (currentOrganization.type === 'national') {
+          console.log('YachtClassesRouter: Setting from currentOrganization (national)');
+          setNationalAssociationId(currentOrganization.id);
+          setNationalAssociationName(currentOrganization.name);
+          setLoading(false);
+          return;
+        } else if (currentOrganization.type === 'state') {
+          console.log('YachtClassesRouter: Setting from currentOrganization (state)');
+          setStateAssociationId(currentOrganization.id);
+          setStateAssociationName(currentOrganization.name);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback: check if the current club IS a national or state association
       // This handles superadmins viewing association dashboards
       if (currentClub) {
         console.log('YachtClassesRouter: Checking current club organization type');

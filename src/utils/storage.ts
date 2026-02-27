@@ -3,10 +3,9 @@ import { supabase } from './supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { offlineStorage } from './offlineStorage';
 
-// Test Supabase connection
 const testSupabaseConnection = async (): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('members').select('count').limit(1);
+    const { error } = await supabase.from('members').select('id', { count: 'exact', head: true }).limit(1);
     return !error;
   } catch (error) {
     console.warn('Supabase connection test failed:', error);
@@ -391,38 +390,31 @@ export const updateMember = async (id: string, formData: MemberFormData): Promis
       }
     }
 
-    // Get current user to check if this member should be linked to the user account
-    const { data: { user } } = await supabase.auth.getUser();
+    const updateFields: Record<string, any> = {
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      club: formData.club || null,
+      street: formData.street || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      postcode: formData.postcode || null,
+      date_joined: formData.date_joined || null,
+      membership_level: formData.membership_level || null,
+      membership_level_custom: formData.membership_level_custom || null,
+      is_financial: formData.is_financial,
+      amount_paid: formData.amount_paid || null,
+      emergency_contact_name: formData.emergency_contact_name || null,
+      emergency_contact_phone: formData.emergency_contact_phone || null,
+      emergency_contact_relationship: formData.emergency_contact_relationship || null,
+    };
 
-    // Only link the member to the user if the email addresses match
-    const shouldLinkToUser = user && user.email && formData.email && user.email.toLowerCase() === formData.email.toLowerCase();
-    const userId = shouldLinkToUser ? user.id : null;
-
-    // Update member
     const { error: memberError } = await supabase
       .from('members')
-      .update({
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        club: formData.club || null,
-        street: formData.street || null,
-        city: formData.city || null,
-        state: formData.state || null,
-        postcode: formData.postcode || null,
-        date_joined: formData.date_joined || null,
-        membership_level: formData.membership_level || null,
-        membership_level_custom: formData.membership_level_custom || null,
-        is_financial: formData.is_financial,
-        amount_paid: formData.amount_paid || null,
-        emergency_contact_name: formData.emergency_contact_name || null,
-        emergency_contact_phone: formData.emergency_contact_phone || null,
-        emergency_contact_relationship: formData.emergency_contact_relationship || null,
-        user_id: userId // Only link if emails match
-      })
+      .update(updateFields)
       .eq('id', id)
-      .eq('club_id', currentClubId); // Ensure we only update members from current club
+      .eq('club_id', currentClubId);
 
     if (memberError) {
       console.error('Error updating member:', memberError);

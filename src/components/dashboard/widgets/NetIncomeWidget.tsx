@@ -4,6 +4,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { formatCurrency } from '../../../utils/formatCurrency';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 interface NetIncomeWidgetProps {
   widgetId: string;
@@ -21,6 +22,7 @@ export const NetIncomeWidget: React.FC<NetIncomeWidgetProps> = ({
   colorTheme = 'default'
 }) => {
   const { currentClub } = useAuth();
+  const { type, stateAssociationId, nationalAssociationId } = useOrganizationContext();
   const [loading, setLoading] = useState(true);
   const [netIncome, setNetIncome] = useState(0);
   const [taxAmount, setTaxAmount] = useState(0);
@@ -29,66 +31,176 @@ export const NetIncomeWidget: React.FC<NetIncomeWidgetProps> = ({
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
-      loadNetIncome();
-    }
-  }, [currentClub]);
+    loadNetIncome();
+  }, [currentClub, type, stateAssociationId, nationalAssociationId]);
 
   const loadNetIncome = async () => {
-    if (!currentClub?.clubId) return;
-
     try {
-      const { data: clubData } = await supabase
-        .from('clubs')
-        .select('finance_settings')
-        .eq('id', currentClub.clubId)
-        .single();
-
-      const taxSettings = clubData?.finance_settings?.tax || { enabled: false, rate: 0 };
-      setTaxEnabled(taxSettings.enabled);
-
+      let taxSettings = { enabled: false, rate: 0 };
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      const { data: currentIncome } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('club_id', currentClub.clubId)
-        .eq('type', 'deposit')
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+      let currentIncomeTotal = 0;
+      let currentExpensesTotal = 0;
+      let previousIncomeTotal = 0;
+      let previousExpensesTotal = 0;
 
-      const { data: currentExpenses } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('club_id', currentClub.clubId)
-        .eq('type', 'expense')
-        .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+      if (type === 'state' && stateAssociationId) {
+        // Get tax settings for state association
+        const { data: assocData } = await supabase
+          .from('state_associations')
+          .select('finance_settings')
+          .eq('id', stateAssociationId)
+          .single();
 
-      const { data: previousIncome } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('club_id', currentClub.clubId)
-        .eq('type', 'deposit')
-        .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
-        .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+        taxSettings = assocData?.finance_settings?.tax || { enabled: false, rate: 0 };
+        setTaxEnabled(taxSettings.enabled);
 
-      const { data: previousExpenses } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('club_id', currentClub.clubId)
-        .eq('type', 'expense')
-        .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
-        .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+        const { data: currentIncome } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'income')
+          .eq('payment_status', 'completed')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
 
-      const currentIncomeTotal = currentIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const currentExpensesTotal = currentExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        const { data: currentExpenses } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousIncome } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'income')
+          .eq('payment_status', 'completed')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousExpenses } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', stateAssociationId)
+          .eq('association_type', 'state')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        currentIncomeTotal = currentIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        currentExpensesTotal = currentExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousIncomeTotal = previousIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousExpensesTotal = previousExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      } else if (type === 'national' && nationalAssociationId) {
+        // Get tax settings for national association
+        const { data: assocData } = await supabase
+          .from('national_associations')
+          .select('finance_settings')
+          .eq('id', nationalAssociationId)
+          .single();
+
+        taxSettings = assocData?.finance_settings?.tax || { enabled: false, rate: 0 };
+        setTaxEnabled(taxSettings.enabled);
+
+        const { data: currentIncome } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'income')
+          .eq('payment_status', 'completed')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: currentExpenses } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousIncome } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'income')
+          .eq('payment_status', 'completed')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousExpenses } = await supabase
+          .from('association_transactions')
+          .select('amount')
+          .eq('association_id', nationalAssociationId)
+          .eq('association_type', 'national')
+          .eq('type', 'expense')
+          .eq('payment_status', 'completed')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        currentIncomeTotal = currentIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        currentExpensesTotal = currentExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousIncomeTotal = previousIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousExpensesTotal = previousExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      } else if (currentClub?.clubId) {
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('finance_settings')
+          .eq('id', currentClub.clubId)
+          .single();
+
+        taxSettings = clubData?.finance_settings?.tax || { enabled: false, rate: 0 };
+        setTaxEnabled(taxSettings.enabled);
+
+        const { data: currentIncome } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('club_id', currentClub.clubId)
+          .eq('type', 'deposit')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: currentExpenses } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('club_id', currentClub.clubId)
+          .eq('type', 'expense')
+          .gte('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousIncome } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('club_id', currentClub.clubId)
+          .eq('type', 'deposit')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        const { data: previousExpenses } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('club_id', currentClub.clubId)
+          .eq('type', 'expense')
+          .gte('date', sixtyDaysAgo.toISOString().split('T')[0])
+          .lt('date', thirtyDaysAgo.toISOString().split('T')[0]);
+
+        currentIncomeTotal = currentIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        currentExpensesTotal = currentExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousIncomeTotal = previousIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+        previousExpensesTotal = previousExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      }
+
       const currentNet = currentIncomeTotal - currentExpensesTotal;
-
-      const previousIncomeTotal = previousIncome?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const previousExpensesTotal = previousExpenses?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
       const previousNet = previousIncomeTotal - previousExpensesTotal;
 
       let finalNetIncome = currentNet;

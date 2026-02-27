@@ -264,7 +264,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
-          <div className="rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800/80 via-slate-800/70 to-slate-900/80 backdrop-blur-sm shadow-xl p-6">
+          <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 backdrop-blur-sm shadow-xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white tracking-tight">{task.title}</h2>
               <div className={`px-4 py-1.5 rounded-xl text-sm font-semibold shadow-lg ${
@@ -367,7 +367,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div className="p-8 text-center rounded-xl border border-slate-600/50 bg-slate-700/30">
+                  <div className="p-8 text-center rounded-xl border border-slate-700/50 bg-slate-800/20">
                     <MessageSquare className="mx-auto h-10 w-10 text-slate-500 mb-3" />
                     <p className="text-slate-400 font-medium">No comments yet</p>
                   </div>
@@ -378,7 +378,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
         </div>
         
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800/80 via-slate-800/70 to-slate-900/80 backdrop-blur-sm shadow-xl p-6">
+          <div className="rounded-2xl border border-slate-700/50 bg-slate-800/30 backdrop-blur-sm shadow-xl p-6">
             <h3 className="text-lg font-bold text-white mb-6 tracking-tight">Task Details</h3>
             
             <div className="space-y-5">
@@ -477,26 +477,31 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
                 </div>
               )}
 
-              {followers.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Supporting Members</div>
-                  <div className="flex flex-col gap-2.5">
-                    {followers.map((follower) => (
-                      <div key={follower.id} className="flex items-center gap-2.5">
-                        <Avatar
-                          firstName={follower.first_name}
-                          lastName={follower.last_name}
-                          imageUrl={follower.avatar_url}
-                          size="sm"
-                        />
-                        <span className="text-white font-medium text-sm">
-                          {follower.first_name} {follower.last_name}
-                        </span>
-                      </div>
-                    ))}
+              {(() => {
+                const assigneeUserId = (task as any).assignee?.user_id;
+                const filteredFollowers = assigneeUserId ? followers.filter(f => f.id !== assigneeUserId) : followers;
+                if (filteredFollowers.length === 0) return null;
+                return (
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Supporting Members</div>
+                    <div className="flex flex-col gap-2.5">
+                      {filteredFollowers.map((follower) => (
+                        <div key={follower.id} className="flex items-center gap-2.5">
+                          <Avatar
+                            firstName={follower.first_name}
+                            lastName={follower.last_name}
+                            imageUrl={follower.avatar_url}
+                            size="sm"
+                          />
+                          <span className="text-white font-medium text-sm">
+                            {follower.first_name} {follower.last_name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               <div>
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Created</div>

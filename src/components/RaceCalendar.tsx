@@ -64,6 +64,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [showSubscribeMenu, setShowSubscribeMenu] = useState(false);
   const [showLocationExplorer, setShowLocationExplorer] = useState(false);
+  const [sailingDays, setSailingDays] = useState<any[]>([]);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const subscribeMenuRef = useRef<HTMLDivElement>(null);
@@ -323,7 +324,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         );
 
         // Combine all events (using local copies instead of original public events where they exist)
-        const allEvents = [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents];
+        // For associations, only show public events (state/national level events)
+        // For clubs, show all events including club-specific events
+        const allEvents = currentOrganization?.type === 'state' || currentOrganization?.type === 'national'
+          ? [...filteredPublicEvents]  // Associations: only public state/national events
+          : [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents];  // Clubs: all events
+
         const enrichedEvents = await enrichEventsWithAttendance(allEvents);
         setEvents(enrichedEvents);
       } catch (error) {
@@ -336,6 +342,45 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
     loadData();
   }, [propEvents, currentClub, currentOrganization]); // Reload when club/organization changes or component remounts
+
+  // Load sailing days for the club
+  useEffect(() => {
+    const loadSailingDays = async () => {
+      if (!currentClub?.clubId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('club_sailing_days')
+          .select(`
+            id,
+            day_of_week,
+            start_time,
+            end_time,
+            boat_class_id,
+            boat_classes(name)
+          `)
+          .eq('club_id', currentClub.clubId)
+          .eq('is_active', true)
+          .order('day_of_week');
+
+        if (error) throw error;
+
+        const formattedDays = (data || []).map((sd: any) => ({
+          id: sd.id,
+          day_of_week: sd.day_of_week,
+          start_time: sd.start_time,
+          end_time: sd.end_time,
+          boat_class_name: sd.boat_classes?.name || null
+        }));
+
+        setSailingDays(formattedDays);
+      } catch (err) {
+        console.error('Error loading sailing days:', err);
+      }
+    };
+
+    loadSailingDays();
+  }, [currentClub?.clubId]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -1394,6 +1439,33 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                 Race Calendar
               </h2>
+              {sailingDays.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  {sailingDays.map((day) => (
+                    <div
+                      key={day.id}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                        darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'
+                      }`}
+                    >
+                      <Calendar size={14} className="text-blue-500" />
+                      <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                        {day.day_of_week}
+                      </span>
+                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {day.start_time.substring(0, 5)}-{day.end_time.substring(0, 5)}
+                      </span>
+                      {day.boat_class_name && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {day.boat_class_name}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

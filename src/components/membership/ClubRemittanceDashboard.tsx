@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet, AlertTriangle, ChevronDown, Calendar, Filter } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -8,9 +9,116 @@ import {
   getClubOutstandingTotal,
   getRemittancesWithMembers,
   exportRemittancesToCSV,
+  isRemittanceOverdue,
+  getOverdueDays,
   MembershipRemittance,
   ClubOutstandingTotal
 } from '../../utils/remittanceStorage';
+
+interface ClubDropdownOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
+const ClubAppDropdown: React.FC<{
+  value: string;
+  options: ClubDropdownOption[];
+  onChange: (value: string) => void;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  minWidth?: number;
+}> = ({ value, options, onChange, icon, placeholder = 'Select...', minWidth = 160 }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, minWidth) });
+  }, [minWidth]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onClickOut = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePos();
+    document.addEventListener('mousedown', onClickOut);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onClickOut);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePos]);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          bg-slate-800/80 text-slate-200 border border-slate-700/60
+          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
+          cursor-pointer
+        `}
+        style={{ minWidth }}
+      >
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
+          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+            {selected ? selected.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
+          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+        >
+          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`
+                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
+                `}
+              >
+                <div className="flex items-center gap-2.5">
+                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
+                  <span>{opt.label}</span>
+                </div>
+                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 interface ClubRemittanceDashboardProps {
   darkMode: boolean;
@@ -26,12 +134,13 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
   const [loading, setLoading] = useState(true);
   const [outstanding, setOutstanding] = useState<ClubOutstandingTotal | null>(null);
   const [remittances, setRemittances] = useState<MembershipRemittance[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('pending');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
   const [showBulkPaymentModal, setShowBulkPaymentModal] = useState(false);
+  const [overdueCount, setOverdueCount] = useState(0);
   const [bulkPaymentDetails, setBulkPaymentDetails] = useState({
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'bank_transfer',
@@ -50,17 +159,19 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
 
     setLoading(true);
     try {
-      const [outstandingData, remittancesData] = await Promise.all([
+      const [outstandingData, remittancesData, allPendingData] = await Promise.all([
         getClubOutstandingTotal(currentClub.clubId),
         getRemittancesWithMembers(currentClub.clubId, {
           status: selectedStatus,
-          year: selectedYear
-        })
+          year: selectedYear !== 'all' ? selectedYear : undefined
+        }),
+        getRemittancesWithMembers(currentClub.clubId, { status: 'pending' })
       ]);
 
       setOutstanding(outstandingData);
       setRemittances(remittancesData);
-      setSelectedIds(new Set()); // Clear selection on data reload
+      setOverdueCount(allPendingData.filter(r => isRemittanceOverdue(r)).length);
+      setSelectedIds(new Set());
     } catch (error) {
       console.error('Error loading remittance data:', error);
     } finally {
@@ -77,7 +188,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
   const handleExport = () => {
     exportRemittancesToCSV(
       remittances,
-      `${currentClub?.name}-remittances-${selectedYear}.csv`
+      `${currentClub?.name}-remittances-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`
     );
   };
 
@@ -479,47 +590,71 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
         </div>
       </div>
 
-      {/* Filters with Export Button - Slate Styling */}
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-sm font-medium mb-2 text-slate-300">
-              Year
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
+      {/* Overdue Warning Banner */}
+      {overdueCount > 0 && (
+        <div className="bg-red-500/10 backdrop-blur-sm rounded-xl border border-red-500/30 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <p className="font-medium text-red-300">
+                  {overdueCount} overdue remittance{overdueCount !== 1 ? 's' : ''}
+                </p>
+                <p className="text-sm text-red-400/70">
+                  Association fees unpaid for 4+ weeks from membership start date
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedStatus('overdue')}
+              className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-medium transition-colors text-sm"
             >
-              {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+              View Overdue
+            </button>
           </div>
+        </div>
+      )}
 
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-medium mb-2 text-slate-300">
-              Status
-            </label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600/50 text-white focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
-            >
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-              <option value="waived">Waived</option>
-            </select>
-          </div>
+      {/* Filters with Export Button */}
+      <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <ClubAppDropdown
+            value={String(selectedYear)}
+            onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+            icon={<Calendar size={15} />}
+            options={[
+              { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+              ...availableYears.map(year => ({
+                value: String(year),
+                label: String(year),
+                icon: <Calendar size={14} className="text-blue-400" />
+              }))
+            ]}
+            minWidth={160}
+          />
+
+          <ClubAppDropdown
+            value={selectedStatus}
+            onChange={(v) => setSelectedStatus(v)}
+            icon={<Filter size={15} />}
+            options={[
+              { value: 'pending', label: 'Pending', icon: <Clock size={14} className="text-orange-400" /> },
+              { value: 'paid', label: 'Paid', icon: <CheckCircle size={14} className="text-green-400" /> },
+              { value: 'overdue', label: 'Overdue', icon: <AlertTriangle size={14} className="text-red-400" /> },
+              { value: 'waived', label: 'Waived', icon: <X size={14} className="text-slate-400" /> }
+            ]}
+            minWidth={160}
+          />
 
           <button
             onClick={handleExport}
             disabled={remittances.length === 0}
-            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2 border ${
               remittances.length === 0
-                ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed'
-                : 'bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white'
+                ? 'bg-slate-800/80 border-slate-700/60 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-800/80 border-slate-700/60 hover:bg-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white'
             }`}
           >
             <Download className="w-4 h-4" />
@@ -615,21 +750,37 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                   </td>
                 </tr>
               ) : (
-                remittances.map((remittance) => (
+                remittances.map((remittance) => {
+                  const overdue = isRemittanceOverdue(remittance);
+                  const overdueDays = overdue ? getOverdueDays(remittance) : 0;
+                  const overdueWeeks = Math.floor(overdueDays / 7);
+
+                  return (
                   <tr
                     key={remittance.id}
                     className={`hover:bg-slate-700/30 transition-colors ${
-                      selectedIds.has(remittance.id) ? 'bg-blue-500/10' : ''
+                      selectedIds.has(remittance.id)
+                        ? 'bg-blue-500/10'
+                        : overdue
+                        ? 'bg-red-500/5 border-l-2 border-l-red-500'
+                        : ''
                     }`}
                   >
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
-                        <Avatar
-                          imageUrl={remittance.member?.avatar_url}
-                          firstName={remittance.member?.first_name || ''}
-                          lastName={remittance.member?.last_name || ''}
-                          size="sm"
-                        />
+                        <div className="relative">
+                          <Avatar
+                            imageUrl={remittance.member?.avatar_url}
+                            firstName={remittance.member?.first_name || ''}
+                            lastName={remittance.member?.last_name || ''}
+                            size="sm"
+                          />
+                          {overdue && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                              <AlertTriangle className="w-2.5 h-2.5 text-white" />
+                            </div>
+                          )}
+                        </div>
                         <div>
                           <div className="font-medium text-white">
                             {remittance.member ? `${remittance.member.first_name} ${remittance.member.last_name}` : 'Unknown'}
@@ -643,25 +794,37 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                     <td className="px-4 py-4 text-slate-300">
                       {remittance.membership_year}
                     </td>
-                    <td className="px-4 py-4 font-medium text-blue-400">
+                    <td className={`px-4 py-4 font-medium ${overdue ? 'text-red-400' : 'text-blue-400'}`}>
                       ${remittance.state_contribution_amount.toFixed(2)}
                     </td>
                     <td className="px-4 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        remittance.club_to_state_status === 'paid'
-                          ? 'bg-green-900/30 text-green-400'
-                          : remittance.club_to_state_status === 'overdue'
-                          ? 'bg-red-900/30 text-red-400'
-                          : remittance.club_to_state_status === 'waived'
-                          ? 'bg-slate-700/50 text-slate-400'
-                          : 'bg-orange-900/30 text-orange-400'
-                      }`}>
-                        {remittance.club_to_state_status}
-                      </span>
+                      {overdue ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400 border border-red-500/30">
+                            <AlertTriangle className="w-3 h-3" />
+                            Overdue
+                          </span>
+                          <span className="text-[10px] text-red-400/70">
+                            {overdueWeeks} week{overdueWeeks !== 1 ? 's' : ''} overdue
+                          </span>
+                        </div>
+                      ) : (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          remittance.club_to_state_status === 'paid'
+                            ? 'bg-green-900/30 text-green-400'
+                            : remittance.club_to_state_status === 'waived'
+                            ? 'bg-slate-700/50 text-slate-400'
+                            : 'bg-orange-900/30 text-orange-400'
+                        }`}>
+                          {remittance.club_to_state_status}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-sm text-slate-400">
                       {remittance.club_to_state_paid_date
                         ? new Date(remittance.club_to_state_paid_date).toLocaleDateString()
+                        : overdue
+                        ? <span className="text-red-400">Overdue</span>
                         : 'Pending'}
                     </td>
                     <td className="px-4 py-4">
@@ -700,7 +863,8 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -788,18 +952,20 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Payment Method
                   </label>
-                  <select
+                  <ClubAppDropdown
                     value={bulkPaymentDetails.paymentMethod}
-                    onChange={(e) => setBulkPaymentDetails({...bulkPaymentDetails, paymentMethod: e.target.value})}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="credit_card">Credit Card</option>
-                    <option value="debit_card">Debit Card</option>
-                    <option value="cash">Cash</option>
-                    <option value="check">Check</option>
-                    <option value="other">Other</option>
-                  </select>
+                    onChange={(v) => setBulkPaymentDetails({...bulkPaymentDetails, paymentMethod: v})}
+                    icon={<Wallet size={15} />}
+                    options={[
+                      { value: 'bank_transfer', label: 'Bank Transfer', icon: <ArrowUpRight size={14} className="text-blue-400" /> },
+                      { value: 'credit_card', label: 'Credit Card', icon: <Wallet size={14} className="text-green-400" /> },
+                      { value: 'debit_card', label: 'Debit Card', icon: <Wallet size={14} className="text-teal-400" /> },
+                      { value: 'cash', label: 'Cash', icon: <DollarSign size={14} className="text-yellow-400" /> },
+                      { value: 'check', label: 'Check', icon: <CheckCircle size={14} className="text-slate-400" /> },
+                      { value: 'other', label: 'Other', icon: <Clock size={14} className="text-slate-400" /> }
+                    ]}
+                    minWidth={220}
+                  />
                 </div>
 
                 <div>

@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CheckCircle, Grid, List, Eye, UserPlus, DollarSign, AlertCircle, MapPin as MapPinIcon, Edit2, Trash2, MoreVertical, Anchor, Calendar, Trophy, TrendingUp } from 'lucide-react';
+import { Building, Plus, Users, CheckCircle, Grid, List, Eye, UserPlus, DollarSign, AlertCircle, MapPin as MapPinIcon, Edit2, Trash2, MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, XCircle, Check, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
 import { useNavigate } from 'react-router-dom';
 import { loadGoogleMaps } from '../../utils/googleMaps';
-import { ClubEditModal } from '../../components/ClubEditModal';
+
 import { useNotification } from '../../contexts/NotificationContext';
+
+interface SailingDay {
+  id: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  boat_class_name?: string;
+}
 
 interface Club {
   id: string;
@@ -19,6 +27,7 @@ interface Club {
   pending_applications?: number;
   pending_payments?: number;
   boat_classes?: string[];
+  sailing_days?: SailingDay[];
   upcoming_events?: number;
   recent_results?: number;
   default_venue?: {
@@ -27,6 +36,20 @@ interface Club {
     name: string;
     address: string;
   } | null;
+}
+
+interface PendingClub {
+  id: string;
+  name: string;
+  abbreviation: string;
+  location: string | null;
+  email: string | null;
+  phone: string | null;
+  club_introduction: string | null;
+  approval_status: string;
+  registered_by_user_id: string;
+  created_at: string;
+  registrant_email?: string;
 }
 
 interface ClubsManagementPageProps {
@@ -52,6 +75,8 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [clubToDelete, setClubToDelete] = useState<Club | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [pendingClubs, setPendingClubs] = useState<PendingClub[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
   const { addNotification } = useNotification();
 
   useEffect(() => {
@@ -61,6 +86,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
   useEffect(() => {
     if (stateAssociationId) {
       loadClubs();
+      loadPendingClubs();
     }
   }, [stateAssociationId]);
 
@@ -133,6 +159,8 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
           )
         `)
         .eq('state_association_id', stateAssociationId)
+        .neq('approval_status', 'pending_approval')
+        .neq('approval_status', 'rejected')
         .order('name', { ascending: true });
 
       console.log('ClubsManagementPage: Clubs query result:', { data, error, count: data?.length });
@@ -160,6 +188,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             applicationsResult,
             paymentsResult,
             boatClassesResult,
+            sailingDaysResult,
             upcomingSingleEventsResult,
             upcomingSeriesRoundsResult,
             recentSingleResultsResult,
@@ -188,15 +217,29 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               .neq('club_to_state_status', 'paid')
               .eq('membership_year', new Date().getFullYear()),
 
-            // Boat classes sailed at this club (from members' boats via members table)
+            // Boat classes assigned to this club
             supabase
-              .from('member_boats')
+              .from('club_boat_classes')
               .select(`
-                boat_type,
-                members!inner(club_id)
+                boat_class_id,
+                boat_classes(name)
               `)
-              .eq('members.club_id', club.id)
-              .not('boat_type', 'is', null),
+              .eq('club_id', club.id),
+
+            // Sailing days for this club
+            supabase
+              .from('club_sailing_days')
+              .select(`
+                id,
+                day_of_week,
+                start_time,
+                end_time,
+                boat_class_id,
+                boat_classes(name)
+              `)
+              .eq('club_id', club.id)
+              .eq('is_active', true)
+              .order('day_of_week'),
 
             // Upcoming single events (future events from quick_races)
             supabase
@@ -238,12 +281,17 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
           const pendingPaymentAmount = paymentsResult.data?.reduce((sum, payment) =>
             sum + (Number(payment.state_contribution_amount) || 0), 0) || 0;
 
-          // Extract unique boat classes
-          const uniqueBoatClasses = [...new Set(
-            (boatClassesResult.data || [])
-              .map(b => b.boat_type)
-              .filter(Boolean)
-          )];
+          const uniqueBoatClasses = (boatClassesResult.data || [])
+            .map((b: any) => b.boat_classes?.name)
+            .filter(Boolean);
+
+          const sailingDays = (sailingDaysResult.data || []).map((sd: any) => ({
+            id: sd.id,
+            day_of_week: sd.day_of_week,
+            start_time: sd.start_time,
+            end_time: sd.end_time,
+            boat_class_name: sd.boat_classes?.name || null
+          }));
 
           // Log all query results for debugging
           console.log(`[${club.name}] Query results:`, {
@@ -278,6 +326,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             pending_applications: applicationsResult.count || 0,
             pending_payments: pendingPaymentAmount,
             boat_classes: uniqueBoatClasses,
+            sailing_days: sailingDays,
             upcoming_events: totalUpcomingEvents,
             recent_results: totalRecentResults,
             default_venue: defaultVenue ? {
@@ -295,6 +344,102 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       console.error('Error loading clubs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPendingClubs = async () => {
+    if (!stateAssociationId) return;
+
+    try {
+      setPendingLoading(true);
+
+      const { data, error } = await supabase
+        .from('clubs')
+        .select('id, name, abbreviation, location, email, phone, club_introduction, approval_status, registered_by_user_id, created_at')
+        .eq('state_association_id', stateAssociationId)
+        .eq('approval_status', 'pending_approval')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const pendingWithEmails = await Promise.all(
+        (data || []).map(async (club) => {
+          let registrantEmail = '';
+          if (club.registered_by_user_id) {
+            const { data: emailData } = await supabase.rpc('get_user_id_by_email', {}).catch(() => ({ data: null }));
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', club.registered_by_user_id)
+              .maybeSingle();
+            registrantEmail = profileData?.full_name || club.email || '';
+          }
+          return { ...club, registrant_email: registrantEmail || club.email || '' };
+        })
+      );
+
+      setPendingClubs(pendingWithEmails);
+    } catch (error) {
+      console.error('Error loading pending clubs:', error);
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
+  const handleApproveClub = async (clubId: string) => {
+    try {
+      const { error } = await supabase
+        .from('clubs')
+        .update({ approval_status: 'active' })
+        .eq('id', clubId);
+
+      if (error) throw error;
+
+      const club = pendingClubs.find(c => c.id === clubId);
+
+      if (club?.registered_by_user_id) {
+        const { data: existingLink } = await supabase
+          .from('user_clubs')
+          .select('id')
+          .eq('user_id', club.registered_by_user_id)
+          .eq('club_id', clubId)
+          .maybeSingle();
+
+        if (!existingLink) {
+          await supabase
+            .from('user_clubs')
+            .insert({
+              user_id: club.registered_by_user_id,
+              club_id: clubId,
+              role: 'admin',
+            });
+        }
+      }
+
+      addNotification('success', `${club?.name || 'Club'} has been approved`);
+      loadPendingClubs();
+      loadClubs();
+    } catch (error) {
+      console.error('Error approving club:', error);
+      addNotification('error', 'Failed to approve club');
+    }
+  };
+
+  const handleRejectClub = async (clubId: string) => {
+    try {
+      const { error } = await supabase
+        .from('clubs')
+        .update({ approval_status: 'rejected' })
+        .eq('id', clubId);
+
+      if (error) throw error;
+
+      const club = pendingClubs.find(c => c.id === clubId);
+      addNotification('success', `${club?.name || 'Club'} registration has been rejected`);
+      loadPendingClubs();
+    } catch (error) {
+      console.error('Error rejecting club:', error);
+      addNotification('error', 'Failed to reject club');
     }
   };
 
@@ -704,15 +849,15 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
 
           <div className={`p-6 rounded-xl border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-lg bg-green-600/20">
-                <CheckCircle className="text-green-400" size={24} />
+              <div className="p-3 rounded-lg bg-amber-600/20">
+                <Clock className="text-amber-400" size={24} />
               </div>
               <div>
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Active Clubs
+                  Pending Approvals
                 </p>
                 <p className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                  {clubs.length}
+                  {pendingClubs.length}
                 </p>
               </div>
             </div>
@@ -734,6 +879,96 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             </div>
           </div>
         </div>
+
+        {/* Pending Club Approvals */}
+        {pendingClubs.length > 0 && (
+          <div className={`mb-8 rounded-xl border ${darkMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+            <div className="p-5 border-b border-amber-500/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20">
+                  <Clock className="text-amber-400" size={20} />
+                </div>
+                <div>
+                  <h3 className={`text-lg font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                    Pending Club Registrations
+                  </h3>
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {pendingClubs.length} club{pendingClubs.length !== 1 ? 's' : ''} awaiting your approval
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="divide-y divide-amber-500/10">
+              {pendingClubs.map((club) => (
+                <div key={club.id} className="p-5 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        darkMode ? 'bg-slate-700' : 'bg-slate-100'
+                      }`}>
+                        <Building className={darkMode ? 'text-slate-400' : 'text-slate-500'} size={20} />
+                      </div>
+                      <div>
+                        <h4 className={`font-semibold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                          {club.name}
+                        </h4>
+                        <div className="flex items-center gap-3 text-xs">
+                          {club.abbreviation && (
+                            <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>{club.abbreviation}</span>
+                          )}
+                          {club.location && (
+                            <span className={`flex items-center gap-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                              <MapPinIcon size={10} /> {club.location}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {club.club_introduction && (
+                      <p className={`text-sm line-clamp-2 mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {club.club_introduction}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-4 text-xs">
+                      {club.registrant_email && (
+                        <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>
+                          Registered by: {club.registrant_email}
+                        </span>
+                      )}
+                      <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>
+                        {new Date(club.created_at).toLocaleDateString('en-AU', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleRejectClub(club.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20'
+                          : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                      }`}
+                    >
+                      <X size={14} />
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => handleApproveClub(club.id)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <Check size={14} />
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Clubs Display */}
         {filteredClubs.length === 0 ? (
@@ -774,23 +1009,23 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             {filteredClubs.map((club) => (
               <div
                 key={club.id}
-                className={`group p-6 rounded-xl border backdrop-blur-sm transition-all hover:shadow-lg ${
+                className={`group flex flex-col p-6 rounded-xl border backdrop-blur-sm transition-all hover:shadow-lg ${
                   darkMode
                     ? 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/50'
                     : 'bg-white/10 border-slate-200/20 hover:border-emerald-300'
                 }`}
               >
                 {/* Header with Logo */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     {club.logo ? (
                       <img
                         src={club.logo}
                         alt={club.name}
-                        className="w-12 h-12 rounded-lg object-cover"
+                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                       />
                     ) : (
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                         darkMode ? 'bg-slate-700' : 'bg-slate-100'
                       }`}>
                         <Building className={darkMode ? 'text-slate-500' : 'text-slate-400'} size={24} />
@@ -807,8 +1042,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                       )}
                     </div>
                   </div>
-                  {/* Actions Menu */}
-                  <div className="relative">
+                  <div className="relative flex-shrink-0">
                     <button
                       onClick={() => setOpenMenuId(openMenuId === club.id ? null : club.id)}
                       className={`p-2 rounded-lg transition-colors ${
@@ -856,143 +1090,168 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                   </div>
                 </div>
 
-                {/* Club Introduction */}
-                {club.club_introduction && (
-                  <div className="mb-4">
-                    <p className={`text-sm line-clamp-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {club.club_introduction}
-                    </p>
-                  </div>
-                )}
-
-                {/* Boat Classes */}
-                {club.boat_classes && club.boat_classes.length > 0 && (
-                  <div className="mb-4">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Anchor size={14} className={darkMode ? 'text-sky-400' : 'text-sky-600'} />
-                      <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Classes Sailed
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {club.boat_classes.slice(0, 4).map((boatClass, index) => (
-                        <span
-                          key={index}
-                          className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            darkMode
-                              ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                              : 'bg-sky-100 text-sky-700 border border-sky-200'
-                          }`}
-                        >
-                          {boatClass}
-                        </span>
+                {/* Sailing Days - fixed height area */}
+                <div className="mb-3 min-h-[40px]">
+                  {club.sailing_days && club.sailing_days.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Calendar size={14} className="text-blue-400" />
+                        <span className="text-xs font-medium text-blue-400">REGULAR SAILING</span>
+                      </div>
+                      {club.sailing_days.slice(0, 2).map((day) => (
+                        <div key={day.id} className="flex items-center gap-2 text-xs">
+                          <Clock size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                          <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                            {day.day_of_week}
+                          </span>
+                          <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
+                            {day.start_time.substring(0, 5)} - {day.end_time.substring(0, 5)}
+                          </span>
+                          {day.boat_class_name && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs">
+                              {day.boat_class_name}
+                            </span>
+                          )}
+                        </div>
                       ))}
-                      {club.boat_classes.length > 4 && (
-                        <span
-                          className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            darkMode
-                              ? 'bg-slate-700 text-slate-400'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          +{club.boat_classes.length - 4}
-                        </span>
+                      {club.sailing_days.length > 2 && (
+                        <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                          +{club.sailing_days.length - 2} more
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
-
-                {/* Activity Stats Grid */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <div className={`p-3 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700/30 border-slate-600/50'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="flex items-center justify-center mb-1">
-                      <Calendar size={18} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className={darkMode ? 'text-slate-600' : 'text-slate-400'} />
+                      <p className={`text-xs italic ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                        No sailing days defined
+                      </p>
                     </div>
-                    <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                      {club.upcoming_events || 0}
-                    </div>
-                    <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Events
-                    </div>
-                  </div>
-
-                  <div className={`p-3 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700/30 border-slate-600/50'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="flex items-center justify-center mb-1">
-                      <Trophy size={18} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
-                    </div>
-                    <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                      {club.recent_results || 0}
-                    </div>
-                    <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Results
-                    </div>
-                  </div>
-
-                  <div className={`p-3 rounded-lg border ${
-                    darkMode
-                      ? 'bg-slate-700/30 border-slate-600/50'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}>
-                    <div className="flex items-center justify-center mb-1">
-                      <Users size={18} className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} />
-                    </div>
-                    <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-                      {club.member_count || 0}
-                    </div>
-                    <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Members
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* Alert Stats - Only show if there are pending items */}
-                {((club.pending_applications || 0) > 0 || (club.pending_payments || 0) > 0) && (
-                  <div className="space-y-2 mb-4">
-                    {(club.pending_applications || 0) > 0 && (
-                      <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
-                        darkMode ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'
-                      }`}>
-                        <span className={`flex items-center gap-1.5 ${darkMode ? 'text-orange-300' : 'text-orange-700'}`}>
-                          <UserPlus size={14} />
-                          Pending Applications
-                        </span>
-                        <span className={`font-bold ${darkMode ? 'text-orange-200' : 'text-orange-800'}`}>
-                          {club.pending_applications}
+                {/* Boat Classes - fixed height area */}
+                <div className="mb-4 min-h-[52px]">
+                  {club.boat_classes && club.boat_classes.length > 0 ? (
+                    <>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Anchor size={14} className={darkMode ? 'text-sky-400' : 'text-sky-600'} />
+                        <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Classes Sailed
                         </span>
                       </div>
-                    )}
-                    {(club.pending_payments || 0) > 0 && (
-                      <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
-                        darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
-                      }`}>
-                        <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
-                          <DollarSign size={14} />
-                          Pending Payments
-                        </span>
-                        <span className={`font-bold ${darkMode ? 'text-red-200' : 'text-red-800'}`}>
-                          ${(club.pending_payments || 0).toFixed(2)}
-                        </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {club.boat_classes.slice(0, 4).map((boatClass, index) => (
+                          <span
+                            key={index}
+                            className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                              darkMode
+                                ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                : 'bg-sky-100 text-sky-700 border border-sky-200'
+                            }`}
+                          >
+                            {boatClass}
+                          </span>
+                        ))}
+                        {club.boat_classes.length > 4 && (
+                          <span
+                            className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                              darkMode
+                                ? 'bg-slate-700 text-slate-400'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            +{club.boat_classes.length - 4}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Anchor size={14} className={darkMode ? 'text-slate-600' : 'text-slate-400'} />
+                      <span className={`text-xs italic ${darkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+                        No classes recorded
+                      </span>
+                    </div>
+                  )}
+                </div>
 
-                {/* Actions */}
-                <button
-                  onClick={() => handleViewClub(club.id)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg font-medium transition-all"
-                >
-                  <Eye size={16} />
-                  View Members
-                </button>
+                {/* Bottom section - pushed to bottom */}
+                <div className="mt-auto space-y-3">
+                  {/* Activity Stats Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className={`p-3 rounded-lg border ${
+                      darkMode
+                        ? 'bg-slate-700/30 border-slate-600/50'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-center mb-1">
+                        <Calendar size={18} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
+                      </div>
+                      <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                        {club.upcoming_events || 0}
+                      </div>
+                      <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Events
+                      </div>
+                    </div>
+
+                    <div className={`p-3 rounded-lg border ${
+                      darkMode
+                        ? 'bg-slate-700/30 border-slate-600/50'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-center mb-1">
+                        <Trophy size={18} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                      </div>
+                      <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                        {club.recent_results || 0}
+                      </div>
+                      <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Results
+                      </div>
+                    </div>
+
+                    <div className={`p-3 rounded-lg border ${
+                      darkMode
+                        ? 'bg-slate-700/30 border-slate-600/50'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-center mb-1">
+                        <Users size={18} className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} />
+                      </div>
+                      <div className={`text-lg font-bold text-center ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                        {club.member_count || 0}
+                      </div>
+                      <div className={`text-xs text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Members
+                      </div>
+                    </div>
+                  </div>
+
+                  {(club.pending_payments || 0) > 0 && (
+                    <div className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${
+                      darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                        <DollarSign size={14} />
+                        Pending Payments
+                      </span>
+                      <span className={`font-bold ${darkMode ? 'text-red-200' : 'text-red-800'}`}>
+                        ${(club.pending_payments || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Actions - always at very bottom */}
+                  <button
+                    onClick={() => handleViewClub(club.id)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg font-medium transition-all"
+                  >
+                    <Eye size={16} />
+                    View Members
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1163,10 +1422,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         darkMode={darkMode}
       />
 
-      {/* Edit Club Modal */}
+      {/* Edit Club Wizard */}
       {selectedClubId && (
-        <ClubEditModal
-          clubId={selectedClubId}
+        <ClubOnboardingWizard
           isOpen={showEditModal}
           onClose={() => {
             setShowEditModal(false);
@@ -1177,6 +1435,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             setShowEditModal(false);
             setSelectedClubId(null);
           }}
+          stateAssociationId={currentOrganization?.id || ''}
+          darkMode={darkMode}
+          clubId={selectedClubId}
         />
       )}
 

@@ -5,34 +5,46 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
+import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 
 export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { currentClub } = useAuth();
+  const orgContext = useOrganizationContext();
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
-    fetchPendingApplications();
-  }, [currentClub]);
+    if (!orgContext.isLoading) {
+      fetchPendingApplications();
+    }
+  }, [orgContext.clubIds, orgContext.isLoading]);
 
   const fetchPendingApplications = async () => {
-    if (!currentClub?.clubId) {
+    if (orgContext.clubIds.length === 0) {
       setLoading(false);
       return;
     }
 
     try {
+      console.log('📊 Fetching pending applications for:', {
+        type: orgContext.type,
+        orgId: orgContext.currentOrganization?.id,
+        clubIds: orgContext.clubIds,
+        clubIdsLength: orgContext.clubIds.length
+      });
+
       const { count, error } = await supabase
         .from('membership_applications')
         .select('id', { count: 'exact', head: true })
-        .eq('club_id', currentClub.clubId)
+        .in('club_id', orgContext.clubIds)
         .eq('status', 'pending')
         .eq('is_draft', false);
 
       if (error) throw error;
 
+      console.log(`📋 Found ${count || 0} pending applications across ${orgContext.clubIds.length} clubs`);
       setPendingCount(count || 0);
     } catch (err) {
       console.error('Error fetching pending applications:', err);
@@ -43,7 +55,12 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
 
   const handleClick = () => {
     if (!isEditMode) {
-      navigate('/membership', { state: { activeTab: 'applications', filterStatus: 'pending' } });
+      // Navigate to association members page for state/national, or club membership for individual clubs
+      if (orgContext.type === 'state' || orgContext.type === 'national') {
+        navigate('/association-members', { state: { activeTab: 'applications', filterStatus: 'pending' } });
+      } else {
+        navigate('/membership', { state: { activeTab: 'applications', filterStatus: 'pending' } });
+      }
     }
   };
 
@@ -72,9 +89,9 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Pending Applications</p>
+          <p className="text-xs text-slate-400 mb-0.5">{orgContext.type === 'club' ? 'Pending Applications' : 'Pending Club Memberships'}</p>
           <p className="text-2xl font-bold text-white mb-0.5">
-            {loading ? '...' : pendingCount}
+            {loading || orgContext.isLoading ? '...' : pendingCount}
           </p>
           <p className="text-xs text-slate-400">
             {pendingCount > 0

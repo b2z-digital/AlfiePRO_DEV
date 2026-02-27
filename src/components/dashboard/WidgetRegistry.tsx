@@ -22,7 +22,9 @@ import {
   AlertCircle,
   PieChart,
   BarChart3,
-  Clock
+  Clock,
+  Building2,
+  ArrowRight
 } from 'lucide-react';
 import { WidgetDefinition } from '../../types/dashboard';
 import { FinancialHealthWidget } from './widgets/FinancialHealthWidget';
@@ -36,6 +38,7 @@ import { UpcomingEventsWidget } from './widgets/UpcomingEventsWidget';
 import { RecentResultsWidget } from './widgets/RecentResultsWidget';
 import { EventCountWidget } from './widgets/EventCountWidget';
 import { MembersCountWidget } from './widgets/MembersCountWidget';
+import { ClubsCountWidget } from './widgets/ClubsCountWidget';
 import { TasksCountWidget } from './widgets/TasksCountWidget';
 import { QuickEventSetupWidget } from './widgets/QuickEventSetupWidget';
 import { EventWebsitesWidget } from './widgets/EventWebsitesWidget';
@@ -52,6 +55,7 @@ import { FinancialPositionWidget } from './widgets/FinancialPositionWidget';
 import { MembershipOverviewWidget } from './widgets/MembershipOverviewWidget';
 import { ApplicationsRenewalsWidget } from './widgets/ApplicationsRenewalsWidget';
 import { RemittanceStatusWidget } from './widgets/RemittanceStatusWidget';
+import { RemittancePaymentFlowWidget } from './widgets/RemittancePaymentFlowWidget';
 import { ActiveMembersWidget } from './widgets/ActiveMembersWidget';
 import { PendingRenewalsWidget } from './widgets/PendingRenewalsWidget';
 import { NewMembersWidget } from './widgets/NewMembersWidget';
@@ -68,6 +72,7 @@ import { RecentApplicationsWidget } from './widgets/RecentApplicationsWidget';
 import { MembershipRenewalsWidget } from './widgets/MembershipRenewalsWidget';
 import { MembershipTypesLargeWidget } from './widgets/MembershipTypesLargeWidget';
 import { MembersByClassLargeWidget } from './widgets/MembersByClassLargeWidget';
+import { PlatformBillingWidget } from './widgets/PlatformBillingWidget';
 
 export const WIDGET_REGISTRY: WidgetDefinition[] = [
   {
@@ -142,6 +147,17 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     defaultSize: '1x1',
     component: MembersCountWidget,
     category: 'membership'
+  },
+  {
+    id: 'clubs-count',
+    type: 'clubs-count',
+    name: 'Association Clubs',
+    description: 'Total clubs in association and active subscription rate',
+    icon: Building2,
+    defaultSize: '1x1',
+    component: ClubsCountWidget,
+    category: 'membership',
+    associationOnly: true
   },
   {
     id: 'tasks-count',
@@ -399,10 +415,34 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     name: 'Association Remittances',
     description: 'Monitor association fees owed and payment status',
     icon: DollarSign,
-    defaultSize: '1x2',
+    defaultSize: '1x3',
     component: RemittanceStatusWidget,
     category: 'membership',
     requiredPermissions: ['admin', 'treasurer', 'membership']
+  },
+  {
+    id: 'remittance-payment-flow',
+    type: 'remittance-payment-flow',
+    name: 'Payment Flow',
+    description: 'Visual pipeline of payments from clubs through state to national association',
+    icon: ArrowRight,
+    defaultSize: '1x3',
+    component: RemittancePaymentFlowWidget,
+    category: 'finance',
+    requiredPermissions: ['admin', 'treasurer', 'membership'],
+    associationOnly: true
+  },
+  {
+    id: 'platform-billing',
+    type: 'platform-billing',
+    name: 'Platform Fees',
+    description: 'View AlfiePRO subscription fees, outstanding amounts, and payment history',
+    icon: Receipt,
+    defaultSize: '1x3',
+    component: PlatformBillingWidget,
+    category: 'finance',
+    requiredPermissions: ['admin', 'treasurer'],
+    associationOnly: true
   },
   {
     id: 'activity-feed',

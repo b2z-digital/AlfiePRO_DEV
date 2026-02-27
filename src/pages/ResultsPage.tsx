@@ -6,6 +6,9 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
 import { RaceSeries, RaceEvent } from '../types/race';
+import { HeatDesignation } from '../types/heat';
+import { LetterScore, getLetterScoreValue } from '../types';
+import { getLetterScorePointsForRace } from '../utils/scratchCalculations';
 import { getStoredRaceSeries, getStoredRaceEvents, combineAllDayResults, storeRaceSeries } from '../utils/raceStorage';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { formatDate } from '../utils/date';
@@ -323,9 +326,17 @@ export const ResultsPage: React.FC = () => {
       }
 
       // Combine club events with public events
-      const allEvents = [...events, ...publicEvents];
+      // For state/national associations, only show public events (not club events)
+      const allEvents = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
+        ? publicEvents
+        : [...events, ...publicEvents];
 
-      const enrichedSeries = await enrichSeriesWithRoundData(series);
+      // For state/national associations, don't show club series
+      const filteredSeries = (currentOrganization?.type === 'state' || currentOrganization?.type === 'national')
+        ? []
+        : series;
+
+      const enrichedSeries = await enrichSeriesWithRoundData(filteredSeries);
 
       // Fetch member avatars if online
       let memberAvatarMap: Record<string, string> = {};
@@ -874,7 +885,8 @@ export const ResultsPage: React.FC = () => {
         const eventComponent = React.createElement(EventResultsDisplay, {
           event: displayEvent,
           darkMode: false,
-          isExportMode: true
+          isExportMode: true,
+          seriesName: selectedRound?.seriesName
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -950,7 +962,8 @@ export const ResultsPage: React.FC = () => {
         const eventComponent = React.createElement(EventResultsDisplay, {
           event: displayEvent,
           darkMode: false,
-          isExportMode: true
+          isExportMode: true,
+          seriesName: selectedRound?.seriesName
         });
         const root = ReactDOM.createRoot(exportDiv);
         root.render(eventComponent);
@@ -1042,19 +1055,183 @@ export const ResultsPage: React.FC = () => {
       link.download = filename;
       link.click();
     } else if (event) {
-      csvData = event.skippers?.map((skipper, index) => ({
-        Position: index + 1,
-        Name: skipper.name,
-        'Sail Number': skipper.sailNo,
-        Club: skipper.club,
-        Design: skipper.hull || skipper.boatModel
-      })) || [];
+      const isShrs = event.heatManagement?.configuration?.scoringSystem === 'shrs';
+      const shrsQualifyingRounds = event.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+      const skippers = event.skippers || [];
+      const raceResults = event.raceResults || [];
 
-      const csv = Papa.unparse(csvData);
+      const groupResultsByRace = () => {
+        const resultsByRace: Record<number, any[]> = {};
+        if (!raceResults.length || !skippers.length) return resultsByRace;
+        const hasRaceProperty = raceResults.some(r => r.race !== undefined);
+        if (hasRaceProperty) {
+          raceResults.forEach(result => {
+            const raceNum = result.race;
+            if (!resultsByRace[raceNum]) resultsByRace[raceNum] = [];
+            resultsByRace[raceNum].push(result);
+          });
+        } else {
+          let currentRace = 1;
+          let skippersSeen = 0;
+          raceResults.forEach(result => {
+            if (!resultsByRace[currentRace]) resultsByRace[currentRace] = [];
+            resultsByRace[currentRace].push({ ...result, race: currentRace });
+            skippersSeen++;
+            if (skippersSeen === skippers.length) { currentRace++; skippersSeen = 0; }
+          });
+        }
+        return resultsByRace;
+      };
+
+      const resultsByRace = groupResultsByRace();
+      const allRaceNumbers = Object.keys(resultsByRace).map(Number).sort((a, b) => a - b);
+      const activeSkippers = skippers.filter(s => !s.withdrawnFromRace || typeof s.withdrawnFromRace !== 'number');
+      const activeSkipperCount = activeSkippers.length;
+      const raceNumbers = allRaceNumbers.filter(raceNum => {
+        const rr = resultsByRace[raceNum] || [];
+        const activeCount = rr.filter(result => {
+          const sk = skippers[result.skipperIndex];
+          if (!sk) return false;
+          return !sk.withdrawnFromRace || typeof sk.withdrawnFromRace !== 'number' || raceNum < sk.withdrawnFromRace;
+        }).length;
+        return activeCount >= activeSkipperCount;
+      });
+
+      const totals: Record<number, { gross: number; net: number }> = {};
+      const drops: Record<string, boolean> = {};
+
+      skippers.forEach((skipper, idx) => {
+        const scores = raceNumbers.map(raceNum => {
+          const rr = resultsByRace[raceNum] || [];
+          const result = rr.find((r: any) => r.skipperIndex === idx);
+          if (!result) {
+            const skipperWithdrewAtRace = skipper.withdrawnFromRace && typeof skipper.withdrawnFromRace === 'number' && raceNum >= skipper.withdrawnFromRace;
+            if (skipperWithdrewAtRace) return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
+            return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
+          }
+          if (result.letterScore) {
+            if ((result.letterScore === 'RDG' || result.letterScore === 'DPI' || result.letterScore === 'RDGfix') && result.customPoints !== undefined) {
+              return { race: raceNum, score: result.customPoints, isDNE: false, isLetterScore: true };
+            }
+            const raceFinishers = rr.filter((res: any) => res.position !== null && !res.letterScore).length;
+            return { race: raceNum, score: getLetterScoreValue(result.letterScore as LetterScore, raceFinishers, skippers.length), isDNE: result.letterScore === 'DNE', isLetterScore: true };
+          }
+          if (result.position !== null) return { race: raceNum, score: result.position, isDNE: false, isLetterScore: false };
+          return { race: raceNum, score: skippers.length + 1, isDNE: false, isLetterScore: false };
+        });
+
+        const gross = scores.reduce((sum, r) => sum + r.score, 0);
+        let numDrops = 0;
+        const dropRules = event.dropRules || [4, 8, 16, 24, 32, 40];
+        for (const threshold of dropRules) {
+          if (scores.length >= threshold) numDrops++;
+          else break;
+        }
+        if (numDrops === 0) { totals[idx] = { gross, net: gross }; return; }
+        const dneScores = scores.filter(s => s.isDNE);
+        const droppableScores = scores.filter(s => !s.isDNE);
+        const sortedDroppable = [...droppableScores].sort((a, b) => b.score - a.score);
+        sortedDroppable.slice(0, numDrops).forEach(r => { drops[`${idx}-${r.race}`] = true; });
+        let net = gross;
+        scores.forEach(r => { if (drops[`${idx}-${r.race}`]) net -= r.score; });
+        totals[idx] = { gross, net };
+      });
+
+      const sortedSkippers = skippers.map((skipper, index) => ({
+        ...skipper, index, netTotal: totals[index]?.net || 0
+      })).sort((a, b) => {
+        if (a.netTotal !== b.netTotal) return a.netTotal - b.netTotal;
+        return a.index - b.index;
+      });
+
+      const shrsFleetMap = new Map<number, HeatDesignation>();
+      if (isShrs && event.heatManagement) {
+        const finalsRounds = event.heatManagement.rounds.filter(r => r.round > shrsQualifyingRounds && r.completed);
+        if (finalsRounds.length > 0) {
+          finalsRounds[0].heatAssignments.forEach(assignment => {
+            assignment.skipperIndices.forEach(idx => {
+              shrsFleetMap.set(idx, assignment.heatDesignation);
+            });
+          });
+        }
+      }
+      const shrsHasFinals = isShrs && shrsFleetMap.size > 0;
+
+      const displaySkippers = shrsHasFinals
+        ? [...sortedSkippers].sort((a, b) => {
+            const fleetA = shrsFleetMap.get(a.index) || 'Z';
+            const fleetB = shrsFleetMap.get(b.index) || 'Z';
+            if (fleetA !== fleetB) return fleetA.localeCompare(fleetB);
+            if (a.netTotal !== b.netTotal) return a.netTotal - b.netTotal;
+            return a.index - b.index;
+          })
+        : sortedSkippers;
+
+      const fleetNames: Record<string, string> = { 'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet', 'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F' };
+      const getRaceLabel = (raceNum: number) => {
+        if (!isShrs) return `R${raceNum}`;
+        return raceNum <= shrsQualifyingRounds ? `Q${raceNum}` : `F${raceNum - shrsQualifyingRounds}`;
+      };
+
+      const csvRows: any[] = [];
+      let currentFleet: string | null = null;
+      let posCounter = 0;
+
+      displaySkippers.forEach(skipper => {
+        const skipperFleet = shrsHasFinals ? (shrsFleetMap.get(skipper.index) || 'Z') : null;
+
+        if (shrsHasFinals && skipperFleet !== currentFleet) {
+          currentFleet = skipperFleet;
+          posCounter = 0;
+          const separator: Record<string, string> = { Position: '', 'Sail Number': '', Skipper: fleetNames[skipperFleet!] || `Fleet ${skipperFleet}`, Club: '', Design: '' };
+          if (shrsHasFinals) separator['Fleet'] = '';
+          raceNumbers.forEach(rn => { separator[getRaceLabel(rn)] = ''; });
+          separator['Gross'] = '';
+          separator['Net'] = '';
+          csvRows.push(separator);
+        }
+
+        posCounter++;
+        const row: Record<string, string | number> = {};
+        row['Position'] = posCounter;
+        row['Sail Number'] = skipper.sailNo || '';
+        row['Skipper'] = skipper.name;
+        row['Club'] = skipper.club || '';
+        row['Design'] = skipper.hull || skipper.boatModel || '';
+        if (shrsHasFinals) {
+          row['Fleet'] = skipperFleet === 'A' ? 'Gold' : skipperFleet === 'B' ? 'Silver' : skipperFleet === 'C' ? 'Bronze' : skipperFleet || '';
+        }
+
+        raceNumbers.forEach(raceNum => {
+          const rr = resultsByRace[raceNum] || [];
+          const result = rr.find((r: any) => r.skipperIndex === skipper.index);
+          const isDropped = drops[`${skipper.index}-${raceNum}`];
+          let val = '-';
+          if (result) {
+            if (result.letterScore) {
+              const pts = getLetterScorePointsForRace(result.letterScore, raceNum, raceResults, skippers, skipper.index);
+              val = `${pts}`;
+            } else if (result.position !== null) {
+              val = `${result.position}`;
+            }
+          } else {
+            const skipperWithdrew = skipper.withdrawnFromRace && typeof skipper.withdrawnFromRace === 'number' && raceNum >= skipper.withdrawnFromRace;
+            if (skipperWithdrew) val = `${skippers.length + 1}`;
+          }
+          row[getRaceLabel(raceNum)] = isDropped ? `[${val}]` : val;
+        });
+
+        row['Gross'] = totals[skipper.index]?.gross || 0;
+        row['Net'] = totals[skipper.index]?.net || 0;
+        csvRows.push(row);
+      });
+
+      const csv = Papa.unparse(csvRows);
       const blob = new Blob([csv], { type: 'text/csv' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `results-${Date.now()}.csv`;
+      const eventName = event.eventName || (event as any).name || 'results';
+      link.download = `${eventName.replace(/\s+/g, '_')}_results_${Date.now()}.csv`;
       link.click();
     }
     } catch (error) {
@@ -1827,6 +2004,7 @@ export const ResultsPage: React.FC = () => {
           darkMode={true}
           heatManagement={selectedEvent.heatManagement}
           skippers={selectedEvent.skippers}
+          currentEvent={selectedEvent}
         />
       )}
 

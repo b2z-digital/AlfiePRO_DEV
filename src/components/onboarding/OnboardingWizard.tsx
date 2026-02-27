@@ -255,6 +255,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ darkMode, on
     const applicationData = { ...formData, ...finalData };
 
     try {
+      // Check if user has existing memberships at other clubs
+      const { data: existingMemberships } = await supabase
+        .from('club_memberships')
+        .select('id, club_id')
+        .eq('member_id', user.id)
+        .neq('club_id', applicationData.clubId)
+        .in('status', ['active', 'pending']);
+
+      const hasExistingMembership = existingMemberships && existingMemberships.length > 0;
+
       const payload = {
         user_id: user.id,
         club_id: applicationData.clubId,
@@ -277,7 +287,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ darkMode, on
         payment_method: applicationData.paymentMethod,
         code_of_conduct_accepted: applicationData.codeOfConductAccepted,
         code_of_conduct_accepted_at: new Date().toISOString(),
-        application_data: applicationData,
+        application_data: {
+          ...applicationData,
+          has_existing_membership: hasExistingMembership,
+          should_pay_association_fees: !hasExistingMembership,
+        },
         draft_step: 0,
         is_draft: false,
         status: 'pending',

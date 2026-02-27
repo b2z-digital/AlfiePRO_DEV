@@ -3,8 +3,9 @@ import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, Edit2, Che
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
-import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS } from '../utils/shrsHeatSystem';
+import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
+import { HMSSeedingModal } from './HMSSeedingModal';
 import { ConfirmationModal } from './ConfirmationModal';
 import { supabase } from '../utils/supabase';
 
@@ -36,6 +37,7 @@ interface RaceSettingsModalProps {
   onClearAllRaceResults?: () => void;
   onScoringModeChange?: (mode: 'pro' | 'touch') => void;
   currentEvent?: any;
+  autoEnableHeatRacing?: boolean;
 }
 
 const DROP_RULE_OPTIONS = [
@@ -43,7 +45,7 @@ const DROP_RULE_OPTIONS = [
   { label: 'Low Point System (1 after 4, 2 after 8, 3 after 12 and then every 4 races after)', value: [4, 8, 12, 16, 20, 24, 28, 32, 36, 40], forHeatRacing: false },
   { label: 'RRS - Appendix A Scoring System (1 after 4, 2 after 8, 3 after 16 and then every 8 races after)', value: [4, 8, 16, 24, 32, 40], forHeatRacing: false },
   { label: 'HMS Heat System', value: 'hms', forHeatRacing: true },
-  { label: 'SHRS - Simple Heat Racing System (1 after 4, 2 after 8, +1 per 8 races)', value: 'shrs', forHeatRacing: true },
+  { label: 'SHR - Structured Heat Racing (1 after 4, 2 after 8, +1 per 8 races)', value: 'shrs', forHeatRacing: true },
   { label: 'Custom', value: 'custom', forHeatRacing: false }
 ];
 
@@ -64,7 +66,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   hasRaceResults = false,
   onClearAllRaceResults,
   onScoringModeChange,
-  currentEvent
+  currentEvent,
+  autoEnableHeatRacing = false
 }) => {
   const [currentNumRaces, setCurrentNumRaces] = useState(initialNumRaces);
   const [currentDropRules, setCurrentDropRules] = useState<number[] | string>(initialDropRules);
@@ -77,10 +80,80 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   );
   const [currentHeatManagement, setCurrentHeatManagement] = useState<HeatManagement | null>(initialHeatManagement);
   const [scoringMode, setScoringMode] = useState<'pro' | 'touch'>('pro');
+  const [nationalAssociationId, setNationalAssociationId] = useState<string | undefined>(undefined);
 
   // Observer settings
   const [enableObservers, setEnableObservers] = useState(currentEvent?.enable_observers ?? true);
   const [observersPerHeat, setObserversPerHeat] = useState(currentEvent?.observers_per_heat ?? 2);
+
+  // Start system
+
+  // SHRS qualifying/finals structure
+  const [shrsQualifyingRounds, setShrsQualifyingRounds] = useState(
+    initialHeatManagement?.configuration.shrsQualifyingRounds || Math.max(2, Math.floor(initialNumRaces * 2 / 3))
+  );
+  const [shrsAssignmentMode, setShrsAssignmentMode] = useState<'progressive' | 'preset'>(
+    initialHeatManagement?.configuration.shrsAssignmentMode || 'progressive'
+  );
+
+  // Load national association ID from club's state association
+  useEffect(() => {
+    const loadNationalAssociationId = async () => {
+      console.log('RaceSettingsModal: Attempting to load national association ID', {
+        isOpen,
+        currentEvent,
+        clubId: currentEvent?.clubId,
+        hasCurrentEvent: !!currentEvent
+      });
+
+      if (!isOpen) {
+        console.log('Modal not open, skipping');
+        return;
+      }
+
+      if (!currentEvent?.clubId) {
+        console.warn('No clubId on currentEvent, cannot load national association ID');
+        return;
+      }
+
+      try {
+        console.log('Fetching club data for clubId:', currentEvent.clubId);
+        // Get club's state association
+        const { data: clubData, error: clubError } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', currentEvent.clubId)
+          .single();
+
+        console.log('Club data result:', { clubData, clubError });
+
+        if (clubData?.state_association_id) {
+          console.log('Fetching state association data for:', clubData.state_association_id);
+          // Get state association's national association
+          const { data: stateData, error: stateError } = await supabase
+            .from('state_associations')
+            .select('national_association_id')
+            .eq('id', clubData.state_association_id)
+            .single();
+
+          console.log('State association data result:', { stateData, stateError });
+
+          if (stateData?.national_association_id) {
+            setNationalAssociationId(stateData.national_association_id);
+            console.log('✓ Successfully loaded national association ID:', stateData.national_association_id);
+          } else {
+            console.warn('State association has no national_association_id');
+          }
+        } else {
+          console.warn('Club has no state_association_id');
+        }
+      } catch (err) {
+        console.error('Error loading national association ID:', err);
+      }
+    };
+
+    loadNationalAssociationId();
+  }, [isOpen, currentEvent?.clubId]);
 
   // Load user's scoring mode preference
   useEffect(() => {
@@ -195,7 +268,25 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     return { isValid: true };
   };
 
-  const configValidation = validatePromotionRelegationPractical(skippers.length, numHeats, promotionCount);
+  const isSHRS = currentDropRules === 'shrs';
+
+  const validateSHRSPractical = (totalSkippers: number, heats: number): { isValid: boolean; message?: string } => {
+    if (heats > 5) {
+      return { isValid: false, message: 'SHR allows a maximum of 5 heats.' };
+    }
+    const maxPerHeat = Math.ceil(totalSkippers / heats);
+    if (maxPerHeat > 20) {
+      return { isValid: false, message: `SHR allows a maximum of 20 boats per heat. With ${totalSkippers} boats and ${heats} heats, the largest heat would have ${maxPerHeat}. Add more heats or reduce entries.` };
+    }
+    if (totalSkippers > 100) {
+      return { isValid: false, message: `SHR supports a maximum of 100 boats (5 heats x 20 boats). You have ${totalSkippers} entries.` };
+    }
+    return { isValid: true };
+  };
+
+  const configValidation = isSHRS
+    ? validateSHRSPractical(skippers.length, numHeats)
+    : validatePromotionRelegationPractical(skippers.length, numHeats, promotionCount);
 
   // Calculate heat sizes based on actual heat count (manual or auto)
   const calculateHeatSizes = (totalSkippers: number, heats: number): number[] => {
@@ -203,24 +294,34 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     const baseSize = Math.floor(totalSkippers / heats);
     const remainder = totalSkippers % heats;
     const sizes = new Array(heats).fill(baseSize);
-    // Add remainder boats to the FIRST heat (Heat A - top heat)
-    // In HMS, Heat A is the top heat with best skippers and should be largest
-    // Bottom heats (B, C, D, etc.) get base size
-    if (remainder > 0) {
-      sizes[0] += remainder;
+    if (isSHRS) {
+      for (let i = 0; i < remainder; i++) {
+        sizes[i]++;
+      }
+    } else {
+      if (remainder > 0) {
+        sizes[0] += remainder;
+      }
     }
     return sizes;
   };
 
   const heatSizes = numHeats > 0 ? calculateHeatSizes(skippers.length, numHeats) : [];
 
-  const [initialAssignment, setInitialAssignment] = useState<'random' | 'manual'>('random');
+  const [initialAssignment, setInitialAssignment] = useState<'random' | 'manual' | 'hms'>('random');
   const [showManualAssignmentModal, setShowManualAssignmentModal] = useState(false);
+  const [showHMSSeedingModal, setShowHMSSeedingModal] = useState(false);
 
   useEffect(() => {
     if (initialHeatManagement?.configuration) {
       const config = initialHeatManagement.configuration;
-      setInitialAssignment(config.seedingMethod === 'random' ? 'random' : 'manual');
+      if (config.seedingMethod === 'random') {
+        setInitialAssignment('random');
+      } else if (config.seedingMethod === 'ranking') {
+        setInitialAssignment('hms');
+      } else {
+        setInitialAssignment('manual');
+      }
     }
   }, [initialHeatManagement]);
 
@@ -258,7 +359,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       // Validate configuration
-      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : 'manual';
+      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : initialAssignment === 'hms' ? 'ranking' : 'manual';
       const config: HMSConfig = {
         numberOfHeats: numHeats,
         promotionCount,
@@ -299,18 +400,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         });
       }
 
-      // For manual assignment, open modal instead of auto-seeding
-      if (initialAssignment === 'manual') {
-        setShowManualAssignmentModal(true);
-        return;
-      }
-
-      // DON'T seed heats immediately when toggling on
-      // Wait until user clicks "Save Settings" to seed with final configuration
-      // Just enable the UI for now
+      // DON'T open assignment modals or seed heats immediately when toggling on
+      // Wait until user configures settings and clicks "Save Settings"
+      // This prevents modals from opening before the race officer has set the number of heats
       return;
     } else if (!enabled) {
-      // Disabling heat racing
+      // Disabling heat racing - COMPLETELY CLEAR all heat management data
       setIsHeatRacingEnabled(false);
 
       // Reset manual overrides so they start fresh when re-enabled
@@ -322,18 +417,26 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         setCurrentDropRules([4, 8, 16, 24, 32, 40]); // RRS - Appendix A
       }
 
-      if (currentHeatManagement) {
-        // Disable heat management but preserve configuration
-        setCurrentHeatManagement({
-          ...currentHeatManagement,
-          configuration: {
-            ...currentHeatManagement.configuration,
-            enabled: false
-          }
-        });
+      // Completely clear heat management data (don't preserve old assignments)
+      setCurrentHeatManagement(null);
+
+      if (addNotification) {
+        addNotification('info', 'Heat Racing disabled. All heat assignments and configuration cleared.');
       }
     }
   };
+
+  useEffect(() => {
+    if (isOpen && autoEnableHeatRacing && !isHeatRacingEnabled && skippers.length >= 16) {
+      handleHeatToggle(true);
+      setTimeout(() => {
+        const heatSection = document.getElementById('heat-racing-section');
+        if (heatSection) {
+          heatSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 200);
+    }
+  }, [isOpen, autoEnableHeatRacing]);
 
   if (!isOpen) return null;
 
@@ -348,7 +451,10 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
     } else {
       setIsCustomDropRules(false);
-      setCurrentDropRules(value); // Can be either array or string ('hms' or 'shrs')
+      setCurrentDropRules(value);
+      if (value === 'shrs') {
+        setInitialAssignment('hms');
+      }
     }
   };
 
@@ -365,6 +471,31 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
   const handleManualAssignmentConfirm = (assignments: any[]) => {
     console.log('🎯 Manual assignments received:', JSON.stringify(assignments, null, 2));
 
+    let allRounds;
+    if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+      const allQualifyingRounds = generatePreSetQualifyingAssignments(
+        assignments,
+        numHeats,
+        shrsQualifyingRounds
+      );
+      allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+        round: idx + 1,
+        heatAssignments: roundAssignments.map(a => ({
+          heatDesignation: a.heatDesignation as any,
+          skipperIndices: a.skipperIndices
+        })),
+        results: [],
+        completed: false
+      }));
+    } else {
+      allRounds = [{
+        round: 1,
+        heatAssignments: assignments,
+        results: [],
+        completed: false
+      }];
+    }
+
     const finalHeatManagement = {
       configuration: {
         enabled: true,
@@ -372,18 +503,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         promotionCount: promotionCount,
         seedingMethod: 'manual' as SeedingMethod,
         autoAssign: false,
-        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
       },
       currentRound: 1,
       currentHeat: assignments[assignments.length - 1].heatDesignation,
-      rounds: [
-        {
-          round: 1,
-          heatAssignments: assignments,
-          results: [],
-          completed: false
-        }
-      ]
+      rounds: allRounds
     };
 
     console.log('🎯 Saving heat management:', JSON.stringify(finalHeatManagement, null, 2));
@@ -395,6 +520,62 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     });
 
     setShowManualAssignmentModal(false);
+  };
+
+  const handleHMSSeedingConfirm = (assignments: any[], rankedSkipperIndices?: number[]) => {
+    console.log('🎯 HMS Seeding assignments received:', JSON.stringify(assignments, null, 2));
+    console.log('🎯 Ranked skipper indices:', rankedSkipperIndices);
+
+    let allRounds;
+    if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+      const allQualifyingRounds = generatePreSetQualifyingAssignments(
+        assignments,
+        numHeats,
+        shrsQualifyingRounds
+      );
+      allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+        round: idx + 1,
+        heatAssignments: roundAssignments.map(a => ({
+          heatDesignation: a.heatDesignation as any,
+          skipperIndices: a.skipperIndices
+        })),
+        results: [],
+        completed: false
+      }));
+    } else {
+      allRounds = [{
+        round: 1,
+        heatAssignments: assignments,
+        results: [],
+        completed: false
+      }];
+    }
+
+    const finalHeatManagement = {
+      configuration: {
+        enabled: true,
+        numberOfHeats: numHeats,
+        promotionCount: promotionCount,
+        seedingMethod: 'manual' as SeedingMethod,
+        autoAssign: false,
+        scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {}),
+        ...(rankedSkipperIndices && rankedSkipperIndices.length > 0 ? { rankedSkipperIndices } : {})
+      },
+      currentRound: 1,
+      currentHeat: assignments[assignments.length - 1].heatDesignation,
+      rounds: allRounds
+    };
+
+    console.log('🎯 Saving HMS Seeding heat management:', JSON.stringify(finalHeatManagement, null, 2));
+
+    onSaveSettings({
+      numRaces: currentNumRaces,
+      dropRules: currentDropRules,
+      heatManagement: finalHeatManagement
+    });
+
+    setShowHMSSeedingModal(false);
   };
 
   const handleScoringModeChange = async (mode: 'pro' | 'touch') => {
@@ -429,18 +610,43 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
     if (isHeatRacingEnabled) {
       // Validate configuration
-      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : 'manual';
+      const seedingMethod: SeedingMethod = initialAssignment === 'random' ? 'random' : initialAssignment === 'hms' ? 'ranking' : 'manual';
       console.log('🎯 numHeats being used:', numHeats, '(manualHeatCount:', manualHeatCount, ', recommended:', optimalHeats.numberOfHeats, ')');
       console.log('🎯 promotionCount being used:', promotionCount, '(manualPromotionCount:', manualPromotionCount, ')');
+      console.log('🎯 Scoring system:', currentDropRules);
 
-      const config: HMSConfig = {
-        numberOfHeats: numHeats,
-        promotionCount: promotionCount,
-        seedingMethod,
-        maxHeatSize: 12
-      };
+      // Use appropriate validation based on scoring system
+      let validation: { valid: boolean; errors: string[]; warnings: string[] };
 
-      const validation = validateHeatConfig(config, skippers.length);
+      if (currentDropRules === 'shrs') {
+        // SHRS validation - no promotion/relegation
+        // SHRS typically uses about 1/3 of races for qualifying, minimum 2 races
+        const qualifyingRaces = Math.max(2, Math.floor(currentNumRaces / 3));
+
+        const shrsConfig: SHRSConfig = {
+          numberOfHeats: numHeats,
+          numberOfRaces: currentNumRaces,
+          qualifyingRaces: qualifyingRaces,
+          useTable2: true // Use alphabetic labeling (A, B, C, D)
+        };
+        const shrsValidation = validateSHRSConfig(shrsConfig, skippers.length);
+        // Adapt SHRS validation result to match HMS format
+        validation = {
+          valid: shrsValidation.isValid,
+          errors: shrsValidation.errors,
+          warnings: [] // SHRS doesn't have warnings
+        };
+      } else {
+        // HMS validation - with promotion/relegation
+        const hmsConfig: HMSConfig = {
+          numberOfHeats: numHeats,
+          promotionCount: promotionCount,
+          seedingMethod,
+          maxHeatSize: 12
+        };
+        validation = validateHeatConfig(hmsConfig, skippers.length);
+      }
+
       if (!validation.valid) {
         if (addNotification) {
           addNotification('error', `Cannot save heat racing settings: ${validation.errors.join(', ')}`);
@@ -450,7 +656,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         return;
       }
 
-      // Show HMS recommendations as info notification
+      // Show recommendations as info notification
       if (validation.warnings.length > 0 && addNotification) {
         validation.warnings.forEach(warning => {
           addNotification('info', warning);
@@ -458,24 +664,35 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
 
       if (currentHeatManagement) {
-        // CRITICAL: Compare against ACTUAL number of heats in assignments, not stored config
-        // The config might have been saved incorrectly before, so we need to check reality
         const actualHeatCount = currentHeatManagement.rounds[0]?.heatAssignments?.length || 0;
         const heatCountChanged = actualHeatCount !== numHeats;
         const hasAnyRoundResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
-
-        // When reducing heat count, we MUST regenerate even if there are results
-        // because we can't have 3 heats in assignments when config says 2 heats
         const isReducingHeats = actualHeatCount > numHeats;
-        const shouldRegenerate = heatCountChanged && (!hasAnyRoundResults || isReducingHeats);
+
+        const previousScoringSystem = currentHeatManagement.configuration.scoringSystem || 'hms';
+        const newScoringSystem = (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules as string : 'hms';
+        const scoringSystemChanged = previousScoringSystem !== newScoringSystem;
+
+        // Check if heat sizes are unbalanced (indicates old seeding algorithm or corrupted data)
+        const currentHeatSizes = currentHeatManagement.rounds[0]?.heatAssignments?.map(h => h.skipperIndices.length) || [];
+        const maxSize = Math.max(...currentHeatSizes);
+        const minSize = Math.min(...currentHeatSizes);
+        const hasUnbalancedHeats = currentHeatSizes.length > 0 && maxSize - minSize > 1 && !hasAnyRoundResults;
+
+        const shouldRegenerate = (heatCountChanged || scoringSystemChanged || hasUnbalancedHeats) && (!hasAnyRoundResults || isReducingHeats || scoringSystemChanged || hasUnbalancedHeats);
 
         console.log('🔍 Heat regeneration check:', {
           storedConfigHeats: currentHeatManagement.configuration.numberOfHeats,
           actualHeatsInAssignments: actualHeatCount,
           newHeats: numHeats,
           heatCountChanged,
+          scoringSystemChanged,
+          previousScoringSystem,
+          newScoringSystem,
           hasAnyRoundResults,
           isReducingHeats,
+          currentHeatSizes,
+          hasUnbalancedHeats,
           shouldRegenerate,
           roundsData: currentHeatManagement.rounds.map(r => ({
             round: r.round,
@@ -485,32 +702,63 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         });
 
         if (shouldRegenerate) {
-          // Regenerate heats when count changes (especially when reducing)
+          if (initialAssignment === 'manual') {
+            setShowManualAssignmentModal(true);
+            return;
+          }
+          if (initialAssignment === 'hms') {
+            setShowHMSSeedingModal(true);
+            return;
+          }
+
           if (hasAnyRoundResults) {
             console.log('⚠️ Regenerating heats will clear existing results!');
           }
+
+          if (hasUnbalancedHeats && addNotification) {
+            addNotification('info', `Detected unbalanced heat sizes (${currentHeatSizes.join(', ')}). Auto-fixing to balanced distribution.`);
+          }
+
           console.log('🔄 Heat count changed from', currentHeatManagement.configuration.numberOfHeats, 'to', numHeats, '- regenerating heats');
 
           let heatAssignments;
 
           if (currentDropRules === 'shrs') {
-            // Use SHRS-specific seeding (zigzag pattern)
-            const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
-            const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-            heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
-              const heatIndex = Number(heatNum) - 1;
-              return {
-                heatDesignation: heatLabels[heatIndex] as any,
-                skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => sk.sailNumber === s.sailNumber))
-              };
-            });
+            heatAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
           } else {
-            // Use HMS seeding
-            heatAssignments = seedInitialHeats(skippers, config);
+            const hmsSeederConfig: HMSConfig = {
+              numberOfHeats: numHeats,
+              promotionCount: promotionCount,
+              seedingMethod,
+              maxHeatSize: 12
+            };
+            heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
           }
 
-          console.log('✅ Generated', heatAssignments.length, 'heat assignments:', heatAssignments.map(h => h.heatDesignation));
+          let allRounds;
+          if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+            const allQualifyingRounds = generatePreSetQualifyingAssignments(
+              heatAssignments,
+              numHeats,
+              shrsQualifyingRounds
+            );
+            allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+              round: idx + 1,
+              heatAssignments: roundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as any,
+                skipperIndices: a.skipperIndices
+              })),
+              results: [],
+              completed: false
+            }));
+          } else {
+            allRounds = [{
+              round: 1,
+              heatAssignments,
+              results: [],
+              completed: false
+            }];
+          }
 
           finalHeatManagement = {
             configuration: {
@@ -519,34 +767,62 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               promotionCount: promotionCount,
               seedingMethod,
               autoAssign: initialAssignment === 'random',
-              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
             },
             currentRound: 1,
             currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
-            rounds: [
-              {
-                round: 1,
-                heatAssignments,
-                results: [],
-                completed: false
-              }
-            ]
+            rounds: allRounds
           };
         } else {
-          // Only update configuration without regenerating heats
-          // This happens when increasing heat count with existing results
           console.log('ℹ️ Updating configuration only - preserving existing heat assignments and results');
-          finalHeatManagement = {
-            ...currentHeatManagement,
-            configuration: {
-              enabled: true,
-              numberOfHeats: numHeats,
-              promotionCount: promotionCount,
-              seedingMethod,
-              autoAssign: initialAssignment === 'random',
-              scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
-            }
+          const updatedConfig = {
+            enabled: true,
+            numberOfHeats: numHeats,
+            promotionCount: promotionCount,
+            seedingMethod,
+            autoAssign: initialAssignment === 'random',
+            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+            ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
           };
+
+          const hasResults = currentHeatManagement.rounds.some(r => r.results && r.results.length > 0);
+          const needsPreAssignments = currentDropRules === 'shrs' &&
+            shrsAssignmentMode === 'preset' &&
+            shrsQualifyingRounds > 1 &&
+            !hasResults &&
+            currentHeatManagement.rounds.length < shrsQualifyingRounds;
+
+          if (needsPreAssignments) {
+            const firstRoundAssignments = currentHeatManagement.rounds[0]?.heatAssignments || [];
+            const allQualifyingRounds = generatePreSetQualifyingAssignments(
+              firstRoundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as string,
+                skipperIndices: [...a.skipperIndices]
+              })),
+              numHeats,
+              shrsQualifyingRounds
+            );
+            const allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+              round: idx + 1,
+              heatAssignments: roundAssignments.map(a => ({
+                heatDesignation: a.heatDesignation as any,
+                skipperIndices: a.skipperIndices
+              })),
+              results: [],
+              completed: false
+            }));
+            finalHeatManagement = {
+              ...currentHeatManagement,
+              configuration: updatedConfig,
+              rounds: allRounds
+            };
+          } else {
+            finalHeatManagement = {
+              ...currentHeatManagement,
+              configuration: updatedConfig
+            };
+          }
         }
       } else {
         // For manual assignment, show the manual assignment modal
@@ -555,24 +831,49 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
           return; // Don't save yet, wait for manual assignments
         }
 
-        // Create new heat management with seeded heats
+        // For HMS seeding, show the HMS seeding modal
+        if (initialAssignment === 'hms') {
+          setShowHMSSeedingModal(true);
+          return; // Don't save yet, wait for HMS seeding assignments
+        }
+
         let heatAssignments;
 
         if (currentDropRules === 'shrs') {
-          // Use SHRS-specific seeding (zigzag pattern)
-          const shrsHeats = seedInitialHeatsForSHRS(skippers, numHeats);
-          const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-          heatAssignments = Array.from(shrsHeats.entries()).map(([heatNum, heatSkippers]) => {
-            const heatIndex = Number(heatNum) - 1;
-            return {
-              heatDesignation: heatLabels[heatIndex] as any,
-              skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => sk.sailNumber === s.sailNumber))
-            };
-          });
+          heatAssignments = seedSHRSHeatsByIndex(skippers, numHeats);
         } else {
-          // Use HMS seeding
-          heatAssignments = seedInitialHeats(skippers, config);
+          const hmsSeederConfig: HMSConfig = {
+            numberOfHeats: numHeats,
+            promotionCount: promotionCount,
+            seedingMethod,
+            maxHeatSize: 12
+          };
+          heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
+        }
+
+        let allRounds;
+        if (currentDropRules === 'shrs' && shrsAssignmentMode === 'preset' && shrsQualifyingRounds > 1) {
+          const allQualifyingRounds = generatePreSetQualifyingAssignments(
+            heatAssignments,
+            numHeats,
+            shrsQualifyingRounds
+          );
+          allRounds = allQualifyingRounds.map((roundAssignments, idx) => ({
+            round: idx + 1,
+            heatAssignments: roundAssignments.map(a => ({
+              heatDesignation: a.heatDesignation as any,
+              skipperIndices: a.skipperIndices
+            })),
+            results: [],
+            completed: false
+          }));
+        } else {
+          allRounds = [{
+            round: 1,
+            heatAssignments,
+            results: [],
+            completed: false
+          }];
         }
 
         finalHeatManagement = {
@@ -582,18 +883,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
             promotionCount: promotionCount,
             seedingMethod,
             autoAssign: initialAssignment === 'random',
-            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms'
+            scoringSystem: (currentDropRules === 'hms' || currentDropRules === 'shrs') ? currentDropRules : 'hms',
+        ...(currentDropRules === 'shrs' ? { shrsQualifyingRounds, shrsAssignmentMode } : {})
           },
           currentRound: 1,
-          currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation, // Start with lowest heat
-          rounds: [
-            {
-              round: 1,
-              heatAssignments,
-              results: [],
-              completed: false
-            }
-          ]
+          currentHeat: heatAssignments[heatAssignments.length - 1].heatDesignation,
+          rounds: allRounds
         };
       }
     } else {
@@ -618,7 +913,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       heatDesignations: finalHeatManagement?.rounds[0]?.heatAssignments.map(h => h.heatDesignation)
     });
 
-    onSaveSettings({
+    await onSaveSettings({
       numRaces: currentNumRaces,
       dropRules: currentDropRules,
       heatManagement: finalHeatManagement,
@@ -632,13 +927,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
       }
     });
 
-    // Show success notification
     if (addNotification) {
       addNotification('success', 'Updated Successfully');
     }
-
-    // Close the modal
-    onClose();
   };
 
   return (
@@ -750,17 +1041,6 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </h3>
             </div>
 
-            {isHeatRacingEnabled && (
-              <div className={`p-3 rounded-lg ${darkMode ? 'bg-amber-900/20 border border-amber-600/30' : 'bg-amber-50 border border-amber-200'}`}>
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={16} className={`flex-shrink-0 mt-0.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`} />
-                  <p className={`text-xs ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>
-                    Touch Mode is not available when Heat Racing is enabled. Heat Racing uses a specialized scoring interface.
-                  </p>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2">
               <button
                 type="button"
@@ -797,11 +1077,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
 
               <button
                 type="button"
-                onClick={() => !isHeatRacingEnabled && handleScoringModeChange('touch')}
-                disabled={isHeatRacingEnabled}
+                onClick={() => handleScoringModeChange('touch')}
                 className={`
                   w-full p-4 rounded-lg transition-all border-2 text-left
-                  ${isHeatRacingEnabled ? 'opacity-50 cursor-not-allowed' : ''}
                   ${scoringMode === 'touch'
                     ? darkMode
                       ? 'bg-blue-900/30 border-blue-600'
@@ -818,10 +1096,9 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                     </div>
                     <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                       Simplified tablet interface with large sail numbers (Tablet)
-                      {isHeatRacingEnabled && ' - Not available with Heat Racing'}
                     </div>
                   </div>
-                  {scoringMode === 'touch' && !isHeatRacingEnabled && (
+                  {scoringMode === 'touch' && (
                     <div className="flex-shrink-0 ml-3">
                       <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
                         <Check size={14} className="text-white" />
@@ -886,77 +1163,24 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               </h3>
             </div>
 
-            {/* Number of Races */}
-            <div className="space-y-3">
-              <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Hash size={16} />
-                  Number of Races
-                </div>
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {NUM_RACES_OPTIONS.map(num => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setCurrentNumRaces(num)}
-                    className={`
-                      px-4 py-2 rounded-lg text-sm font-medium transition-all
-                      ${currentNumRaces === num
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : darkMode
-                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }
-                    `}
-                  >
-                    {num} Races
-                  </button>
-                ))}
-                <input
-                  type="number"
-                  value={currentNumRaces}
-                  onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
-                  min="1"
-                  max="50"
-                  className={`
-                    w-20 px-3 py-2 rounded-lg text-sm text-center border
-                    ${darkMode
-                      ? 'bg-slate-700 border-slate-600 text-white'
-                      : 'bg-white border-slate-300 text-slate-900'}
-                  `}
-                />
-              </div>
-            </div>
-
-            {/* Scoring System */}
-            <div className="space-y-3">
-              <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Award size={16} />
-                  Scoring System
-                </div>
-              </label>
-              <div className="space-y-2">
-                {DROP_RULE_OPTIONS
-                  .filter(option => {
-                    // Show heat-specific options only when heat racing is enabled
-                    if (option.forHeatRacing) {
-                      return isHeatRacingEnabled;
-                    }
-                    // Show non-heat options when heat racing is disabled
-                    return !isHeatRacingEnabled;
-                  })
-                  .map((option, index) => (
+            {/* Number of Races - only in General section when heat racing is off */}
+            {!isHeatRacingEnabled && (
+              <div className="space-y-3">
+                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Hash size={16} />
+                    Number of Races
+                  </div>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {NUM_RACES_OPTIONS.map(num => (
                     <button
-                      key={index}
+                      key={num}
                       type="button"
-                      onClick={() => handleDropRuleChange(option.value)}
+                      onClick={() => setCurrentNumRaces(num)}
                       className={`
-                        w-full text-left px-4 py-3 rounded-lg text-sm transition-all
-                        ${(Array.isArray(option.value) && JSON.stringify(option.value) === JSON.stringify(currentDropRules)) ||
-                          (typeof option.value === 'string' && option.value !== 'custom' && option.value === currentDropRules) ||
-                          (option.value === 'custom' && isCustomDropRules)
+                        px-4 py-2 rounded-lg text-sm font-medium transition-all
+                        ${currentNumRaces === num
                           ? 'bg-blue-600 text-white shadow-md'
                           : darkMode
                             ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -964,30 +1188,80 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         }
                       `}
                     >
-                      {option.label}
+                      {num} Races
                     </button>
                   ))}
-                {isCustomDropRules && (
-                  <div className="mt-2">
-                    <input
-                      type="text"
-                      value={customDropRules}
-                      onChange={(e) => handleCustomDropRulesChange(e.target.value)}
-                      placeholder="e.g., 4, 8, 12"
-                      className={`
-                        w-full px-3 py-2 rounded-lg text-sm border
-                        ${darkMode
-                          ? 'bg-slate-700 border-slate-600 text-white placeholder:text-slate-500'
-                          : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'}
-                      `}
-                    />
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Enter race numbers separated by commas (e.g., 4, 8, 12)
-                    </p>
-                  </div>
-                )}
+                  <input
+                    type="number"
+                    value={currentNumRaces}
+                    onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
+                    min="1"
+                    max="50"
+                    className={`
+                      w-20 px-3 py-2 rounded-lg text-sm text-center border
+                      ${darkMode
+                        ? 'bg-slate-700 border-slate-600 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'}
+                    `}
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Scoring System - Only show when heat racing is disabled */}
+            {!isHeatRacingEnabled && (
+              <div className="space-y-3">
+                <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Award size={16} />
+                    Scoring System
+                  </div>
+                </label>
+                <div className="space-y-2">
+                  {DROP_RULE_OPTIONS
+                    .filter(option => !option.forHeatRacing)
+                    .map((option, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleDropRuleChange(option.value)}
+                        className={`
+                          w-full text-left px-4 py-3 rounded-lg text-sm transition-all
+                          ${(Array.isArray(option.value) && JSON.stringify(option.value) === JSON.stringify(currentDropRules)) ||
+                            (typeof option.value === 'string' && option.value !== 'custom' && option.value === currentDropRules) ||
+                            (option.value === 'custom' && isCustomDropRules)
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : darkMode
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }
+                        `}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  {isCustomDropRules && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={customDropRules}
+                        onChange={(e) => handleCustomDropRulesChange(e.target.value)}
+                        placeholder="e.g., 4, 8, 12"
+                        className={`
+                          w-full px-3 py-2 rounded-lg text-sm border
+                          ${darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white placeholder:text-slate-500'
+                            : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'}
+                        `}
+                      />
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Enter race numbers separated by commas (e.g., 4, 8, 12)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Heat Racing Settings */}
@@ -1030,8 +1304,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               }`}>
                 {isHeatRacingEnabled ? (
                   <p>
-                    <span className="font-semibold">{currentDropRules === 'shrs' ? 'SHRS' : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats with promotion/relegation between races.
-                    Heats are scored from lowest to highest (F → A). Configure your settings below.
+                    <span className="font-semibold">{currentDropRules === 'shrs' ? `SHR-${shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : 'HMS'} Heat Racing Active:</span> Skippers will be divided into heats{currentDropRules === 'shrs' ? '' : ' with promotion/relegation between races'}.
+                    {currentDropRules === 'shrs' ? ` Using ${shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'} assignment.` : ' Heats are scored from lowest to highest (F → A).'} Configure your settings below.
                   </p>
                 ) : (
                   <p>
@@ -1060,27 +1334,104 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   </div>
                 )}
 
+                {/* Heat Racing Scoring System */}
+                <div className="space-y-3">
+                  <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award size={16} />
+                      Scoring System
+                    </div>
+                  </label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {DROP_RULE_OPTIONS
+                      .filter(option => option.forHeatRacing)
+                      .map((option, index) => {
+                        const isHMS = option.value === 'hms';
+                        const isSHRSOption = option.value === 'shrs';
+                        const isSelected = option.value === currentDropRules;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleDropRuleChange(option.value)}
+                            className={`
+                              group relative w-full text-left p-4 rounded-xl transition-all border-2
+                              ${isSelected
+                                ? isHMS
+                                  ? 'bg-gradient-to-br from-purple-600 to-purple-700 border-purple-400 text-white shadow-lg'
+                                  : 'bg-gradient-to-br from-blue-600 to-blue-700 border-blue-400 text-white shadow-lg'
+                                : darkMode
+                                  ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:border-slate-500 hover:bg-slate-700'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow-md'
+                              }
+                            `}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                                isSelected
+                                  ? 'bg-white/20'
+                                  : darkMode
+                                    ? 'bg-slate-800'
+                                    : 'bg-slate-100'
+                              }`}>
+                                <Trophy className={isSelected ? 'text-white' : darkMode ? 'text-purple-400' : 'text-purple-600'} size={24} />
+                              </div>
+                              <div className="flex-1">
+                                <div className={`text-2xl font-black mb-1 tracking-tight ${
+                                  isSelected ? 'text-white' : darkMode ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {isHMS ? 'HMS' : 'SHR'}
+                                </div>
+                                <div className={`text-sm font-medium ${
+                                  isSelected ? 'text-white/90' : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                }`}>
+                                  {isHMS ? 'Heat Management System' : 'Structured Heat Racing'}
+                                </div>
+                                <div className={`text-xs mt-2 ${
+                                  isSelected ? 'text-white/75' : darkMode ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                  {isSHRSOption ? '1 after 4, 2 after 8, +1 per 8 races' : 'Dynamic heat management with promotion/relegation'}
+                                </div>
+                              </div>
+                              {isSelected && (
+                                <div className="flex-shrink-0">
+                                  <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center">
+                                    <Check size={16} className={isHMS ? 'text-purple-600' : 'text-blue-600'} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
                 {/* Automatic Heat Configuration */}
-                <div className={`p-4 rounded-lg ${
+                <div className={`p-5 rounded-xl border-2 ${
                   hasHeatScores
-                    ? darkMode ? 'bg-slate-800/50 opacity-60' : 'bg-slate-100 opacity-60'
-                    : darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                    ? darkMode ? 'bg-slate-800/50 border-slate-700 opacity-60' : 'bg-slate-100 border-slate-300 opacity-60'
+                    : darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600' : 'bg-gradient-to-br from-blue-50 to-slate-50 border-blue-200'
                 }`}>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Heat Configuration
+                      <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <div className="flex items-center gap-2">
+                          <Trophy size={18} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
+                          Heat Configuration
+                        </div>
                       </label>
-                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
                         Auto-calculated
                       </span>
                     </div>
 
                     {numHeats > 0 ? (
                       <>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-white'} relative`}>
-                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1`}>
+                        <div className={`grid gap-4 ${isSHRS ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
+                            <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
                               Number of Heats
                             </div>
                             {isEditingHeats && !hasHeatScores ? (
@@ -1088,15 +1439,22 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 <input
                                   type="number"
                                   min="2"
-                                  max="6"
+                                  max={5}
                                   value={manualHeatCount !== null ? manualHeatCount : optimalHeats.numberOfHeats}
                                   onChange={(e) => {
                                     const value = parseInt(e.target.value);
-                                    if (value >= 2 && value <= 6) {
-                                      // Check if this configuration would be valid
-                                      const validation = validatePromotionRelegationPractical(skippers.length, value, promotionCount);
-                                      if (!validation.isValid && addNotification) {
-                                        addNotification('warning', validation.message || 'Invalid heat configuration');
+                                    const maxHeats = 5;
+                                    if (value >= 2 && value <= maxHeats) {
+                                      if (isSHRS) {
+                                        const shrsVal = validateSHRSPractical(skippers.length, value);
+                                        if (!shrsVal.isValid && addNotification) {
+                                          addNotification('warning', shrsVal.message || 'Invalid SHR configuration');
+                                        }
+                                      } else {
+                                        const validation = validatePromotionRelegationPractical(skippers.length, value, promotionCount);
+                                        if (!validation.isValid && addNotification) {
+                                          addNotification('warning', validation.message || 'Invalid heat configuration');
+                                        }
                                       }
                                       setManualHeatCount(value);
                                     }
@@ -1128,7 +1486,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             ) : (
                               <div className="flex items-center justify-between">
-                                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {numHeats}
                                 </div>
                                 {!hasHeatScores && (
@@ -1152,10 +1510,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             )}
                           </div>
-                          <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-white'} relative`}>
-                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-1`}>
-                              Promotion/Relegation
-                            </div>
+                          {/* Hide promotion/relegation for SHRS as it doesn't use that system */}
+                          {!isSHRS && (
+                            <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} relative shadow-sm`}>
+                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
+                                Promotion/Relegation
+                              </div>
                             {isEditingPromotion && !hasHeatScores ? (
                               <div className="flex items-center gap-2">
                                 <input
@@ -1201,7 +1561,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                               </div>
                             ) : (
                               <div className="flex items-center justify-between">
-                                <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                <div className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {promotionCount}
                                 </div>
                                 {!hasHeatScores && (
@@ -1229,7 +1589,8 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                                 Default: 4
                               </div>
                             )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
@@ -1243,11 +1604,176 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                           </div>
                         </div>
 
+                        <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm`}>
+                          <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-3`}>
+                            Number of Races
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {NUM_RACES_OPTIONS.map(num => (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => setCurrentNumRaces(num)}
+                                className={`
+                                  px-4 py-2 rounded-lg text-sm font-medium transition-all
+                                  ${currentNumRaces === num
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : darkMode
+                                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                  }
+                                `}
+                              >
+                                {num} Races
+                              </button>
+                            ))}
+                            <input
+                              type="number"
+                              value={currentNumRaces}
+                              onChange={(e) => setCurrentNumRaces(parseInt(e.target.value) || 12)}
+                              min="1"
+                              max="50"
+                              className={`
+                                w-20 px-3 py-2 rounded-lg text-sm text-center border
+                                ${darkMode
+                                  ? 'bg-slate-700 border-slate-600 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'}
+                              `}
+                            />
+                          </div>
+                        </div>
+
+                        {isSHRS && (
+                          <div className={`p-4 rounded-xl border-2 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} shadow-sm space-y-4`}>
+                            <div>
+                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-0.5`}>
+                                Qualifying Assignment Method
+                              </div>
+                              <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} mb-2`}>
+                                Select how qualifying heats will be allocated.
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => !hasHeatScores && setShrsAssignmentMode('progressive')}
+                                  disabled={hasHeatScores}
+                                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                    hasHeatScores ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                  } ${shrsAssignmentMode === 'progressive'
+                                    ? darkMode
+                                      ? 'border-blue-500 bg-blue-500/10'
+                                      : 'border-blue-500 bg-blue-50'
+                                    : darkMode
+                                      ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                                      : 'border-slate-200 bg-white hover:border-slate-300'
+                                  }`}
+                                >
+                                  <div className={`text-sm font-semibold ${shrsAssignmentMode === 'progressive'
+                                    ? 'text-blue-500'
+                                    : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                  }`}>
+                                    Progressive (SHR-P)
+                                  </div>
+                                  <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    Round 1 heats are assigned prior to racing. Subsequent heat movements are determined after each round based on heat results using structured Movement Tables.
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => !hasHeatScores && setShrsAssignmentMode('preset')}
+                                  disabled={hasHeatScores}
+                                  className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                    hasHeatScores ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                  } ${shrsAssignmentMode === 'preset'
+                                    ? darkMode
+                                      ? 'border-green-500 bg-green-500/10'
+                                      : 'border-green-500 bg-green-50'
+                                    : darkMode
+                                      ? 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                                      : 'border-slate-200 bg-white hover:border-slate-300'
+                                  }`}
+                                >
+                                  <div className={`text-sm font-semibold ${shrsAssignmentMode === 'preset'
+                                    ? 'text-green-600'
+                                    : darkMode ? 'text-slate-300' : 'text-slate-700'
+                                  }`}>
+                                    Balanced (SHR-B)
+                                  </div>
+                                  <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    All qualifying heats for the nominated rounds are pre-assigned before racing. The rotation is structured to balance heat sizes and distribute competitor matchups evenly across the fleet.
+                                  </div>
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'} mb-2`}>
+                                Race Structure
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
+                                    Qualifying Rounds
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="2"
+                                    max={Math.max(2, currentNumRaces - 2)}
+                                    value={shrsQualifyingRounds}
+                                    onChange={(e) => {
+                                      const val = Math.max(2, Math.min(parseInt(e.target.value) || 2, currentNumRaces - 2));
+                                      setShrsQualifyingRounds(val);
+                                    }}
+                                    disabled={hasHeatScores}
+                                    className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
+                                      hasHeatScores ? 'opacity-50 cursor-not-allowed' : ''
+                                    } ${
+                                      darkMode
+                                        ? 'bg-slate-700 border-slate-600 text-white'
+                                        : 'bg-white border-slate-300 text-slate-900'
+                                    }`}
+                                  />
+                                </div>
+                                <div>
+                                  <label className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-1 block`}>
+                                    Finals Rounds
+                                  </label>
+                                  <div className={`w-full px-3 py-2 text-lg font-bold rounded-lg border ${
+                                    darkMode
+                                      ? 'bg-slate-700/50 border-slate-600 text-slate-300'
+                                      : 'bg-slate-50 border-slate-300 text-slate-700'
+                                  }`}>
+                                    {Math.max(0, currentNumRaces - shrsQualifyingRounds)}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'} space-y-1`}>
+                              {shrsAssignmentMode === 'progressive' ? (
+                                <>
+                                  <p>After each race, heat assignments update based on finishing positions using the official SHR Movement Tables.</p>
+                                  <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p>All qualifying round assignments generated before racing. Algorithm maximizes opponent variety across rounds.</p>
+                                  <p>Finals: Skippers split into Gold/Silver{numHeats > 2 ? '/Bronze' : ''} fleets by qualifying rank.</p>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'} p-2 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                          {manualHeatCount !== null || manualPromotionCount !== null ? (
+                          {isSHRS ? (
+                            <>
+                              <strong>SHR-{shrsAssignmentMode === 'preset' ? 'B' : 'P'} Configuration:</strong> {numHeats} heats, {shrsQualifyingRounds} qualifying + {Math.max(0, currentNumRaces - shrsQualifyingRounds)} finals rounds ({shrsAssignmentMode === 'preset' ? 'Balanced' : 'Progressive'}). Sizes: {heatSizes.join(', ')} boats.
+                            </>
+                          ) : manualHeatCount !== null || manualPromotionCount !== null ? (
                             <>
                               <strong>Configuration:</strong> {numHeats} heats with sizes of {heatSizes.join(', ')} boats.
-                              {promotionCount} boats promotion/relegation{manualPromotionCount !== null ? ' (custom)' : ''}.
+                              {' '}{promotionCount} boats promotion/relegation{manualPromotionCount !== null ? ' (custom)' : ''}.
                             </>
                           ) : (
                             <>
@@ -1278,31 +1804,31 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 </div>
 
                 {/* Observer Settings */}
-                <div className={`p-4 rounded-lg space-y-4 ${
-                  darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
+                <div className={`p-5 rounded-xl border-2 space-y-4 ${
+                  darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-800 border-slate-600' : 'bg-gradient-to-br from-purple-50 to-slate-50 border-purple-200'
                 }`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Eye size={18} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
-                      <label className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <Eye size={20} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
+                      <label className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         Observer System
                       </label>
                     </div>
                     <button
                       onClick={() => setEnableObservers(!enableObservers)}
                       type="button"
-                      className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${
-                        enableObservers ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-200'
+                      className={`relative w-14 h-7 rounded-full transition-colors duration-200 shadow-sm ${
+                        enableObservers ? 'bg-purple-600' : darkMode ? 'bg-slate-600' : 'bg-slate-300'
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded-full bg-white shadow transform transition-transform ${
+                      <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
                         enableObservers ? 'translate-x-8' : 'translate-x-1'
                       } mt-1`} />
                     </button>
                   </div>
 
-                  <div className={`text-xs p-3 rounded-lg ${
-                    darkMode ? 'bg-slate-800/50 text-slate-400' : 'bg-purple-50 text-purple-800'
+                  <div className={`text-xs p-3 rounded-lg border ${
+                    darkMode ? 'bg-slate-800/50 text-slate-400 border-slate-700' : 'bg-purple-50 text-purple-800 border-purple-100'
                   }`}>
                     {enableObservers ? (
                       <p>
@@ -1316,47 +1842,47 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   </div>
 
                   {enableObservers && (
-                    <div className="space-y-2">
-                      <label className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <div className="space-y-3">
+                      <label className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         Observers Per Heat
                       </label>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => setObserversPerHeat(Math.max(2, observersPerHeat - 1))}
                           type="button"
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-colors border-2 ${
                             observersPerHeat <= 2
-                              ? darkMode ? 'bg-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                              : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              ? darkMode ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : darkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
                           }`}
                           disabled={observersPerHeat <= 2}
                         >
                           -
                         </button>
-                        <div className={`flex-1 text-center px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-800' : 'bg-white'
+                        <div className={`flex-1 text-center px-4 py-3 rounded-xl border-2 ${
+                          darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
                         }`}>
-                          <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                          <div className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             {observersPerHeat}
                           </div>
-                          <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          <div className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                             observers
                           </div>
                         </div>
                         <button
                           onClick={() => setObserversPerHeat(Math.min(10, observersPerHeat + 1))}
                           type="button"
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold transition-colors border-2 ${
                             observersPerHeat >= 10
-                              ? darkMode ? 'bg-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                              : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              ? darkMode ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                              : darkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'
                           }`}
                           disabled={observersPerHeat >= 10}
                         >
                           +
                         </button>
                       </div>
-                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} text-center`}>
+                      <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'} text-center`}>
                         Recommended: 2-4 observers for effective monitoring
                       </p>
                     </div>
@@ -1368,12 +1894,12 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                   <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Initial Assignment
                   </label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setInitialAssignment('random')}
                       disabled={hasHeatScores}
                       className={`
-                        flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                        flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-lg text-sm font-medium transition-all
                         ${hasHeatScores
                           ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : initialAssignment === 'random'
@@ -1384,20 +1910,16 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         }
                       `}
                     >
-                      <Shuffle size={16} />
-                      Random Assignment
+                      <Shuffle size={18} />
+                      <span className="text-xs">Random</span>
                     </button>
                     <button
                       onClick={() => {
                         setInitialAssignment('manual');
-                        // If heat racing is enabled, open modal immediately
-                        if (isHeatRacingEnabled) {
-                          setShowManualAssignmentModal(true);
-                        }
                       }}
                       disabled={hasHeatScores}
                       className={`
-                        flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                        flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-lg text-sm font-medium transition-all
                         ${hasHeatScores
                           ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : initialAssignment === 'manual'
@@ -1408,8 +1930,28 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                         }
                       `}
                     >
-                      <Users size={16} />
-                      Manual Assignment
+                      <Users size={18} />
+                      <span className="text-xs">Manual</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setInitialAssignment('hms');
+                      }}
+                      disabled={hasHeatScores}
+                      className={`
+                        flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-lg text-sm font-medium transition-all
+                        ${hasHeatScores
+                          ? darkMode ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : initialAssignment === 'hms'
+                            ? 'bg-green-600 text-white shadow-md'
+                            : darkMode
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }
+                      `}
+                    >
+                      <Award size={18} />
+                      <span className="text-xs">National Rankings</span>
                     </button>
                   </div>
                 </div>
@@ -1500,6 +2042,7 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 </p>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -1561,6 +2104,29 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
         skippers={skippers}
         numHeats={numHeats}
         darkMode={darkMode}
+        onRankingAssignment={() => {
+          setShowManualAssignmentModal(false);
+          setShowHMSSeedingModal(true);
+        }}
+      />
+
+      {/* National Rankings Modal */}
+      {showHMSSeedingModal && console.log('Rendering HMSSeedingModal with props:', {
+        nationalAssociationId,
+        yachtClassName: currentEvent?.raceClass,
+        currentEventKeys: currentEvent ? Object.keys(currentEvent) : [],
+        currentEventRaceClass: currentEvent?.raceClass
+      })}
+      <HMSSeedingModal
+        isOpen={showHMSSeedingModal}
+        onClose={() => setShowHMSSeedingModal(false)}
+        onConfirm={handleHMSSeedingConfirm}
+        skippers={skippers}
+        numHeats={numHeats}
+        darkMode={darkMode}
+        currentEvent={currentEvent}
+        nationalAssociationId={nationalAssociationId}
+        yachtClassName={currentEvent?.raceClass}
       />
 
       {/* Clear All Results Confirmation Modal */}

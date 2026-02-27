@@ -164,25 +164,48 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
 
   const generateExpenseNumber = async () => {
     try {
-      // Get the next expense number
-      const { data: settings } = await supabase
-        .from('club_finance_settings')
-        .select('number_prefix, next_number_starts_from')
-        .eq('club_id', currentClub?.clubId)
-        .single();
-      
-      const prefix = settings?.number_prefix || 'EXP-';
-      const nextNumber = settings?.next_number_starts_from || 1;
-      
-      // Get the count of existing expenses to determine the next number
-      const { count } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('club_id', currentClub?.clubId)
-        .eq('type', 'expense');
-      
-      const expenseNum = (count || 0) + nextNumber;
-      setExpenseNumber(`${prefix}${expenseNum.toString().padStart(5, '0')}`);
+      let prefix = 'EXP-';
+      let nextNumber = 1;
+
+      if (isAssociation) {
+        const { data: settings } = await supabase
+          .from('association_finance_settings')
+          .select('expense_prefix, expense_next_number')
+          .eq('association_id', associationId)
+          .eq('association_type', associationType)
+          .maybeSingle();
+
+        prefix = settings?.expense_prefix || 'EXP-';
+        nextNumber = settings?.expense_next_number || 1;
+
+        const { count } = await supabase
+          .from('association_transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('association_id', associationId)
+          .eq('association_type', associationType)
+          .eq('type', 'expense');
+
+        const expenseNum = (count || 0) + nextNumber;
+        setExpenseNumber(`${prefix}${expenseNum.toString().padStart(5, '0')}`);
+      } else {
+        const { data: settings } = await supabase
+          .from('club_finance_settings')
+          .select('number_prefix, next_number_starts_from')
+          .eq('club_id', currentClub?.clubId)
+          .maybeSingle();
+
+        prefix = settings?.number_prefix || 'EXP-';
+        nextNumber = settings?.next_number_starts_from || 1;
+
+        const { count } = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('club_id', currentClub?.clubId)
+          .eq('type', 'expense');
+
+        const expenseNum = (count || 0) + nextNumber;
+        setExpenseNumber(`${prefix}${expenseNum.toString().padStart(5, '0')}`);
+      }
     } catch (err) {
       console.error('Error generating expense number:', err);
       setExpenseNumber(`EXP-${Date.now()}`);

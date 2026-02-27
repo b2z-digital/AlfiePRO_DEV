@@ -170,7 +170,7 @@ export const HomepageTileModal: React.FC<HomepageTileModalProps> = ({
               Link URL <span className="text-red-500">*</span>
             </label>
             <input
-              type="url"
+              type="text"
               value={formData.link_url}
               onChange={(e) => setFormData({ ...formData, link_url: e.target.value })}
               className={`w-full px-4 py-2 rounded-lg border ${

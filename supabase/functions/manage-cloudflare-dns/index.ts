@@ -24,7 +24,7 @@ interface DNSRecordRequest {
 const CLOUDFLARE_ZONE_ID = '24a931869593b5979f71b71b58782faf';
 const CLOUDFLARE_API_TOKEN = 'VePIZnC5YLpDMa6TxkYSSzw1gX-wgKe0cgwOKOa_';
 const BASE_DOMAIN = 'alfiepro.com.au';
-const CLOUDFRONT_TARGET = 'd205ctqm5i025u.cloudfront.net';
+const CLOUDFRONT_TARGET = 'd3jmzkpreoudd5.cloudfront.net';
 
 Deno.serve(async (req: Request) => {
   try {

@@ -382,7 +382,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                   {formData.assignee_id ? (
                     <div className="flex items-center gap-2">
                       {(() => {
-                        const assignee = clubMembers.find(m => m.user_id === formData.assignee_id);
+                        const assignee = clubMembers.find(m => m.id === formData.assignee_id);
                         return assignee ? (
                           <>
                             <Avatar
@@ -432,14 +432,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                             key={member.id}
                             type="button"
                             onClick={() => {
-                              if (member.user_id) {
-                                handleInputChange('assignee_id', member.user_id);
-                                setShowAssigneeDropdown(false);
-                              }
+                              handleInputChange('assignee_id', member.id);
+                              setShowAssigneeDropdown(false);
                             }}
                             className={`
                               w-full px-3 py-2 flex items-center gap-3 hover:bg-slate-600 transition-colors text-left
-                              ${formData.assignee_id === member.user_id ? 'bg-slate-600' : ''}
+                              ${formData.assignee_id === member.id ? 'bg-slate-600' : ''}
                               ${!member.user_id ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                           >
@@ -453,7 +451,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                               {member.first_name} {member.last_name}
                               {!member.user_id && <span className="text-xs text-slate-400 ml-2">(No account)</span>}
                             </span>
-                            {formData.assignee_id === member.user_id && (
+                            {formData.assignee_id === member.id && (
                               <span className="ml-auto text-blue-400">✓</span>
                             )}
                           </button>
@@ -521,7 +519,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                     {clubMembers.length > 0 ? (
                       clubMembers.map((member) => {
                         const isSelected = member.user_id && formData.followers.includes(member.user_id);
-                        const isAssignee = member.user_id && formData.assignee_id === member.user_id;
+                        const isAssignee = formData.assignee_id === member.id;
                         const hasNoAccount = !member.user_id;
 
                         return (

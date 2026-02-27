@@ -62,10 +62,26 @@ export const PublicClubHomepage: React.FC = () => {
       }
 
       const today = new Date().toISOString();
+
+      // Build filter to include club events + state/national association events
+      let eventFilter = `club_id.eq.${clubId}`;
+      if (clubData?.state_association_id) {
+        const stateId = clubData.state_association_id;
+        eventFilter += `,state_association_id.eq.${stateId}`;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+        if (stateAssoc?.national_association_id) {
+          eventFilter += `,national_association_id.eq.${stateAssoc.national_association_id}`;
+        }
+      }
+
       const { data: eventsData, error: eventsError } = await supabase
         .from('public_events')
         .select('id, event_name, date, venue, race_class')
-        .eq('club_id', clubId)
+        .or(eventFilter)
         .gte('date', today)
         .order('date', { ascending: true })
         .limit(4);
@@ -76,7 +92,7 @@ export const PublicClubHomepage: React.FC = () => {
       const { data: resultsData, error: resultsError } = await supabase
         .from('public_events')
         .select('id, event_name, date')
-        .eq('club_id', clubId)
+        .or(eventFilter)
         .lt('date', today)
         .order('date', { ascending: false })
         .limit(4);
@@ -87,7 +103,7 @@ export const PublicClubHomepage: React.FC = () => {
       const { data: articlesData, error: articlesError } = await supabase
         .from('articles')
         .select('id, title, excerpt, cover_image, published_at')
-        .eq('club_id', clubId)
+        .or(eventFilter)
         .eq('is_published', true)
         .order('published_at', { ascending: false })
         .limit(3);
@@ -480,12 +496,14 @@ export const PublicClubHomepage: React.FC = () => {
               <p className="text-gray-400 leading-relaxed mb-6">
                 {club.club_introduction?.substring(0, 200)}...
               </p>
-              <button
-                onClick={handleJoinClub}
-                className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition-colors font-semibold"
+              <a
+                href="https://alfiepro.com.au"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition-colors font-semibold"
               >
                 Become a Member
-              </button>
+              </a>
             </div>
             <div>
               <h4 className="font-bold text-lg mb-4">Quick Links</h4>
@@ -511,7 +529,7 @@ export const PublicClubHomepage: React.FC = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; {new Date().getFullYear()} {club.name}. All rights reserved. Powered by Alfie.</p>
+            <p>&copy; {new Date().getFullYear()} {club.name}. All rights reserved. Powered by AlfiePRO.</p>
           </div>
         </div>
       </footer>

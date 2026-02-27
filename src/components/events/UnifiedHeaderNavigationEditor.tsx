@@ -207,13 +207,16 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(file, 'logo');
+
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `${websiteId}-${Date.now()}.${fileExt}`;
       const filePath = `event-logos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, compressed, { upsert: true });
 
       if (uploadError) throw uploadError;
 
