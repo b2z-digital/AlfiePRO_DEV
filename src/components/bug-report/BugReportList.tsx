@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Bug, Clock, CheckCircle2, AlertTriangle, ArrowRight, CircleDot, Filter, XCircle } from 'lucide-react';
+import { Plus, Bug, Lightbulb, Clock, CheckCircle2, ArrowRight, CircleDot, XCircle, Copy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { BugReportDetail } from './BugReportDetail';
@@ -14,6 +14,7 @@ interface BugReportListProps {
 
 interface BugReport {
   id: string;
+  report_type: string;
   title: string;
   description: string;
   severity: string;
@@ -22,18 +23,23 @@ interface BugReport {
   page_url: string;
   reporter_name: string;
   reporter_club: string;
-  created_at: string;
-  updated_at: string;
   admin_notes: string;
   resolution_notes: string;
+  steps_to_reproduce: string;
+  reporter_email: string;
+  browser_info: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const STATUS_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   open: { icon: CircleDot, color: 'text-blue-400', label: 'Open' },
   in_progress: { icon: Clock, color: 'text-amber-400', label: 'In Progress' },
   resolved: { icon: CheckCircle2, color: 'text-green-400', label: 'Resolved' },
+  fixed: { icon: CheckCircle2, color: 'text-green-400', label: 'Fixed' },
   closed: { icon: CheckCircle2, color: 'text-slate-400', label: 'Closed' },
   wont_fix: { icon: XCircle, color: 'text-slate-400', label: "Won't Fix" },
+  duplicate: { icon: Copy, color: 'text-slate-400', label: 'Duplicate' },
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -124,7 +130,7 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
         <div className="flex items-center gap-2">
           <Bug className="w-5 h-5 text-red-500" />
           <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Bug Reports
+            Feedback
           </h3>
         </div>
         <button
@@ -174,17 +180,18 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
               <Bug className={`w-6 h-6 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
             </div>
             <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              No bug reports
+              No reports
             </p>
             <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-              {statusFilter === 'active' ? 'No active bugs - nice!' : 'Nothing to show'}
+              {statusFilter === 'active' ? 'No active items' : 'Nothing to show'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-700/50">
+          <div className={`divide-y ${darkMode ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
             {reports.map(report => {
               const statusCfg = STATUS_CONFIG[report.status] || STATUS_CONFIG.open;
               const StatusIcon = statusCfg.icon;
+              const isBug = report.report_type === 'bug';
               return (
                 <button
                   key={report.id}
@@ -194,9 +201,12 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${SEVERITY_COLORS[report.severity] || 'bg-slate-500'}`} />
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                      isBug ? (SEVERITY_COLORS[report.severity] || 'bg-slate-500') : 'bg-teal-500'
+                    }`} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        {!isBug && <Lightbulb className="w-3 h-3 text-teal-400 flex-shrink-0" />}
                         <p className={`text-sm font-medium truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           {report.title}
                         </p>

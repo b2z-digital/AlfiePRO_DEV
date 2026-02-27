@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Bug, Clock, CheckCircle2, CircleDot, XCircle, Send, MessageSquare, Globe, Monitor, ExternalLink, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bug, Lightbulb, Clock, CheckCircle2, CircleDot, XCircle, Send, MessageSquare, Globe, Trash2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -8,6 +8,7 @@ interface BugReportDetailProps {
   darkMode: boolean;
   report: {
     id: string;
+    report_type?: string;
     title: string;
     description: string;
     steps_to_reproduce?: string;
@@ -59,6 +60,9 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
   const [resolutionNotes, setResolutionNotes] = useState(report.resolution_notes || '');
   const [saving, setSaving] = useState(false);
   const [sendingComment, setSendingComment] = useState(false);
+
+  const isBug = report.report_type !== 'feature_request';
+  const accentColor = isBug ? 'red' : 'teal';
 
   useEffect(() => {
     loadComments();
@@ -145,6 +149,10 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
+        {isBug
+          ? <Bug className="w-4 h-4 text-red-500 flex-shrink-0" />
+          : <Lightbulb className="w-4 h-4 text-teal-500 flex-shrink-0" />
+        }
         <h3 className={`font-semibold text-sm truncate flex-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
           {report.title}
         </h3>
@@ -162,11 +170,18 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
-              SEVERITY_BADGES[report.severity] || SEVERITY_BADGES.medium
-            }`}>
-              {report.severity}
-            </span>
+            {!isBug && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                Feature Request
+              </span>
+            )}
+            {isBug && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                SEVERITY_BADGES[report.severity] || SEVERITY_BADGES.medium
+              }`}>
+                {report.severity}
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
               darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
             }`}>
@@ -260,7 +275,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                     darkMode
                       ? 'bg-slate-700/50 border-slate-600 text-white placeholder-slate-500'
                       : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                  } focus:outline-none focus:ring-1 focus:ring-red-500/30`}
+                  } focus:outline-none focus:ring-1 focus:ring-${accentColor}-500/30`}
                 />
                 {resolutionNotes !== (report.resolution_notes || '') && (
                   <button
@@ -301,14 +316,18 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                     key={c.id}
                     className={`p-2.5 rounded-xl ${
                       c.is_admin_reply
-                        ? darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+                        ? isBug
+                          ? darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+                          : darkMode ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-200'
                         : darkMode ? 'bg-slate-700/50' : 'bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-xs font-medium ${
                         c.is_admin_reply
-                          ? darkMode ? 'text-red-400' : 'text-red-600'
+                          ? isBug
+                            ? darkMode ? 'text-red-400' : 'text-red-600'
+                            : darkMode ? 'text-teal-400' : 'text-teal-600'
                           : darkMode ? 'text-slate-300' : 'text-slate-700'
                       }`}>
                         {c.user_name || 'User'}
@@ -341,7 +360,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
             darkMode
               ? 'bg-slate-700/50 border-slate-600 text-white placeholder-slate-500'
               : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-          } focus:outline-none focus:ring-1 focus:ring-red-500/30`}
+          } focus:outline-none focus:ring-1 focus:ring-${accentColor}-500/30`}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -352,7 +371,9 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
         <button
           onClick={handleAddComment}
           disabled={!newComment.trim() || sendingComment}
-          className="p-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50"
+          className={`p-2 rounded-xl text-white transition-colors disabled:opacity-50 ${
+            isBug ? 'bg-red-500 hover:bg-red-600' : 'bg-teal-500 hover:bg-teal-600'
+          }`}
         >
           {sendingComment ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
