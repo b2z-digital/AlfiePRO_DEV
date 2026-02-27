@@ -677,12 +677,12 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
         // 2. Fetch race_series (all series types)
         const { data: raceSeries } = await supabase
           .from('race_series')
-          .select('standings')
+          .select('results')
           .eq('club_id', currentClub.clubId);
 
         raceSeries?.forEach(series => {
-          if (series.standings && Array.isArray(series.standings)) {
-            series.standings.forEach((result: any, idx: number) => {
+          if (series.results && Array.isArray(series.results)) {
+            series.results.forEach((result: any, idx: number) => {
               const skipperName = result.skipper || result.name;
               if (!skipperName) return;
 

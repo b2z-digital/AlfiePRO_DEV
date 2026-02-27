@@ -250,8 +250,6 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
     return fullName.toLowerCase().includes(query) || email.toLowerCase().includes(query) || memberNumber.toLowerCase().includes(query);
   });
 
-  if (!isOpen) return null;
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -356,6 +354,8 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
     const file = e.dataTransfer.files[0];
     if (file && (file.type === 'text/csv' || file.name.endsWith('.csv'))) handleFileUpload(file);
   }, []);
+
+  if (!isOpen) return null;
 
   const processImport = async () => {
     setImportStep('importing');
