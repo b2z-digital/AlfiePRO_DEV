@@ -8,6 +8,7 @@ import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import {
   DndContext,
   closestCenter,
@@ -39,6 +40,7 @@ interface PositionDefinition {
   dashboard_template_id?: string | null;
   position_priority?: number | null;
   show_on_website?: boolean;
+  access_level?: string;
 }
 
 interface PositionAssignment {
@@ -63,6 +65,7 @@ interface Member {
 export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode }) => {
   const { currentClub } = useAuth();
   const { addNotification } = useNotifications();
+  const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<'positions' | 'assignments'>('assignments');
   const [positions, setPositions] = useState<PositionDefinition[]>([]);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
@@ -71,9 +74,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   const [editingPosition, setEditingPosition] = useState<PositionDefinition | null>(null);
   const [showPositionForm, setShowPositionForm] = useState(false);
 
-  const isAdmin = currentClub?.role === 'admin';
-  const isEditor = currentClub?.role === 'editor';
-  const canManage = isAdmin || isEditor;
+  const canManage = isAdmin || isEditor || isStateAdmin || isNationalAdmin;
 
   useEffect(() => {
     if (currentClub) {
@@ -153,6 +154,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             dashboard_template_id: positionData.dashboard_template_id,
             position_priority: positionData.position_priority,
             show_on_website: positionData.show_on_website,
+            access_level: positionData.access_level,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingPosition.id);
@@ -174,7 +176,8 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             display_order: maxOrder + 1,
             dashboard_template_id: positionData.dashboard_template_id,
             position_priority: positionData.position_priority,
-            show_on_website: positionData.show_on_website
+            show_on_website: positionData.show_on_website,
+            access_level: positionData.access_level
           });
 
         if (error) throw error;
@@ -186,7 +189,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
       fetchData();
     } catch (error: any) {
       console.error('Error saving position:', error);
-      addNotification('error', 'Failed to save position');
+      addNotification('error', error?.message || 'Failed to save position');
     }
   };
 
@@ -519,6 +522,27 @@ const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
         )}
       </div>
 
+      {position.access_level && (
+        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+          position.access_level === 'admin'
+            ? 'bg-amber-500/10 border-amber-500/20'
+            : position.access_level === 'editor'
+              ? 'bg-blue-500/10 border-blue-500/20'
+              : 'bg-slate-500/10 border-slate-500/20'
+        }`}>
+          <Shield size={11} className={
+            position.access_level === 'admin' ? 'text-amber-400'
+              : position.access_level === 'editor' ? 'text-blue-400'
+                : 'text-slate-400'
+          } />
+          <span className={`text-xs capitalize ${
+            position.access_level === 'admin' ? 'text-amber-400'
+              : position.access_level === 'editor' ? 'text-blue-400'
+                : 'text-slate-400'
+          }`}>{position.access_level}</span>
+        </div>
+      )}
+
       {position.show_on_website && (
         <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
           <Globe size={11} className="text-green-400" />
@@ -562,10 +586,15 @@ interface DashboardTemplate {
 const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel }) => {
   const isPresident = (name: string) => /president/i.test(name);
   const isSecretary = (name: string) => /secretary/i.test(name);
+  const isTreasurer = (name: string) => /treasurer/i.test(name);
+  const isExecutiveRole = (name: string) =>
+    isPresident(name) || name.toLowerCase().includes('vice president') || isSecretary(name) || isTreasurer(name);
 
   const defaultWebsite = position
     ? (position.show_on_website ?? false)
     : false;
+
+  const defaultAccessLevel = position?.access_level || 'editor';
 
   const [formData, setFormData] = useState({
     position_name: position?.position_name || '',
@@ -573,26 +602,31 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
     dashboard_template_id: position?.dashboard_template_id || null as string | null,
     position_priority: position?.position_priority ?? 50,
     show_on_website: defaultWebsite,
+    access_level: defaultAccessLevel,
   });
   const [templates, setTemplates] = useState<DashboardTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
 
-  // Auto-set show_on_website and dashboard template when name changes (new positions only)
   useEffect(() => {
     if (!position && templates.length > 0) {
       const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
       const autoTemplate = getDefaultTemplateForPosition(formData.position_name);
+      const autoAccess = isExecutiveRole(formData.position_name) ? 'admin' : 'editor';
       setFormData(prev => ({
         ...prev,
         show_on_website: shouldShow,
         dashboard_template_id: autoTemplate,
+        access_level: autoAccess,
       }));
     } else if (!position) {
       const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
-      if (shouldShow !== formData.show_on_website) {
-        setFormData(prev => ({ ...prev, show_on_website: shouldShow }));
-      }
+      const autoAccess = isExecutiveRole(formData.position_name) ? 'admin' : 'editor';
+      setFormData(prev => ({
+        ...prev,
+        show_on_website: shouldShow,
+        access_level: autoAccess,
+      }));
     }
   }, [formData.position_name, templates]);
 
@@ -694,6 +728,43 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
             placeholder="Brief description of the role"
             rows={2}
           />
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <Shield size={13} />
+            System Access Level
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Members assigned to this position will receive this access level in the club
+          </p>
+          <div className="flex gap-2">
+            {[
+              { value: 'admin', label: 'Admin', color: 'amber', desc: 'Full access' },
+              { value: 'editor', label: 'Editor', color: 'blue', desc: 'Can edit' },
+              { value: 'viewer', label: 'Viewer', color: 'slate', desc: 'Read only' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, access_level: opt.value }))}
+                className={`flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border transition-all ${
+                  formData.access_level === opt.value
+                    ? `bg-${opt.color}-500/10 border-${opt.color}-500/30 text-${opt.color}-400`
+                    : 'border-slate-600/50 text-slate-500 hover:border-slate-500'
+                }`}
+                style={formData.access_level === opt.value ? {
+                  backgroundColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                  borderColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.3)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(100, 116, 139, 0.3)',
+                  color: opt.color === 'amber' ? '#fbbf24' : opt.color === 'blue' ? '#60a5fa' : '#94a3b8',
+                } : {}}
+              >
+                <Shield size={16} />
+                <span className="text-xs font-medium">{opt.label}</span>
+                <span className="text-[10px] opacity-60">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Show on Website toggle */}
@@ -919,6 +990,26 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
           <div className="flex items-center gap-2 mb-1">
             <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
             <h3 className="font-semibold text-white">{position.position_name}</h3>
+            {position.access_level && (
+              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
+                position.access_level === 'admin'
+                  ? 'bg-amber-500/10 border-amber-500/20'
+                  : position.access_level === 'editor'
+                    ? 'bg-blue-500/10 border-blue-500/20'
+                    : 'bg-slate-500/10 border-slate-500/20'
+              }`}>
+                <Shield size={10} className={
+                  position.access_level === 'admin' ? 'text-amber-400'
+                    : position.access_level === 'editor' ? 'text-blue-400'
+                      : 'text-slate-400'
+                } />
+                <span className={`text-xs capitalize ${
+                  position.access_level === 'admin' ? 'text-amber-400'
+                    : position.access_level === 'editor' ? 'text-blue-400'
+                      : 'text-slate-400'
+                }`}>{position.access_level}</span>
+              </span>
+            )}
             {position.show_on_website && (
               <span className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
                 <Globe size={10} className="text-green-400" />
