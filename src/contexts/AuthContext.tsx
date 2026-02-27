@@ -32,12 +32,14 @@ interface AuthContextType {
   loading: boolean;
   clubsLoaded: boolean;
   isLoggingOut: boolean;
+  isSwitchingClub: boolean;
   isSuperAdmin: boolean;
   isNationalOrgAdmin: boolean;
   isStateOrgAdmin: boolean;
   userSubscription: UserSubscription | null;
   onboardingCompleted: boolean;
   hasPendingApplication: boolean;
+  hasPendingClubApplication: boolean;
   signOut: () => Promise<void>;
   refreshUserClubs: () => Promise<UserClub[]>;
   setCurrentClub: (club: UserClub | null) => void;
@@ -62,10 +64,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [clubsLoaded, setClubsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // Check if we're in the middle of a club switch (persists across reload)
+  const [isSwitchingClub, setIsSwitchingClub] = useState(() => {
+    return sessionStorage.getItem('switching_club') === 'true';
+  });
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
+  const [hasPendingClubApplication, setHasPendingClubApplication] = useState(false);
   const [isStateOrgAdmin, setIsStateOrgAdmin] = useState(false);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -87,15 +94,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     try {
+      // Check user metadata for super admin status first (this is the primary way)
+      const { data: { user: userData } } = await supabase.auth.getUser();
+      const isSuperAdminFromMetadata = userData?.user_metadata?.is_super_admin === true;
+
       // Execute all role checks and subscription fetch in parallel for better performance
       const [superAdminResult, nationalAdminResult, stateAdminResult, subscriptionResult] = await Promise.all([
-        supabase
-          .from('user_clubs')
-          .select('role')
-          .eq('user_id', effectiveUserId)
-          .eq('role', 'super_admin')
-          .limit(1)
-          .maybeSingle(),
+        supabase.rpc('get_user_club_roles', { p_user_id: effectiveUserId }),
         supabase
           .from('user_national_associations')
           .select('role')
@@ -120,7 +125,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .maybeSingle()
       ]);
 
-      const userIsSuperAdmin = superAdminResult.data?.role === 'super_admin';
+      const userClubRoles = superAdminResult.data || [];
+      const userIsSuperAdmin = isSuperAdminFromMetadata || (Array.isArray(userClubRoles) && userClubRoles.some((r: any) => r.role === 'super_admin'));
       setIsSuperAdmin(userIsSuperAdmin);
 
       const userIsNationalAdmin = nationalAdminResult.data?.role === 'national_admin';
@@ -141,7 +147,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // If super admin, fetch all clubs
         const { data: allClubsData, error: allClubsError } = await supabase
           .from('clubs')
-          .select('id, name, abbreviation, logo');
+          .select('id, name, abbreviation, logo')
+          .order('name');
         
         if (allClubsError) throw allClubsError;
         
@@ -217,6 +224,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log('Fetched user clubs with details:', validClubs);
       setUserClubs(validClubs);
       setClubsLoaded(true);
+
+      // Clear club switching state once clubs are loaded
+      if (sessionStorage.getItem('switching_club') === 'true') {
+        console.log('✅ Club switch completed');
+        sessionStorage.removeItem('switching_club');
+        sessionStorage.removeItem('switching_to_club_name');
+        setIsSwitchingClub(false);
+      }
 
       // Set current club if none is selected or restore from localStorage
       // Get user's default club preference
@@ -295,11 +310,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (isActualChange) {
         console.log('🔄 Club changed by user - reloading page');
+
+        // Set sessionStorage flag to persist across reload
+        sessionStorage.setItem('switching_club', 'true');
+        sessionStorage.setItem('switching_to_club_name', club.club?.name || 'club');
+
+        // Show loading overlay before reload
+        setIsSwitchingClub(true);
+
         // Clear any cached data from previous club
         localStorage.removeItem(CURRENT_EVENT_KEY);
 
-        // Force reload to refresh all data for the new club
-        window.location.reload();
+        // Slightly longer delay to ensure loading overlay renders
+        setTimeout(() => {
+          // Force reload to refresh all data for the new club
+          window.location.reload();
+        }, 150);
       } else {
         console.log('✅ No reload needed (initial load or same club)');
       }
@@ -412,11 +438,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             lastName
           };
 
-          // Update ref BEFORE setting state
+          const previousUserId = currentUserIdRef.current;
           currentUserIdRef.current = session.user.id;
+
+          if (previousUserId && previousUserId !== session.user.id) {
+            localStorage.removeItem('currentClubId');
+            localStorage.removeItem('currentOrganization');
+          }
+
           setUser(enhancedUser);
 
-          // Check onboarding status
           const { data: profileData } = await supabase
             .from('profiles')
             .select('onboarding_completed')
@@ -436,6 +467,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             .maybeSingle();
 
           setHasPendingApplication(!!pendingApp);
+
+          // Check for pending club registration
+          const { data: pendingClub } = await supabase
+            .from('clubs')
+            .select('id')
+            .eq('registered_by_user_id', session.user.id)
+            .eq('approval_status', 'pending_approval')
+            .limit(1)
+            .maybeSingle();
+
+          setHasPendingClubApplication(!!pendingClub);
 
           // CRITICAL: Load user clubs on initial auth (pass user ID explicitly)
           await refreshUserClubs(session.user.id);
@@ -466,12 +508,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           async (event, session) => {
             console.log('Auth state changed:', event, session?.user?.email);
 
-            // Handle token refresh events - DON'T reload clubs (they haven't changed!)
-            // This prevents unnecessary state updates and channel thrashing
             if (event === 'TOKEN_REFRESHED') {
-              console.log('Token refreshed successfully - no action needed');
-              // Token refresh doesn't change user clubs/roles, so skip refresh
-              // This prevents realtime channels from being destroyed and recreated
+              return;
+            }
+
+            if (event === 'PASSWORD_RECOVERY') {
+              return;
+            }
+
+            const isOnResetPage = window.location.pathname === '/reset-password';
+            if (isOnResetPage && (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED')) {
               return;
             }
 
@@ -489,6 +535,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUserSubscription(null);
                 setOnboardingCompleted(false);
                 setHasPendingApplication(false);
+                setHasPendingClubApplication(false);
               }
               return;
             }
@@ -512,8 +559,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 lastName
               };
 
-              // Update ref BEFORE setting state to ensure synchronous check works
+              const prevUserId = currentUserIdRef.current;
               currentUserIdRef.current = session.user.id;
+
+              if (prevUserId && prevUserId !== session.user.id) {
+                localStorage.removeItem('currentClubId');
+                localStorage.removeItem('currentOrganization');
+              }
+
               setUser(enhancedUser);
 
               // Check onboarding status
@@ -537,6 +590,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
               setHasPendingApplication(!!pendingApp);
 
+              // Check for pending club registration
+              const { data: pendingClub } = await supabase
+                .from('clubs')
+                .select('id')
+                .eq('registered_by_user_id', session.user.id)
+                .eq('approval_status', 'pending_approval')
+                .limit(1)
+                .maybeSingle();
+
+              setHasPendingClubApplication(!!pendingClub);
+
               // Refresh clubs with explicit user ID
               await refreshUserClubs(session.user.id);
             } else if (mounted) {
@@ -550,6 +614,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setUserSubscription(null);
               setOnboardingCompleted(false);
               setHasPendingApplication(false);
+              setHasPendingClubApplication(false);
               localStorage.removeItem('currentClubId');
             }
           }
@@ -606,12 +671,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loading,
     clubsLoaded,
     isLoggingOut,
+    isSwitchingClub,
     isSuperAdmin,
     isNationalOrgAdmin,
     isStateOrgAdmin,
     userSubscription,
     onboardingCompleted,
     hasPendingApplication,
+    hasPendingClubApplication,
     signOut,
     refreshUserClubs,
     setCurrentClub: handleSetCurrentClub,

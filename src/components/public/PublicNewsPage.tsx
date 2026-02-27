@@ -20,7 +20,7 @@ interface NewsArticle {
   tags?: string[];
 }
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
 
 const getClubInitials = (clubName: string): string => {
   return clubName
@@ -29,6 +29,24 @@ const getClubInitials = (clubName: string): string => {
     .join('')
     .toUpperCase()
     .slice(0, 3);
+};
+
+const getArticleImageUrl = (coverImage?: string): string => {
+  if (!coverImage || coverImage === '/RC-Yachts-image-custom_crop.jpg') return DEFAULT_COVER_IMAGE;
+
+  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    return coverImage;
+  }
+
+  if (coverImage.startsWith('/')) {
+    return DEFAULT_COVER_IMAGE;
+  }
+
+  const { data } = supabase.storage
+    .from('article-images')
+    .getPublicUrl(coverImage);
+
+  return data.publicUrl || DEFAULT_COVER_IMAGE;
 };
 
 export const PublicNewsPage: React.FC = () => {
@@ -70,24 +88,40 @@ export const PublicNewsPage: React.FC = () => {
   const loadArticles = async () => {
     try {
       setLoading(true);
-      console.log('Loading articles for club:', clubId);
+
+      let articleFilter = `club_id.eq.${clubId}`;
+
+      const { data: clubDetail } = await supabase
+        .from('clubs')
+        .select('state_association_id')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      if (clubDetail?.state_association_id) {
+        const stateId = clubDetail.state_association_id;
+        articleFilter += `,state_association_id.eq.${stateId}`;
+        const { data: stateAssoc } = await supabase
+          .from('state_associations')
+          .select('national_association_id')
+          .eq('id', stateId)
+          .maybeSingle();
+        if (stateAssoc?.national_association_id) {
+          articleFilter += `,national_association_id.eq.${stateAssoc.national_association_id}`;
+        }
+      }
 
       const { data, error } = await supabase
         .from('articles')
         .select('*')
-        .eq('club_id', clubId)
+        .or(articleFilter)
         .eq('status', 'published')
         .order('published_at', { ascending: false });
 
-      console.log('Articles query result:', { data, error });
-
       if (error) {
-        console.error('Articles query error:', error);
         throw error;
       }
 
       if (data) {
-        console.log(`Found ${data.length} articles`);
         setArticles(data as any);
 
         const tags = new Set<string>();
@@ -185,8 +219,8 @@ export const PublicNewsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredArticles.map((article) => (
               <article key={article.id} className="bg-white rounded-sm overflow-hidden shadow-md hover:shadow-xl transition-shadow group">
-                <div className="relative h-56 overflow-hidden">
-                  <img src={article.cover_image || DEFAULT_COVER_IMAGE} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="relative h-56 overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
+                  <img src={getArticleImageUrl(article.cover_image)} alt={article.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }} />
                 </div>
                 <div className="p-6">
                   <div className="flex items-center text-xs text-gray-500 mb-3">
@@ -213,7 +247,7 @@ export const PublicNewsPage: React.FC = () => {
         )}
       </div>
 
-        <PublicFooter club={club} />
+        <PublicFooter club={club} clubId={clubId} />
       </div>
     </div>
   );

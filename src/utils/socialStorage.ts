@@ -295,7 +295,8 @@ export const socialStorage = {
       .from('social_groups')
       .select(`
         *,
-        user_membership:social_group_members!inner(role, status)
+        user_membership:social_group_members!inner(role, status),
+        club:clubs!social_groups_club_id_fkey(id, name, abbreviation, logo)
       `)
       .order('name');
 
@@ -373,19 +374,43 @@ export const socialStorage = {
   async getConnections(userId?: string) {
     const { data: { user } } = await supabase.auth.getUser();
     const targetUserId = userId || user?.id;
+    if (!targetUserId) return [];
 
-    const { data, error } = await supabase
-      .from('social_connections')
-      .select(`
-        *,
-        connected_user:profiles(id, full_name, avatar_url)
-      `)
-      .eq('user_id', targetUserId)
-      .eq('status', 'accepted')
-      .order('created_at', { ascending: false });
+    const [outgoing, incoming] = await Promise.all([
+      supabase
+        .from('social_connections')
+        .select(`*, connected_user:profiles!social_connections_connected_user_id_profiles_fkey(id, full_name, avatar_url, last_seen)`)
+        .eq('user_id', targetUserId)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('social_connections')
+        .select(`*, connected_user:profiles!social_connections_user_id_profiles_fkey(id, full_name, avatar_url, last_seen)`)
+        .eq('connected_user_id', targetUserId)
+        .eq('status', 'accepted')
+        .order('created_at', { ascending: false }),
+    ]);
 
-    if (error) throw error;
-    return data;
+    if (outgoing.error) throw outgoing.error;
+    if (incoming.error) throw incoming.error;
+
+    const seen = new Set<string>();
+    const all: any[] = [];
+    for (const c of (outgoing.data || [])) {
+      const otherId = c.connected_user_id;
+      if (!seen.has(otherId)) {
+        seen.add(otherId);
+        all.push(c);
+      }
+    }
+    for (const c of (incoming.data || [])) {
+      const otherId = c.user_id;
+      if (!seen.has(otherId)) {
+        seen.add(otherId);
+        all.push(c);
+      }
+    }
+    return all;
   },
 
   async sendConnectionRequest(connectedUserId: string, type: 'friend' | 'follow' = 'friend') {
@@ -407,6 +432,24 @@ export const socialStorage = {
     return data;
   },
 
+  async getPendingConnectionRequests() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('social_connections')
+      .select(`
+        *,
+        requester:profiles!social_connections_user_id_profiles_fkey(id, full_name, avatar_url)
+      `)
+      .eq('connected_user_id', user.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
   async acceptConnectionRequest(connectionId: string) {
     const { data, error } = await supabase
       .from('social_connections')
@@ -417,6 +460,47 @@ export const socialStorage = {
       .eq('id', connectionId)
       .select()
       .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async rejectConnectionRequest(connectionId: string) {
+    const { error } = await supabase
+      .from('social_connections')
+      .delete()
+      .eq('id', connectionId);
+
+    if (error) throw error;
+  },
+
+  async updateGroup(groupId: string, updates: Partial<SocialGroup>) {
+    const { data, error } = await supabase
+      .from('social_groups')
+      .update(updates)
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteGroup(groupId: string) {
+    const { error } = await supabase
+      .from('social_groups')
+      .delete()
+      .eq('id', groupId);
+
+    if (error) throw error;
+  },
+
+  async getClubGroups(clubId: string) {
+    const { data, error } = await supabase
+      .from('social_groups')
+      .select('*')
+      .eq('club_id', clubId)
+      .order('name');
 
     if (error) throw error;
     return data;
@@ -450,12 +534,18 @@ export const socialStorage = {
   },
 
   async uploadSocialMedia(file: File, folder: string = 'social') {
-    const fileExt = file.name.split('.').pop();
+    let uploadFile: File = file;
+    if (file.type.startsWith('image/')) {
+      const { compressImage } = await import('./imageCompression');
+      uploadFile = await compressImage(file, 'photo');
+    }
+
+    const fileExt = uploadFile.name.split('.').pop();
     const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
     const { data, error } = await supabase.storage
       .from('media')
-      .upload(fileName, file);
+      .upload(fileName, uploadFile);
 
     if (error) throw error;
 

@@ -255,8 +255,8 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
           return renewalDate.getFullYear() === currentYear;
         }).length;
 
-        const clubRetention = clubLastYear > 0
-          ? (clubRenewalsThisYear / clubLastYear) * 100
+        const clubRetention = clubLastYearActive > 0
+          ? (clubRenewalsThisYear / clubLastYearActive) * 100
           : 0;
 
         return {

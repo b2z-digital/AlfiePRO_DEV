@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle } from 'lucide-react';
+import { X, Users, Shuffle, Edit3, Check, RefreshCw, Eye, UserPlus, AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
-import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments } from '../types/heat';
+import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
-import { selectObservers, saveObserverAssignments, getObserverAssignments, toggleObserver, ObserverAssignment } from '../utils/observerUtils';
+import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
+import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 
 interface HeatAssignmentModalProps {
   isOpen: boolean;
@@ -43,6 +44,177 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
 
+  const [initialEditMode, setInitialEditMode] = useState(false);
+  const [selectedSkipperToMove, setSelectedSkipperToMove] = useState<number | null>(null);
+  const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
+  const [previewRoundIndex, setPreviewRoundIndex] = useState<number | null>(null);
+
+  const rankedSkipperIndices = useMemo(() => {
+    const indices = (heatManagement.configuration as any)?.rankedSkipperIndices;
+    return new Set<number>(Array.isArray(indices) ? indices : []);
+  }, [heatManagement.configuration]);
+
+  const shrsHasPreAssignments = heatManagement.configuration.scoringSystem === 'shrs' &&
+    heatManagement.configuration.shrsAssignmentMode === 'preset' &&
+    heatManagement.rounds.length > 1 &&
+    !heatManagement.rounds.some(r => r.results && r.results.length > 0);
+
+  const totalPreAssignedRounds = shrsHasPreAssignments ? heatManagement.rounds.length : 0;
+
+  const exportAllSHRSAssignments = () => {
+    const rows: string[] = ['Round,Heat,Sail Number,Skipper Name,Club'];
+
+    for (const rd of heatManagement.rounds) {
+      const sortedAssignments = [...rd.heatAssignments].sort((a, b) =>
+        a.heatDesignation.localeCompare(b.heatDesignation)
+      );
+      const config = heatManagement.configuration;
+      const roundLabel = config.scoringSystem === 'shrs'
+        ? getSHRSRoundLabel(rd.round, config)
+        : `R${rd.round}`;
+
+      for (const assignment of sortedAssignments) {
+        for (const idx of assignment.skipperIndices) {
+          const skipper = skippers[idx];
+          if (skipper) {
+            rows.push(`${roundLabel},Heat ${assignment.heatDesignation},${skipper.sailNo || ''},${skipper.name || ''},${skipper.club || ''}`);
+          }
+        }
+      }
+    }
+
+    const csvContent = rows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `SHR_Heat_Assignments_All_Qualifying_Rounds.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const buildObserverMap = () => {
+    const obsMap = new Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]>();
+    observersByHeat.forEach((observers, heatNumber) => {
+      const sortedDesignations = heatAssignments
+        .map(a => a.heatDesignation)
+        .sort((a, b) => a.localeCompare(b));
+      const designation = sortedDesignations[heatNumber - 1];
+      if (!designation) return;
+      const key = `${round}-${designation}`;
+      obsMap.set(key, observers.map(o => {
+        const matchedSkipper = skippers.find(s =>
+          s.sailNo === o.skipper_sail_number || s.name === o.skipper_name
+        );
+        return {
+          skipperName: o.skipper_name,
+          sailNumber: o.skipper_sail_number || '',
+          countryCode: matchedSkipper?.country_code || undefined,
+        };
+      }));
+    });
+    return obsMap;
+  };
+
+  const getExportOptions = () => ({
+    eventName: currentEvent?.name || currentEvent?.eventName || '',
+    eventDate: currentEvent?.date || '',
+    venueName: (currentEvent as any)?.venue || '',
+    clubName: (currentEvent as any)?.clubName || '',
+    showFlag: currentEvent?.show_flag ?? false,
+    showCountry: currentEvent?.show_country ?? false,
+  });
+
+  const handleExportCurrentRoundPdf = () => {
+    const roundIdx = previewRoundIndex ?? heatManagement.rounds.findIndex(r => r.round === round);
+    if (roundIdx < 0) return;
+    exportSingleRoundPdf(heatManagement, roundIdx, skippers, getExportOptions(), buildObserverMap());
+  };
+
+  const handleExportAllRoundsPdf = async () => {
+    const stateObsMap = buildObserverMap();
+    let obsMap = new Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]>();
+    if (currentEvent?.id) {
+      const rawMap = await getAllObserversForEvent(currentEvent.id);
+      rawMap.forEach((observers, key) => {
+        obsMap.set(key, observers.map(o => {
+          const matched = skippers.find(s =>
+            s.sailNo === o.sailNumber || s.name === o.skipperName
+          );
+          return { ...o, countryCode: matched?.country_code || undefined };
+        }));
+      });
+    }
+    stateObsMap.forEach((observers, key) => {
+      obsMap.set(key, observers);
+    });
+    exportAllRoundsPdf(heatManagement, skippers, getExportOptions(), obsMap);
+  };
+
+  const resolveObserverConflicts = (updatedAssignments: HeatAssignment[]) => {
+    const changedHeats: number[] = [];
+    let resolvedMap: Map<number, ObserverAssignment[]> | undefined;
+
+    setObserversByHeat(prev => {
+      const newMap = new Map(prev);
+      const sortedDesignations = updatedAssignments
+        .map(a => a.heatDesignation)
+        .sort((a, b) => a.localeCompare(b));
+
+      for (let i = 0; i < sortedDesignations.length; i++) {
+        const designation = sortedDesignations[i];
+        const heatNumber = i + 1;
+        const assignment = updatedAssignments.find(a => a.heatDesignation === designation);
+        if (!assignment) continue;
+
+        const observers = newMap.get(heatNumber);
+        if (!observers || observers.length === 0) continue;
+
+        const racingSet = new Set(assignment.skipperIndices);
+        const conflicting = observers.filter(o => racingSet.has(o.skipper_index));
+        if (conflicting.length === 0) continue;
+
+        const existingObserverIndices = new Set(observers.map(o => o.skipper_index));
+
+        let cleaned = observers.filter(o => !racingSet.has(o.skipper_index));
+        const needed = observers.length - cleaned.length;
+
+        for (let r = 0; r < needed; r++) {
+          const candidate = skippers.findIndex((s, idx) =>
+            s &&
+            !racingSet.has(idx) &&
+            !existingObserverIndices.has(idx) &&
+            !cleaned.some(o => o.skipper_index === idx)
+          );
+          if (candidate !== -1) {
+            cleaned.push({
+              skipper_index: candidate,
+              skipper_name: skippers[candidate].name,
+              skipper_sail_number: skippers[candidate].sailNo,
+              times_served: 0,
+              is_manual_assignment: true
+            });
+            existingObserverIndices.add(candidate);
+          }
+        }
+
+        newMap.set(heatNumber, cleaned);
+        changedHeats.push(heatNumber);
+      }
+
+      resolvedMap = newMap;
+      return newMap;
+    });
+
+    if (resolvedMap && currentEvent?.id && changedHeats.length > 0) {
+      for (const heatNumber of changedHeats) {
+        const observers = resolvedMap.get(heatNumber);
+        if (observers && observers.length > 0) {
+          saveObserverAssignments(currentEvent.id, heatNumber, round, observers);
+        }
+      }
+    }
+  };
+
   // Observer state - store per heat
   const [observersByHeat, setObserversByHeat] = useState<Map<number, ObserverAssignment[]>>(new Map());
   const [loadingObservers, setLoadingObservers] = useState(false);
@@ -61,16 +233,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setAppliedRelegations(new Set());
       setHasAppliedChanges(false);
       setIsApplyingChanges(false);
+      setInitialEditMode(false);
+      setSelectedSkipperToMove(null);
+      setLocalAssignments(null);
     }
   }, [isOpen]);
 
-  // Create a stable key that represents the state of rounds that should trigger observer reload
   const roundDataKey = useMemo(() => {
     const { currentRound, roundJustCompleted, rounds } = heatManagement;
 
-    // Determine which round we're displaying
     let targetRound;
-    if (roundJustCompleted && currentRound > roundJustCompleted) {
+    if (previewRoundIndex !== null) {
+      targetRound = rounds[previewRoundIndex]?.round || currentRound;
+    } else if (roundJustCompleted && currentRound > roundJustCompleted) {
       targetRound = currentRound;
     } else if (roundJustCompleted) {
       targetRound = roundJustCompleted;
@@ -90,72 +265,50 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       .map(h => `${h.heatDesignation}:${h.skipperIndices.slice().sort().join(',')}`)
       .join('|');
 
-    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}-${assignmentHash}`;
-  }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds]);
+    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}-${assignmentHash}-preview${previewRoundIndex}`;
+  }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds, previewRoundIndex]);
 
-  // Load and select observers when modal opens
+  const preAllocationDone = React.useRef(false);
+
   useEffect(() => {
-    console.log('🔵 HeatAssignmentModal useEffect TRIGGERED:', {
-      isOpen,
-      hasEventId: !!currentEvent?.id,
-      roundDataKey,
-      dependencies: {
-        isOpen,
-        eventId: currentEvent?.id,
-        enable_observers: currentEvent?.enable_observers,
-        observers_per_heat: currentEvent?.observers_per_heat,
-        skipperCount: skippers?.length
-      }
-    });
+    if (!isOpen) {
+      preAllocationDone.current = false;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     const loadObservers = async () => {
-      console.log('🎯 HeatAssignmentModal - Checking observer conditions:', {
-        isOpen,
-        hasEventId: !!currentEvent?.id,
-        enable_observers: currentEvent?.enable_observers,
-        observers_per_heat: currentEvent?.observers_per_heat,
-        roundDataKey,
-        currentEvent
-      });
-
       if (!isOpen || !currentEvent?.id) {
-        console.log('⏭️ Skipping observer load - no event or modal closed');
         setObserversByHeat(new Map());
         return;
       }
 
-      // Check if observers are enabled - if undefined, fetch from database
-      const enableObservers = currentEvent?.enable_observers;
-      if (enableObservers === undefined) {
-        console.log('🔄 Observer settings undefined, fetching from database...');
+      let enableObs = currentEvent?.enable_observers;
+      if (enableObs === undefined) {
         const { data: eventData, error } = await supabase
           .from('quick_races')
           .select('enable_observers, observers_per_heat')
           .eq('id', currentEvent.id)
           .maybeSingle();
 
-        if (error) {
-          console.error('❌ Error fetching observer settings:', error);
-          setObserversByHeat(new Map());
+        if (error || cancelled) {
+          if (!cancelled) setObserversByHeat(new Map());
           return;
         }
 
-        console.log('📥 Fetched observer settings from DB:', eventData);
-
-        // Update currentEvent with the fetched values
         if (eventData) {
           (currentEvent as any).enable_observers = eventData.enable_observers ?? true;
           (currentEvent as any).observers_per_heat = eventData.observers_per_heat ?? 2;
         }
 
-        // If observers are not enabled, don't proceed
         if (!eventData?.enable_observers) {
-          console.log('⏭️ Observers disabled for this event');
-          setObserversByHeat(new Map());
+          if (!cancelled) setObserversByHeat(new Map());
           return;
         }
-      } else if (!enableObservers) {
-        console.log('⏭️ Observers disabled for this event');
+        enableObs = eventData?.enable_observers;
+      } else if (!enableObs) {
         setObserversByHeat(new Map());
         return;
       }
@@ -163,242 +316,171 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setLoadingObservers(true);
       try {
         const { currentRound, rounds, roundJustCompleted } = heatManagement;
+        const isSHRSMode = heatManagement.configuration.scoringSystem === 'shrs';
+        const observersPerHeat = currentEvent.observers_per_heat || 2;
 
-        // CRITICAL: Use the SAME logic as the modal display to determine which round to load observers for
-        // This ensures observers match the round being displayed
-        let roundToLoadObserversFor;
-        if (roundJustCompleted) {
-          // Show the round that was just completed (with results)
-          // This matches the modal display logic at line 383-385
-          roundToLoadObserversFor = rounds.find(r => r.round === roundJustCompleted);
-          console.log('🏁 Showing completed round', roundJustCompleted);
-        } else {
-          // Show the next uncompleted round, or current round
-          // This matches the modal display logic at line 388
-          roundToLoadObserversFor = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
-          console.log('➡️ Showing current/next round', roundToLoadObserversFor?.round);
+        const shrsPreAssign = isSHRSMode &&
+          rounds.length > 1 &&
+          !rounds.some(r => r.results && r.results.length > 0);
+
+        if (shrsPreAssign && !preAllocationDone.current) {
+          preAllocationDone.current = true;
+          await preAllocateObserversForAllRounds(
+            currentEvent.id,
+            rounds.map(r => ({
+              round: r.round,
+              heatAssignments: r.heatAssignments.map(h => ({
+                heatDesignation: h.heatDesignation as string,
+                skipperIndices: h.skipperIndices
+              }))
+            })),
+            skippers,
+            observersPerHeat
+          );
         }
 
-        console.log('✅ Loading observers for round', roundToLoadObserversFor?.round);
-        console.log('   Round data:', roundToLoadObserversFor);
+        if (cancelled) return;
 
-        // CRITICAL FIX: If the round we're displaying is NOT completed, don't load old observers
-        // This handles the case where Round 1 completes, modal shows Round 2 assignments,
-        // but we shouldn't load Round 1 observers - we need to assign NEW observers for Round 2
-        if (roundToLoadObserversFor && !roundToLoadObserversFor.completed) {
-          console.log('🆕 Round is not completed - will assign new observers, not load historical ones');
+        let roundToLoadObserversFor;
+        if (previewRoundIndex !== null && shrsPreAssign) {
+          roundToLoadObserversFor = rounds[previewRoundIndex];
+        } else if (roundJustCompleted) {
+          roundToLoadObserversFor = rounds.find(r => r.round === roundJustCompleted);
+        } else {
+          roundToLoadObserversFor = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
         }
 
         if (!roundToLoadObserversFor) {
-          console.warn('⚠️ No round data found');
-          setObserversByHeat(new Map());
+          if (!cancelled) setObserversByHeat(new Map());
           return;
         }
 
         const currentRoundData = roundToLoadObserversFor;
-        const roundNumberToLoad = currentRoundData.round; // Use the round we're displaying, not currentRound
+        const roundNumberToLoad = currentRoundData.round;
 
-        // Load observers PER HEAT
         const newObserversByHeat = new Map<number, ObserverAssignment[]>();
-        const observersPerHeat = currentEvent.observers_per_heat || 2;
 
-        console.log('👀 Loading', observersPerHeat, 'observers per heat');
-        console.log('🔥 Total heats:', currentRoundData.heatAssignments.length);
-
-        // IMPORTANT: Sort heats alphabetically to match UI rendering order
-        // This ensures heatNumber (1, 2, 3...) maps correctly to Heat A, B, C...
         const sortedHeats = [...currentRoundData.heatAssignments].sort((a, b) =>
           a.heatDesignation.localeCompare(b.heatDesignation)
         );
 
-        // Use results from the round we're displaying
-        const roundResults = currentRoundData.results || [];
-
-        // Check which heats are completed to determine observer assignment
-        // Heats complete from bottom to top (B -> A for 2 heats, C -> B -> A for 3 heats)
-        const heatCompletionStatus = sortedHeats.map((heat, idx) => {
-          const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
-
-          // For completed rounds, check if this heat has ANY results with positions
-          // (don't rely on original skipperIndices as skippers may have moved between heats)
-          let isCompleted;
-          if (currentRoundData.completed) {
-            // If round is complete, a heat is complete if it has any results with scored positions
-            isCompleted = heatResults.some(r => r.position !== null || r.letterScore || r.markedAsUP);
-          } else {
-            // For active rounds, check if all skippers in the original assignment have results
-            isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
-              const result = heatResults.find(r => r.skipperIndex === skipperIdx);
-              return result && (result.position !== null || result.letterScore || result.markedAsUP);
-            });
-          }
-
-          return { heatDesignation: heat.heatDesignation, heatNumber: idx + 1, isCompleted };
-        });
-
-        console.log('📊 Heat completion status:', heatCompletionStatus);
-
-        // Determine which heat should have observers (the first uncompleted heat from bottom to top)
-        // Reverse to check from bottom (last) to top (first)
-        const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
-        console.log('🎯 Next heat to score:', nextHeatToScore?.heatDesignation || 'All heats completed');
-
-        // Get all completed heats to show their previous observers
-        const completedHeats = heatCompletionStatus.filter(h => h.isCompleted);
-        console.log('🏁 Completed heats:', completedHeats.map(h => h.heatDesignation).join(', ') || 'None');
-
-        // Process each heat separately
-        for (let i = 0; i < sortedHeats.length; i++) {
-          const heat = sortedHeats[i];
-          const heatNumber = i + 1; // Heat 1 = Heat A, Heat 2 = Heat B, etc.
-
-          console.log(`\n🔍 Heat ${heat.heatDesignation} (heat ${heatNumber}):`);
-
-          // Assign observers to:
-          // 1. The next heat that needs scoring (active observers)
-          // 2. ALL completed heats (to show previous observers)
-          const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
-          const isCompletedHeat = heatCompletionStatus[i].isCompleted;
-
-          console.log(`  isNextHeatToScore: ${isNextHeatToScore}, isCompletedHeat: ${isCompletedHeat}`);
-
-          if (!isNextHeatToScore && !isCompletedHeat) {
-            console.log(`  ⏭️ Skipping observer assignment - this heat has not been scored yet`);
-            continue;
-          }
-
-          if (isCompletedHeat) {
-            console.log(`  ✅ This is a completed heat - loading observers for completed heat`);
-          }
-
-          if (isNextHeatToScore) {
-            console.log(`  ✅ This is the next heat to score - assigning observers`);
-          }
-
-          // For completed heats, load existing observers to show who observed
-          // For the next heat to score in an active round, we may need to re-select if heat composition changed
-          let shouldSelectNewObservers = false;
-          let existingObservers: ObserverAssignment[] | null = null;
-
-          if (isCompletedHeat) {
-            // Heat is complete - load observers who actually observed this heat
-            existingObservers = await getObserverAssignments(
+        if (shrsPreAssign) {
+          for (let i = 0; i < sortedHeats.length; i++) {
+            if (cancelled) return;
+            const heatNumber = i + 1;
+            const existingObservers = await getObserverAssignments(
               currentEvent.id,
               heatNumber,
               roundNumberToLoad
             );
-            console.log(`  📖 Loading ${existingObservers?.length || 0} observers for completed heat`);
-
             if (existingObservers && existingObservers.length > 0) {
               newObserversByHeat.set(heatNumber, existingObservers);
             }
-          } else if (isNextHeatToScore) {
-            // For the next heat to score, check if we can reuse existing observers
-            // This applies to BOTH completed and uncompleted rounds
-            existingObservers = await getObserverAssignments(
+          }
+        } else {
+          const roundResults = currentRoundData.results || [];
+
+          const heatCompletionStatus = sortedHeats.map((heat, idx) => {
+            const heatResults = roundResults.filter(r => r.heatDesignation === heat.heatDesignation);
+            let isCompleted;
+            if (currentRoundData.completed) {
+              isCompleted = heatResults.some(r => r.position !== null || r.letterScore || r.markedAsUP);
+            } else {
+              isCompleted = heat.skipperIndices.length > 0 && heat.skipperIndices.every(skipperIdx => {
+                const result = heatResults.find(r => r.skipperIndex === skipperIdx);
+                return result && (result.position !== null || result.letterScore || result.markedAsUP);
+              });
+            }
+            return { heatDesignation: heat.heatDesignation, heatNumber: idx + 1, isCompleted };
+          });
+
+          const nextHeatToScore = [...heatCompletionStatus].reverse().find(h => !h.isCompleted);
+          const noScoringStarted = roundResults.length === 0;
+
+          for (let i = 0; i < sortedHeats.length; i++) {
+            if (cancelled) return;
+            const heat = sortedHeats[i];
+            const heatNumber = i + 1;
+            const isNextHeatToScore = nextHeatToScore && nextHeatToScore.heatNumber === heatNumber;
+            const isCompletedHeat = heatCompletionStatus[i].isCompleted;
+            const adjacentHeat = i - 1 >= 0 ? sortedHeats[i - 1] : null;
+            const nextHeatIndices = adjacentHeat ? adjacentHeat.skipperIndices : undefined;
+
+            if (!isNextHeatToScore && !isCompletedHeat && !isSHRSMode && !noScoringStarted) {
+              continue;
+            }
+
+            const existingObservers = await getObserverAssignments(
               currentEvent.id,
               heatNumber,
               roundNumberToLoad
             );
 
-            console.log(`  📋 Checking existing observers for Round ${roundNumberToLoad}, Heat ${heatNumber}:`, existingObservers?.length || 0);
-            if (existingObservers && existingObservers.length > 0) {
-              console.log(`     Existing observer indices:`, existingObservers.map(o => o.skipper_index));
-              console.log(`     Racing skipper indices:`, heat.skipperIndices);
+            if (isCompletedHeat) {
+              if (existingObservers && existingObservers.length > 0) {
+                newObserversByHeat.set(heatNumber, existingObservers);
+              }
+              continue;
             }
 
-            // Validate existing observers:
-            // 1. Count must match expected
-            // 2. None of the observers can be racing in THIS heat
-            const observersRacingInHeat = existingObservers?.filter(obs => {
-              const isRacing = heat.skipperIndices.includes(obs.skipper_index);
-              if (isRacing) {
-                console.log(`     ❌ Observer ${obs.skipper_name} (index ${obs.skipper_index}) is RACING in this heat!`);
-              }
-              return isRacing;
-            }) || [];
+            const observersRacingInHeat = existingObservers?.filter(obs =>
+              obs.skipper_index !== undefined && obs.skipper_index !== null &&
+              heat.skipperIndices.includes(obs.skipper_index)
+            ) || [];
 
-            // Also check if ALL observers are still available
-            const observersStillInHeat = existingObservers?.filter(obs => {
-              const skipperStillExists = obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index];
-              if (!skipperStillExists) {
-                console.log(`     ⚠️ Observer ${obs.skipper_name} (index ${obs.skipper_index}) no longer exists in skipper list`);
-              }
-              return skipperStillExists;
-            }) || [];
+            const observersInNextHeat = existingObservers?.filter(obs =>
+              obs.skipper_index !== undefined && obs.skipper_index !== null &&
+              nextHeatIndices && nextHeatIndices.includes(obs.skipper_index)
+            ) || [];
 
-            const hasValidExistingObservers = existingObservers &&
+            const observersStillExist = existingObservers?.filter(obs =>
+              obs.skipper_index !== undefined && obs.skipper_index !== null &&
+              obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index]
+            ) || [];
+
+            const hasValid = existingObservers &&
               existingObservers.length > 0 &&
               existingObservers.length === observersPerHeat &&
-              observersRacingInHeat.length === 0 && // No observers can be racing in this heat
-              observersStillInHeat.length === existingObservers.length; // All observers still exist
+              observersRacingInHeat.length === 0 &&
+              observersInNextHeat.length === 0 &&
+              observersStillExist.length === existingObservers.length;
 
-            if (hasValidExistingObservers) {
-              console.log(`  ✅ Using existing ${existingObservers.length} valid observers:`, existingObservers.map(o => `${o.skipper_name} (${o.skipper_index})`));
+            if (hasValid) {
               newObserversByHeat.set(heatNumber, existingObservers);
             } else {
-              if (existingObservers && existingObservers.length > 0) {
-                console.warn(`  ⚠️ Existing observers invalid - will re-select`);
-              } else {
-                console.log(`  ℹ️ No existing observers found - will select new`);
-              }
-              shouldSelectNewObservers = true;
-            }
-          } else {
-            console.log(`  ⏭️ Not next heat to score and not completed - skipping observer assignment`);
-          }
-
-          // Select new observers if needed
-          if (shouldSelectNewObservers) {
-            console.log(`  🔄 Selecting new observers for this heat`);
-            console.log('  🏁 Skippers racing in this heat:', heat.skipperIndices);
-
-            // Select observers from skippers NOT racing in THIS specific heat
-            const observersForThisHeat = await selectObservers(
-              currentEvent.id,
-              heatNumber,
-              roundNumberToLoad,
-              heat.skipperIndices, // Only exclude skippers in THIS heat
-              skippers,
-              observersPerHeat
-            );
-
-            console.log(`  ✅ Selected ${observersForThisHeat.length} observers:`, observersForThisHeat);
-
-            // Save observers for this specific heat
-            if (observersForThisHeat.length > 0) {
-              console.log(`  💾 Saving ${observersForThisHeat.length} observers to database for Heat ${heatNumber}, Round ${roundNumberToLoad}...`);
-              await saveObserverAssignments(
+              const observersForThisHeat = await selectObservers(
                 currentEvent.id,
                 heatNumber,
                 roundNumberToLoad,
-                observersForThisHeat
+                heat.skipperIndices,
+                skippers,
+                observersPerHeat,
+                nextHeatIndices
               );
-              console.log(`  ✅ Successfully saved observers to database`);
-              newObserversByHeat.set(heatNumber, observersForThisHeat);
+
+              if (observersForThisHeat.length > 0) {
+                await saveObserverAssignments(
+                  currentEvent.id,
+                  heatNumber,
+                  roundNumberToLoad,
+                  observersForThisHeat
+                );
+                newObserversByHeat.set(heatNumber, observersForThisHeat);
+              }
             }
           }
         }
 
-        console.log('\n📊 Loaded observers for', newObserversByHeat.size, 'heats');
-        console.log('   Observer details by heat:');
-        for (let i = 1; i <= sortedHeats.length; i++) {
-          const observers = newObserversByHeat.get(i);
-          console.log(`   Heat ${['A', 'B', 'C', 'D', 'E', 'F'][i-1]}: ${observers ? observers.map(o => `${o.skipper_name} (${o.skipper_index})`).join(', ') : 'NONE'}`);
-        }
-        setObserversByHeat(newObserversByHeat);
-
-        if (newObserversByHeat.size === 0) {
-          console.warn('⚠️ No observers selected - may need more skippers or different configuration');
-        }
+        if (!cancelled) setObserversByHeat(newObserversByHeat);
       } catch (error) {
         console.error('Error loading observers:', error);
       } finally {
-        setLoadingObservers(false);
+        if (!cancelled) setLoadingObservers(false);
       }
     };
 
     loadObservers();
+    return () => { cancelled = true; };
   }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
 
   if (!isOpen) return null;
@@ -462,11 +544,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const roundJustCompleted = heatManagement.roundJustCompleted;
   let roundToDisplay;
 
-  if (roundJustCompleted) {
-    // Show the round that was just completed (with results)
+  if (previewRoundIndex !== null && shrsHasPreAssignments) {
+    roundToDisplay = rounds[previewRoundIndex];
+  } else if (roundJustCompleted) {
     roundToDisplay = rounds.find(r => r.round === roundJustCompleted);
   } else {
-    // Show the next uncompleted round, or current round
     roundToDisplay = rounds.find(r => !r.completed) || rounds.find(r => r.round === currentRound);
   }
 
@@ -513,8 +595,20 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     a.heatDesignation.localeCompare(b.heatDesignation)
   );
 
+  if (initialEditMode && localAssignments) {
+    heatAssignments = localAssignments;
+  }
+
   // Find the next round (if current round is complete)
   const nextRound = completed ? rounds.find(r => r.round === round + 1) : null;
+
+  // For SHRS, check if we should allow progression even if next round doesn't exist yet
+  const isSHRS = heatManagement.configuration.scoringSystem === 'shrs';
+  const shrsPhase = isSHRS ? getSHRSPhase(round, configuration) : null;
+  const isFinalsPhase = shrsPhase === 'finals';
+  const isTransitionRound = isSHRS && isSHRSTransitionRound(round, configuration);
+  const expectedRounds = heatManagement.configuration.numberOfRounds || 6;
+  const shouldAllowProgression = completed && round < expectedRounds;
 
   console.log('HeatAssignmentModal Debug:', {
     round,
@@ -522,11 +616,35 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     roundJustCompleted,
     nextRound: nextRound ? `Round ${nextRound.round}` : 'null',
     totalRounds: rounds.length,
+    isSHRS,
+    expectedRounds,
+    shouldAllowProgression,
     allRounds: rounds.map(r => ({ round: r.round, completed: r.completed }))
   });
 
-  // Get vibrant gradient colors for each heat
   const getHeatGradient = (heat: HeatDesignation): string => {
+    if (isSHRS) {
+      if (isFinalsPhase) {
+        const finalsGradients: Record<HeatDesignation, string> = {
+          'A': 'bg-gradient-to-br from-yellow-400 to-yellow-600 border-yellow-700',
+          'B': 'bg-gradient-to-br from-slate-300 to-slate-400 border-slate-500',
+          'C': 'bg-gradient-to-br from-amber-600 to-amber-700 border-amber-800',
+          'D': 'bg-gradient-to-br from-orange-600 to-orange-700 border-orange-800',
+          'E': 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-700',
+          'F': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700'
+        };
+        return finalsGradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
+      }
+      const qualifyingGradients: Record<HeatDesignation, string> = {
+        'A': 'bg-gradient-to-br from-blue-500 to-blue-600 border-blue-700',
+        'B': 'bg-gradient-to-br from-teal-500 to-teal-600 border-teal-700',
+        'C': 'bg-gradient-to-br from-cyan-500 to-cyan-600 border-cyan-700',
+        'D': 'bg-gradient-to-br from-sky-500 to-sky-600 border-sky-700',
+        'E': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700',
+        'F': 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700'
+      };
+      return qualifyingGradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
+    }
     const gradients: Record<HeatDesignation, string> = {
       'A': 'bg-gradient-to-br from-yellow-500 to-amber-600 border-amber-700',
       'B': 'bg-gradient-to-br from-orange-500 to-orange-600 border-orange-700',
@@ -538,68 +656,157 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     return gradients[heat] || 'bg-gradient-to-br from-slate-500 to-slate-600 border-slate-700';
   };
 
+  const heatCount = heatAssignments.length;
+  const maxWidthClass = heatCount >= 5
+    ? 'max-w-[95vw]'
+    : heatCount === 4
+    ? 'max-w-[85vw]'
+    : heatCount === 3
+    ? 'max-w-[75vw]'
+    : heatCount === 2
+    ? 'max-w-[60vw]'
+    : 'max-w-[40vw]';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black bg-opacity-50">
       <div
-        className={`w-full max-w-7xl max-h-[90vh] rounded-lg shadow-2xl overflow-hidden flex flex-col ${
+        className={`w-full ${maxWidthClass} max-h-[92vh] rounded-xl shadow-2xl overflow-hidden flex flex-col ${
           darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
         }`}
       >
         {/* Header */}
-        <div className={`flex items-center justify-between p-6 border-b ${
+        <div className={`flex items-center justify-between px-5 py-3 border-b flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           <div className="flex items-center gap-3">
-            <Users className="text-blue-400" size={28} />
+            <Users className="text-blue-400" size={24} />
             <div>
-              <h2 className="text-2xl font-bold">
-                Round {round} {completed ? 'Heat Results' : 'Heat Assignments'}
+              <h2 className="text-lg font-bold">
+                {isSHRS ? getSHRSRoundLabel(round, configuration) : `Round ${round}`} - {configuration.scoringSystem === 'shrs' ? `SHR-${configuration.shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
               </h2>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {completed ? 'Round Complete' : 'Current Round'} • {heatAssignments.length} heats
+              <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                {isSHRS && shrsPhase ? (
+                  <span className={`font-semibold ${isFinalsPhase ? 'text-yellow-500' : 'text-blue-400'}`}>
+                    {isFinalsPhase ? 'Finals Series' : 'Qualifying Series'}
+                  </span>
+                ) : (
+                  completed ? 'Round Complete' : 'Current Round'
+                )}
+                {' '} • {heatAssignments.length} heats
                 {editMode && <span className="ml-2 text-amber-500 font-semibold">• Edit Mode</span>}
                 {!editMode && hasAppliedChanges && <span className="ml-2 text-green-500 font-semibold">• Changes Applied</span>}
+                {initialEditMode && <span className="ml-2 text-amber-500 font-semibold">• Tap unranked skippers to swap between heats</span>}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              // Same logic as main button - if round completed, advance to next
-              if (!isInitialAllocation && onStartRound && completed && nextRound) {
-                console.log('X button - Starting next round:', nextRound.round);
-                onStartRound(nextRound.round);
-              }
-              onClose();
-            }}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
-            }`}
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCurrentRoundPdf}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                darkMode
+                  ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+              title="Export this round as PDF"
+            >
+              <FileDown size={16} />
+              Export Round Assignments
+            </button>
+            {shrsHasPreAssignments && (
+              <button
+                onClick={handleExportAllRoundsPdf}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                title="Export all qualifying rounds as multi-page PDF"
+              >
+                <FileDown size={16} />
+                Export ALL Assignments
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (!isInitialAllocation && onStartRound && completed && nextRound) {
+                  onStartRound(nextRound.round);
+                }
+                setPreviewRoundIndex(null);
+                onClose();
+              }}
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
+              }`}
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
-        {/* Warning notification for promotion limit */}
+        {shrsHasPreAssignments && totalPreAssignedRounds > 1 && (
+          <div className={`flex items-center justify-center gap-3 px-5 py-2 border-b flex-shrink-0 ${
+            darkMode ? 'border-slate-700 bg-slate-750' : 'border-slate-200 bg-slate-50'
+          }`}>
+            <button
+              onClick={() => setPreviewRoundIndex(prev => Math.max(0, (prev ?? 0) - 1))}
+              disabled={(previewRoundIndex ?? 0) === 0}
+              className={`p-1 rounded transition-colors ${
+                (previewRoundIndex ?? 0) === 0
+                  ? 'opacity-30 cursor-not-allowed'
+                  : darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'
+              }`}
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="flex items-center gap-1.5">
+              {heatManagement.rounds.map((rd, idx) => (
+                <button
+                  key={rd.round}
+                  onClick={() => setPreviewRoundIndex(idx)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                    (previewRoundIndex ?? 0) === idx
+                      ? 'bg-blue-500 text-white'
+                      : darkMode
+                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                >
+                  {getSHRSRoundLabel(rd.round, heatManagement.configuration)}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPreviewRoundIndex(prev => Math.min(totalPreAssignedRounds - 1, (prev ?? 0) + 1))}
+              disabled={(previewRoundIndex ?? 0) === totalPreAssignedRounds - 1}
+              className={`p-1 rounded transition-colors ${
+                (previewRoundIndex ?? 0) === totalPreAssignedRounds - 1
+                  ? 'opacity-30 cursor-not-allowed'
+                  : darkMode ? 'hover:bg-slate-600' : 'hover:bg-slate-200'
+              }`}
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+
         {limitWarning && (
-          <div className={`mx-6 mt-4 p-3 rounded-lg border ${
+          <div className={`mx-5 mt-2 p-2 rounded-lg border flex-shrink-0 ${
             darkMode
               ? 'bg-amber-900/20 border-amber-700/50 text-amber-300'
               : 'bg-amber-50 border-amber-300 text-amber-800'
           }`}>
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm font-medium">{limitWarning}</p>
+              <p className="text-xs font-medium">{limitWarning}</p>
             </div>
           </div>
         )}
 
-        {/* Heat Grid */}
-        <div className="p-6 overflow-y-auto flex-1">
-          <div className="flex gap-4 overflow-x-auto pb-2" style={{
-            scrollBehavior: 'smooth'
-          }}>
+        {/* Heat Grid - Always columns */}
+        <div className="px-5 py-3 overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="flex gap-3 flex-1 overflow-hidden">
             {/* Find the last completed heat (for edit mode) */}
             {/* Heats complete from bottom to top (C → B → A), so the "last" completed is the HIGHEST one */}
             {(() => {
@@ -735,44 +942,70 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 }
               }
 
+              const isDropTarget = initialEditMode && selectedSkipperToMove !== null && !skipperIndices.includes(selectedSkipperToMove);
+
               return (
                 <div
                   key={heatDesignation}
-                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-shrink-0 ${
-                    darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
+                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 ${
+                    isDropTarget
+                      ? 'border-amber-400 ring-2 ring-amber-400/50'
+                      : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
-                  style={{
-                    minWidth: '380px',  // Ensure enough space for 2 columns of skipper cards
-                    width: heatAssignments.length <= 2 ? 'calc((100% - 1rem) / 2)' : '380px'  // Full width for 1-2 heats, fixed for 3+
-                  }}
                 >
                   {/* Heat Header */}
-                  <div className={`p-3 ${getHeatGradient(heatDesignation)} border-b-2`}>
+                  <div
+                    className={`p-2 ${getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
+                      isDropTarget ? 'cursor-pointer' : ''
+                    }`}
+                    onClick={() => {
+                      if (!isDropTarget || selectedSkipperToMove === null || !localAssignments) return;
+                      const targetAssignment = localAssignments.find(a => a.heatDesignation === heatDesignation);
+                      if (!targetAssignment) return;
+                      const unrankedInTarget = targetAssignment.skipperIndices.filter(i => !rankedSkipperIndices.has(i));
+                      if (unrankedInTarget.length === 0) return;
+                      const swapWith = unrankedInTarget[unrankedInTarget.length - 1];
+                      const updated = localAssignments.map(a => {
+                        if (a.skipperIndices.includes(selectedSkipperToMove)) {
+                          return { ...a, skipperIndices: a.skipperIndices.map(i => i === selectedSkipperToMove ? swapWith : i) };
+                        }
+                        if (a.heatDesignation === heatDesignation) {
+                          return { ...a, skipperIndices: a.skipperIndices.map(i => i === swapWith ? selectedSkipperToMove : i) };
+                        }
+                        return a;
+                      });
+                      setLocalAssignments(updated);
+                      resolveObserverConflicts(updated);
+                      setSelectedSkipperToMove(null);
+                    }}
+                  >
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-white">
-                        Heat {heatDesignation}
+                      <h3 className="text-sm font-bold text-white">
+                        {(isSHRS ? getSHRSHeatLabel(heatDesignation, round, configuration) : `Heat ${heatDesignation}`).toUpperCase()}
                       </h3>
-                      {heatCompleted ? (
-                        <span className="text-xs font-semibold px-2 py-1 rounded bg-green-500 text-white">
-                          Complete
-                        </span>
-                      ) : heatResults.length > 0 && !completed && (
-                        <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-500 text-white">
-                          Scoring
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
+                        {heatCompleted ? (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500 text-white">
+                            Complete
+                          </span>
+                        ) : heatResults.length > 0 && !completed && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500 text-white">
+                            Scoring
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs mt-1 text-white opacity-90">
-                      {skippersToDisplay.length} skippers
-                      {/* Round 2+: Show P slots if this heat hasn't been scored yet (and not bottom heat) */}
-                      {!completed && round >= 2 && !isBottomHeat && !heatCompleted && (
-                        <span className="ml-1 opacity-75">+ {promotionCount} P slots</span>
-                      )}
-                    </p>
+                    {isDropTarget && (
+                      <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-amber-200">
+                        <ArrowRight size={12} />
+                        Swap skipper here
+                      </div>
+                    )}
                   </div>
 
-                  {/* Skipper List - 2 Column Grid - Flex-1 to push observers to bottom */}
-                  <div className="flex-1 p-3 grid grid-cols-2 gap-2 content-start">
+                  {/* Skipper List - Vertical scroll within column */}
+                  <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
                     {sortedSkippers.map((skipperIndex, idx) => {
                       const skipper = skippers[skipperIndex];
                       const result = heatResults.find(r => r.skipperIndex === skipperIndex);
@@ -909,10 +1142,48 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         (!isBottomHeat)  // Can modify if not bottom heat (for promotions)
                       );
 
+                      const isRanked = rankedSkipperIndices.has(skipperIndex);
+                      const isSelectedForMove = initialEditMode && selectedSkipperToMove === skipperIndex;
+                      const isMovable = initialEditMode && !isRanked;
+
                       return (
                         <div
                           key={skipperIndex}
                           onClick={() => {
+                            if (initialEditMode && localAssignments) {
+                              if (isRanked) return;
+                              if (selectedSkipperToMove === skipperIndex) {
+                                setSelectedSkipperToMove(null);
+                                return;
+                              }
+                              if (selectedSkipperToMove !== null) {
+                                const sourceHeat = localAssignments.find(a => a.skipperIndices.includes(selectedSkipperToMove));
+                                const targetHeat = localAssignments.find(a => a.skipperIndices.includes(skipperIndex));
+                                if (sourceHeat && targetHeat && sourceHeat.heatDesignation !== targetHeat.heatDesignation) {
+                                  const updated = localAssignments.map(a => {
+                                    if (a.heatDesignation === sourceHeat.heatDesignation) {
+                                      return {
+                                        ...a,
+                                        skipperIndices: a.skipperIndices.map(i => i === selectedSkipperToMove ? skipperIndex : i)
+                                      };
+                                    }
+                                    if (a.heatDesignation === targetHeat.heatDesignation) {
+                                      return {
+                                        ...a,
+                                        skipperIndices: a.skipperIndices.map(i => i === skipperIndex ? selectedSkipperToMove : i)
+                                      };
+                                    }
+                                    return a;
+                                  });
+                                  setLocalAssignments(updated);
+                                  resolveObserverConflicts(updated);
+                                  setSelectedSkipperToMove(null);
+                                  return;
+                                }
+                              }
+                              setSelectedSkipperToMove(skipperIndex);
+                              return;
+                            }
                             // Only allow editing if:
                             // 1. Edit mode is active
                             // 2. Skipper has a position
@@ -999,20 +1270,32 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               });
                             }
                           }}
-                          className={`p-2 rounded border-2 transition-all ${
+                          className={`p-1.5 rounded border-2 transition-all ${
+                            isSelectedForMove
+                              ? 'ring-2 ring-amber-400 cursor-pointer'
+                              : isMovable
+                                ? 'cursor-pointer hover:shadow-lg hover:scale-105'
+                                : initialEditMode && isRanked
+                                  ? 'opacity-70'
+                                  : ''
+                          } ${
                             isClickableInEditMode ? 'cursor-pointer hover:shadow-lg hover:scale-105' : ''
                           } ${
-                            isPromoted
+                            isSelectedForMove
+                              ? 'bg-amber-50 border-amber-400 dark:bg-amber-900/30 dark:border-amber-500'
+                              : initialEditMode && isRanked
+                              ? darkMode ? 'bg-slate-800 border-green-700' : 'bg-green-50 border-green-300'
+                              : isPromoted
                               ? 'bg-green-50 border-green-400 dark:bg-green-900/20 dark:border-green-500'
                               : isRelegated
                               ? 'bg-red-50 border-red-400 dark:bg-red-900/20 dark:border-red-500'
                               : darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                           }`}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             {result && result.position !== null && (
                               <span className={`
-                                flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                                flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
                                 ${result.position === 1 ? 'bg-yellow-500 text-yellow-900' :
                                   result.position === 2 ? 'bg-slate-300 text-slate-900' :
                                   result.position === 3 ? 'bg-amber-600 text-white' :
@@ -1022,8 +1305,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               </span>
                             )}
 
-                            {/* Sail Number - Prominent Display */}
-                            <div className={`flex-shrink-0 px-2 py-1 rounded font-bold text-sm ${
+                            <div className={`flex-shrink-0 px-1.5 py-0.5 text-xs rounded font-bold ${
                               darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'
                             }`}>
                               {currentEvent?.show_country && skipper.country_code && (
@@ -1034,37 +1316,45 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               {skipper.sailNo}
                             </div>
 
-                            {/* Flag (if event shows flag) */}
                             {currentEvent?.show_flag && skipper.country_code && (
-                              <div className="flex-shrink-0 text-xl leading-none">
+                              <div className="flex-shrink-0 text-lg leading-none">
                                 {getCountryFlag(skipper.country_code)}
                               </div>
                             )}
 
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`font-medium truncate text-sm ${
+                                className={`font-medium truncate text-xs ${
                                   darkMode ? 'text-white' : 'text-slate-900'
                                 }`}
-                                title={skipper.name}  // Show full name on hover
+                                title={skipper.name}
                               >
                                 {skipper.name}
                               </p>
                               {isPromoted && (
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
-                                  {wasPromotedFromBelow ? `↑ From Heat ${lowerHeatLetter}` : '↑ Promoted'}
+                                <p className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                  {wasPromotedFromBelow ? `From Heat ${lowerHeatLetter}` : 'Promoted'}
                                 </p>
                               )}
                               {isRelegated && (
-                                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mt-0.5">
-                                  ↓ Relegate
+                                <p className="text-[10px] font-semibold text-red-600 dark:text-red-400">
+                                  Relegate
+                                </p>
+                              )}
+                              {initialEditMode && isRanked && (
+                                <p className="text-[10px] font-semibold text-green-600 dark:text-green-400 flex items-center gap-0.5">
+                                  <Lock size={8} /> Ranked
+                                </p>
+                              )}
+                              {isSelectedForMove && (
+                                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                  Tap to swap
                                 </p>
                               )}
                             </div>
 
-                            {/* Avatar moved to the right */}
                             {skipper.avatarUrl ? (
-                              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                              <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
                                 <img
                                   src={skipper.avatarUrl}
                                   alt={skipper.name}
@@ -1072,7 +1362,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 />
                               </div>
                             ) : (
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                              <div className={`w-6 h-6 text-[10px] rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
                                 darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
                               }`}>
                                 {skipper.name.split(' ').map(n => n[0]).join('')}
@@ -1080,7 +1370,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             )}
 
                             {result && result.letterScore && (
-                              <span className="flex-shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded bg-red-500 text-white">
+                              <span className="flex-shrink-0 text-[10px] font-semibold px-1 py-0.5 rounded bg-red-500 text-white">
                                 {result.letterScore}
                               </span>
                             )}
@@ -1094,8 +1384,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         2. This specific heat is not completed
                         3. The lower heat is not completed yet
                         4. No manual changes have been applied (which would already show promoted skippers)
+                        5. NOT using SHRS (SHRS doesn't use promotion/relegation)
                         Once lower heat is completed OR changes are applied, promoted skippers are shown in their positions above with green borders */}
-                    {!completed && !heatCompleted && round >= 2 && !isBottomHeat && !lowerHeatCompleted && !hasAppliedChanges && (
+                    {!completed && !heatCompleted && round >= 2 && !isBottomHeat && !lowerHeatCompleted && !hasAppliedChanges && !isSHRS && (
                       <>
                         {Array.from({ length: promotionCount }).map((_, idx) => (
                           <div
@@ -1140,16 +1431,16 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     const isPreviousHeatObservers = heatCompleted;
 
                     return (
-                      <div className={`mt-auto border-t ${
+                      <div className={`mt-auto border-t flex-shrink-0 ${
                         darkMode ? 'border-slate-600' : 'border-slate-200'
                       }`}>
-                        <div className={`p-3 ${
+                        <div className={`p-2 ${
                           darkMode ? 'bg-slate-700' : 'bg-slate-50'
                         }`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <Eye size={16} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
-                              <h5 className={`text-sm font-semibold ${
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <Eye size={12} className={isPreviousHeatObservers ? 'text-slate-400' : 'text-purple-400'} />
+                              <h5 className={`text-[11px] font-semibold ${
                                 isPreviousHeatObservers
                                   ? (darkMode ? 'text-slate-300' : 'text-slate-700')
                                   : (darkMode ? 'text-purple-300' : 'text-purple-700')
@@ -1163,86 +1454,62 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                   setSelectedHeatForObserver(heatNumber);
                                   setShowObserverSelector(true);
                                 }}
-                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-all ${
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-all ${
                                   darkMode
                                     ? 'bg-purple-700 text-purple-200 hover:bg-purple-600'
                                     : 'bg-purple-600 text-white hover:bg-purple-700'
                                 }`}
                                 title="Manage observers"
                               >
-                                <Edit3 size={12} />
+                                <Edit3 size={10} />
                                 <span>Manage</span>
                               </button>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
                             {heatObservers.map((observer, idx) => {
                               const observerSkipper = skippers[observer.skipper_index];
                               if (!observerSkipper) return null;
 
-                              // Style previous observers like regular skipper cards, active observers with purple
                               if (isPreviousHeatObservers) {
-                                // Previous observers - styled like regular skipper cards (no purple, not clickable)
                                 return (
                                   <div
                                     key={observer.skipper_index}
-                                    className={`flex items-center gap-2 p-2 rounded border-2 ${
+                                    className={`flex items-center gap-1 p-1 rounded border ${
                                       darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
                                     }`}
                                   >
-                                    <Eye size={14} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
-                                    {observerSkipper.avatarUrl ? (
-                                      <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
-                                        <img
-                                          src={observerSkipper.avatarUrl}
-                                          alt={observerSkipper.name}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      </div>
-                                    ) : (
-                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                                        darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-300 text-slate-700'
-                                      }`}>
-                                        {observerSkipper.name.split(' ').map(n => n[0]).join('')}
-                                      </div>
-                                    )}
-                                    <span className={`font-medium truncate flex-1 text-xs ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    <Eye size={10} className={`${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`} />
+                                    <span className={`font-medium truncate flex-1 text-[11px] ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                                       {observerSkipper.name}
                                     </span>
-                                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                       #{observerSkipper.sailNo}
                                     </span>
                                   </div>
                                 );
                               }
 
-                              // Active observers - purple styling, clickable to remove
                               return (
                                 <button
                                   key={observer.skipper_index}
                                   onClick={async () => {
                                     if (!currentEvent?.id) return;
-
-                                    // Toggle observer status (remove this observer)
                                     const success = await toggleObserver(
                                       currentEvent.id,
                                       heatNumber,
-                                      round, // Use the round being displayed
+                                      round,
                                       observer.skipper_index,
                                       observerSkipper.name,
                                       observerSkipper.sailNo,
                                       observer.times_served
                                     );
-
                                     if (success) {
-                                      // Reload observers
                                       const updatedObservers = await getObserverAssignments(
                                         currentEvent.id,
                                         heatNumber,
-                                        round // Use the round being displayed
+                                        round
                                       );
-
-                                      // Update state
                                       setObserversByHeat(prev => {
                                         const newMap = new Map(prev);
                                         newMap.set(heatNumber, updatedObservers || []);
@@ -1251,17 +1518,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     }
                                   }}
                                   title="Click to remove this observer"
-                                  className={`flex items-center gap-2 p-2 rounded text-xs transition-all hover:scale-[1.02] cursor-pointer ${
+                                  className={`flex items-center gap-1 p-1 text-[11px] rounded transition-all hover:scale-[1.01] cursor-pointer ${
                                     darkMode
-                                      ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50 hover:bg-purple-900/50 hover:border-purple-600'
-                                      : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100 hover:border-purple-300'
+                                      ? 'bg-purple-900/30 text-purple-200 border border-purple-700/50 hover:bg-purple-900/50'
+                                      : 'bg-purple-50 text-purple-900 border border-purple-200 hover:bg-purple-100'
                                   }`}
                                 >
-                                  <Eye size={14} className="text-purple-400 flex-shrink-0" />
+                                  <Eye size={10} className="text-purple-400 flex-shrink-0" />
                                   <span className="font-medium truncate flex-1 text-left">
                                     {observerSkipper.name}
                                   </span>
-                                  <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  <span className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                     #{observerSkipper.sailNo}
                                   </span>
                                 </button>
@@ -1276,42 +1543,46 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               );
             })}
           </div>
-
-          {/* Info footer */}
-          <div className={`mt-6 p-4 rounded-lg border ${
-            darkMode ? 'bg-slate-700 border-slate-600' : 'bg-blue-50 border-blue-200'
-          }`}>
-            <div className="flex items-start gap-3">
-              <Users className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-              <div>
-                <p className={`text-sm font-medium ${
-                  darkMode ? 'text-white' : 'text-slate-900'
-                }`}>
-                  {editMode
-                    ? `Click any skipper in Heat ${(window as any).__lastCompletedHeat} to toggle promotion/relegation. Promoted skippers (green) move up to the next heat.`
-                    : completed
-                    ? 'This round is complete. Green cards show skippers who will be promoted to the next heat in the following round.'
-                    : 'Skippers are assigned to heats for this round. Close this modal to begin scoring.'
-                  }
-                </p>
-                {!completed && round > 1 && (
-                  <p className={`text-xs mt-1 ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}>
-                    Heat assignments are based on previous round performance.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
-        <div className={`flex ${isInitialAllocation || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-3 p-6 border-t flex-shrink-0 ${
+        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-2 px-5 py-3 border-t flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
-          {/* Show reshuffle/manual assign buttons only for initial Round 1 allocation */}
-          {isInitialAllocation && (onReshuffle || onManualAssign) && (
+          {/* Initial edit mode controls */}
+          {initialEditMode && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setInitialEditMode(false);
+                  setSelectedSkipperToMove(null);
+                  setLocalAssignments(null);
+                }}
+                className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
+                  darkMode
+                    ? 'text-slate-300 hover:bg-slate-700'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (localAssignments && onUpdateAssignments) {
+                    onUpdateAssignments(localAssignments, 1);
+                  }
+                  setInitialEditMode(false);
+                  setSelectedSkipperToMove(null);
+                }}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm bg-green-600 text-white hover:bg-green-700"
+              >
+                <Check size={18} />
+                Apply Changes
+              </button>
+            </div>
+          )}
+          {/* Show reshuffle/manual assign/edit buttons only for initial Round 1 allocation */}
+          {isInitialAllocation && !initialEditMode && (onReshuffle || onManualAssign) && (
             <div className="flex gap-3">
               {onReshuffle && (
                 <button
@@ -1319,7 +1590,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     onReshuffle();
                     onClose();
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-amber-600 text-white hover:bg-amber-700'
                       : 'bg-amber-500 text-white hover:bg-amber-600'
@@ -1335,7 +1606,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     onManualAssign();
                     onClose();
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-teal-600 text-white hover:bg-teal-700'
                       : 'bg-teal-500 text-white hover:bg-teal-600'
@@ -1343,6 +1614,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 >
                   <Edit3 size={18} />
                   Manual Assign
+                </button>
+              )}
+              {rankedSkipperIndices.size > 0 && onUpdateAssignments && (
+                <button
+                  onClick={() => {
+                    setInitialEditMode(true);
+                    setLocalAssignments([...heatAssignments].map(a => ({
+                      ...a,
+                      skipperIndices: [...a.skipperIndices]
+                    })));
+                  }}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
+                    darkMode
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  <Edit3 size={18} />
+                  Edit Assignments
                 </button>
               )}
             </div>
@@ -1363,7 +1653,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       setModifiedRelegations(new Set(appliedRelegations));
                     }
                   }}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                     darkMode
                       ? 'bg-amber-600 text-white hover:bg-amber-700'
                       : 'bg-amber-500 text-white hover:bg-amber-600'
@@ -1386,7 +1676,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                         setModifiedRelegations(new Set());
                       }
                     }}
-                    className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+                    className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                       darkMode
                         ? 'text-slate-300 hover:bg-slate-700'
                         : 'text-slate-600 hover:bg-slate-100'
@@ -1464,7 +1754,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       }
                     }}
                     disabled={isApplyingChanges}
-                    className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-colors font-medium ${
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
                       isApplyingChanges
                         ? 'bg-green-400 cursor-not-allowed'
                         : 'bg-green-600 hover:bg-green-700'
@@ -1478,23 +1768,19 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             </div>
           )}
 
-          <button
+          {!initialEditMode && <button
             onClick={() => {
               if (!isInitialAllocation) {
-                if (completed && nextRound) {
-                  // Advancing to next round after completing current round
-                  // Use onAdvanceToNextRound if available - this keeps modal open to show new round allocations
-                  console.log('Advancing to next round:', nextRound.round);
+                if (completed && (nextRound || shouldAllowProgression)) {
+                  const targetRound = nextRound ? nextRound.round : round + 1;
+                  console.log('Advancing to next round:', targetRound);
                   if (onAdvanceToNextRound) {
-                    onAdvanceToNextRound(nextRound.round);
-                    // Don't close - modal will update to show new round allocations
+                    onAdvanceToNextRound(targetRound);
                     return;
                   } else if (onStartRound) {
-                    // Fallback to old behavior
-                    onStartRound(nextRound.round);
+                    onStartRound(targetRound);
                   }
                 } else if (!completed && roundToDisplay && onStartRound) {
-                  // Start scoring the current round
                   console.log('Starting current round:', roundToDisplay.round);
                   onStartRound(roundToDisplay.round);
                 }
@@ -1502,7 +1788,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClose();
             }}
             disabled={loadingObservers}
-            className={`px-6 py-2 rounded-lg transition-colors font-medium ${
+            className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
               loadingObservers
                 ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
                 : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -1517,9 +1803,21 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 Setting up observers...
               </span>
             ) : (
-              completed && nextRound ? `Next Round (Round ${nextRound.round})` : completed ? 'Close' : isInitialAllocation ? 'Accept & Start Scoring' : 'Start Scoring'
+              completed && shouldAllowProgression
+                ? isSHRS
+                  ? `Progress to ${isSHRSFinalsRound(round + 1, configuration) ? `Final ${(round + 1) - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${round + 1}`}`
+                  : `Progress to Round ${round + 1}`
+                : completed && nextRound
+                ? isSHRS
+                  ? `Score ${isSHRSFinalsRound(nextRound.round, configuration) ? `Final ${nextRound.round - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${nextRound.round}`}`
+                  : `Next Round (Round ${nextRound.round})`
+                : completed
+                ? 'Close'
+                : isInitialAllocation
+                ? 'Accept & Start Scoring'
+                : 'Start Scoring'
             )}
-          </button>
+          </button>}
         </div>
       </div>
 

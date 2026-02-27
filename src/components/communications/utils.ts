@@ -226,13 +226,18 @@ export const uploadAttachment = async (
   notificationId: string,
   userId: string
 ) => {
-  const fileName = `${Date.now()}_${file.name}`;
+  let uploadFile: File = file;
+  if (file.type.startsWith('image/')) {
+    const { compressImage } = await import('../../utils/imageCompression');
+    uploadFile = await compressImage(file, 'photo');
+  }
+
+  const fileName = `${Date.now()}_${uploadFile.name}`;
   const filePath = `notifications/${notificationId}/${fileName}`;
 
-  // Upload to storage
   const { error: uploadError } = await supabase.storage
     .from('media')
-    .upload(filePath, file);
+    .upload(filePath, uploadFile);
 
   if (uploadError) throw uploadError;
 

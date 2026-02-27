@@ -110,7 +110,7 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-slate-400 mb-0.5">Member Clubs</p>
+          <p className="text-xs text-slate-400 mb-0.5">Association Clubs</p>
           <p className="text-2xl font-bold text-white mb-0.5">
             {loading || orgContext.isLoading ? '...' : clubCount}
           </p>

@@ -45,6 +45,7 @@ export interface WidgetDefinition {
   category: 'overview' | 'finance' | 'membership' | 'race' | 'communication' | 'analytics';
   requiredPermissions?: string[];
   preview?: string;
+  associationOnly?: boolean;
 }
 
 export type WidgetColorTheme = 'default' | 'purple' | 'blue' | 'green' | 'orange' | 'pink' | 'red' | 'indigo' | 'teal' | 'amber';

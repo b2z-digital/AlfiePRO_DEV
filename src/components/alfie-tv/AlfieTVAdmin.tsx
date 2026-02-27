@@ -23,7 +23,7 @@ interface AlfieTVAdminProps {
 }
 
 export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
-  const { currentClub, user, isSuperAdmin, isStateOrgAdmin, isNationalOrgAdmin } = useAuth();
+  const { currentClub, currentOrganization, user, isSuperAdmin, isStateOrgAdmin, isNationalOrgAdmin } = useAuth();
   const { addNotification } = useNotification();
   const navigate = useNavigate();
   const lightMode = !darkMode;
@@ -43,19 +43,29 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
   const [syncingChannels, setSyncingChannels] = useState<Set<string>>(new Set());
 
   const canCreateGlobalChannels = isSuperAdmin || isStateOrgAdmin || isNationalOrgAdmin;
+  const organizationId = currentClub?.clubId || currentOrganization?.id;
+  const organizationType = currentOrganization?.type || 'club';
+  const isAssociation = organizationType === 'state' || organizationType === 'national';
+
+  // Auto-set global for associations since they don't have club context
+  useEffect(() => {
+    if (isAssociation) {
+      setIsGlobal(true);
+    }
+  }, [isAssociation]);
 
   useEffect(() => {
-    if (currentClub?.clubId) {
+    if (organizationId) {
       loadChannels();
     }
-  }, [currentClub?.clubId]);
+  }, [organizationId]);
 
   const loadChannels = async () => {
-    if (!currentClub?.clubId) return;
+    if (!organizationId) return;
 
     setLoading(true);
     try {
-      const data = await alfieTVStorage.getChannels(currentClub.clubId);
+      const data = await alfieTVStorage.getChannels(organizationId);
       setChannels(data);
     } catch (error) {
       console.error('Error loading channels:', error);
@@ -77,9 +87,9 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
       return;
     }
 
-    // If not global, require club context
-    if (!isGlobal && !currentClub?.clubId) {
-      addNotification('Please select a club to add a club-specific channel', 'error');
+    // If not global, require organization context
+    if (!isGlobal && !organizationId) {
+      addNotification('Please select an organization to add a channel', 'error');
       return;
     }
 
@@ -91,8 +101,8 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
         is_global: isGlobal
       };
 
-      // Add club_id for club-specific channels
-      if (!isGlobal && currentClub?.clubId) {
+      // Add club_id for club-specific channels (only if it's a club, not an association)
+      if (!isGlobal && organizationType === 'club' && currentClub?.clubId) {
         channelData.club_id = currentClub.clubId;
       }
 
@@ -503,19 +513,22 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
                         checked={isGlobal}
                         onChange={(e) => setIsGlobal(e.target.checked)}
                         className="w-5 h-5 rounded text-blue-600 mt-0.5"
+                        disabled={isAssociation}
                       />
                       <div className="flex-1">
                         <label htmlFor="is-global" className={`text-sm font-medium block mb-1 ${
                           isGlobal ? 'text-blue-700' : lightMode ? 'text-gray-700' : 'text-slate-300'
                         }`}>
-                          Make this a Global Channel
+                          {isAssociation ? 'Global Channel' : 'Make this a Global Channel'}
                         </label>
                         <p className={`text-xs ${
                           isGlobal ? 'text-blue-600' : lightMode ? 'text-gray-500' : 'text-slate-400'
                         }`}>
-                          {isGlobal
-                            ? '✓ This channel will be visible to all users across all clubs and associations'
-                            : 'This channel will only be visible to members of the selected club'}
+                          {isAssociation
+                            ? '✓ Association channels are always global and visible to all users'
+                            : isGlobal
+                              ? '✓ This channel will be visible to all users across all clubs and associations'
+                              : 'This channel will only be visible to members of the selected club'}
                         </p>
                       </div>
                     </div>

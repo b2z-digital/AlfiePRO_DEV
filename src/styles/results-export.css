@@ -13,66 +13,49 @@
   border-collapse: collapse;
   border: 0.5px solid #12192a;
   margin-bottom: 20px;
-  table-layout: fixed;
 }
-
-/* Fixed column widths for export */
-.results-export-container th:nth-child(1),
-.results-export-container td:nth-child(1) { width: 40px; } /* Pos */
-.results-export-container th:nth-child(2),
-.results-export-container td:nth-child(2) { width: 50px; } /* Sail */
-.results-export-container th:nth-child(3),
-.results-export-container td:nth-child(3) { width: 120px; } /* Skipper */
-.results-export-container th:nth-child(4),
-.results-export-container td:nth-child(4) { width: 70px; } /* Club */
-.results-export-container th:nth-child(5),
-.results-export-container td:nth-child(5) { width: 70px; } /* Design */
-
-/* Race columns - fixed 60px width */
-.results-export-container th:nth-child(n+6):not(:nth-last-child(-n+2)),
-.results-export-container td:nth-child(n+6):not(:nth-last-child(-n+2)) {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
-}
-
-/* Gross and Net columns */
-.results-export-container th:nth-last-child(2),
-.results-export-container td:nth-last-child(2) { width: 50px; } /* Gross */
-.results-export-container th:nth-last-child(1),
-.results-export-container td:nth-last-child(1) { width: 50px; } /* Net */
 
 .results-export-container th,
 .results-export-container td {
   border: 0.5px solid #12192a;
-  padding: 0 8px !important;
+  padding: 0 6px !important;
+  margin: 0 !important;
   text-align: center;
+  height: 28px !important;
+  line-height: 28px !important;
   vertical-align: middle !important;
-  line-height: 44px !important;
-  height: 44px !important;
-  background-color: #ffffff !important;
   color: #000 !important;
+  font-weight: 600;
+  font-size: 13px;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.results-export-container tbody tr:nth-child(odd) td:not(.dropped-score) {
+  background-color: #ffffff !important;
+}
+
+.results-export-container tbody tr:nth-child(even) td:not(.dropped-score) {
+  background-color: #eaeef3 !important;
 }
 
 .results-export-container th {
   background-color: #12192a !important;
   color: white !important;
   font-weight: bold;
-  height: 44px !important;
+  height: 30px !important;
+  line-height: 30px !important;
   padding: 0 8px !important;
-  line-height: 44px !important;
 }
 
 .results-export-container tbody tr {
-  background-color: #ffffff !important;
+  background-color: transparent !important;
+  height: 28px !important;
 }
 
-.results-export-container tbody tr:nth-child(even) {
-  background-color: #ffffff !important;
-}
-
-.results-export-container tbody tr:nth-child(odd) {
-  background-color: #ffffff !important;
+.results-export-container thead tr {
+  height: 30px !important;
 }
 
 .results-export-container .dropped-score {
@@ -83,16 +66,6 @@
 
 .results-export-container td:nth-child(3) {
   text-align: left;
-  vertical-align: middle !important;
-}
-
-/* Ensure nested elements don't interfere with vertical alignment */
-.results-export-container td > div:not(.split-cell-content) {
-  line-height: inherit;
-}
-
-.results-export-container td * {
-  vertical-align: middle;
 }
 
 .results-export-container .event-title {
@@ -100,6 +73,14 @@
   font-weight: bold;
   margin-bottom: 5px;
   text-align: center;
+}
+
+.results-export-container .event-series-name {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-align: center;
+  color: #333;
 }
 
 .results-export-container .event-subtitle {
@@ -132,18 +113,17 @@
 .results-export-container .net-total {
   font-weight: bold;
   background-color: #e8f4f8 !important;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 /* Split cell styles for handicap format */
 .results-export-container .split-cell {
   padding: 0 !important;
   position: relative !important;
-  height: 44px !important;
+  height: 32px !important;
   line-height: normal !important;
   overflow: visible !important;
   vertical-align: middle !important;
-  background-color: #ffffff !important;
 }
 
 .results-export-container .split-cell > div,
@@ -152,8 +132,8 @@
   display: block !important;
   position: relative !important;
   width: 100% !important;
-  height: 44px !important;
-  min-height: 44px !important;
+  height: 32px !important;
+  min-height: 32px !important;
 }
 
 .results-export-container .split-cell > div > div,
@@ -273,9 +253,9 @@
 
 /* Handicap carryover bonus row styling */
 .results-export-container thead tr:last-child th {
-  height: 28px !important;
-  line-height: 28px !important;
-  padding: 4px 8px !important;
+  height: 24px !important;
+  line-height: 24px !important;
+  padding: 2px 8px !important;
   vertical-align: middle !important;
   background-color: #12192a !important;
   border-bottom: 1px solid #12192a !important;

@@ -348,7 +348,7 @@ export function getDefaultLayout(): DashboardLayout {
       }
     ],
     rows: [
-      { id: 'row-1', columns: 3, widgetIds: ['event-count-1', 'members-count-1', 'tasks-count-1'], order: 0 },
+      { id: 'row-1', columns: 3, widgetIds: ['event-count-1', 'members-count-1', 'tasks-count-1'], order: 0, height: 'compact' },
       { id: 'row-2', columns: 2, widgetIds: ['upcoming-events-1', 'recent-results-1'], order: 1 },
       { id: 'row-3', columns: 3, widgetIds: ['financial-health-1', 'weather-1', 'membership-status-1'], order: 2 }
     ],

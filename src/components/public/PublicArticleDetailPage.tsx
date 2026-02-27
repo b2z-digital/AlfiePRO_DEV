@@ -9,7 +9,25 @@ import { formatDate } from '../../utils/date';
 import { usePublicNavigation } from '../../hooks/usePublicNavigation';
 import { GoogleAnalytics } from '../GoogleAnalytics';
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
+
+const getArticleImageUrl = (coverImage?: string | null): string => {
+  if (!coverImage || coverImage === '/RC-Yachts-image-custom_crop.jpg') return DEFAULT_COVER_IMAGE;
+
+  if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    return coverImage;
+  }
+
+  if (coverImage.startsWith('/')) {
+    return DEFAULT_COVER_IMAGE;
+  }
+
+  const { data } = supabase.storage
+    .from('article-images')
+    .getPublicUrl(coverImage);
+
+  return data.publicUrl || DEFAULT_COVER_IMAGE;
+};
 
 interface Article {
   id: string;
@@ -103,7 +121,7 @@ export const PublicArticleDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <PublicFooter club={club} />
+        <PublicFooter club={club} clubId={clubId} />
       </div>
     );
   }
@@ -126,7 +144,7 @@ export const PublicArticleDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <PublicFooter club={club} />
+        <PublicFooter club={club} clubId={clubId} />
       </div>
     );
   }
@@ -173,11 +191,12 @@ export const PublicArticleDetailPage: React.FC = () => {
         </div>
 
         {article.cover_image && (
-          <div className="w-full">
+          <div className="w-full bg-gradient-to-br from-slate-700 to-slate-800">
             <img
-              src={article.cover_image}
+              src={getArticleImageUrl(article.cover_image)}
               alt={article.title}
               className="w-full h-auto max-h-[600px] object-contain bg-gray-100"
+              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
             />
           </div>
         )}
@@ -199,7 +218,7 @@ export const PublicArticleDetailPage: React.FC = () => {
         </div>
       </div>
 
-      <PublicFooter club={club} />
+      <PublicFooter club={club} clubId={clubId} />
     </div>
   );
 };

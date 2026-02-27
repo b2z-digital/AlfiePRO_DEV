@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Globe } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../utils/supabase';
 import CoverImageUploadModal from './CoverImageUploadModal';
 import { CustomizableDashboard } from './dashboard/CustomizableDashboard';
@@ -22,9 +23,9 @@ interface StateAssociationData {
 
 export const StateAssociationDashboard: React.FC<StateAssociationDashboardProps> = ({ darkMode }) => {
   const { user, isSuperAdmin, currentOrganization } = useAuth();
+  const { isStateAdmin } = usePermissions();
   const [loading, setLoading] = useState(true);
   const [stateAssociation, setStateAssociation] = useState<StateAssociationData | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showCoverImageModal, setShowCoverImageModal] = useState(false);
 
   useEffect(() => {
@@ -57,9 +58,6 @@ export const StateAssociationDashboard: React.FC<StateAssociationDashboardProps>
 
       if (stateAssocData) {
         setStateAssociation(stateAssocData);
-
-        // Check user's role - use the role from currentOrganization
-        setIsAdmin(currentOrganization.role === 'state_admin' || currentOrganization.role === 'national_admin' || isSuperAdmin);
       }
 
     } catch (error) {
@@ -172,7 +170,7 @@ export const StateAssociationDashboard: React.FC<StateAssociationDashboardProps>
             <Globe className="w-5 h-5" />
             <span className="hidden sm:inline">View Public Website</span>
           </a>
-          {isAdmin && (
+          {isStateAdmin && (
             <button
               onClick={() => setShowCoverImageModal(true)}
               className="p-3 bg-slate-900 bg-opacity-70 hover:bg-opacity-90 text-white rounded-lg backdrop-blur-sm transition-all flex items-center gap-2"

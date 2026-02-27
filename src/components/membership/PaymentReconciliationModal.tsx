@@ -8,6 +8,7 @@ import { updateMembershipTransactionStatus } from '../../utils/membershipFinance
 interface PaymentReconciliationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onUpdate?: () => void;
   clubId: string;
   darkMode?: boolean;
 }
@@ -32,6 +33,7 @@ interface PendingPayment {
 export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProps> = ({
   isOpen,
   onClose,
+  onUpdate,
   clubId,
   darkMode = true,
 }) => {
@@ -145,6 +147,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
       addNotification('success', isPaid ? 'Marked as unpaid' : 'Payment confirmed');
       fetchPendingPayments();
       setSelectedMembers(new Set());
+      onUpdate?.();
     } catch (error: any) {
       console.error('Error updating payment status:', error);
       addNotification('error', 'Failed to update payment status');
@@ -184,6 +187,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
       addNotification('success', `${selectedMembers.size} payment(s) confirmed`);
       fetchPendingPayments();
       setSelectedMembers(new Set());
+      onUpdate?.();
     } catch (error: any) {
       console.error('Error updating payments:', error);
       addNotification('error', 'Failed to update payments');

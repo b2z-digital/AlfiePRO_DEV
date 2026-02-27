@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle, Radio } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -17,6 +17,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { WindyWeatherWidget } from './WindyWeatherWidget';
 import { EventRegistrationModal } from './events/EventRegistrationModal';
 import LiveTrackingQRCodeModal from './live-tracking/LiveTrackingQRCodeModal';
+import { getLiveTrackingEvent } from '../utils/liveTrackingStorage';
 import { EventWebsiteSettingsModal } from './events/EventWebsiteSettingsModal';
 import { EventLivestreamModal } from './livestream/EventLivestreamModal';
 
@@ -60,7 +61,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   onViewVenue,
   onEventDataUpdated
 }) => {
-  const { can, currentOrganization } = usePermissions();
+  const { can, currentOrganization, isAdmin, isEditor } = usePermissions();
   const [event, setEvent] = useState<RaceEvent>(initialEvent);
   const eventRef = useRef<RaceEvent>(initialEvent);
 
@@ -107,6 +108,48 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [loadingRegistration, setLoadingRegistration] = useState(false);
   const [allRegistrations, setAllRegistrations] = useState<any[]>([]);
   const [loadingAllRegistrations, setLoadingAllRegistrations] = useState(false);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState<{ sent: number; failed: number } | null>(null);
+  const [smsAlreadySent, setSmsAlreadySent] = useState(false);
+  const [loadingSkipperTracking, setLoadingSkipperTracking] = useState(false);
+  const [hasLiveTrackingEvent, setHasLiveTrackingEvent] = useState(false);
+
+  useEffect(() => {
+    const checkLiveTracking = async () => {
+      if (!event.enableLiveTracking) {
+        setHasLiveTrackingEvent(false);
+        return;
+      }
+      try {
+        const dbId = extractDbId(event.id);
+        const trackingEvent = await getLiveTrackingEvent(dbId);
+        setHasLiveTrackingEvent(!!(trackingEvent?.access_token || trackingEvent?.short_code));
+      } catch {
+        setHasLiveTrackingEvent(false);
+      }
+    };
+    checkLiveTracking();
+  }, [event.id, event.enableLiveTracking]);
+
+  const handleJoinLiveTracking = async () => {
+    setLoadingSkipperTracking(true);
+    try {
+      const dbId = extractDbId(event.id);
+      const trackingEvent = await getLiveTrackingEvent(dbId);
+      if (trackingEvent?.access_token) {
+        navigate(`/live/${trackingEvent.short_code || trackingEvent.access_token}`);
+      } else if (trackingEvent?.short_code) {
+        navigate(`/live/${trackingEvent.short_code}`);
+      } else {
+        setError('Live tracking is not yet set up for this event. Ask your race officer to enable it.');
+      }
+    } catch {
+      setError('Could not load live tracking details.');
+    } finally {
+      setLoadingSkipperTracking(false);
+    }
+  };
 
   // Check if event has participants or has been started
   const hasParticipants = event.skippers && event.skippers.length > 0;
@@ -358,6 +401,35 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     checkEventWebsite();
   }, [event.id, event.isPublicEvent]);
 
+  useEffect(() => {
+    const checkSmsStatus = async () => {
+      if (!currentClub?.clubId || !can('manage', 'events')) return;
+      const { data: settings } = await supabase
+        .from('sms_club_settings')
+        .select('is_enabled')
+        .eq('club_id', currentClub.clubId)
+        .maybeSingle();
+      setSmsEnabled(!!settings?.is_enabled);
+
+      if (settings?.is_enabled) {
+        const eventId = event.isSeriesEvent && event.seriesId
+          ? `${extractDbId(event.seriesId)}__${event.roundName}`
+          : extractDbId(event.id);
+        const { data: existingLog } = await supabase
+          .from('sms_event_logs')
+          .select('id, total_sent, status')
+          .eq('club_id', currentClub.clubId)
+          .eq('event_id', eventId)
+          .in('status', ['sending', 'completed'])
+          .maybeSingle();
+        if (existingLog) {
+          setSmsAlreadySent(true);
+          setSmsSent({ sent: existingLog.total_sent || 0, failed: 0 });
+        }
+      }
+    };
+    checkSmsStatus();
+  }, [currentClub?.clubId, event.id]);
 
   // Fetch race report
   useEffect(() => {
@@ -1199,6 +1271,46 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     }
   };
 
+  const handleSendSms = async () => {
+    if (!currentClub?.clubId || smsSending) return;
+    setSmsSending(true);
+    setSmsSent(null);
+    try {
+      const eventId = event.isSeriesEvent && event.seriesId
+        ? `${extractDbId(event.seriesId)}__${event.roundName}`
+        : extractDbId(event.id);
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-event-sms`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          club_id: currentClub.clubId,
+          event_id: eventId,
+          event_name: event.eventName || event.seriesName || 'Club Race',
+          event_date: event.raceDate || '',
+          boat_class: event.raceClass || '',
+          venue: event.raceVenue || '',
+          trigger_type: 'manual',
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Failed to send SMS');
+      }
+      setSmsSent({ sent: result.sent || 0, failed: result.failed || 0 });
+      setSmsAlreadySent(true);
+    } catch (err: any) {
+      setSmsSent({ sent: 0, failed: -1 });
+      console.error('SMS send error:', err.message);
+    } finally {
+      setSmsSending(false);
+    }
+  };
+
   const updateAttendance = async (status: 'yes' | 'no' | 'maybe') => {
     if (!user?.id || !event.id) return;
 
@@ -1948,6 +2060,44 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               )}
             </div>
           </div>
+
+          {smsEnabled && can('manage', 'events') && (
+            <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MessageSquare size={18} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
+                  <div>
+                    <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                      SMS Attendance
+                    </h4>
+                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {smsAlreadySent
+                        ? `${smsSent?.sent || 0} messages sent`
+                        : 'Send SMS to members with phone numbers'}
+                    </p>
+                  </div>
+                </div>
+                {smsAlreadySent ? (
+                  <div className="flex items-center gap-2 text-green-400">
+                    <CheckCircle size={16} />
+                    <span className="text-xs font-medium">Sent</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleSendSms}
+                    disabled={smsSending}
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors disabled:opacity-50"
+                  >
+                    {smsSending ? (
+                      <><Loader2 size={14} className="animate-spin" /> Sending...</>
+                    ) : (
+                      <><MessageSquare size={14} /> Notify Members</>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2140,7 +2290,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 {hasEventWebsite ? 'Event Website' : 'Create Website'}
               </button>
             )}
-            {event.enableLiveTracking && (event.clubId || event.eventLevel === 'state' || event.eventLevel === 'national') && (
+            {event.enableLiveTracking && (event.clubId || event.eventLevel === 'state' || event.eventLevel === 'national') && (isAdmin || isEditor) && (
               <button
                 onClick={() => setShowLiveTrackingQR(true)}
                 className="
@@ -2149,9 +2299,26 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   hover:from-blue-700 hover:to-blue-600
                   transition-all duration-200
                 "
-                title="Live Skipper Tracking"
+                title="Live Skipper Tracking QR Code"
               >
                 <QrCode size={18} />
+                Live Tracking QR
+              </button>
+            )}
+            {event.enableLiveTracking && hasLiveTrackingEvent && user && (
+              <button
+                onClick={handleJoinLiveTracking}
+                disabled={loadingSkipperTracking}
+                className="
+                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
+                  bg-gradient-to-r from-cyan-600 to-blue-600
+                  hover:from-cyan-700 hover:to-blue-700
+                  transition-all duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                "
+                title="Join Live Tracking"
+              >
+                {loadingSkipperTracking ? <Loader2 size={18} className="animate-spin" /> : <Radio size={18} />}
                 Live Tracking
               </button>
             )}

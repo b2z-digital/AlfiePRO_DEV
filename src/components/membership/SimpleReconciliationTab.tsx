@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   DollarSign, Users, CheckCircle, Plus, LogOut, Calendar,
   Building2, AlertCircle, Check, ChevronDown, ChevronRight, Edit, Trash2
@@ -45,7 +46,7 @@ interface ClubGroup {
 interface SimpleReconciliationTabProps {
   darkMode: boolean;
   stateAssociationId: string;
-  selectedYear: number;
+  selectedYear: number | 'all';
   selectedClubFilter?: string;
 }
 
@@ -55,6 +56,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
   selectedYear,
   selectedClubFilter
 }) => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -145,18 +147,19 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
     }));
 
     // Calculate allocated amounts and get linked members
+    // Only count remittances where bulk_payment is false/null (state has reconciled them)
+    // bulk_payment=true means club paid but state hasn't reconciled yet
     const paymentsWithAllocations = await Promise.all(paymentsData.map(async (p) => {
-      // Check how much has been allocated from this payment
       const { data: allocatedRemittances } = await supabase
         .from('membership_remittances')
         .select('id, state_contribution_amount')
         .eq('club_to_state_payment_reference', p.payment_reference)
-        .eq('club_to_state_status', 'paid');
+        .eq('club_to_state_status', 'paid')
+        .or('bulk_payment.is.null,bulk_payment.eq.false');
 
       const allocated = allocatedRemittances?.reduce((sum, r) =>
         sum + parseFloat(r.state_contribution_amount as any || '0'), 0) || 0;
 
-      // Get IDs of members already linked to this payment
       const linkedMemberIds = allocatedRemittances?.map(r => r.id) || [];
 
       return {
@@ -572,7 +575,15 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+        <div className="text-center">
+          <div className="relative w-16 h-16 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-4 border-slate-700" />
+            <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
+            <DollarSign className="absolute inset-0 m-auto w-6 h-6 text-blue-400" />
+          </div>
+          <p className="text-white font-medium mb-1">Loading Club Payments</p>
+          <p className="text-sm text-slate-400">Fetching payment records and member data...</p>
+        </div>
       </div>
     );
   }
@@ -633,14 +644,14 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
             <div>
               <p className="text-sm text-slate-400">Payments Received</p>
-              <p className="text-xl font-bold text-white">{payments.length}</p>
+              <p className="text-xl font-bold text-white">{payments.filter(p => p.unallocated_amount > 0).length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-orange-900/20 border border-orange-600/30 rounded-lg p-4">
+        <div className="bg-red-900/20 border border-red-600/30 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-600/20">
-              <Users size={20} className="text-orange-400" />
+            <div className="p-2 rounded-lg bg-red-600/20">
+              <Users size={20} className="text-red-400" />
             </div>
             <div>
               <p className="text-sm text-slate-400">Members Pending</p>
@@ -694,21 +705,21 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
           </div>
 
-          {payments.length === 0 ? (
+          {payments.filter(p => p.unallocated_amount > 0).length === 0 ? (
             <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-600/50 rounded-lg bg-slate-800/20">
               <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="mb-2 font-medium">No payments recorded</p>
-              <p className="text-sm mb-4">Record a payment in the finance system with "Club Membership Remittances" category</p>
+              <p className="mb-2 font-medium">No payments requiring reconciliation</p>
+              <p className="text-sm mb-4">All payments have been fully allocated. Record a new payment in the finance system with "Club Membership Remittances" category</p>
               <button
-                onClick={() => window.location.href = '#/finances'}
+                onClick={() => navigate('/finances/invoices?action=create&type=deposit')}
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
               >
-                Go to Finances
+                Create a Deposit
               </button>
             </div>
           ) : (
             <div className="space-y-3">
-              {payments.map(payment => (
+              {payments.filter(p => p.unallocated_amount > 0).map(payment => (
                 <div
                   key={payment.id}
                   onClick={() => payment.unallocated_amount > 0 && openPaymentReconciliation(payment)}
@@ -728,7 +739,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                           </span>
                         )}
                         {payment.allocated_amount > 0 && payment.allocated_amount < payment.total_amount && (
-                          <span className="px-2 py-0.5 bg-orange-600/20 text-orange-300 text-xs font-medium rounded-full">
+                          <span className="px-2 py-0.5 bg-red-600/20 text-red-300 text-xs font-medium rounded-full">
                             Partially Allocated
                           </span>
                         )}
@@ -799,32 +810,48 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
         </div>
 
         {/* RIGHT: Members Requiring Payment */}
-        <div className="bg-gradient-to-br from-orange-900/10 to-transparent border-2 border-orange-600/30 rounded-xl p-5">
+        <div className={`bg-gradient-to-br ${
+          clubGroups.length === 0
+            ? 'from-green-900/10 to-transparent border-2 border-green-600/30'
+            : 'from-red-900/10 to-transparent border-2 border-red-600/30'
+        } rounded-xl p-5`}>
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-orange-600/20">
-                <AlertCircle size={22} className="text-orange-400" />
+              <div className={`p-2 rounded-lg ${
+                clubGroups.length === 0 ? 'bg-green-600/20' : 'bg-red-600/20'
+              }`}>
+                {clubGroups.length === 0 ? (
+                  <CheckCircle size={22} className="text-green-400" />
+                ) : (
+                  <AlertCircle size={22} className="text-red-400" />
+                )}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-white">Members Requiring Payment</h3>
-                <p className="text-sm text-slate-300">Outstanding remittances to be reconciled</p>
+                <p className="text-sm text-slate-300">
+                  {clubGroups.length === 0
+                    ? 'All remittances reconciled'
+                    : 'Outstanding remittances to be reconciled'}
+                </p>
               </div>
             </div>
 
             {/* Info Card */}
-            <div className="mt-4 p-3 rounded-lg bg-orange-600/10 border border-orange-600/30">
-              <div className="flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-orange-600/20 flex-shrink-0">
-                  <Users className="w-4 h-4 text-orange-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-orange-200 font-medium mb-1">Awaiting Reconciliation</p>
-                  <p className="text-xs text-orange-300/80">
-                    These members need payment reconciliation. Click a payment on the left to match with these members.
-                  </p>
+            {clubGroups.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg bg-red-600/10 border border-red-600/30">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 rounded-lg bg-red-600/20 flex-shrink-0">
+                    <Users className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-red-200 font-medium mb-1">Awaiting Reconciliation</p>
+                    <p className="text-xs text-red-300/80">
+                      These members need payment reconciliation. Click a payment on the left to match with these members.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {clubGroups.length === 0 ? (
@@ -838,7 +865,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
               {clubGroups.map(group => (
                 <div
                   key={group.club_id}
-                  className="rounded-lg border-2 border-slate-600/70 bg-slate-800/40 overflow-hidden hover:border-orange-500/50 transition-all"
+                  className="rounded-lg border-2 border-slate-600/70 bg-slate-800/40 overflow-hidden hover:border-red-500/50 transition-all"
                 >
                   {/* Club Header */}
                   <div
@@ -863,7 +890,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-slate-400 mb-1">Outstanding</p>
-                        <p className="text-lg font-semibold text-orange-400">
+                        <p className="text-lg font-semibold text-red-400">
                           ${group.total_amount.toFixed(2)}
                         </p>
                       </div>
@@ -1035,102 +1062,131 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
             </div>
 
             {/* Members List */}
-            <div className="p-6 pt-0">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Pending Members</h3>
-                <button
-                  onClick={() => setReconciliationMembers(new Set())}
-                  className="text-sm text-slate-400 hover:text-white transition-colors"
-                >
-                  Clear All
-                </button>
-              </div>
+            {(() => {
+              const selMembers = unpaidMembers.filter(m => reconciliationMembers.has(m.id));
+              const selTotal = selMembers.reduce((sum, m) => sum + m.state_contribution, 0);
+              const rem = activePayment.unallocated_amount - selTotal;
+              const matched = Math.abs(rem) < 0.01 && reconciliationMembers.size > 0;
 
-              {/* Group by Club */}
-              <div className="space-y-3">
-                {clubGroups.map(group => (
-                  <div key={group.club_id} className="rounded-lg border border-slate-600/50 bg-slate-700/20 overflow-hidden">
-                    <div className="p-3 bg-slate-700/30 border-b border-slate-600/50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-white">{group.club_name}</p>
-                          <p className="text-xs text-slate-400">{group.member_count} members • ${group.total_amount.toFixed(2)}</p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            const clubMemberIds = group.members.map(m => m.id);
-                            const allSelected = clubMemberIds.every(id => reconciliationMembers.has(id));
-                            if (allSelected) {
-                              setReconciliationMembers(prev => {
-                                const newSet = new Set(prev);
-                                clubMemberIds.forEach(id => newSet.delete(id));
-                                return newSet;
-                              });
-                            } else {
-                              setReconciliationMembers(prev => {
-                                const newSet = new Set(prev);
-                                clubMemberIds.forEach(id => newSet.add(id));
-                                return newSet;
-                              });
-                            }
-                          }}
-                          className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          {group.members.every(m => reconciliationMembers.has(m.id)) ? 'Deselect All' : 'Select All'}
-                        </button>
-                      </div>
+              return (
+                <>
+                  <div className="p-6 pt-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white">Pending Members</h3>
+                      <button
+                        onClick={() => setReconciliationMembers(new Set())}
+                        className="text-sm text-slate-400 hover:text-white transition-colors"
+                      >
+                        Clear All
+                      </button>
                     </div>
-                    <div className="divide-y divide-slate-600/30">
-                      {group.members.map(member => (
-                        <div
-                          key={member.id}
-                          onClick={() => toggleReconciliationMember(member.id)}
-                          className="p-3 hover:bg-slate-700/30 cursor-pointer transition-colors flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={reconciliationMembers.has(member.id)}
-                              onChange={() => {}}
-                              className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-600"
-                            />
-                            <Avatar
-                              imageUrl={member.member_avatar}
-                              firstName={member.member_name.split(' ')[0]}
-                              lastName={member.member_name.split(' ').slice(1).join(' ')}
-                              size="sm"
-                            />
-                            <div>
-                              <p className="text-white text-sm font-medium">{member.member_name}</p>
+
+                    <div className="space-y-3">
+                      {clubGroups.map(group => (
+                        <div key={group.club_id} className="rounded-lg border border-slate-600/50 bg-slate-700/20 overflow-hidden">
+                          <div className="p-3 bg-slate-700/30 border-b border-slate-600/50">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-white">{group.club_name}</p>
+                                <p className="text-xs text-slate-400">{group.member_count} members - ${group.total_amount.toFixed(2)}</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const clubMemberIds = group.members.map(m => m.id);
+                                  const allSelected = clubMemberIds.every(id => reconciliationMembers.has(id));
+                                  if (allSelected) {
+                                    setReconciliationMembers(prev => {
+                                      const newSet = new Set(prev);
+                                      clubMemberIds.forEach(id => newSet.delete(id));
+                                      return newSet;
+                                    });
+                                  } else {
+                                    setReconciliationMembers(prev => {
+                                      const newSet = new Set(prev);
+                                      clubMemberIds.forEach(id => newSet.add(id));
+                                      return newSet;
+                                    });
+                                  }
+                                }}
+                                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                              >
+                                {group.members.every(m => reconciliationMembers.has(m.id)) ? 'Deselect All' : 'Select All'}
+                              </button>
                             </div>
                           </div>
-                          <p className="text-white font-semibold">${member.state_contribution.toFixed(2)}</p>
+                          <div className="divide-y divide-slate-600/30">
+                            {group.members.map(member => {
+                              const isSelected = reconciliationMembers.has(member.id);
+                              return (
+                                <div
+                                  key={member.id}
+                                  onClick={() => toggleReconciliationMember(member.id)}
+                                  className={`p-3 cursor-pointer transition-all flex items-center justify-between ${
+                                    isSelected && matched
+                                      ? 'bg-green-600/15 hover:bg-green-600/25 border-l-2 border-green-500'
+                                      : isSelected
+                                      ? 'bg-blue-600/15 hover:bg-blue-600/25 border-l-2 border-blue-500'
+                                      : 'hover:bg-slate-700/30 border-l-2 border-transparent'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${
+                                      isSelected && matched
+                                        ? 'bg-green-500 border-green-500'
+                                        : isSelected
+                                        ? 'bg-blue-500 border-blue-500'
+                                        : 'border-slate-600 bg-slate-700'
+                                    }`}>
+                                      {isSelected && <Check className="w-3 h-3 text-white" />}
+                                    </div>
+                                    <Avatar
+                                      imageUrl={member.member_avatar}
+                                      firstName={member.member_name.split(' ')[0]}
+                                      lastName={member.member_name.split(' ').slice(1).join(' ')}
+                                      size="sm"
+                                    />
+                                    <div>
+                                      <p className={`text-sm font-medium ${isSelected && matched ? 'text-green-200' : isSelected ? 'text-blue-200' : 'text-white'}`}>
+                                        {member.member_name}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <p className={`font-semibold ${isSelected && matched ? 'text-green-300' : isSelected ? 'text-blue-300' : 'text-white'}`}>
+                                    ${member.state_contribution.toFixed(2)}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Footer Actions */}
-            <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setActivePayment(null)}
-                  className="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={completePaymentReconciliation}
-                  disabled={processing || reconciliationMembers.size === 0}
-                  className="flex-1 px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processing ? 'Processing...' : `Reconcile ${reconciliationMembers.size} Member${reconciliationMembers.size !== 1 ? 's' : ''}`}
-                </button>
-              </div>
-            </div>
+                  <div className="sticky bottom-0 bg-slate-800 border-t border-slate-700 p-6">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setActivePayment(null)}
+                        className="px-6 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={completePaymentReconciliation}
+                        disabled={processing || reconciliationMembers.size === 0}
+                        className={`flex-1 px-6 py-3 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          matched
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        {processing ? 'Processing...' : `Reconcile ${reconciliationMembers.size} Member${reconciliationMembers.size !== 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>,
         document.body
@@ -1179,8 +1235,8 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                   {reconcileOption === 'existing' && (
                     <div className="mt-4">
                       {payments.length === 0 ? (
-                        <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30">
-                          <p className="text-sm text-orange-300">
+                        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                          <p className="text-sm text-red-300">
                             No payments available. Please create a new payment instead.
                           </p>
                         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -12,6 +12,8 @@ import { HandicapChangeBadge } from './touch-mode/HandicapChangeBadge';
 import { HandicapProgressionModal } from './touch-mode/HandicapProgressionModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
+import { StartBoxModal } from './start-box/StartBoxModal';
+import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -27,7 +29,11 @@ interface TouchModeScoringProps {
   isScoringLastHeat?: boolean; // True when all other heats are complete and this is the last one
   onConfirmResults?: () => void; // Called when user confirms the finish order
   updateSkipper?: (skipperIndex: number, updates: Partial<Skipper>) => void;
-  heatObservers?: ObserverAssignment[]; // Observers for the current heat
+  heatObservers?: ObserverAssignment[];
+  roundLabel?: string;
+  allSkippers?: Skipper[];
+  allRaceResults?: RaceResult[];
+  isFullscreen?: boolean;
 }
 
 interface FinishingEntry {
@@ -53,7 +59,11 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   isScoringLastHeat = false,
   onConfirmResults,
   updateSkipper,
-  heatObservers = []
+  heatObservers = [],
+  roundLabel,
+  allSkippers,
+  allRaceResults,
+  isFullscreen = false
 }) => {
   const [currentRace, setCurrentRace] = useState(initialRace);
   const [finishOrder, setFinishOrder] = useState<FinishingEntry[]>([]);
@@ -71,6 +81,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [showProgressionModal, setShowProgressionModal] = useState(false);
   const [selectedSkipperForProgression, setSelectedSkipperForProgression] = useState<number | null>(null);
   const [isHandicapViewerOpen, setIsHandicapViewerOpen] = useState(false);
+  const [showStartBoxModal, setShowStartBoxModal] = useState(false);
+  const [raceTimerRunning, setRaceTimerRunning] = useState(false);
 
   const { user } = useAuth();
 
@@ -184,7 +196,15 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
       // Check current status
       const statusData = await getRaceStatus(currentEvent.id);
-      const raceNote = `${isHeatScoring ? 'Round' : 'Race'} ${currentRace}`;
+      const raceNote = (() => {
+        if (!isHeatScoring) return `Race ${currentRace}`;
+        const isShrsScoring = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
+        const shrsQR = currentEvent?.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+        if (isShrsScoring && shrsQR > 0) {
+          return currentRace <= shrsQR ? `Qualifying Rd ${currentRace}` : `Final ${currentRace - shrsQR}`;
+        }
+        return `Round ${currentRace}`;
+      })();
 
       // If status is not "live", automatically set it to "live" with race/round number
       if (statusData && statusData.status !== 'live') {
@@ -203,13 +223,12 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   useEffect(() => {
     const previousRace = currentRace;
     setCurrentRace(initialRace);
-    setIsConfirmed(false); // Reset confirmation when changing races
+    setIsConfirmed(false);
+    setRaceTimerRunning(false);
 
-    // Keep handicap viewer open if we just advanced to the next consecutive race
-    // (This happens after confirmation, so race officer can see updated handicaps)
     const isAutoAdvancing = initialRace === previousRace + 1 && isHandicapViewerOpen;
     if (!isAutoAdvancing) {
-      setIsHandicapViewerOpen(false); // Close viewer if manually navigating
+      setIsHandicapViewerOpen(false);
     }
   }, [initialRace]);
 
@@ -583,6 +602,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   // Handler for confirming the finish order
   const handleConfirmResults = () => {
     setIsConfirmed(true);
+    setRaceTimerRunning(false);
     console.log('✅ User confirmed finish order for race', currentRace);
 
     // Check if this is a handicap event - use raceFormat from event if available
@@ -739,12 +759,28 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   // Get scoring system display name
   const getScoringSystemName = () => {
+    // Check if heat management has a scoring system specified (most reliable for heat racing)
+    if (currentEvent?.heatManagement?.configuration?.scoringSystem) {
+      const heatScoringSystem = currentEvent.heatManagement.configuration.scoringSystem;
+      if (heatScoringSystem === 'hms') {
+        return 'HMS Heat System';
+      } else if (heatScoringSystem === 'shrs') {
+        const mode = currentEvent.heatManagement.configuration.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+      }
+    }
+
+    // Check dropRules string values
     if (typeof dropRules === 'string') {
-      if (dropRules === 'shrs') return 'SHRS - Simple Heat Racing System';
-      if (dropRules === 'hms') return 'HMS - Hawkesbury Memorial Series';
+      if (dropRules === 'shrs') {
+        const mode = currentEvent?.heatManagement?.configuration?.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+      }
+      if (dropRules === 'hms') return 'HMS Heat System';
       return dropRules;
     }
 
+    // Check array-based scoring systems
     if (!Array.isArray(dropRules) || dropRules.length === 0) {
       return 'No Discards';
     }
@@ -777,9 +813,27 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
 
   return (
-    <div className={`h-[75vh] flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
-      {/* Header - Race Navigation Only */}
-      <div className={`border-b px-4 py-3 flex items-center justify-center flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+    <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
+      {/* Header - Race Navigation with StartBox + Race Timer */}
+      <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+        <div className="w-[160px] flex items-center">
+          <button
+            onClick={() => setShowStartBoxModal(true)}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
+              raceTimerRunning
+                ? darkMode
+                  ? 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : darkMode
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25'
+                  : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+            }`}
+          >
+            <Timer size={16} />
+            Starter Console
+          </button>
+        </div>
+
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigateRace('prev')}
@@ -790,7 +844,18 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           </button>
 
           <div className="text-2xl font-bold">
-            {isHeatScoring ? 'Round' : 'Race'} {currentRace}
+            {roundLabel || (isHeatScoring
+              ? (() => {
+                  const isShrs = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
+                  const shrsQR = currentEvent?.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+                  if (isShrs && shrsQR > 0) {
+                    return currentRace <= shrsQR
+                      ? `Qualifying Rd ${currentRace}`
+                      : `Final ${currentRace - shrsQR}`;
+                  }
+                  return `Round ${currentRace}`;
+                })()
+              : `Race ${currentRace}`)}
           </div>
 
           <button
@@ -800,6 +865,16 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           >
             <ChevronRight size={24} />
           </button>
+        </div>
+
+        <div className="w-[160px] flex items-center justify-end">
+          {raceTimerRunning && (
+            <RaceElapsedTimer
+              isRunning={raceTimerRunning}
+              onStop={() => setRaceTimerRunning(false)}
+              darkMode={darkMode}
+            />
+          )}
         </div>
       </div>
 
@@ -1234,6 +1309,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         dropRules={Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]}
         isScratchEvent={!isHandicapEvent}
         currentEvent={currentEvent}
+        allSkippers={allSkippers}
+        allRaceResults={allRaceResults}
       />
 
       {/* Post-Race Handicap Modal */}
@@ -1263,6 +1340,15 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
           darkMode={darkMode}
         />
       )}
+
+      {/* Digital StartBox Modal */}
+      <StartBoxModal
+        isOpen={showStartBoxModal}
+        onClose={() => setShowStartBoxModal(false)}
+        onSequenceComplete={() => setRaceTimerRunning(true)}
+        clubId={currentEvent?.clubId || null}
+        darkMode={darkMode}
+      />
     </div>
   );
 };

@@ -100,13 +100,16 @@ export const EventHeaderEditor: React.FC<Props> = ({ websiteId, config, onSave, 
 
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const { compressImage } = await import('../../utils/imageCompression');
+      const compressed = await compressImage(file, 'logo');
+
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `${websiteId}/header-logo-${Date.now()}.${fileExt}`;
       const filePath = `event-media/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(filePath, file, {
+        .upload(filePath, compressed, {
           cacheControl: '3600',
           upsert: true
         });

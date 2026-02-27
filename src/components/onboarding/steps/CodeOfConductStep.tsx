@@ -94,19 +94,18 @@ Failure to comply with this Code of Conduct may result in disciplinary action, i
   };
 
   return (
-    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
-      <div className="w-full max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-            <FileText className="text-purple-500 w-5 h-5 sm:w-6 sm:h-6" />
-          </div>
-          <h2 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Code of Conduct
-          </h2>
+    <div className="bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 sm:p-8 md:p-12">
+      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+          <FileText className="text-purple-500 w-5 h-5 sm:w-6 sm:h-6" />
         </div>
-        <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Please review and accept the club's code of conduct
-        </p>
+        <h2 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          Code of Conduct
+        </h2>
+      </div>
+      <p className={`mb-4 sm:mb-6 text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+        Please review and accept the club's code of conduct
+      </p>
 
         <div
           className={`rounded-xl border transition-all ${
@@ -243,7 +242,6 @@ Failure to comply with this Code of Conduct may result in disciplinary action, i
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />
           </button>
         </div>
-      </div>
     </div>
   );
 };

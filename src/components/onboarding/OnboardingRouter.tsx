@@ -78,13 +78,16 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
         }
       }
 
-      // TEMPORARILY BYPASS CHOICE SCREEN - Always go to join-club mode
+      // Show choice screen if no existing applications
       if (clubApp) {
         console.log('OnboardingRouter: Setting mode to start-club');
         setMode('start-club');
-      } else {
-        console.log('OnboardingRouter: Bypassing choice screen, setting mode to join-club');
+      } else if (memberApp) {
+        console.log('OnboardingRouter: Setting mode to join-club');
         setMode('join-club');
+      } else {
+        console.log('OnboardingRouter: Showing choice screen');
+        setMode('choice');
       }
     } catch (error) {
       console.error('Error checking applications:', error);

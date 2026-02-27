@@ -4,7 +4,7 @@
 - [x] AWS Amplify hosting configured
 - [x] Wildcard SSL certificate (*.alfiepro.com.au)
 - [x] Cloudflare DNS configured
-- [x] CloudFront distribution: `d205ctqm5i025u.cloudfront.net`
+- [x] CloudFront distribution: `d3jmzkpreoudd5.cloudfront.net`
 
 ---
 

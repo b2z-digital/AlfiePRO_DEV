@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Globe, TrendingUp, CheckCircle, Download, RefreshCw, BarChart3, DollarSign, Check, X, CheckSquare, Square, Plus, Receipt } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { Globe, TrendingUp, CheckCircle, Download, RefreshCw, BarChart3, DollarSign, Check, X, CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import {
@@ -15,6 +16,111 @@ interface NationalRemittanceDashboardProps {
   darkMode: boolean;
   nationalAssociationId: string;
 }
+
+interface NatDropdownOption {
+  value: string;
+  label: string;
+  icon?: React.ReactNode;
+}
+
+const NatAppDropdown: React.FC<{
+  value: string;
+  options: NatDropdownOption[];
+  onChange: (value: string) => void;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  minWidth?: number;
+}> = ({ value, options, onChange, icon, placeholder = 'Select...', minWidth = 160 }) => {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, minWidth) });
+  }, [minWidth]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onClickOut = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => updatePos();
+    document.addEventListener('mousedown', onClickOut);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('mousedown', onClickOut);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [open, updatePos]);
+
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`
+          flex items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+          bg-slate-800/80 text-slate-200 border border-slate-700/60
+          ${open ? 'ring-2 ring-blue-500/40 border-blue-500/50' : 'hover:bg-slate-700/80 hover:border-slate-600'}
+          cursor-pointer
+        `}
+        style={{ minWidth }}
+      >
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-slate-400 flex-shrink-0">{icon}</span>}
+          <span className={selected ? 'text-slate-200' : 'text-slate-500'}>
+            {selected ? selected.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 99999 }}
+          className="rounded-xl shadow-2xl border bg-slate-800 border-slate-700 shadow-black/50"
+        >
+          <div className="py-1 max-h-[280px] overflow-y-auto overscroll-contain rounded-xl
+            [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent
+            [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-600/50"
+          >
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`
+                  w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors text-left
+                  ${value === opt.value ? 'bg-blue-500/15 text-blue-400' : 'text-slate-300 hover:bg-slate-700/80'}
+                `}
+              >
+                <div className="flex items-center gap-2.5">
+                  {opt.icon && <span className="flex-shrink-0">{opt.icon}</span>}
+                  <span>{opt.label}</span>
+                </div>
+                {value === opt.value && <Check size={14} className="text-blue-400 flex-shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 interface StateStats {
   stateId: string;
@@ -35,7 +141,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
   const [remittances, setRemittances] = useState<MembershipRemittance[]>([]);
   const [payments, setPayments] = useState<AssociationPayment[]>([]);
   const [stateStats, setStateStats] = useState<StateStats[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [selectedTab, setSelectedTab] = useState<'overview' | 'remittances' | 'payments'>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -53,7 +159,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
     setLoading(true);
     try {
       const [remittancesData, paymentsData] = await Promise.all([
-        getNationalRemittances(nationalAssociationId, { year: selectedYear }),
+        getNationalRemittances(nationalAssociationId, { year: selectedYear !== 'all' ? selectedYear : undefined }),
         getPaymentsForEntity('national_association', nationalAssociationId)
       ]);
 
@@ -360,28 +466,29 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
           {selectedTab === 'overview' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className={`px-3 py-2 rounded-lg border ${
-                    darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
-                >
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
+                <NatAppDropdown
+                  value={String(selectedYear)}
+                  onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+                  icon={<Calendar size={15} />}
+                  options={[
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    ...availableYears.map(year => ({
+                      value: String(year),
+                      label: String(year),
+                      icon: <Calendar size={14} className="text-blue-400" />
+                    }))
+                  ]}
+                  minWidth={160}
+                />
 
                 <button
-                  onClick={() => exportRemittancesToCSV(remittances, `national-remittances-${selectedYear}.csv`)}
+                  onClick={() => exportRemittancesToCSV(remittances, `national-remittances-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`)}
                   disabled={remittances.length === 0}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                    darkMode
-                      ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                  } ${remittances.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all flex items-center gap-2 border ${
+                    remittances.length === 0
+                      ? 'bg-slate-800/80 border-slate-700/60 text-slate-500 cursor-not-allowed'
+                      : 'bg-slate-800/80 border-slate-700/60 hover:bg-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-white'
+                  }`}
                 >
                   <Download className="w-4 h-4" />
                   Export Overview
@@ -521,25 +628,26 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
               )}
 
               {/* Filters */}
-              <div className="flex gap-4 mb-4 items-end">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Year
-                  </label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {availableYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex items-center gap-3 mb-5">
+                <NatAppDropdown
+                  value={String(selectedYear)}
+                  onChange={(v) => setSelectedYear(v === 'all' ? 'all' : Number(v))}
+                  icon={<Calendar size={15} />}
+                  options={[
+                    { value: 'all', label: 'All Years', icon: <Calendar size={14} className="text-slate-400" /> },
+                    ...availableYears.map(year => ({
+                      value: String(year),
+                      label: String(year),
+                      icon: <Calendar size={14} className="text-blue-400" />
+                    }))
+                  ]}
+                  minWidth={160}
+                />
                 <button
                   onClick={toggleSelectAll}
-                  className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/60 hover:border-slate-600 text-sm font-medium transition-all flex items-center gap-2"
                 >
+                  <CheckSquare size={15} className="text-slate-400" />
                   {selectedIds.size === remittances.filter(r => r.state_to_national_status === 'pending').length ? 'Deselect All' : 'Select All Pending'}
                 </button>
               </div>
@@ -636,7 +744,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
             <div>
               <div className="mb-4 flex justify-end">
                 <button
-                  onClick={() => exportPaymentsToCSV(payments, `national-payments-${selectedYear}.csv`)}
+                  onClick={() => exportPaymentsToCSV(payments, `national-payments-${selectedYear === 'all' ? 'all-years' : selectedYear}.csv`)}
                   disabled={payments.length === 0}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                     darkMode

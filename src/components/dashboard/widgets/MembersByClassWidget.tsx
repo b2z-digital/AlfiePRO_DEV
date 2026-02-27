@@ -136,7 +136,7 @@ export const MembersByClassWidget: React.FC<MembersByClassWidgetProps> = ({
 
   return (
     <ThemedWidgetWrapper
-      title={`Members by Class - ${getContextLabel(orgContext.type)}`}
+      title={`Members by Class - ${orgContext.type === 'club' ? 'Club' : 'Association'}`}
       icon={BarChart3}
       isEditMode={isEditMode}
       onRemove={onRemove}

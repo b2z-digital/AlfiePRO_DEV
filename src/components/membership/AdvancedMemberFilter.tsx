@@ -313,7 +313,16 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
     });
   };
 
+  const isFilterEmpty = (config: MemberFilterConfig) => {
+    return config.groups.every(g => g.conditions.length === 0);
+  };
+
   const handleApply = () => {
+    if (isFilterEmpty(filterConfig)) {
+      onApply(filterConfig);
+      onClose();
+      return;
+    }
     const validation = validateFilterConfig(filterConfig);
     if (!validation.valid) {
       alert(`Filter validation failed:\n${validation.errors.join('\n')}`);
@@ -324,7 +333,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
   };
 
   const handleClear = () => {
-    setFilterConfig({
+    const emptyConfig: MemberFilterConfig = {
       groups: [
         {
           id: `group-${Date.now()}`,
@@ -333,7 +342,9 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
         }
       ],
       groupLogic: 'AND'
-    });
+    };
+    onApply(emptyConfig);
+    onClose();
   };
 
   const inputClass = "px-4 py-2.5 bg-slate-800/80 text-sm text-slate-200 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all";

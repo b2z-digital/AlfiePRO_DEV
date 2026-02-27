@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -34,6 +34,7 @@ import { NameMappingManager } from './pages/NameMappingManager';
 import { TasksPage } from './tasks/TasksPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
+import { useFeatureAccess } from '../hooks/useFeatureAccess';
 import { YachtClassesRouter } from '../pages/YachtClassesRouter';
 
 // Import Website section components
@@ -82,6 +83,16 @@ import MarketingTemplateEditorPage from '../pages/MarketingTemplateEditorPage';
 import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage';
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 import LivestreamPage from '../pages/LivestreamPage';
+import SuperAdminDashboard from '../pages/SuperAdminDashboard';
+import { UsageStatisticsTab } from './super-admin/UsageStatisticsTab';
+import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
+import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
+import { BackupManagementTab } from './super-admin/BackupManagementTab';
+import { UserManagementTab } from './super-admin/UserManagementTab';
+import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
+import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
+import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
+import { usePlatformTracking } from '../hooks/usePlatformTracking';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -162,14 +173,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   onClearSelectedEvent
 }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [localSwitchingClub, setLocalSwitchingClub] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     activeRaces: 0,
     clubMembers: 0,
     upcomingEvents: 0
   });
-  const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin } = useAuth();
-  const { can, isMember } = usePermissions();
+  const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
+  const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
+  const { isFeatureEnabled } = useFeatureAccess();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -191,6 +204,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [showEventDetails, setShowEventDetails] = useState(false);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
   const { addNotification } = useNotifications();
+
+  const orgType = currentOrganization?.type === 'national_association' ? 'national' : currentOrganization?.type === 'state_association' ? 'state' : null;
+  const { trackPageView } = usePlatformTracking(
+    currentClub?.clubId || null,
+    currentOrganization?.id || null,
+    orgType
+  );
+
+  useEffect(() => {
+    if (location.pathname) {
+      trackPageView(location.pathname);
+    }
+  }, [location.pathname, trackPageView]);
+
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [unreadTasksCount, setUnreadTasksCount] = useState(0);
   const [membershipActionCount, setMembershipActionCount] = useState(0);
@@ -667,7 +694,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'State Associations',
           icon: Building,
           description: 'Manage state associations',
-          path: '/associations'
+          path: '/associations',
+          permission: 'membership.manage'
         }
       ]
     }] : []),
@@ -683,35 +711,48 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Flag,
           description: 'Manage races and series',
           path: '/race-management',
-          permission: 'races.manage'
+          permission: 'races.manage',
+          featureKey: 'race_management'
         },
         {
           id: 'race-calendar',
           label: 'Race Calendar',
           icon: Calendar,
           description: 'View upcoming races',
-          path: '/calendar'
+          path: '/calendar',
+          featureKey: 'race_calendar'
         },
         {
           id: 'results',
           label: 'Results',
           icon: Trophy,
           description: 'View race results',
-          path: '/results'
+          path: '/results',
+          featureKey: 'results_display'
         },
-        {
+        ...(isSuperAdmin ? [{
           id: 'hms-validator',
           label: 'HMS Validator',
           icon: FileCheck,
           description: 'Validate AlfiePRO results against HMS scoring',
-          path: '/hms-validator'
-        },
+          path: '/hms-validator',
+          featureKey: 'hms_validator'
+        }] : []),
         {
           id: 'yacht-classes',
           label: 'Yacht Classes',
           icon: Sailboat,
           description: 'View yacht classes sailed at the club',
-          path: '/yacht-classes'
+          path: '/yacht-classes',
+          featureKey: 'yacht_classes'
+        },
+        {
+          id: 'venues',
+          label: 'Venues',
+          icon: MapPin,
+          description: 'Manage racing venues',
+          path: '/venues',
+          featureKey: 'venues'
         }
       ]
     },
@@ -726,29 +767,33 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'News',
           icon: Newspaper,
           description: 'Club news and announcements',
-          path: '/news'
+          path: '/news',
+          featureKey: 'news'
         },
         {
           id: 'media',
           label: 'Media',
           icon: Camera,
           description: 'Manage club media',
-          path: '/media'
+          path: '/media',
+          featureKey: 'media'
         },
         {
           id: 'alfie-tv',
           label: 'AlfieTV',
           icon: Tv,
           description: 'Watch RC yachting videos',
-          path: '/alfie-tv'
+          path: '/alfie-tv',
+          featureKey: 'alfie_tv'
         },
-        {
+        ...(!isMember ? [{
           id: 'livestream',
           label: 'Livestream',
           icon: Video,
           description: 'Broadcast races to YouTube',
-          path: '/livestream'
-        }
+          path: '/livestream',
+          featureKey: 'livestream'
+        }] : [])
       ]
     },
     ...(currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? [{
@@ -762,48 +807,62 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'Clubs',
           icon: Building,
           description: 'Manage member clubs',
-          path: '/clubs'
+          path: '/clubs',
+          permission: 'membership.manage'
         }] : []),
         {
           id: 'association-members',
           label: 'Club Members',
           icon: Users,
           description: currentOrganization?.type === 'national' ? 'View all members across associations' : 'View all members in member clubs',
-          path: '/association-members'
+          path: '/association-members',
+          permission: 'membership.view'
         },
         {
           id: 'association-member-reports',
           label: 'Member Reports',
           icon: TrendingUp,
           description: 'View member analytics and custom reports',
-          path: '/association-member-reports'
+          path: '/association-member-reports',
+          permission: 'membership.view'
         },
         {
           id: 'association-remittances',
           label: 'Remittances',
           icon: Receipt,
           description: 'Track membership fee remittances',
-          path: '/association-remittances'
+          path: '/association-remittances',
+          permission: 'finance.manage'
         },
         {
           id: 'finances-assoc',
           label: 'Finances',
           icon: DollarSign,
           description: 'Manage association finances',
-          path: '/finances'
+          path: '/finances',
+          permission: 'finance.manage'
+        },
+        {
+          id: 'meetings-assoc',
+          label: 'Meetings',
+          icon: Calendar,
+          description: 'Manage association meetings',
+          path: '/meetings'
         },
         ...(currentOrganization?.type === 'national' ? [{
           id: 'rankings',
           label: 'National Rankings',
           icon: Award,
           description: 'Manage national skipper rankings',
-          path: '/rankings'
+          path: '/rankings',
+          permission: 'membership.manage'
         }, {
           id: 'name-mapping',
           label: 'Name Mapping',
           icon: Link,
           description: 'Map rankings to member records',
-          path: '/name-mapping'
+          path: '/name-mapping',
+          permission: 'membership.manage'
         }] : [])
       ]
     }] : []),
@@ -818,28 +877,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: isMember ? 'My Membership' : 'Club Membership',
           icon: Users,
           description: isMember ? 'Manage your membership' : 'Manage Club Memberships',
-          path: '/membership-dashboard'
+          path: '/membership-dashboard',
+          featureKey: 'membership'
         },
-        ...(isMember ? [{
-          id: 'my-boats',
-          label: 'My Boats',
-          icon: Anchor,
-          description: 'Manage your registered boats',
-          path: '/my-boats'
-        }] : []),
         {
           id: 'meetings',
           label: 'Meetings',
           icon: Calendar,
           description: 'Manage club meetings',
-          path: '/meetings'
+          path: '/meetings',
+          featureKey: 'meetings'
         },
         {
           id: 'tasks',
           label: 'Tasks',
           icon: CheckSquare,
           description: 'Manage club tasks',
-          path: '/tasks'
+          path: '/tasks',
+          featureKey: 'tasks'
         },
         {
           id: 'finances',
@@ -847,7 +902,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: DollarSign,
           description: 'Manage club finances',
           path: '/finances',
-          permission: 'finance.manage'
+          permission: 'finance.manage',
+          featureKey: 'finance'
         }
       ]
     }] : []),
@@ -862,7 +918,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           label: 'Inbox & Notifications',
           icon: Mail,
           description: 'Send and manage member communications',
-          path: '/comms'
+          path: '/comms',
+          featureKey: 'notifications'
         },
         {
           id: 'marketing',
@@ -870,14 +927,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Send,
           description: 'Email campaigns and automation flows',
           path: '/marketing',
-          permission: 'admin'
+          permission: 'membership.manage',
+          featureKey: 'marketing'
         },
         {
           id: 'community',
           label: 'Community',
           icon: MessageSquare,
           description: 'Connect with other members',
-          path: '/community'
+          path: '/community',
+          featureKey: 'community'
         }
       ]
     },
@@ -894,39 +953,36 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: currentOrganization
             ? 'Manage documents, files, and links for clubs'
             : 'Manage documents, files, and links',
-          path: '/resources'
-        },
-        {
-          id: 'venues',
-          label: 'Venues',
-          icon: MapPin,
-          description: 'Manage racing venues',
-          path: '/venues'
+          path: '/resources',
+          featureKey: 'resources'
         },
         {
           id: 'my-garage',
           label: 'Boat Shed',
           icon: Wrench,
           description: 'Manage your boats, maintenance, and rig tuning',
-          path: '/my-garage'
+          path: '/my-garage',
+          featureKey: 'boat_shed'
         },
         {
           id: 'weather',
           label: 'Weather',
           icon: Wind,
           description: 'Live marine weather forecast',
-          path: '/weather'
+          path: '/weather',
+          featureKey: 'weather'
         },
         {
           id: 'classifieds',
           label: 'Classifieds',
           icon: Tag,
           description: 'Buy, sell, and trade sailing gear',
-          path: '/classifieds'
+          path: '/classifieds',
+          featureKey: 'classifieds'
         }
       ]
     },
-    {
+    ...(!isAssociationViewer ? [{
       id: 'website',
       label: 'Website',
       collapsible: true,
@@ -938,30 +994,50 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Monitor,
           description: 'Manage club website',
           path: '/website',
-          permission: 'website.manage'
+          permission: 'website.manage',
+          featureKey: 'website_management'
         }
       ]
-    }
+    }] : [])
   ];
 
+  const isPlatformMode = (currentOrganization as any)?.type === 'platform';
+
   // Filter navigation sections based on permissions
-  const navigationSections = allNavigationSections.map(section => ({
-    ...section,
-    items: section.items.filter(item => {
-      if (!item.permission) return true;
-      return can(item.permission as any);
-    })
-  })).filter(section => section.items.length > 0);
+  const navigationSections = isPlatformMode
+    ? [
+        { id: 'dashboard', label: null, collapsible: false, items: [
+          { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' },
+          { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
+          { id: 'engagement', label: 'Engagement Analytics', icon: Activity, description: 'Login & usage tracking', path: '/engagement' },
+          { id: 'resources', label: 'Resource & Costs', icon: Server, description: 'Hosting & DB costs', path: '/resources' },
+          { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
+          { id: 'integrations', label: 'Platform Integrations', icon: Link, description: 'Manage integrations', path: '/integrations' },
+          { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
+          { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
+          { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
+        ]}
+      ]
+    : allNavigationSections.map(section => ({
+        ...section,
+        items: section.items.filter((item: any) => {
+          if (item.permission && !can(item.permission as any)) return false;
+          if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+          return true;
+        })
+      })).filter(section => section.items.length > 0);
 
   return (
     <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
-      {/* Loading overlay when switching organizations */}
-      {isTransitioning && (
+      {/* Loading overlay when switching organizations or clubs */}
+      {(isTransitioning || isSwitchingClub || localSwitchingClub) && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
           <div className="bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-3">
               <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-white font-medium">Switching organization...</span>
+              <span className="text-white font-medium">
+                {isSwitchingClub || localSwitchingClub ? 'Switching club...' : 'Switching organization...'}
+              </span>
             </div>
           </div>
         </div>
@@ -1163,15 +1239,48 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               currentClubId={currentOrganization?.id || currentClub?.clubId || null}
               onClubChange={async (orgId) => {
                 try {
+                  if (orgId === 'super-admin-dashboard') {
+                    setCurrentOrganization({
+                      id: 'super-admin-dashboard',
+                      type: 'platform' as any,
+                      name: 'AlfiePRO Management',
+                      role: 'super_admin'
+                    });
+                    setCurrentClub(null);
+                    setIsTransitioning(false);
+                    navigate('/');
+                    return;
+                  }
+
                   const club = userClubs.find(c => c.clubId === orgId);
                   if (club) {
+                    // Check if we're actually switching clubs (not just selecting the current one)
+                    const isActualSwitch = currentClub?.clubId !== club.clubId;
+
+                    if (isActualSwitch) {
+                      // Show switching overlay
+                      setLocalSwitchingClub(true);
+                    }
+
                     // Switching to a club
                     setCurrentClub(club);
                     setCurrentOrganization(null);
-                    // Force dashboard refresh with new key
-                    setDashboardRefreshKey(prev => prev + 1);
+
                     // Always navigate to home when switching contexts
                     navigate('/');
+
+                    if (isActualSwitch) {
+                      // Force dashboard refresh with new key after a brief moment
+                      // This ensures the overlay is visible before the content remounts
+                      setTimeout(() => {
+                        setDashboardRefreshKey(prev => prev + 1);
+                      }, 100);
+
+                      // Clear the switching overlay after content loads
+                      setTimeout(() => {
+                        setLocalSwitchingClub(false);
+                      }, 1500);
+                    }
                   } else {
                     // Only show loader when fetching association data from database
                     setIsTransitioning(true);
@@ -1460,7 +1569,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <Routes>
               <Route path="/" element={
-                currentOrganization?.type === 'national' ? (
+                (currentOrganization as any)?.type === 'platform' ? (
+                  <SuperAdminDashboard key="super-admin" />
+                ) : currentOrganization?.type === 'national' ? (
                   <NationalAssociationDashboard key={currentOrganization.id} darkMode={darkMode} />
                 ) : currentOrganization?.type === 'state' ? (
                   <StateAssociationDashboard key={currentOrganization.id} darkMode={darkMode} />
@@ -1474,6 +1585,48 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   />
                 )
               } />
+              {/* Super Admin Routes */}
+              <Route path="/usage" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <UsageStatisticsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/engagement" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <EngagementAnalyticsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/resources" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ResourceCostsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/billing" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <PlatformBillingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/integrations" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <PlatformIntegrationsTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/features" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <FeatureAccessTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/backups" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <BackupManagementTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/user-management" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <UserManagementTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
               <Route path="/association-members" element={
@@ -1507,6 +1660,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       <StateRemittanceDashboard
                         darkMode={darkMode}
                         stateAssociationId={currentOrganization.id}
+                        stateAssociationName={currentOrganization.name}
                       />
                     ) : null}
                   </div>
@@ -1579,7 +1733,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <WysiwygDocumentBuilder />
               } />
               <Route path="/membership-dashboard" element={<MembershipDashboard darkMode={darkMode} />} />
-              <Route path="/my-boats" element={<MyBoatsPage darkMode={darkMode} />} />
               <Route path="/community" element={<CommunityPage darkMode={darkMode} />} />
               <Route path="/membership/:clubId" element={<MembershipPage />} />
               <Route path="/membership/:clubId/renew/:memberId" element={<MembershipPage />} />

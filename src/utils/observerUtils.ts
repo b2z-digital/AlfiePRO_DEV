@@ -19,6 +19,7 @@ export interface ObserverAssignment {
  * @param racingSkipperIndices - Indices of skippers racing in this heat
  * @param allSkippers - All skippers in the event
  * @param observersNeeded - Number of observers needed
+ * @param nextHeatSkipperIndices - Indices of skippers racing in the next heat (excluded so they can prepare)
  * @returns Array of selected observers
  */
 export async function selectObservers(
@@ -27,15 +28,10 @@ export async function selectObservers(
   raceNumber: number,
   racingSkipperIndices: number[],
   allSkippers: Skipper[],
-  observersNeeded: number
+  observersNeeded: number,
+  nextHeatSkipperIndices?: number[]
 ): Promise<ObserverAssignment[]> {
   try {
-    console.log(`    🔧 selectObservers called for heat ${heatNumber}, race ${raceNumber}`);
-    console.log(`    🚫 Excluding racing skippers (indices):`, racingSkipperIndices);
-    console.log(`    👥 Total skippers available:`, allSkippers.length);
-    console.log(`    🎯 Observers needed:`, observersNeeded);
-
-    // Get observer history for this event
     const { data: existingObservers, error } = await supabase
       .from('heat_observers')
       .select('*')
@@ -47,46 +43,33 @@ export async function selectObservers(
       return [];
     }
 
-    // Create a map of times each skipper has served as observer
     const timesServedMap = new Map<number, number>();
     existingObservers?.forEach(observer => {
       timesServedMap.set(observer.skipper_index, observer.times_served);
     });
 
-    // Filter out skippers who are racing in this heat
+    const excludedSet = new Set(racingSkipperIndices);
+    if (nextHeatSkipperIndices) {
+      nextHeatSkipperIndices.forEach(idx => excludedSet.add(idx));
+    }
+
     const availableSkippers = allSkippers
       .map((skipper, index) => ({
         ...skipper,
         index,
         timesServed: timesServedMap.get(index) || 0
       }))
-      .filter(skipper => {
-        const isRacing = racingSkipperIndices.includes(skipper.index);
-        return !isRacing;
-      });
+      .filter(skipper => !excludedSet.has(skipper.index));
 
-    console.log(`    ✅ Available skippers after filtering:`, availableSkippers.length);
-    console.log(`    📋 Available skipper indices:`, availableSkippers.map(s => s.index).slice(0, 10));
-
-    // Sort by times served (ascending) and then by random to add fairness
-    // Add a small random factor to break ties fairly
     const sortedAvailable = availableSkippers.sort((a, b) => {
       if (a.timesServed !== b.timesServed) {
-        return a.timesServed - b.timesServed; // Prioritize those who have served least
+        return a.timesServed - b.timesServed;
       }
-      // Random tie-breaker for skippers with same times served
       return Math.random() - 0.5;
     });
 
-    // Select the required number of observers
     const selectedObservers = sortedAvailable.slice(0, observersNeeded);
 
-    console.log(`    🎯 Selected ${selectedObservers.length} observers:`);
-    selectedObservers.forEach(obs => {
-      console.log(`       - ${obs.name} (index ${obs.index}, #${obs.sailNo || obs.sailNumber})`);
-    });
-
-    // Map to observer assignments
     const observers: ObserverAssignment[] = selectedObservers.map(skipper => ({
       skipper_index: skipper.index,
       skipper_name: skipper.name,
@@ -140,7 +123,7 @@ export async function saveObserverAssignments(
           event_id: eventId,
           heat_number: heatNumber,
           race_number: raceNumber,
-          skipper_index: observer.skipper_index || null,
+          skipper_index: observer.skipper_index ?? null,
           skipper_name: observer.skipper_name,
           skipper_sail_number: observer.skipper_sail_number,
           is_manual_assignment: observer.is_manual_assignment || false,
@@ -207,6 +190,123 @@ export async function getObserverAssignments(
   } catch (err) {
     console.error('[getObserverAssignments] Error getting observers:', err);
     return [];
+  }
+}
+
+export async function getAllObserversForEvent(
+  eventId: string
+): Promise<Map<string, { skipperName: string; sailNumber: string }[]>> {
+  const obsMap = new Map<string, { skipperName: string; sailNumber: string }[]>();
+  try {
+    const { data, error } = await supabase
+      .from('heat_observers')
+      .select('*')
+      .eq('event_id', eventId);
+
+    if (error || !data) return obsMap;
+
+    const heatLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+    for (const row of data) {
+      const designation = heatLabels[row.heat_number - 1];
+      if (!designation) continue;
+      const key = `${row.race_number}-${designation}`;
+      if (!obsMap.has(key)) obsMap.set(key, []);
+      obsMap.get(key)!.push({
+        skipperName: row.skipper_name || '',
+        sailNumber: row.skipper_sail_number || '',
+      });
+    }
+  } catch {
+    // ignore
+  }
+  return obsMap;
+}
+
+export async function preAllocateObserversForAllRounds(
+  eventId: string,
+  rounds: Array<{ round: number; heatAssignments: Array<{ heatDesignation: string; skipperIndices: number[] }> }>,
+  allSkippers: Skipper[],
+  observersPerHeat: number
+): Promise<boolean> {
+  try {
+    console.log(`🔄 Pre-allocating observers for ${rounds.length} rounds, ${observersPerHeat} per heat`);
+
+    const { data: allExisting } = await supabase
+      .from('heat_observers')
+      .select('race_number, heat_number')
+      .eq('event_id', eventId);
+
+    if (allExisting && allExisting.length > 0) {
+      const validRoundNumbers = new Set(rounds.map(r => r.round));
+      const roundsToInvalidate = new Set<number>();
+
+      for (const roundData of rounds) {
+        const currentHeatCount = roundData.heatAssignments.length;
+        const existingForRound = allExisting.filter(r => r.race_number === roundData.round);
+        if (existingForRound.length === 0) continue;
+        const maxHeatInDB = Math.max(...existingForRound.map(r => r.heat_number));
+        if (maxHeatInDB > currentHeatCount) {
+          roundsToInvalidate.add(roundData.round);
+        }
+      }
+
+      for (const row of allExisting) {
+        if (!validRoundNumbers.has(row.race_number)) {
+          roundsToInvalidate.add(row.race_number);
+        }
+      }
+
+      for (const roundNum of roundsToInvalidate) {
+        console.log(`  🗑️ Cleaning stale Q${roundNum} observers (structure changed)`);
+        await supabase
+          .from('heat_observers')
+          .delete()
+          .eq('event_id', eventId)
+          .eq('race_number', roundNum);
+      }
+    }
+
+    for (const roundData of rounds) {
+      const sortedHeats = [...roundData.heatAssignments].sort((a, b) =>
+        a.heatDesignation.localeCompare(b.heatDesignation)
+      );
+
+      for (let i = 0; i < sortedHeats.length; i++) {
+        const heat = sortedHeats[i];
+        const heatNumber = i + 1;
+        const nextHeatToScore = i - 1 >= 0 ? sortedHeats[i - 1] : null;
+        const nextHeatIndices = nextHeatToScore ? nextHeatToScore.skipperIndices : undefined;
+
+        const existing = await getObserverAssignments(eventId, heatNumber, roundData.round);
+        if (existing && existing.length === observersPerHeat) {
+          const hasConflict = existing.some(obs => {
+            if (obs.skipper_index === undefined || obs.skipper_index === null) return false;
+            if (heat.skipperIndices.includes(obs.skipper_index)) return true;
+            if (nextHeatIndices && nextHeatIndices.includes(obs.skipper_index)) return true;
+            return false;
+          });
+          if (!hasConflict) {
+            continue;
+          }
+        }
+
+        const observers = await selectObservers(
+          eventId, heatNumber, roundData.round,
+          heat.skipperIndices, allSkippers, observersPerHeat,
+          nextHeatIndices
+        );
+
+        if (observers.length > 0) {
+          await saveObserverAssignments(eventId, heatNumber, roundData.round, observers);
+        }
+      }
+    }
+
+    console.log(`✅ Pre-allocation complete for ${rounds.length} rounds`);
+    return true;
+  } catch (err) {
+    console.error('Error pre-allocating observers:', err);
+    return false;
   }
 }
 

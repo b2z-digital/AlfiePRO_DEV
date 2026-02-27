@@ -27,6 +27,8 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   const tableRef = useRef<HTMLDivElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [observersByHeatRound, setObserversByHeatRound] = useState<Map<string, ObserverAssignment[]>>(new Map());
+  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
 
   // Close export menu when clicking outside
   useEffect(() => {
@@ -144,15 +146,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   const { completedRounds, heats, promotionCount, maxPositionsByHeat } = processedData;
 
   const getHeatColor = (heat: HeatDesignation) => {
-    const colors = {
-      'A': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'B': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'C': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'D': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'E': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-      'F': darkMode ? 'bg-slate-700/50' : 'bg-slate-100',
-    };
-    return colors[heat] || (darkMode ? 'bg-slate-700/50' : 'bg-slate-100');
+    return darkMode ? 'bg-slate-700' : 'bg-slate-100';
   };
 
   const getHeatBorderColor = (heat: HeatDesignation) => {
@@ -176,6 +170,20 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
     const heatIndex = heats.indexOf(heat);
     return heatIndex < heats.length - 1 && position > (maxPos - promotionCount);
   };
+
+  const getShrsFleetInfo = (heat: HeatDesignation): { name: string; bgClass: string; textClass: string; borderClass: string } => {
+    const fleetMap: Record<string, { name: string; bgClass: string; textClass: string; borderClass: string }> = {
+      'A': { name: 'Gold Fleet', bgClass: 'bg-yellow-500', textClass: 'text-yellow-950', borderClass: 'border-yellow-500' },
+      'B': { name: 'Silver Fleet', bgClass: 'bg-slate-400', textClass: 'text-slate-950', borderClass: 'border-slate-400' },
+      'C': { name: 'Bronze Fleet', bgClass: 'bg-amber-600', textClass: 'text-white', borderClass: 'border-amber-600' },
+      'D': { name: '4th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+      'E': { name: '5th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+      'F': { name: '6th Fleet', bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' },
+    };
+    return fleetMap[heat] || { name: `Fleet ${heat}`, bgClass: 'bg-slate-500', textClass: 'text-white', borderClass: 'border-slate-500' };
+  };
+
+  const hasFinalRounds = isShrs && completedRounds.some(r => r.round > shrsQualifyingRounds);
 
   // Export functions
   const exportAsJPG = async () => {
@@ -220,24 +228,29 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
   };
 
   const exportAsCSV = () => {
-    // Build CSV data
     const rows: string[][] = [];
 
-    // Header row 1
+    const getRoundLabel = (roundNum: number) => {
+      if (isShrs) {
+        return roundNum <= shrsQualifyingRounds
+          ? `Qualifying Rd ${roundNum}`
+          : `Final ${roundNum - shrsQualifyingRounds}`;
+      }
+      return `Round ${roundNum}`;
+    };
+
     const header1 = ['Heat', 'Pos'];
     completedRounds.forEach(round => {
-      header1.push(`Round ${round.round}`, '', '');
+      header1.push(getRoundLabel(round.round), '', '');
     });
     rows.push(header1);
 
-    // Header row 2
     const header2 = ['', ''];
     completedRounds.forEach(() => {
       header2.push('Sail No', 'Skipper', 'Pts');
     });
     rows.push(header2);
 
-    // Data rows
     heats.forEach(heat => {
       const maxPos = maxPositionsByHeat.get(heat) || 0;
       const positions = Array.from({ length: maxPos }, (_, i) => i + 1);
@@ -245,17 +258,14 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
       positions.forEach((position, posIdx) => {
         const row: string[] = [];
 
-        // Heat column (only on first row)
         if (posIdx === 0) {
           row.push(`Heat ${heat}`);
         } else {
           row.push('');
         }
 
-        // Position column
         row.push(String(position));
 
-        // Round data
         completedRounds.forEach(round => {
           const heatResults = round.results
             .filter(r => r.heatDesignation === heat)
@@ -273,30 +283,39 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           const result = heatResults[position - 1];
           const skipper = result ? skippers[result.skipperIndex] : null;
 
-          // Calculate points
-          const totalCompetitorsInRound = round.results.length;
           let points = '';
           if (result) {
-            if (result.letterScore) {
-              points = String(totalCompetitorsInRound + 1);
-            } else if (result.position !== null) {
-              if (round.round === 1) {
+            if (isShrs) {
+              if (result.letterScore) {
+                const heatSizes = round.heatAssignments.map(a => a.skipperIndices.length);
+                const largestHeat = Math.max(...heatSizes);
+                points = String(largestHeat + 1);
+              } else if (result.position !== null) {
                 points = String(result.position);
-              } else {
-                let overallPoints = 0;
-                const heatsArray: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
-                const currentHeatIndex = heatsArray.indexOf(heat);
+              }
+            } else {
+              const totalCompetitorsInRound = round.results.length;
+              if (result.letterScore) {
+                points = String(totalCompetitorsInRound + 1);
+              } else if (result.position !== null) {
+                if (round.round === 1) {
+                  points = String(result.position);
+                } else {
+                  let overallPoints = 0;
+                  const heatsArray: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+                  const currentHeatIndex = heatsArray.indexOf(heat);
 
-                for (let i = 0; i < currentHeatIndex; i++) {
-                  const higherHeat = heatsArray[i];
-                  const higherHeatResults = round.results.filter(
-                    r => r.heatDesignation === higherHeat && r.position !== null
-                  );
-                  overallPoints += higherHeatResults.length;
+                  for (let i = 0; i < currentHeatIndex; i++) {
+                    const higherHeat = heatsArray[i];
+                    const higherHeatResults = round.results.filter(
+                      r => r.heatDesignation === higherHeat && r.position !== null
+                    );
+                    overallPoints += higherHeatResults.length;
+                  }
+
+                  overallPoints += position;
+                  points = String(overallPoints);
                 }
-
-                overallPoints += position;
-                points = String(overallPoints);
               }
             }
           }
@@ -311,27 +330,24 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
         rows.push(row);
       });
 
-      // Add observer row for this heat
       const observerRow: string[] = ['', 'Observers'];
       completedRounds.forEach(round => {
         const key = `${heat}-${round.round}`;
         const observers = observersByHeatRound.get(key) || [];
 
         const observerNames = observers.length > 0
-          ? observers.map(o => o.member_name).join(', ')
-          : 'No observers recorded';
+          ? observers.map(o => `${o.skipper_name} #${o.skipper_sail_number || ''}`).join(', ')
+          : '';
 
         observerRow.push('', observerNames, '');
       });
       rows.push(observerRow);
     });
 
-    // Convert to CSV string
     const csvContent = rows.map(row =>
       row.map(cell => `"${cell}"`).join(',')
     ).join('\n');
 
-    // Download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -437,15 +453,37 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           </div>
         </div>
 
-        {/* Legend */}
-        <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
-          <div className="flex flex-wrap gap-6 text-xs">
-            <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded ${darkMode ? 'bg-emerald-500/20 border-2 border-emerald-500' : 'bg-emerald-50 border-2 border-emerald-400'}`} />
-              <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Promotion Zone (Top {promotionCount})</span>
+        {/* Legend - only show for HMS (promotion/relegation system) */}
+        {!isShrs && (
+          <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex flex-wrap gap-6 text-xs">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded ${darkMode ? 'bg-emerald-500/20 border-2 border-emerald-500' : 'bg-emerald-50 border-2 border-emerald-400'}`} />
+                <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>Promotion Zone (Top {promotionCount})</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* SHRS Fleet Legend */}
+        {isShrs && hasFinalRounds && (
+          <div className={`px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex flex-wrap gap-4 text-xs items-center">
+              <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Fleet Finals:</span>
+              {heats.map(h => {
+                const fleet = getShrsFleetInfo(h);
+                return (
+                  <div key={h} className="flex items-center gap-1.5">
+                    <div className={`w-3 h-3 rounded-full ${fleet.bgClass}`} />
+                    <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
+                      Heat {h} = {fleet.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Results Table */}
         <div className="flex-1 overflow-auto">
@@ -472,7 +510,20 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         colSpan={3}
                         className={`px-4 py-3 text-center text-sm font-bold border-l-4 ${darkMode ? 'text-slate-300 border-slate-600' : 'text-slate-700 border-slate-400'}`}
                       >
-                        Round {round.round}
+                        {isShrs
+                          ? (round.round <= shrsQualifyingRounds
+                            ? `Qualifying Rd ${round.round}`
+                            : (
+                              <div>
+                                <span>Final {round.round - shrsQualifyingRounds}</span>
+                                <div className="flex gap-1 justify-center mt-1">
+                                  {heats.map(h => (
+                                    <div key={h} className={`w-2 h-2 rounded-full ${getShrsFleetInfo(h).bgClass}`} title={getShrsFleetInfo(h).name} />
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          : `Round ${round.round}`}
                       </th>
                     ))}
                   </tr>
@@ -525,6 +576,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                 <span className={darkMode ? 'text-slate-200' : 'text-slate-900'}>
                                   Heat {heat}
                                 </span>
+                                {isShrs && hasFinalRounds && (
+                                  <div className={`mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${getShrsFleetInfo(heat).bgClass} ${getShrsFleetInfo(heat).textClass}`}>
+                                    {getShrsFleetInfo(heat).name}
+                                  </div>
+                                )}
                               </div>
                             </td>
                           ) : null}
@@ -532,7 +588,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                           {/* Position */}
                           <td className={`
                             px-3 py-2 text-center font-semibold text-sm sticky left-[80px] z-20
-                            ${position % 2 === 0 ? (darkMode ? 'bg-slate-800/30' : 'bg-slate-50/50') : (darkMode ? 'bg-slate-800' : 'bg-white')}
+                            ${darkMode ? 'bg-slate-800' : 'bg-white'}
                             ${darkMode ? 'text-slate-300' : 'text-slate-700'}
                           `}>
                             {position}
@@ -578,40 +634,44 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                               }
                             }
 
-                            // Only show promotion zone for rounds after the first (seeding) round
-                            const showZones = round.round > 1;
+                            const showZones = !isShrs && round.round > 1;
                             const cellZoneClass = showZones && isPromo
                               ? (darkMode ? 'bg-emerald-500/10' : 'bg-emerald-50/50')
                               : '';
 
-                            // Calculate points for this result
-                            const totalCompetitorsInRound = round.results.length;
                             let points = '—';
                             if (result) {
-                              if (result.letterScore) {
-                                points = String(totalCompetitorsInRound + 1);
-                              } else if (result.position !== null) {
-                                // For rounds after seeding, calculate overall position
-                                if (round.round === 1) {
-                                  // Seeded round: use position within heat
+                              if (isShrs) {
+                                if (result.letterScore) {
+                                  const heatSizes = round.heatAssignments.map(a => a.skipperIndices.length);
+                                  const largestHeat = Math.max(...heatSizes);
+                                  points = String(largestHeat + 1);
+                                } else if (result.position !== null) {
                                   points = String(result.position);
-                                } else {
-                                  // Later rounds: calculate overall position based on heat hierarchy
-                                  // Count all finishers from higher heats
-                                  let overallPoints = 0;
-                                  const heats: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
-                                  const currentHeatIndex = heats.indexOf(heat);
+                                }
+                              } else {
+                                const totalCompetitorsInRound = round.results.length;
+                                if (result.letterScore) {
+                                  points = String(totalCompetitorsInRound + 1);
+                                } else if (result.position !== null) {
+                                  if (round.round === 1) {
+                                    points = String(result.position);
+                                  } else {
+                                    let overallPoints = 0;
+                                    const heats: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+                                    const currentHeatIndex = heats.indexOf(heat);
 
-                                  for (let i = 0; i < currentHeatIndex; i++) {
-                                    const higherHeat = heats[i];
-                                    const higherHeatResults = round.results.filter(
-                                      r => r.heatDesignation === higherHeat && r.position !== null
-                                    );
-                                    overallPoints += higherHeatResults.length;
+                                    for (let i = 0; i < currentHeatIndex; i++) {
+                                      const higherHeat = heats[i];
+                                      const higherHeatResults = round.results.filter(
+                                        r => r.heatDesignation === higherHeat && r.position !== null
+                                      );
+                                      overallPoints += higherHeatResults.length;
+                                    }
+
+                                    overallPoints += position;
+                                    points = String(overallPoints);
                                   }
-
-                                  overallPoints += position;
-                                  points = String(overallPoints);
                                 }
                               }
                             }
@@ -621,7 +681,9 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                 {/* Sail Number */}
                                 <td className={`
                                   px-2 py-2 text-center text-xs border-l-4
-                                  ${darkMode ? 'text-slate-400 border-slate-600' : 'text-slate-600 border-slate-400'}
+                                  ${isShrs && round.round > shrsQualifyingRounds
+                                    ? `${darkMode ? 'text-slate-400' : 'text-slate-600'} ${getShrsFleetInfo(heat).borderClass}`
+                                    : `${darkMode ? 'text-slate-400 border-slate-600' : 'text-slate-600 border-slate-400'}`}
                                   ${cellZoneClass}
                                 `}>
                                   {skipper?.sailNo || '—'}
@@ -679,11 +741,11 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                         ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'}
                       `}>
                         {/* Empty cell for Heat column */}
-                        <td className={`sticky left-0 z-20 ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'}`}></td>
+                        <td className={`sticky left-0 z-20 ${darkMode ? 'bg-slate-900' : 'bg-purple-50'}`}></td>
                         {/* Observer label */}
                         <td colSpan={1} className={`
                           px-3 py-2 text-xs font-semibold sticky left-[80px] z-20
-                          ${darkMode ? 'text-purple-300 bg-purple-900/20' : 'text-purple-700 bg-purple-50'}
+                          ${darkMode ? 'text-purple-300 bg-slate-900' : 'text-purple-700 bg-purple-50'}
                         `}>
                           <div className="flex items-center gap-1.5">
                             <Eye size={14} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
@@ -703,7 +765,9 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                               colSpan={3}
                               className={`
                                 px-3 py-2 text-xs border-l-4
-                                ${darkMode ? 'text-slate-300 border-slate-600' : 'text-slate-700 border-slate-400'}
+                                ${isShrs && round.round > shrsQualifyingRounds
+                                  ? `${darkMode ? 'text-slate-300' : 'text-slate-700'} ${getShrsFleetInfo(heat).borderClass}`
+                                  : `${darkMode ? 'text-slate-300 border-slate-600' : 'text-slate-700 border-slate-400'}`}
                               `}
                             >
                               {observers.length > 0 ? (

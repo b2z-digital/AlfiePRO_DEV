@@ -261,17 +261,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       throw new Error('No club selected');
     }
 
-    console.log('Starting cover image upload...', {
-      clubId: currentClub.clubId,
-      fileSize: file.size,
-      fileType: file.type,
-      fileName: file.name,
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-      supabaseUrlDefined: !!import.meta.env.VITE_SUPABASE_URL
-    });
-
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(file, 'cover');
+
+      const fileExt = compressed.name.split('.').pop() || 'jpg';
       const fileName = `${currentClub.clubId}/cover-${Date.now()}.${fileExt}`;
 
       console.log('Uploading to storage bucket: media, path:', fileName);
@@ -296,29 +290,25 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
         const uploadResult = await supabase.storage
           .from('media')
-          .upload(fileName, file, {
+          .upload(fileName, compressed, {
             cacheControl: '3600',
             upsert: false
           });
 
         uploadData = uploadResult.data;
         uploadError = uploadResult.error;
-
-        console.log('Upload result:', { uploadData, uploadError });
       } catch (directUploadError: any) {
-        console.warn('Direct upload failed, trying base64 workaround for WebContainer environments:', directUploadError);
+        console.warn('Direct upload failed, trying base64 workaround:', directUploadError);
 
-        // Workaround for StackBlitz/WebContainer: Convert to base64 and upload as text
         const base64Data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => {
             const result = reader.result as string;
-            // Remove data URL prefix to get just the base64 string
             const base64 = result.split(',')[1];
             resolve(base64);
           };
           reader.onerror = reject;
-          reader.readAsDataURL(file);
+          reader.readAsDataURL(compressed);
         });
 
         // Convert base64 back to binary

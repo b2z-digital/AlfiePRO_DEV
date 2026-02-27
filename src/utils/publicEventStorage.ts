@@ -247,6 +247,99 @@ export const createLocalCopyOfPublicEvent = async (publicEvent: PublicEvent, clu
   }
 };
 
+export interface ClashingEvent {
+  id: string;
+  event_name: string;
+  date: string;
+  end_date?: string;
+  event_level: string;
+  venue?: string;
+  race_class?: string;
+}
+
+export const checkEventDateClashes = async (
+  startDate: string,
+  endDate: string | null,
+  excludeEventId?: string,
+  clubId?: string
+): Promise<ClashingEvent[]> => {
+  try {
+    const effectiveEnd = endDate || startDate;
+    const results: ClashingEvent[] = [];
+
+    let query = supabase
+      .from('public_events')
+      .select('id, event_name, date, end_date, event_level, venue, race_class')
+      .in('event_level', ['state', 'national'])
+      .lte('date', effectiveEnd);
+
+    if (excludeEventId) {
+      query = query.neq('id', excludeEventId);
+    }
+
+    const { data } = await query;
+
+    if (data) {
+      results.push(...data.filter(evt => {
+        const evtEnd = evt.end_date || evt.date;
+        return evtEnd >= startDate;
+      }));
+    }
+
+    if (clubId) {
+      let clubQuery = supabase
+        .from('quick_races')
+        .select('id, event_name, race_date, end_date')
+        .eq('club_id', clubId)
+        .lte('race_date', effectiveEnd);
+
+      if (excludeEventId) {
+        clubQuery = clubQuery.neq('id', excludeEventId);
+      }
+
+      const { data: clubEvents } = await clubQuery;
+
+      if (clubEvents) {
+        const clubClashes = clubEvents.filter(evt => {
+          const evtEnd = evt.end_date || evt.race_date;
+          return evtEnd >= startDate;
+        });
+        results.push(...clubClashes.map(evt => ({
+          id: evt.id,
+          event_name: evt.event_name || 'Unnamed Event',
+          date: evt.race_date,
+          end_date: evt.end_date,
+          event_level: 'club',
+        })));
+      }
+
+      const { data: seriesRounds } = await supabase
+        .from('race_series_rounds')
+        .select('id, round_name, date, club_id, cancelled')
+        .eq('club_id', clubId)
+        .eq('cancelled', false)
+        .gte('date', startDate)
+        .lte('date', effectiveEnd);
+
+      if (seriesRounds) {
+        const filteredRounds = excludeEventId
+          ? seriesRounds.filter(r => r.id !== excludeEventId)
+          : seriesRounds;
+        results.push(...filteredRounds.map(r => ({
+          id: r.id,
+          event_name: r.round_name || 'Series Round',
+          date: r.date,
+          event_level: 'club',
+        })));
+      }
+    }
+
+    return results;
+  } catch {
+    return [];
+  }
+};
+
 // Add a new public event
 export const addPublicEvent = async (eventData: Omit<PublicEvent, 'id' | 'created_at' | 'updated_at'>): Promise<PublicEvent | null> => {
   try {

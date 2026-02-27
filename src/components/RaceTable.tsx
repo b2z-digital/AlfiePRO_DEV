@@ -257,7 +257,6 @@ export const RaceTable: React.FC<RaceTableProps> = ({
         setHasManualHandicaps(false);
       }
       clearRace(raceToDelete);
-      addNotification('success', `Race ${raceToDelete} results have been cleared`);
       setRaceToDelete(null);
     }
   };
@@ -458,11 +457,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
       // Update the skipper to mark them as withdrawn from this race onwards
       updateSkipper(skipperIndex, { withdrawnFromRace: race });
 
-      // Close the selector
       setShowLetterScoreSelector(null);
-
-      // Show notification
-      addNotification('success', `${skipperName} has been withdrawn from the event starting from Race ${race}. All subsequent races will automatically receive ${skippers.length + 1} points.`);
     } else {
       console.error('❌ Cannot withdraw - missing updateSkipper or showLetterScoreSelector', {
         hasUpdateSkipper: !!updateSkipper,
@@ -804,13 +799,27 @@ export const RaceTable: React.FC<RaceTableProps> = ({
   // Get scoring system name based on drop rules
   const getScoringSystemName = () => {
     console.log('📋 getScoringSystemName - dropRules:', dropRules, 'type:', typeof dropRules);
+    console.log('📋 currentEvent.heatManagement?.configuration?.scoringSystem:', currentEvent?.heatManagement?.configuration?.scoringSystem);
 
-    // Check if it's a string (HMS or SHRS)
+    // Check if heat management has a scoring system specified (most reliable for heat racing)
+    if (currentEvent?.heatManagement?.configuration?.scoringSystem) {
+      const heatScoringSystem = currentEvent.heatManagement.configuration.scoringSystem;
+      console.log('✅ Using heatManagement scoringSystem:', heatScoringSystem);
+      if (heatScoringSystem === 'hms') {
+        return 'HMS Heat System';
+      } else if (heatScoringSystem === 'shrs') {
+        const mode = currentEvent.heatManagement.configuration.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+      }
+    }
+
+    // Check if it's a string (HMS or SHR)
     if (typeof dropRules === 'string') {
       if (dropRules === 'shrs') {
-        return 'SHRS - Simple Heat Racing System';
+        const mode = currentEvent?.heatManagement?.configuration?.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
       } else if (dropRules === 'hms') {
-        return 'HMS - Hawkesbury Memorial Series';
+        return 'HMS Heat System';
       }
       return dropRules;
     }

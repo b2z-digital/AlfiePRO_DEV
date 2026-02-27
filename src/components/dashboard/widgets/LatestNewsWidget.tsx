@@ -26,7 +26,11 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
   }, [currentClub, currentOrganization]);
 
   const loadArticles = async () => {
-    if (!currentOrganization?.id) {
+    const orgId = currentOrganization?.id;
+    const orgType = currentOrganization?.type;
+    const clubId = currentClub?.clubId;
+
+    if (!orgId && !clubId) {
       setLoading(false);
       return;
     }
@@ -39,12 +43,12 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (currentOrganization.type === 'state') {
-        query = query.or(`state_association_id.eq.${currentOrganization.id},national_association_id.not.is.null`);
-      } else if (currentOrganization.type === 'national') {
-        query = query.eq('national_association_id', currentOrganization.id);
+      if (orgType === 'state') {
+        query = query.or(`state_association_id.eq.${orgId},national_association_id.not.is.null`);
+      } else if (orgType === 'national') {
+        query = query.eq('national_association_id', orgId);
       } else {
-        query = query.eq('club_id', currentOrganization.id);
+        query = query.eq('club_id', orgId || clubId);
       }
 
       const { data, error } = await query;
@@ -100,7 +104,7 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Newspaper className="text-amber-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">Latest News</h2>
+          <h2 className="text-lg font-semibold text-white">{currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? 'Association News' : 'Latest News'}</h2>
         </div>
         <button
           onClick={handleCreateArticle}

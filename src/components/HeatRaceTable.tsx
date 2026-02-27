@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoreHorizontal, Edit, RotateCcw, Calendar, CalendarRange } from 'lucide-react';
+import { Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoreHorizontal, Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
 import { HeatRaceInput } from './HeatRaceInput';
 import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calculateOverallPositions } from '../types/heat';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +31,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
   onConfigureHeats
 }) => {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showCompleteHeatConfirm, setShowCompleteHeatConfirm] = useState(false);
   const [overallExpanded, setOverallExpanded] = useState(false);
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
   const [showLetterScoreSelector, setShowLetterScoreSelector] = useState<string | null>(null);
@@ -236,7 +237,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
               {heat}
             </div>
             <h4 className="font-medium">Heat {heat}</h4>
-            {isComplete && (
+            {isComplete && !isCurrentHeat && (
               <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-900/30 text-green-400">
                 Completed
               </span>
@@ -246,6 +247,15 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
             <span className="text-sm">
               {heatSkippers.length} skippers
             </span>
+            {isCurrentHeat && isComplete && !displayRoundData.completed && (
+              <button
+                onClick={() => setShowCompleteHeatConfirm(true)}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                <Check size={18} />
+                Complete Heat {heat}
+              </button>
+            )}
           </div>
         </div>
         
@@ -789,6 +799,20 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
         message="Are you sure you want to exit? Your results will be saved, but the event scoring is still active until scores are published."
         confirmText="Exit"
         cancelText="Stay"
+        darkMode={darkMode}
+      />
+
+      <ConfirmationModal
+        isOpen={showCompleteHeatConfirm}
+        onClose={() => setShowCompleteHeatConfirm(false)}
+        onConfirm={() => {
+          onCompleteHeat(currentHeat);
+          setShowCompleteHeatConfirm(false);
+        }}
+        title={`Complete Heat ${currentHeat}?`}
+        message={`All skippers have been scored. Confirm to finalize Heat ${currentHeat} and proceed to the next heat.`}
+        confirmText="Complete Heat"
+        cancelText="Keep Editing"
         darkMode={darkMode}
       />
     </div>

@@ -14,6 +14,10 @@ export interface Venue {
     name: string;
     abbreviation: string;
   };
+  shared_clubs?: {
+    name: string;
+    abbreviation: string;
+  }[];
 }
 
 export interface VenueFormData {

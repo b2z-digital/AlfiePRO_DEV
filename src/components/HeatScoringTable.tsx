@@ -10,8 +10,9 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye } from 'lucide-react';
-import { getObserverAssignments, ObserverAssignment } from '../utils/observerUtils';
+import { Hand, Eye, FileDown } from 'lucide-react';
+import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
+import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment } from '../utils/observerUtils';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -45,6 +46,7 @@ interface HeatScoringTableProps {
   onClearHeatRaceResults?: (heatDesignation: HeatDesignation, round: number, race: number, skipperIndices: number[]) => void;
   onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
+  isFullscreen?: boolean;
 }
 
 export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
@@ -78,9 +80,24 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onAdvanceToNextRound,
   onClearHeatRaceResults,
   onUpdateHeatAssignments,
-  onSelectHeat
+  onSelectHeat,
+  isFullscreen
 }) => {
   const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
+  const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
+  const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
+
+  const getShrsRoundLabel = (roundNum: number, heat?: HeatDesignation | null): string => {
+    if (isShrs && shrsQualifyingRounds > 0) {
+      if (roundNum <= shrsQualifyingRounds) {
+        return `Qualifying Rd ${roundNum}`;
+      }
+      const finalNum = roundNum - shrsQualifyingRounds;
+      const fleetName = heat ? SHRS_FLEET_FULL_NAMES[heat] : null;
+      return fleetName ? `Final ${finalNum} - ${fleetName}` : `Final ${finalNum}`;
+    }
+    return `Round ${roundNum}`;
+  };
 
   // Get all available heats for current round, sorted in reverse order (F -> A)
   // This ensures the last element is the lowest heat (e.g., C in a 3-heat setup)
@@ -606,7 +623,29 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return lastCompleted;
   }, [heatSkipperIndices, raceResults, selectedHeat]);
 
+  const SHRS_FLEET_NAMES: Record<string, string> = {
+    'A': 'Gold', 'B': 'Silver', 'C': 'Bronze',
+    'D': 'Copper', 'E': 'Fleet E', 'F': 'Fleet F',
+  };
+  const SHRS_FLEET_FULL_NAMES: Record<string, string> = {
+    'A': 'Gold Fleet', 'B': 'Silver Fleet', 'C': 'Bronze Fleet',
+    'D': 'Copper Fleet', 'E': 'Fleet E', 'F': 'Fleet F',
+  };
+  const SHRS_FLEET_BUTTON_COLORS: Record<string, string> = {
+    'A': 'bg-yellow-600',
+    'B': 'bg-slate-400',
+    'C': 'bg-amber-700',
+    'D': 'bg-orange-600',
+    'E': 'bg-teal-600',
+    'F': 'bg-green-600',
+  };
+
+  const isInFinals = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound > shrsQualifyingRounds;
+
   const getHeatColor = (heat: HeatDesignation): string => {
+    if (isInFinals) {
+      return SHRS_FLEET_BUTTON_COLORS[heat] || 'bg-slate-600';
+    }
     const colors: Record<HeatDesignation, string> = {
       'A': 'bg-yellow-600',
       'B': 'bg-orange-600',
@@ -619,6 +658,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   };
 
   const getHeatLabel = (heat: HeatDesignation): string => {
+    if (isInFinals) {
+      return SHRS_FLEET_FULL_NAMES[heat] || `Heat ${heat}`;
+    }
     return `Heat ${heat}`;
   };
 
@@ -799,7 +841,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   }
 
   return (
-    <div className="space-y-6 p-8 no-select">
+    <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
       {/* All Heats Complete - Show Actions (hidden in touch mode as it's shown in the button instead) */}
       {areAllHeatsComplete() && !isRoundComplete && !touchMode && (
           <div className={`mt-4 p-4 rounded-lg ${
@@ -808,7 +850,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <div className={`font-semibold ${darkMode ? 'text-green-400' : 'text-green-800'}`}>
-                  All heats scored for Round {heatManagement.currentRound}!
+                  All heats scored for {getShrsRoundLabel(heatManagement.currentRound)}!
                 </div>
                 <div className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
                   Ready to advance to next round with promotion/relegation
@@ -836,7 +878,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 }}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors shadow-md"
               >
-                Advance to Round {heatManagement.currentRound + 1}
+                Advance to {getShrsRoundLabel(heatManagement.currentRound + 1)}
               </button>
             </div>
           </div>
@@ -863,7 +905,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                       : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                   }`}
-                  title={`Go back to Round ${heatManagement.currentRound - 1}`}
+                  title={`Go back to ${getShrsRoundLabel(heatManagement.currentRound - 1)}`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -875,7 +917,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <div className={`px-3 py-1.5 rounded-lg ${
                 darkMode ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-blue-100 text-blue-700 border border-blue-300'
               } font-semibold text-sm`}>
-                Round {heatManagement.currentRound}
+                {getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
               </div>
 
               {/* Heat Buttons - Inline */}
@@ -926,7 +968,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       }
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-base font-bold">{heat}</span>
+                        <span className="text-base font-bold">{isInFinals ? (SHRS_FLEET_NAMES[heat] || heat) : heat}</span>
                         {isComplete && (
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -947,7 +989,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-green-600 hover:bg-green-700 text-white'
                       : 'bg-green-500 hover:bg-green-600 text-white'
                   }`}
-                  title={`Return to active Round ${activeRound}`}
+                  title={`Return to active ${getShrsRoundLabel(activeRound)}`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -966,7 +1008,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       ? 'bg-blue-600 hover:bg-blue-700 text-white animate-pulse'
                       : 'bg-blue-500 hover:bg-blue-600 text-white animate-pulse'
                   }`}
-                  title={`Advance to Round ${heatManagement.currentRound + 1}`}
+                  title={`Advance to ${getShrsRoundLabel(heatManagement.currentRound + 1)}`}
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1008,7 +1050,43 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               >
                 View Assignments
               </button>
-              {/* Only show Race Results and Overall Results after Round 1 is complete and advanced */}
+              {heatManagement.configuration.scoringSystem === 'shrs' && (
+                <button
+                  onClick={async () => {
+                    const opts = {
+                      eventName: currentEvent?.name || currentEvent?.eventName || '',
+                      eventDate: currentEvent?.date || '',
+                      venueName: (currentEvent as any)?.venue || '',
+                      clubName: (currentEvent as any)?.clubName || '',
+                      showFlag: currentEvent?.show_flag ?? false,
+                      showCountry: currentEvent?.show_country ?? false,
+                    };
+                    let obsMap: Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]> | undefined;
+                    if (currentEvent?.id) {
+                      const rawMap = await getAllObserversForEvent(currentEvent.id);
+                      obsMap = new Map();
+                      rawMap.forEach((observers, key) => {
+                        obsMap!.set(key, observers.map(o => {
+                          const matched = skippers.find(s =>
+                            s.sailNo === o.sailNumber || s.name === o.skipperName
+                          );
+                          return { ...o, countryCode: matched?.country_code || undefined };
+                        }));
+                      });
+                    }
+                    exportAllRoundsPdf(heatManagement, skippers, opts, obsMap);
+                  }}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    darkMode
+                      ? 'bg-slate-600 text-white hover:bg-slate-500'
+                      : 'bg-slate-600 text-white hover:bg-slate-500'
+                  }`}
+                  title="Export all qualifying rounds as multi-page PDF"
+                >
+                  <FileDown size={16} />
+                  Export All Rounds
+                </button>
+              )}
               {heatManagement.currentRound > 1 && (
                 <>
                   <button
@@ -1043,7 +1121,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             currentRace={heatManagement.currentRound}
             numRaces={12}
             isHeatScoring={true}
+            isFullscreen={isFullscreen}
             isScoringLastHeat={isScoringLastHeat()}
+            roundLabel={getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
+            allSkippers={skippers}
+            allRaceResults={raceResults}
             raceResults={mappedRaceResults}
             heatObservers={currentHeatObservers}
             updateRaceResults={(updatedResults) => {
@@ -1092,6 +1174,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
             onConfirmResults={() => {
               console.log('✅ Touch mode results confirmed for heat', selectedHeat);
               setTouchModeResultsConfirmed(true);
+
+              // If this is the last heat being scored, complete it now
+              if (selectedHeat && isScoringLastHeat()) {
+                console.log('🏁 Last heat confirmed - completing heat', selectedHeat);
+                onCompleteHeat(selectedHeat);
+              }
             }}
             darkMode={darkMode}
             dropRules={[4, 8, 16, 24, 32, 40]}
@@ -1164,7 +1252,13 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (heatManagement.roundJustCompleted) {
             delete heatManagement.roundJustCompleted;
           }
-          if (onGoToRound) {
+          // Call the actual advance handler with the last heat to trigger round creation
+          if (onAdvanceToNextRound) {
+            const lastHeat = availableHeats[availableHeats.length - 1];
+            console.log('📍 Calling onAdvanceToNextRound with last heat:', lastHeat);
+            onAdvanceToNextRound(lastHeat);
+          } else if (onGoToRound) {
+            // Fallback to just navigating if advance handler not available
             onGoToRound(nextRoundNumber);
           }
         }}

@@ -43,7 +43,6 @@ export const useDataPreloader = () => {
     if (!currentClub?.clubId || isPreloading) return;
 
     setIsPreloading(true);
-    console.log('🔄 Starting data preload for offline access...');
 
     try {
       const stats: PreloadStats = {
@@ -55,7 +54,6 @@ export const useDataPreloader = () => {
         meetings: 0
       };
 
-      // Note: Using Promise.allSettled to handle missing tables gracefully
       const [eventsData, seriesData, membersData, articlesData, meetingsData] = await Promise.allSettled([
         supabase.from('quick_races').select('*').eq('club_id', currentClub.clubId),
         supabase.from('race_series').select('*').eq('club_id', currentClub.clubId),
@@ -71,19 +69,23 @@ export const useDataPreloader = () => {
         }
       }
 
-      if (seriesData.status === 'fulfilled' && seriesData.value.data) {
-        // Cache series in IndexedDB without triggering sync
-        const db = await openIndexedDB();
-        const transaction = db.transaction('series', 'readwrite');
-        const store = transaction.objectStore('series');
+      const db = await offlineStorage.getDB();
 
-        for (const series of seriesData.value.data) {
-          await new Promise((resolve, reject) => {
-            const request = store.put({ ...series, timestamp: Date.now() });
-            request.onsuccess = () => resolve(undefined);
-            request.onerror = () => reject(request.error);
-          });
-          stats.series++;
+      if (seriesData.status === 'fulfilled' && seriesData.value.data) {
+        try {
+          const transaction = db.transaction('series', 'readwrite');
+          const store = transaction.objectStore('series');
+
+          for (const series of seriesData.value.data) {
+            await new Promise<void>((resolve, reject) => {
+              const request = store.put({ ...series, timestamp: Date.now() });
+              request.onsuccess = () => resolve();
+              request.onerror = () => reject(request.error);
+            });
+            stats.series++;
+          }
+        } catch (e) {
+          console.error('Error caching series:', e);
         }
       }
 
@@ -93,84 +95,48 @@ export const useDataPreloader = () => {
       }
 
       if (articlesData.status === 'fulfilled' && articlesData.value.data) {
-        await cacheArticles(articlesData.value.data);
-        stats.articles = articlesData.value.data.length;
+        try {
+          const transaction = db.transaction('articles', 'readwrite');
+          const store = transaction.objectStore('articles');
+
+          for (const article of articlesData.value.data) {
+            await new Promise<void>((resolve, reject) => {
+              const request = store.put(article);
+              request.onsuccess = () => resolve();
+              request.onerror = () => reject(request.error);
+            });
+          }
+          stats.articles = articlesData.value.data.length;
+        } catch (e) {
+          console.error('Error caching articles:', e);
+        }
       }
 
       if (meetingsData.status === 'fulfilled' && meetingsData.value.data) {
-        await cacheMeetings(meetingsData.value.data);
-        stats.meetings = meetingsData.value.data.length;
+        try {
+          const transaction = db.transaction('meetings', 'readwrite');
+          const store = transaction.objectStore('meetings');
+
+          for (const meeting of meetingsData.value.data) {
+            await new Promise<void>((resolve, reject) => {
+              const request = store.put(meeting);
+              request.onsuccess = () => resolve();
+              request.onerror = () => reject(request.error);
+            });
+          }
+          stats.meetings = meetingsData.value.data.length;
+        } catch (e) {
+          console.error('Error caching meetings:', e);
+        }
       }
 
       setPreloadStats(stats);
       setLastPreloadTime(new Date());
-      console.log('✅ Data preload complete:', stats);
     } catch (error) {
-      console.error('❌ Error preloading data:', error);
+      console.error('Error preloading data:', error);
     } finally {
       setIsPreloading(false);
     }
-  };
-
-  const cacheArticles = async (articles: any[]) => {
-    const db = await openIndexedDB();
-    const transaction = db.transaction('articles', 'readwrite');
-    const store = transaction.objectStore('articles');
-
-    for (const article of articles) {
-      await new Promise((resolve, reject) => {
-        const request = store.put(article);
-        request.onsuccess = () => resolve(undefined);
-        request.onerror = () => reject(request.error);
-      });
-    }
-  };
-
-  const cacheMeetings = async (meetings: any[]) => {
-    const db = await openIndexedDB();
-    const transaction = db.transaction('meetings', 'readwrite');
-    const store = transaction.objectStore('meetings');
-
-    for (const meeting of meetings) {
-      await new Promise((resolve, reject) => {
-        const request = store.put(meeting);
-        request.onsuccess = () => resolve(undefined);
-        request.onerror = () => reject(request.error);
-      });
-    }
-  };
-
-  const openIndexedDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open('alfie_pro_offline', 2);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-
-        if (!db.objectStoreNames.contains('articles')) {
-          const articleStore = db.createObjectStore('articles', { keyPath: 'id' });
-          articleStore.createIndex('clubId', 'club_id', { unique: false });
-        }
-
-        if (!db.objectStoreNames.contains('tasks')) {
-          const taskStore = db.createObjectStore('tasks', { keyPath: 'id' });
-          taskStore.createIndex('clubId', 'club_id', { unique: false });
-        }
-
-        if (!db.objectStoreNames.contains('meetings')) {
-          const meetingStore = db.createObjectStore('meetings', { keyPath: 'id' });
-          meetingStore.createIndex('clubId', 'club_id', { unique: false });
-        }
-
-        if (!db.objectStoreNames.contains('series')) {
-          const seriesStore = db.createObjectStore('series', { keyPath: 'id' });
-          seriesStore.createIndex('clubId', 'club_id', { unique: false });
-        }
-      };
-    });
   };
 
   return {

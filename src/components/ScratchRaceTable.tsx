@@ -242,11 +242,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       // Update the skipper to mark them as withdrawn from this race onwards
       updateSkipper(skipperIndex, { withdrawnFromRace: race });
 
-      // Close the selector
       setShowLetterScoreSelector(null);
-
-      // Show notification
-      addNotification('success', `${skipperName} has been withdrawn from the event starting from Race ${race}. All subsequent races will automatically receive ${skippers.length + 1} points.`);
     }
   };
 
@@ -258,7 +254,6 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
   const handleConfirmClearRace = () => {
     if (raceToDelete !== null) {
       clearRace(raceToDelete);
-      addNotification('success', `Race ${raceToDelete} and all subsequent races have been cleared`);
       setRaceToDelete(null);
     }
   };
@@ -281,12 +276,24 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
 
   // Get scoring system name based on drop rules
   const getScoringSystemName = () => {
-    // Check if it's a string (HMS or SHRS)
+    // Check if heat management has a scoring system specified (most reliable for heat racing)
+    if (currentEvent?.heatManagement?.configuration?.scoringSystem) {
+      const heatScoringSystem = currentEvent.heatManagement.configuration.scoringSystem;
+      if (heatScoringSystem === 'hms') {
+        return 'HMS Heat System';
+      } else if (heatScoringSystem === 'shrs') {
+        const mode = currentEvent.heatManagement.configuration.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
+      }
+    }
+
+    // Check if it's a string (HMS or SHR)
     if (typeof dropRules === 'string') {
       if (dropRules === 'shrs') {
-        return 'SHRS - Simple Heat Racing System';
+        const mode = currentEvent?.heatManagement?.configuration?.shrsAssignmentMode;
+        return `SHR-${mode === 'preset' ? 'B' : 'P'} - Structured Heat Racing`;
       } else if (dropRules === 'hms') {
-        return 'HMS - Hawkesbury Memorial Series';
+        return 'HMS Heat System';
       }
       return dropRules;
     }
@@ -711,7 +718,6 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       }
     } catch (err) {
       console.error('Error entering fullscreen:', err);
-      addNotification('error', 'Unable to enter fullscreen mode');
     }
   };
 
@@ -789,7 +795,6 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
       setTimeout(async () => {
         await exitFullscreen();
         setIsFocusMode(false);
-        addNotification('info', `Round ${currentHeatRound} completed! Advance to next round to continue.`);
       }, 1500);
     }
   }, [isHeatRacing, isFocusMode, currentHeatRound, raceResults, skippers]);

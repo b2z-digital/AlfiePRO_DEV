@@ -4,7 +4,8 @@ import { RaceType, BoatType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { storeRaceEvent, storeRaceSeries } from '../../utils/raceStorage';
 import { createTask } from '../../utils/taskStorage';
-import { addPublicEvent, updatePublicEvent } from '../../utils/publicEventStorage';
+import { addPublicEvent, updatePublicEvent, checkEventDateClashes, ClashingEvent } from '../../utils/publicEventStorage';
+import { EventClashWarningModal } from '../events/EventClashWarningModal';
 import { getStoredClubs } from '../../utils/clubStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
 import { getClubBoatClasses } from '../../utils/boatClassStorage';
@@ -142,6 +143,9 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   }>({});
   const [loadingScheduledDocs, setLoadingScheduledDocs] = useState(false);
   const [linkDocumentSchedules, setLinkDocumentSchedules] = useState(true);
+  const [clashingEvents, setClashingEvents] = useState<ClashingEvent[]>([]);
+  const [showClashWarning, setShowClashWarning] = useState(false);
+  const [clashAcknowledged, setClashAcknowledged] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -623,6 +627,27 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!clashAcknowledged && !isEditing) {
+      const eventDate = type === 'quick' ? formData.raceDate : (formData.rounds[0]?.date || '');
+      let eventEndDate: string | null = null;
+
+      if (type === 'quick' && formData.isMultiDay && formData.endDate) {
+        eventEndDate = formData.endDate;
+      } else if (type === 'series' && formData.rounds.length > 0) {
+        const allDates = formData.rounds.map(r => r.date).filter(Boolean).sort();
+        eventEndDate = allDates[allDates.length - 1] || null;
+      }
+
+      if (eventDate) {
+        const clashes = await checkEventDateClashes(eventDate, eventEndDate, undefined, formData.clubId || currentClub?.clubId);
+        if (clashes.length > 0) {
+          setClashingEvents(clashes);
+          setShowClashWarning(true);
+          return;
+        }
+      }
+    }
 
     console.log('🚀 Form submission started');
     console.log('📋 Form data:', formData);
@@ -1328,11 +1353,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({
+                  onClick={() => { setFormData(prev => ({
                     ...prev,
                     isMultiDay: !prev.isMultiDay,
                     endDate: !prev.isMultiDay ? calculateEndDate(prev.raceDate, prev.numberOfDays) : prev.raceDate
-                  }))}
+                  })); setClashAcknowledged(false); }}
                   className={`
                     group relative p-5 rounded-xl border-2 transition-all duration-300 text-left transform hover:scale-[1.02]
                     ${formData.isMultiDay
@@ -1839,7 +1864,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                         type="date"
                         required
                         value={formData.raceDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, raceDate: e.target.value }))}
+                        onChange={(e) => { setFormData(prev => ({ ...prev, raceDate: e.target.value })); setClashAcknowledged(false); }}
                         className={`
                           w-full pl-10 pr-4 py-2 rounded-lg transition-colors
                           ${darkMode
@@ -1867,11 +1892,11 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                           <select
                             required
                             value={formData.numberOfDays}
-                            onChange={(e) => setFormData(prev => ({
+                            onChange={(e) => { setFormData(prev => ({
                               ...prev,
                               numberOfDays: parseInt(e.target.value),
                               endDate: calculateEndDate(prev.raceDate, parseInt(e.target.value))
-                            }))}
+                            })); setClashAcknowledged(false); }}
                             className={`
                               w-full pl-10 pr-4 py-2 rounded-lg transition-colors appearance-none
                               ${darkMode
@@ -3419,6 +3444,26 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           setShowScheduleDocumentModal(false);
         }}
       />
+
+      {showClashWarning && clashingEvents.length > 0 && (
+        <EventClashWarningModal
+          darkMode={darkMode}
+          clashingEvents={clashingEvents}
+          eventName={formData.eventName || formData.seriesName || 'New Event'}
+          onProceed={() => {
+            setShowClashWarning(false);
+            setClashAcknowledged(true);
+            setTimeout(() => {
+              const form = document.querySelector<HTMLFormElement>('form');
+              if (form) form.requestSubmit();
+            }, 0);
+          }}
+          onCancel={() => {
+            setShowClashWarning(false);
+            setClashingEvents([]);
+          }}
+        />
+      )}
     </div>
   );
 };

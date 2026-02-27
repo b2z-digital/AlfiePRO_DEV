@@ -630,12 +630,12 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                       <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
                         Type: CNAME<br />
                         Host: www (or your subdomain)<br />
-                        Target: d205ctqm5i025u.cloudfront.net
+                        Target: d3jmzkpreoudd5.cloudfront.net
                       </span>
                     </div>
                   </div>
                   <button
-                    onClick={() => copyToClipboard('d205ctqm5i025u.cloudfront.net')}
+                    onClick={() => copyToClipboard('d3jmzkpreoudd5.cloudfront.net')}
                     className={`p-2 rounded ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
                   >
                     <Copy size={14} />
