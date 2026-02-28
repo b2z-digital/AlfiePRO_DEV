@@ -12,8 +12,13 @@ export async function getBoatClasses(): Promise<BoatClass[]> {
     .order('name');
 
   if (error) {
-    console.error('Error fetching boat classes:', error);
-    throw error;
+    console.error('Error fetching boat classes via table, trying RPC fallback:', error);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_active_boat_classes');
+    if (rpcError) {
+      console.error('Error fetching boat classes via RPC:', rpcError);
+      throw rpcError;
+    }
+    return rpcData || [];
   }
 
   return data || [];
@@ -112,8 +117,13 @@ export async function getClubBoatClasses(clubId: string): Promise<BoatClass[]> {
     .eq('club_id', clubId);
 
   if (error) {
-    console.error('Error fetching club boat classes:', error);
-    throw error;
+    console.error('Error fetching club boat classes via table, trying RPC fallback:', error);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_club_boat_classes', { p_club_id: clubId });
+    if (rpcError) {
+      console.error('Error fetching club boat classes via RPC:', rpcError);
+      throw rpcError;
+    }
+    return rpcData || [];
   }
 
   return data?.map(item => (item as any).boat_classes).filter(Boolean) || [];
