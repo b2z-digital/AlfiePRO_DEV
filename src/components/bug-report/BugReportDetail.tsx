@@ -31,9 +31,9 @@ interface BugReportDetailProps {
 
 interface Comment {
   id: string;
-  user_name: string;
+  commenter_name: string;
   comment: string;
-  is_admin_reply: boolean;
+  is_internal: boolean;
   created_at: string;
 }
 
@@ -60,6 +60,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
   const [resolutionNotes, setResolutionNotes] = useState(report.resolution_notes || '');
   const [saving, setSaving] = useState(false);
   const [sendingComment, setSendingComment] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   const isBug = report.report_type !== 'feature_request';
   const accentColor = isBug ? 'red' : 'teal';
@@ -97,17 +98,33 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
   const handleAddComment = async () => {
     if (!newComment.trim() || !user) return;
     setSendingComment(true);
-    const profile = user.user_metadata;
-    const { error } = await supabase.from('bug_report_comments').insert({
-      bug_report_id: report.id,
-      user_id: user.id,
-      user_name: profile?.full_name || profile?.first_name || user.email || '',
-      comment: newComment.trim(),
-      is_admin_reply: isSuperAdmin,
-    });
-    if (!error) {
-      setNewComment('');
-      await loadComments();
+    setCommentError('');
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        setCommentError('Session expired. Please refresh the page.');
+        setSendingComment(false);
+        return;
+      }
+
+      const profile = sessionData.session.user.user_metadata;
+      const { error } = await supabase.from('bug_report_comments').insert({
+        bug_report_id: report.id,
+        user_id: sessionData.session.user.id,
+        commenter_name: profile?.full_name || profile?.name || profile?.first_name || sessionData.session.user.email || '',
+        comment: newComment.trim(),
+        is_internal: false,
+      });
+      if (error) {
+        console.error('Failed to add comment:', error);
+        setCommentError(error.message);
+      } else {
+        setNewComment('');
+        await loadComments();
+      }
+    } catch (err: any) {
+      console.error('Error adding comment:', err);
+      setCommentError(err?.message || 'Unknown error');
     }
     setSendingComment(false);
   };
@@ -315,7 +332,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                   <div
                     key={c.id}
                     className={`p-2.5 rounded-xl ${
-                      c.is_admin_reply
+                      c.is_internal
                         ? isBug
                           ? darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
                           : darkMode ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-200'
@@ -324,14 +341,14 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-xs font-medium ${
-                        c.is_admin_reply
+                        c.is_internal
                           ? isBug
                             ? darkMode ? 'text-red-400' : 'text-red-600'
                             : darkMode ? 'text-teal-400' : 'text-teal-600'
                           : darkMode ? 'text-slate-300' : 'text-slate-700'
                       }`}>
-                        {c.user_name || 'User'}
-                        {c.is_admin_reply && ' (Admin)'}
+                        {c.commenter_name || 'User'}
+                        {c.is_internal && ' (Admin)'}
                       </span>
                       <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         {getTimeAgo(c.created_at)}
@@ -348,9 +365,11 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
         </div>
       </div>
 
-      <div className={`flex items-center gap-2 px-4 py-3 border-t ${
-        darkMode ? 'border-slate-700' : 'border-slate-200'
-      }`}>
+      <div className={`px-4 py-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+        {commentError && (
+          <p className="text-xs text-red-400 mb-2">Error: {commentError}</p>
+        )}
+        <div className="flex items-center gap-2">
         <input
           type="text"
           value={newComment}
@@ -381,6 +400,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
             <Send className="w-4 h-4" />
           )}
         </button>
+        </div>
       </div>
     </div>,
     document.body
