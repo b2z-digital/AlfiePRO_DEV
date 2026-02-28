@@ -141,39 +141,54 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       console.log('Loaded clubs:', clubsData);
       setClubs(clubsData || []);
 
-      // Load all members from clubs under this state association
       const clubIds = (clubsData || []).map(c => c.id);
 
-      if (clubIds.length === 0) {
-        console.log('No clubs found for this state association');
-        setMembers([]);
-        setLoading(false);
-        return;
+      let clubMembers: any[] = [];
+      if (clubIds.length > 0) {
+        const { data: clubMembersData, error: clubMembersError } = await supabase
+          .from('members')
+          .select(`
+            id, first_name, last_name, email, phone,
+            membership_level, is_financial, date_joined,
+            renewal_date, club_id, avatar_url
+          `)
+          .in('club_id', clubIds)
+          .eq('membership_status', 'active')
+          .order('last_name');
+
+        if (clubMembersError) {
+          console.error('Error loading club members:', clubMembersError);
+        } else {
+          clubMembers = clubMembersData || [];
+        }
       }
 
-      const { data: membersData, error: membersError } = await supabase
+      const { data: assocMembersData, error: assocMembersError } = await supabase
         .from('members')
         .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          membership_level,
-          is_financial,
-          date_joined,
-          renewal_date,
-          club_id,
-          avatar_url
+          id, first_name, last_name, email, phone,
+          membership_level, is_financial, date_joined,
+          renewal_date, club_id, avatar_url
         `)
-        .in('club_id', clubIds)
+        .eq('state_association_id', stateId)
         .eq('membership_status', 'active')
         .order('last_name');
 
-      if (membersError) {
-        console.error('Error loading members:', membersError);
-        throw membersError;
+      if (assocMembersError) {
+        console.error('Error loading association members:', assocMembersError);
       }
+
+      const allMemberIds = new Set<string>();
+      const allMembers: any[] = [];
+      for (const m of [...clubMembers, ...(assocMembersData || [])]) {
+        if (!allMemberIds.has(m.id)) {
+          allMemberIds.add(m.id);
+          allMembers.push(m);
+        }
+      }
+      allMembers.sort((a, b) => (a.last_name || '').localeCompare(b.last_name || ''));
+
+      const membersData = allMembers;
 
       console.log('Loaded members:', membersData?.length || 0);
 

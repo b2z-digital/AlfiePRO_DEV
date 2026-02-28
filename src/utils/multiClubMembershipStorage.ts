@@ -143,48 +143,47 @@ export async function importAssociationMembers(
   let existing = 0;
   let errors = 0;
 
+  const associationKey = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
   for (const member of members) {
     try {
-      // Check if profile already exists
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', member.email.toLowerCase())
+      const email = member.email.toLowerCase().trim();
+      const nameParts = (member.full_name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'Unknown';
+      const lastName = nameParts.slice(1).join(' ') || 'Unknown';
+
+      const { data: existingMember } = await supabase
+        .from('members')
+        .select('id')
+        .eq(associationKey, associationId)
+        .ilike('email', email)
         .maybeSingle();
 
-      if (existingProfile) {
-        // Profile exists - just ensure they have a member number
-        if (member.member_number) {
-          await supabase
-            .from('profiles')
-            .update({
-              member_number: member.member_number,
-              registration_source: 'association_import'
-            })
-            .eq('id', existingProfile.id);
+      if (existingMember) {
+        const updateData: Record<string, any> = {};
+        if (member.phone) updateData.phone = member.phone;
+        if (Object.keys(updateData).length > 0) {
+          await supabase.from('members').update(updateData).eq('id', existingMember.id);
         }
         existing++;
       } else {
-        // Create new profile without auth.users entry (unclaimed)
-        const { data: newProfile, error: profileError } = await supabase
-          .from('profiles')
+        const { error: insertError } = await supabase
+          .from('members')
           .insert([{
-            email: member.email.toLowerCase(),
-            full_name: member.full_name,
-            date_of_birth: member.date_of_birth,
-            member_number: member.member_number,
-            nationality: countryCode,
-            registration_source: 'association_import'
-          }])
-          .select()
-          .single();
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            phone: member.phone || null,
+            country: countryCode,
+            membership_status: 'active',
+            [associationKey]: associationId,
+          }]);
 
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
+        if (insertError) {
+          console.error('Error creating member:', insertError);
           errors++;
           continue;
         }
-
         created++;
       }
     } catch (err) {
@@ -207,96 +206,79 @@ export async function importAssociationMembersExtended(
   let existing = 0;
   let errors = 0;
 
+  const associationKey = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
   for (const member of members) {
     try {
       const email = (member.email || '').toLowerCase().trim();
       const firstName = (member.first_name || '').trim();
       const lastName = (member.last_name || '').trim();
-      const fullName = `${firstName} ${lastName}`.trim();
 
-      if (!email && !fullName) {
+      if (!firstName && !lastName && !email) {
         errors++;
         continue;
       }
 
+      let existingMemberQuery = supabase
+        .from('members')
+        .select('id')
+        .eq(associationKey, associationId);
+
       if (email) {
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (existingProfile) {
-          const profileUpdate: Record<string, any> = { registration_source: 'association_import' };
-          if (member.member_number) profileUpdate.member_number = member.member_number;
-          if (fullName) profileUpdate.full_name = fullName;
-
-          await supabase
-            .from('profiles')
-            .update(profileUpdate)
-            .eq('id', existingProfile.id);
-
-          existing++;
-        } else {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([{
-              email,
-              full_name: fullName || email,
-              member_number: member.member_number || null,
-              nationality: member.country || countryCode,
-              registration_source: 'association_import'
-            }])
-            .select()
-            .single();
-
-          if (profileError) {
-            console.error('Error creating profile:', profileError);
-            errors++;
-            continue;
-          }
-          created++;
-        }
+        existingMemberQuery = existingMemberQuery.ilike('email', email);
+      } else {
+        existingMemberQuery = existingMemberQuery
+          .ilike('first_name', firstName)
+          .ilike('last_name', lastName);
       }
 
-      if (firstName && lastName) {
-        const { data: existingMember } = await supabase
+      const { data: existingMember } = await existingMemberQuery.maybeSingle();
+
+      const memberData: Record<string, any> = {
+        first_name: firstName || 'Unknown',
+        last_name: lastName || 'Unknown',
+        [associationKey]: associationId,
+      };
+      if (email) memberData.email = email;
+      if (member.phone) memberData.phone = member.phone;
+      if (member.street) memberData.street = member.street;
+      if (member.city) memberData.city = member.city;
+      if (member.state) memberData.state = member.state;
+      if (member.postcode) memberData.postcode = member.postcode;
+      if (member.country) memberData.country = member.country;
+      if (member.membership_level) memberData.membership_level = member.membership_level;
+      if (member.club_name) memberData.club = member.club_name;
+      if (member.nickname) memberData.club = member.nickname;
+      if (member.membership_status) memberData.membership_status = member.membership_status;
+
+      if (member.start_date) memberData.date_joined = member.start_date;
+      else if (member.date_joined) memberData.date_joined = member.date_joined;
+
+      if (member.end_date) memberData.renewal_date = member.end_date;
+
+      if (existingMember) {
+        const { error: updateError } = await supabase
           .from('members')
-          .select('id')
-          .ilike('email', email || 'NO_MATCH_PLACEHOLDER')
-          .maybeSingle();
+          .update(memberData)
+          .eq('id', existingMember.id);
 
-        const memberData: Record<string, any> = {
-          first_name: firstName,
-          last_name: lastName,
-        };
-        if (email) memberData.email = email;
-        if (member.phone) memberData.phone = member.phone;
-        if (member.street) memberData.street = member.street;
-        if (member.city) memberData.city = member.city;
-        if (member.state) memberData.state = member.state;
-        if (member.postcode) memberData.postcode = member.postcode;
-        if (member.country) memberData.country = member.country;
-        if (member.membership_level) memberData.membership_level = member.membership_level;
-        if (member.club_name) memberData.club = member.club_name;
-        if (member.nickname) memberData.club = member.nickname;
-        if (member.membership_status) memberData.membership_status = member.membership_status;
-
-        if (member.start_date) memberData.date_joined = member.start_date;
-        else if (member.date_joined) memberData.date_joined = member.date_joined;
-
-        if (member.end_date) memberData.renewal_date = member.end_date;
-
-        if (existingMember) {
-          await supabase
-            .from('members')
-            .update(memberData)
-            .eq('id', existingMember.id);
+        if (updateError) {
+          console.error('Error updating member:', updateError);
+          errors++;
         } else {
-          if (!memberData.membership_status) memberData.membership_status = 'active';
-          await supabase
-            .from('members')
-            .insert([memberData]);
+          existing++;
+        }
+      } else {
+        if (!memberData.membership_status) memberData.membership_status = 'active';
+        const { error: insertError } = await supabase
+          .from('members')
+          .insert([memberData]);
+
+        if (insertError) {
+          console.error('Error creating member:', insertError);
+          errors++;
+        } else {
+          created++;
         }
       }
     } catch (err) {
@@ -576,11 +558,13 @@ export async function changeMemberRelationshipType(
 
 // Get all unclaimed members (imported by association but not claimed by any club)
 export async function getUnclaimedMembers(associationId: string, associationType: 'state' | 'national'): Promise<any[]> {
+  const associationKey = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
   const { data, error } = await supabase
-    .from('profiles')
-    .select('id, email, full_name, member_number, created_at')
-    .eq('registration_source', 'association_import')
-    .is('primary_club_id', null)
+    .from('members')
+    .select('id, email, first_name, last_name, created_at')
+    .eq(associationKey, associationId)
+    .is('club_id', null)
     .order('created_at', { ascending: false });
 
   if (error) {
