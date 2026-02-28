@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users, Upload, Download, Search, MoreVertical, Edit, Trash2, X, Mail, MailX } from 'lucide-react';
 import Papa from 'papaparse';
+import { ImportListMembersModal } from '../components/marketing/ImportListMembersModal';
 import {
   getMarketingSubscriberLists,
   createMarketingSubscriberList,
@@ -41,9 +42,6 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
   const [memberEmailPreferences, setMemberEmailPreferences] = useState<Record<string, boolean>>({});
   const [updatingPreference, setUpdatingPreference] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadLists();
@@ -239,43 +237,11 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
     setShowListMenu(null);
   }
 
-  async function handleImportMembers() {
-    if (!importFile || !selectedList) return;
-
-    setImporting(true);
-    try {
-      const text = await importFile.text();
-      const result = Papa.parse(text, { header: true });
-
-      const members: Partial<MarketingListMember>[] = result.data
-        .filter((row: any) => row.Email || row.email)
-        .map((row: any) => ({
-          list_id: selectedList.id,
-          email: (row.Email || row.email).trim(),
-          first_name: (row['First Name'] || row.first_name || '').trim(),
-          last_name: (row['Last Name'] || row.last_name || '').trim(),
-          status: 'subscribed',
-          source: 'import'
-        }));
-
-      if (members.length === 0) {
-        alert('No valid email addresses found in CSV file');
-        return;
-      }
-
-      await addListMembers(members);
-
-      alert(`Successfully imported ${members.length} members`);
-      setShowImportModal(false);
-      setImportFile(null);
-
-      // Reload members
+  async function handleImportMembers(members: Partial<MarketingListMember>[]) {
+    await addListMembers(members);
+    setShowImportModal(false);
+    if (selectedList) {
       await handleViewMembers(selectedList);
-    } catch (error) {
-      console.error('Error importing members:', error);
-      alert('Failed to import members. Please check your CSV format.');
-    } finally {
-      setImporting(false);
     }
   }
 
@@ -765,99 +731,14 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
         </div>
       )}
 
-      {/* Import Members Modal */}
       {showImportModal && selectedList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-xl max-w-md w-full p-6 ${
-            darkMode
-              ? 'bg-slate-800 border border-slate-700'
-              : 'bg-white'
-          }`}>
-            <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-              Import Members to {selectedList.name}
-            </h2>
-
-            <div className="space-y-4">
-              <div>
-                <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                  Upload a CSV file with the following columns:
-                </p>
-                <div className={`p-3 rounded-lg text-sm font-mono ${
-                  darkMode ? 'bg-slate-900/50 text-slate-300' : 'bg-gray-50 text-gray-700'
-                }`}>
-                  Email, First Name, Last Name
-                </div>
-                <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-gray-500'}`}>
-                  Email is required. First Name and Last Name are optional.
-                </p>
-              </div>
-
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`w-full px-4 py-3 rounded-lg border-2 border-dashed transition-colors ${
-                    darkMode
-                      ? 'border-slate-600 hover:border-slate-500 text-slate-300'
-                      : 'border-gray-300 hover:border-gray-400 text-gray-700'
-                  }`}
-                >
-                  {importFile ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <Upload className="w-5 h-5" />
-                      <span>{importFile.name}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center gap-2">
-                      <Upload className="w-5 h-5" />
-                      <span>Choose CSV file</span>
-                    </div>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowImportModal(false);
-                  setImportFile(null);
-                }}
-                disabled={importing}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  darkMode
-                    ? 'text-slate-300 hover:bg-slate-700/50'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleImportMembers}
-                disabled={!importFile || importing}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                {importing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    Import
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ImportListMembersModal
+          darkMode={darkMode}
+          listName={selectedList.name}
+          listId={selectedList.id}
+          onImport={handleImportMembers}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
     </div>
   );
