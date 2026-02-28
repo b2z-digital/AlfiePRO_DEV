@@ -248,11 +248,17 @@ export async function importAssociationMembersExtended(
       if (member.country) memberData.country = member.country;
       if (member.membership_level) memberData.membership_level = member.membership_level;
       if (member.club_name) memberData.club = member.club_name;
-      if (member.nickname) memberData.club = member.nickname;
-      if (member.membership_status) memberData.membership_status = member.membership_status;
+      if (member.nickname && !member.club_name) memberData.club = member.nickname;
+      if (member.club_id) memberData.club_id = member.club_id;
+      if (member.membership_status) {
+        memberData.membership_status = member.membership_status;
+        if (member.membership_status === 'active') {
+          memberData.is_financial = true;
+        }
+      }
 
-      if (member.start_date) memberData.date_joined = member.start_date;
-      else if (member.date_joined) memberData.date_joined = member.date_joined;
+      if (member.date_joined) memberData.date_joined = member.date_joined;
+      else if (member.start_date) memberData.date_joined = member.start_date;
 
       if (member.end_date) memberData.renewal_date = member.end_date;
 

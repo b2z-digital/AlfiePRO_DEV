@@ -4,6 +4,12 @@ import Papa from 'papaparse';
 import { importAssociationMembersExtended, getUnclaimedMembers } from '../../utils/multiClubMembershipStorage';
 import { COUNTRY_NAMES } from '../../utils/countryFlags';
 
+interface ClubOption {
+  id: string;
+  name: string;
+  abbreviation?: string;
+}
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -11,6 +17,7 @@ interface Props {
   associationType: 'state' | 'national';
   associationName: string;
   countryCode?: string;
+  clubs?: ClubOption[];
 }
 
 interface FieldMapping {
@@ -190,6 +197,41 @@ function normalizeDate(raw: string): string {
   return trimmed;
 }
 
+function normalizePhone(raw: string): string {
+  if (!raw) return '';
+  let cleaned = raw.replace(/[\s\-().]/g, '');
+  if (/^\+61\d{9}$/.test(cleaned)) {
+    cleaned = '0' + cleaned.slice(3);
+  }
+  if (/^61\d{9}$/.test(cleaned)) {
+    cleaned = '0' + cleaned.slice(2);
+  }
+  if (/^\d{9}$/.test(cleaned) && !cleaned.startsWith('0')) {
+    cleaned = '0' + cleaned;
+  }
+  if (/^\d{8}$/.test(cleaned)) {
+    cleaned = '0' + cleaned;
+  }
+  if (cleaned.length >= 10 && cleaned.startsWith('0')) {
+    return cleaned.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3');
+  }
+  return cleaned || raw.trim();
+}
+
+function matchClubFromText(text: string, clubs: ClubOption[]): ClubOption | null {
+  if (!text || !clubs.length) return null;
+  const lower = text.toLowerCase().trim();
+  for (const club of clubs) {
+    if (club.abbreviation && lower === club.abbreviation.toLowerCase()) return club;
+    if (lower === club.name.toLowerCase()) return club;
+  }
+  for (const club of clubs) {
+    if (club.abbreviation && lower.includes(club.abbreviation.toLowerCase())) return club;
+    if (lower.includes(club.name.toLowerCase())) return club;
+  }
+  return null;
+}
+
 function autoDetectMapping(csvHeaders: string[]): FieldMapping[] {
   const usedColumns = new Set<string>();
 
@@ -219,7 +261,8 @@ export default function AssociationMemberImportModal({
   associationId,
   associationType,
   associationName,
-  countryCode = 'AUS'
+  countryCode = 'AUS',
+  clubs = []
 }: Props) {
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview' | 'importing' | 'complete'>('upload');
   const [rawData, setRawData] = useState<Record<string, string>[]>([]);
@@ -284,7 +327,7 @@ export default function AssociationMemberImportModal({
       const member: Record<string, string> = {};
       fieldMappings.forEach(mapping => {
         if (mapping.csvColumn) {
-          member[mapping.alfieField] = row[mapping.csvColumn] || '';
+          member[mapping.alfieField] = String(row[mapping.csvColumn] || '');
         }
       });
 
@@ -293,10 +336,14 @@ export default function AssociationMemberImportModal({
           h.toLowerCase() === 'contact' || h.toLowerCase() === 'full_name' || h.toLowerCase() === 'name'
         );
         if (contactCol && row[contactCol]) {
-          const parts = row[contactCol].trim().split(/\s+/);
+          const parts = String(row[contactCol]).trim().split(/\s+/);
           member.first_name = parts[0] || '';
           member.last_name = parts.slice(1).join(' ') || '';
         }
+      }
+
+      if (member.phone) {
+        member.phone = normalizePhone(member.phone);
       }
 
       if (member.membership_level) {
@@ -306,6 +353,14 @@ export default function AssociationMemberImportModal({
         }
         if (parsed.level) {
           member.membership_level = parsed.level;
+        }
+      }
+
+      if (member.club_name && clubs.length > 0) {
+        const matched = matchClubFromText(member.club_name, clubs);
+        if (matched) {
+          member.club_id = matched.id;
+          member.club_name = matched.name;
         }
       }
 
@@ -644,10 +699,10 @@ export default function AssociationMemberImportModal({
                       <tr>
                         <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Email</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Phone</th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Club</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Level</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Start</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Country</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Registered</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
@@ -660,16 +715,28 @@ export default function AssociationMemberImportModal({
                             {member.email || '-'}
                           </td>
                           <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
-                            {member.club_name || '-'}
+                            {member.phone || '-'}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {member.club_id ? (
+                              <span className="text-sm text-emerald-400 font-medium">{member.club_name}</span>
+                            ) : member.club_name ? (
+                              <span className="text-sm text-amber-400">{member.club_name}</span>
+                            ) : (
+                              <span className="text-sm text-slate-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {member.membership_status === 'active' ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Active / Financial</span>
+                            ) : member.membership_status ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-500/15 text-slate-400 border border-slate-500/20">{member.membership_status}</span>
+                            ) : (
+                              <span className="text-sm text-slate-500">-</span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
-                            {member.membership_level || '-'}
-                          </td>
-                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
-                            {member.start_date || member.date_joined || '-'}
-                          </td>
-                          <td className="px-3 py-2.5 text-sm text-slate-400 whitespace-nowrap">
-                            {member.country || '-'}
+                            {member.date_joined || member.start_date || '-'}
                           </td>
                         </tr>
                       ))}

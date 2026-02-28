@@ -3,7 +3,7 @@ import { X, User, Mail, Phone, Home, Sailboat, Plus, Trash2, AlertTriangle, Chec
 import { BoatType, MemberFormData, Member } from '../types/member';
 import { addAdminMember } from '../utils/storage';
 import { supabase } from '../utils/supabase';
-import { getClubMemberClaims, acceptMemberClaim } from '../utils/multiClubMembershipStorage';
+import { getClubMemberClaims, acceptMemberClaim, getUnclaimedMembers } from '../utils/multiClubMembershipStorage';
 import { useAuth } from '../contexts/AuthContext';
 import { SAILING_NATIONS, getCountryFlag } from '../utils/countryFlags';
 import Papa from 'papaparse';
@@ -219,7 +219,32 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
     setLoadingClaims(true);
     try {
       const claims = await getClubMemberClaims(clubId);
-      setPendingClaims(claims);
+
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('state_association_id, national_association_id')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      let unassignedMembers: any[] = [];
+      if (clubData?.state_association_id) {
+        unassignedMembers = await getUnclaimedMembers(clubData.state_association_id, 'state');
+      } else if (clubData?.national_association_id) {
+        unassignedMembers = await getUnclaimedMembers(clubData.national_association_id, 'national');
+      }
+
+      const formattedUnassigned = unassignedMembers.map(m => ({
+        id: m.id,
+        is_unassigned_member: true,
+        full_name: `${m.first_name || ''} ${m.last_name || ''}`.trim(),
+        email: m.email,
+        phone: m.phone,
+        first_name: m.first_name,
+        last_name: m.last_name,
+        created_at: m.created_at,
+      }));
+
+      setPendingClaims([...claims, ...formattedUnassigned]);
     } catch (err) {
       console.error('Error loading claims:', err);
     }
@@ -230,13 +255,30 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
     if (!user) return;
     setSubmitting(true);
     setError(null);
-    const claimSuccess = await acceptMemberClaim(claim.id, user.id);
-    if (claimSuccess) {
-      setSuccess(true);
-      setPendingClaims(prev => prev.filter(c => c.id !== claim.id));
-      setTimeout(() => { onSuccess(); onClose(); }, 2000);
+
+    if (claim.is_unassigned_member) {
+      const { error: updateError } = await supabase
+        .from('members')
+        .update({ club_id: clubId, club: clubName })
+        .eq('id', claim.id);
+
+      if (!updateError) {
+        setSuccess(true);
+        setPendingClaims(prev => prev.filter(c => c.id !== claim.id));
+        setTimeout(() => { onSuccess(); onClose(); }, 2000);
+      } else {
+        console.error('Error assigning member to club:', updateError);
+        setError('Failed to assign member to this club.');
+      }
     } else {
-      setError('Failed to claim member. They may need to register an account first.');
+      const claimSuccess = await acceptMemberClaim(claim.id, user.id);
+      if (claimSuccess) {
+        setSuccess(true);
+        setPendingClaims(prev => prev.filter(c => c.id !== claim.id));
+        setTimeout(() => { onSuccess(); onClose(); }, 2000);
+      } else {
+        setError('Failed to claim member. They may need to register an account first.');
+      }
     }
     setSubmitting(false);
   };
@@ -247,7 +289,9 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
     const fullName = claim.profiles?.full_name || claim.full_name || '';
     const email = claim.profiles?.email || claim.email || '';
     const memberNumber = claim.profiles?.member_number || '';
-    return fullName.toLowerCase().includes(query) || email.toLowerCase().includes(query) || memberNumber.toLowerCase().includes(query);
+    const firstName = claim.first_name || '';
+    const lastName = claim.last_name || '';
+    return fullName.toLowerCase().includes(query) || email.toLowerCase().includes(query) || memberNumber.toLowerCase().includes(query) || firstName.toLowerCase().includes(query) || lastName.toLowerCase().includes(query);
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -746,6 +790,11 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h4 className="font-semibold text-slate-100">{claim.profiles?.full_name || claim.full_name || 'Unknown Name'}</h4>
+                            {claim.is_unassigned_member && (
+                              <span className="bg-amber-900/30 text-amber-400 text-xs px-2 py-1 rounded-full font-medium border border-amber-800">
+                                Association Member
+                              </span>
+                            )}
                             {claim.match_confidence && claim.match_confidence > 0.8 && (
                               <span className="bg-green-900/30 text-green-400 text-xs px-2 py-1 rounded-full font-medium border border-green-800">
                                 {Math.round(claim.match_confidence * 100)}% Match
@@ -754,7 +803,11 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
                           </div>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
                             <div className="text-slate-400"><span className="font-medium text-slate-300">Email:</span> {claim.profiles?.email || claim.email || 'N/A'}</div>
-                            <div className="text-slate-400"><span className="font-medium text-slate-300">Member #:</span> {claim.profiles?.member_number || 'Not assigned'}</div>
+                            {claim.is_unassigned_member ? (
+                              <div className="text-slate-400"><span className="font-medium text-slate-300">Added:</span> {claim.created_at ? new Date(claim.created_at).toLocaleDateString() : 'N/A'}</div>
+                            ) : (
+                              <div className="text-slate-400"><span className="font-medium text-slate-300">Member #:</span> {claim.profiles?.member_number || 'Not assigned'}</div>
+                            )}
                             {(claim.profiles?.date_of_birth || claim.date_of_birth) && (
                               <div className="text-slate-400"><span className="font-medium text-slate-300">DOB:</span> {new Date(claim.profiles?.date_of_birth || claim.date_of_birth).toLocaleDateString()}</div>
                             )}
@@ -774,10 +827,14 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
                         <button
                           onClick={() => handleClaimMember(claim)}
                           disabled={submitting}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition disabled:opacity-50 flex items-center gap-2"
+                          className={`px-4 py-2 text-white rounded-lg font-medium transition disabled:opacity-50 flex items-center gap-2 ${
+                            claim.is_unassigned_member
+                              ? 'bg-amber-600 hover:bg-amber-700'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
                           <Check size={18} />
-                          Claim
+                          {claim.is_unassigned_member ? 'Assign' : 'Claim'}
                         </button>
                       </div>
                     </div>
