@@ -191,6 +191,22 @@ export async function deleteMarketingEmailTemplate(id: string): Promise<void> {
 // SUBSCRIBER LISTS
 // =====================================================
 
+export async function ensureClubMembersList(clubId: string): Promise<void> {
+  const { data: existing } = await supabase
+    .from('marketing_subscriber_lists')
+    .select('id')
+    .eq('club_id', clubId)
+    .eq('list_type', 'all_members')
+    .maybeSingle();
+
+  if (!existing) {
+    const { error: rpcError } = await supabase.rpc('ensure_all_members_list', { p_club_id: clubId });
+    if (rpcError) {
+      console.error('Error ensuring Club Members list via RPC:', rpcError);
+    }
+  }
+}
+
 export async function getMarketingSubscriberLists(clubId: string): Promise<MarketingSubscriberList[]> {
   const { data, error } = await supabase
     .from('marketing_subscriber_lists')
