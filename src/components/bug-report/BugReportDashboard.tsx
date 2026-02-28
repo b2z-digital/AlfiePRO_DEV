@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bug, Lightbulb, Clock, CheckCircle2, CircleDot, XCircle, AlertTriangle, Search, MessageSquare, Trash2, ArrowUpDown, Send, Globe, Copy, Eye, Zap, Layers, Database, Monitor, Navigation, Sparkles, ChevronDown, Pencil } from 'lucide-react';
+import { Bug, Lightbulb, Clock, CheckCircle2, CircleDot, XCircle, AlertTriangle, Search, MessageSquare, Trash2, ArrowUpDown, ArrowLeft, Send, Globe, Copy, Eye, Zap, Layers, Database, Monitor, Navigation, Sparkles, ChevronDown, Pencil } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -32,9 +32,9 @@ interface BugReport {
 
 interface Comment {
   id: string;
-  user_name: string;
+  commenter_name: string;
   comment: string;
-  is_admin_reply: boolean;
+  is_internal: boolean;
   created_at: string;
 }
 
@@ -221,9 +221,9 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
     await supabase.from('bug_report_comments').insert({
       bug_report_id: selectedReport.id,
       user_id: user.id,
-      user_name: profile?.full_name || profile?.first_name || user.email || '',
+      commenter_name: profile?.full_name || profile?.first_name || user.email || '',
       comment: newComment.trim(),
-      is_admin_reply: isSuperAdmin,
+      is_internal: false,
     });
     setNewComment('');
     await loadComments(selectedReport.id);
@@ -442,8 +442,8 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
         </div>
       ) : (
         <div className={`flex mt-6 rounded-xl border overflow-hidden ${darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`} style={{ minHeight: '500px' }}>
-          <div className={`w-full ${selectedReport ? 'lg:w-[45%]' : ''} overflow-y-auto ${
-            selectedReport ? `border-r ${darkMode ? 'border-slate-700' : 'border-slate-200'}` : ''
+          <div className={`overflow-y-auto ${
+            selectedReport ? `hidden lg:block lg:w-[45%] border-r ${darkMode ? 'border-slate-700' : 'border-slate-200'}` : 'w-full'
           }`}>
             {loading ? (
               <div className="flex items-center justify-center py-20">
@@ -527,25 +527,33 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
           </div>
 
           {selectedReport && (
-            <div className={`hidden lg:flex lg:w-[55%] flex-col overflow-hidden`}>
+            <div className={`flex w-full lg:w-[55%] flex-col overflow-hidden`}>
               <div className={`px-5 py-4 border-b flex items-center justify-between ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    {selectedReport.report_type === 'bug'
-                      ? <Bug className="w-4 h-4 text-red-400 flex-shrink-0" />
-                      : <Lightbulb className="w-4 h-4 text-teal-400 flex-shrink-0" />
-                    }
-                    <h2 className={`text-lg font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      {selectedReport.title}
-                    </h2>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {selectedReport.report_type === 'bug' ? 'Bug' : 'Feature Request'}
-                    </span>
-                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {new Date(selectedReport.created_at).toLocaleString()}
-                    </span>
+                <div className="min-w-0 flex-1 flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedReport(null)}
+                    className={`lg:hidden p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      {selectedReport.report_type === 'bug'
+                        ? <Bug className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        : <Lightbulb className="w-4 h-4 text-teal-400 flex-shrink-0" />
+                      }
+                      <h2 className={`text-lg font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {selectedReport.title}
+                      </h2>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {selectedReport.report_type === 'bug' ? 'Bug' : 'Feature Request'}
+                      </span>
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {new Date(selectedReport.created_at).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <button
@@ -679,16 +687,16 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
                     <div
                       key={c.id}
                       className={`p-3 rounded-xl mb-2 ${
-                        c.is_admin_reply
+                        c.is_internal
                           ? darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
                           : darkMode ? 'bg-slate-700/50' : 'bg-slate-100'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-xs font-medium ${
-                          c.is_admin_reply ? 'text-red-400' : darkMode ? 'text-slate-300' : 'text-slate-700'
+                          c.is_internal ? 'text-red-400' : darkMode ? 'text-slate-300' : 'text-slate-700'
                         }`}>
-                          {c.user_name}{c.is_admin_reply ? ' (Admin)' : ''}
+                          {c.commenter_name}{c.is_internal ? ' (Admin)' : ''}
                         </span>
                         <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                           {getTimeAgo(c.created_at)}

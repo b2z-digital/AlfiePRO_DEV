@@ -31,9 +31,9 @@ interface BugReportDetailProps {
 
 interface Comment {
   id: string;
-  user_name: string;
+  commenter_name: string;
   comment: string;
-  is_admin_reply: boolean;
+  is_internal: boolean;
   created_at: string;
 }
 
@@ -101,9 +101,9 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
     const { error } = await supabase.from('bug_report_comments').insert({
       bug_report_id: report.id,
       user_id: user.id,
-      user_name: profile?.full_name || profile?.first_name || user.email || '',
+      commenter_name: profile?.full_name || profile?.first_name || user.email || '',
       comment: newComment.trim(),
-      is_admin_reply: isSuperAdmin,
+      is_internal: false,
     });
     if (!error) {
       setNewComment('');
@@ -315,7 +315,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                   <div
                     key={c.id}
                     className={`p-2.5 rounded-xl ${
-                      c.is_admin_reply
+                      c.is_internal
                         ? isBug
                           ? darkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
                           : darkMode ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-200'
@@ -324,14 +324,14 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`text-xs font-medium ${
-                        c.is_admin_reply
+                        c.is_internal
                           ? isBug
                             ? darkMode ? 'text-red-400' : 'text-red-600'
                             : darkMode ? 'text-teal-400' : 'text-teal-600'
                           : darkMode ? 'text-slate-300' : 'text-slate-700'
                       }`}>
-                        {c.user_name || 'User'}
-                        {c.is_admin_reply && ' (Admin)'}
+                        {c.commenter_name || 'User'}
+                        {c.is_internal && ' (Admin)'}
                       </span>
                       <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                         {getTimeAgo(c.created_at)}

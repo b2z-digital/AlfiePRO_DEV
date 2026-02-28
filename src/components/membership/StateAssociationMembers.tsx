@@ -95,7 +95,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const loadMembershipTypesForClub = async (clubId: string) => {
     const { data } = await supabase
       .from('membership_types')
-      .select('id, name, annual_fee')
+      .select('id, name, amount')
       .eq('club_id', clubId)
       .order('name');
     setClubMembershipTypes(data || []);
@@ -510,7 +510,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                     >
                       <option value="">Select Type...</option>
                       {clubMembershipTypes.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}{t.annual_fee ? ` ($${t.annual_fee})` : ''}</option>
+                        <option key={t.id} value={t.id}>{t.name}{t.amount ? ` ($${t.amount})` : ''}</option>
                       ))}
                     </select>
                   </div>
