@@ -97,17 +97,23 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
   const handleAddComment = async () => {
     if (!newComment.trim() || !user) return;
     setSendingComment(true);
-    const profile = user.user_metadata;
-    const { error } = await supabase.from('bug_report_comments').insert({
-      bug_report_id: report.id,
-      user_id: user.id,
-      commenter_name: profile?.full_name || profile?.first_name || user.email || '',
-      comment: newComment.trim(),
-      is_internal: false,
-    });
-    if (!error) {
-      setNewComment('');
-      await loadComments();
+    try {
+      const profile = user.user_metadata;
+      const { error } = await supabase.from('bug_report_comments').insert({
+        bug_report_id: report.id,
+        user_id: user.id,
+        commenter_name: profile?.full_name || profile?.name || profile?.first_name || user.email || '',
+        comment: newComment.trim(),
+        is_internal: false,
+      });
+      if (error) {
+        console.error('Failed to add comment:', error);
+      } else {
+        setNewComment('');
+        await loadComments();
+      }
+    } catch (err) {
+      console.error('Error adding comment:', err);
     }
     setSendingComment(false);
   };

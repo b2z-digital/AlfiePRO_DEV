@@ -568,7 +568,7 @@ export async function getUnclaimedMembers(associationId: string, associationType
 
   const { data, error } = await supabase
     .from('members')
-    .select('id, email, first_name, last_name, created_at')
+    .select('id, email, first_name, last_name, phone, created_at')
     .eq(associationKey, associationId)
     .is('club_id', null)
     .order('created_at', { ascending: false });

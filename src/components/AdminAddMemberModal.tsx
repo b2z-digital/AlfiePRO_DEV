@@ -222,15 +222,13 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
 
       const { data: clubData } = await supabase
         .from('clubs')
-        .select('state_association_id, national_association_id')
+        .select('state_association_id')
         .eq('id', clubId)
         .maybeSingle();
 
       let unassignedMembers: any[] = [];
       if (clubData?.state_association_id) {
         unassignedMembers = await getUnclaimedMembers(clubData.state_association_id, 'state');
-      } else if (clubData?.national_association_id) {
-        unassignedMembers = await getUnclaimedMembers(clubData.national_association_id, 'national');
       }
 
       const formattedUnassigned = unassignedMembers.map(m => ({
