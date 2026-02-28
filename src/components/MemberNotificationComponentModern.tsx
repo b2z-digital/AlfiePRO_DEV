@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoreHorizontal, RefreshCw, Paperclip, Download, ListChecks } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { RichTextEditor } from './communications/RichTextEditor';
@@ -37,11 +37,25 @@ interface Notification {
 
 interface Member {
   id: string;
-  user_id: string;
+  user_id: string | null;
   first_name: string;
   last_name: string;
   email: string;
   avatar_url?: string;
+}
+
+interface MarketingList {
+  id: string;
+  name: string;
+  total_contacts: number;
+  active_subscriber_count: number;
+}
+
+interface Attachment {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
 }
 
 interface MemberNotificationComponentModernProps {
@@ -75,6 +89,14 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{show: boolean; id: string | null; isSent?: boolean}>({show: false, id: null});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [marketingLists, setMarketingLists] = useState<MarketingList[]>([]);
+  const [showMarketingLists, setShowMarketingLists] = useState(false);
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [listMemberEmails, setListMemberEmails] = useState<Map<string, string[]>>(new Map());
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
 
   const [composeForm, setComposeForm] = useState({
     recipients: [] as string[],
@@ -123,6 +145,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
       fetchMembers();
       fetchCurrentUserProfile();
       fetchDrafts();
+      fetchMarketingLists();
     }
   }, [contextId, user]);
 
@@ -300,7 +323,6 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
     if (!user?.id) return;
 
     try {
-      // Fetch ALL drafts for the user across all clubs
       const { data, error } = await supabase
         .from('notification_drafts')
         .select('*, clubs(name)')
@@ -314,6 +336,118 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
     }
   };
 
+  const fetchMarketingLists = async () => {
+    if (!contextId) return;
+    try {
+      const { data, error } = await supabase
+        .from('marketing_subscriber_lists')
+        .select('id, name, total_contacts, active_subscriber_count')
+        .eq('club_id', contextId)
+        .order('name');
+      if (error) throw error;
+      setMarketingLists(data || []);
+    } catch (err) {
+      console.error('Error fetching marketing lists:', err);
+    }
+  };
+
+  const loadListMembers = async (listId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('marketing_list_members')
+        .select('email, first_name, last_name')
+        .eq('list_id', listId)
+        .eq('status', 'active');
+      if (error) throw error;
+      const emails = (data || []).map(m => m.email).filter(Boolean);
+      setListMemberEmails(prev => new Map(prev).set(listId, emails));
+      return emails;
+    } catch (err) {
+      console.error('Error loading list members:', err);
+      return [];
+    }
+  };
+
+  const handleToggleList = async (listId: string) => {
+    if (selectedListIds.includes(listId)) {
+      setSelectedListIds(prev => prev.filter(id => id !== listId));
+      const emails = listMemberEmails.get(listId) || [];
+      setComposeForm(prev => ({
+        ...prev,
+        externalEmails: prev.externalEmails.filter(e => !emails.includes(e))
+      }));
+    } else {
+      setSelectedListIds(prev => [...prev, listId]);
+      let emails = listMemberEmails.get(listId);
+      if (!emails) {
+        emails = await loadListMembers(listId);
+      }
+      const memberEmails = members.map(m => m.email);
+      const existingEmails = new Set(composeForm.externalEmails);
+      const newEmails = emails.filter(e => !existingEmails.has(e) && !memberEmails.includes(e));
+      if (newEmails.length > 0) {
+        setComposeForm(prev => ({
+          ...prev,
+          externalEmails: [...prev.externalEmails, ...newEmails]
+        }));
+      }
+    }
+  };
+
+  const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingAttachment(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 10 * 1024 * 1024) {
+          addNotification('error', `File "${file.name}" exceeds 10MB limit`);
+          continue;
+        }
+        const timestamp = Date.now();
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${contextId}/${timestamp}_${safeName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('message-attachments')
+          .upload(path, file);
+
+        if (uploadError) {
+          addNotification('error', `Failed to upload "${file.name}"`);
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('message-attachments')
+          .getPublicUrl(path);
+
+        setAttachments(prev => [...prev, {
+          name: file.name,
+          url: urlData.publicUrl,
+          size: file.size,
+          type: file.type
+        }]);
+      }
+    } catch (err) {
+      console.error('Error uploading attachment:', err);
+      addNotification('error', 'Failed to upload file');
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const sendNotification = async () => {
     if ((composeForm.recipients.length === 0 && composeForm.externalEmails.length === 0) || !composeForm.subject || !composeForm.body) {
       addNotification('error', 'Please fill in all required fields');
@@ -325,6 +459,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
 
       const selectedRecipients = composeForm.recipients;
       const recipientsData = [];
+      const allExternalEmails = new Set(composeForm.externalEmails);
 
       for (const id of selectedRecipients) {
         const member = members.find(m => m.user_id === id);
@@ -354,16 +489,23 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
         }
       }
 
-      for (const email of composeForm.externalEmails) {
+      for (const member of members) {
+        if (!member.user_id && member.email && composeForm.recipients.includes(`email:${member.id}`)) {
+          allExternalEmails.add(member.email);
+        }
+      }
+
+      for (const email of allExternalEmails) {
+        const memberMatch = members.find(m => m.email === email);
         recipientsData.push({
           id: null,
           user_id: null,
           email: email,
-          name: email
+          name: memberMatch ? `${memberMatch.first_name || ''} ${memberMatch.last_name || ''}`.trim() || email : email
         });
       }
 
-      const hasExternalOnly = composeForm.externalEmails.length > 0 && composeForm.recipients.length === 0;
+      const hasExternalOnly = allExternalEmails.size > 0 && selectedRecipients.filter(id => !id.startsWith('email:')).length === 0;
 
       const { error } = await supabase.functions.invoke('send-notification', {
         body: {
@@ -378,13 +520,14 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
           sender_avatar: currentUserProfile?.avatar_url || user?.user_metadata?.avatar_url,
           club_name: currentClub?.club?.name || currentOrganization?.name,
           sender_first_name: currentUserProfile?.first_name || user?.user_metadata?.first_name || '',
-          sender_last_name: currentUserProfile?.last_name || user?.user_metadata?.last_name || ''
+          sender_last_name: currentUserProfile?.last_name || user?.user_metadata?.last_name || '',
+          attachments: attachments.length > 0 ? attachments : undefined
         }
       });
 
       if (error) throw error;
 
-      const totalRecipients = composeForm.recipients.length + composeForm.externalEmails.length;
+      const totalRecipients = recipientsData.length;
       addNotification('success', `Message sent to ${totalRecipients} recipient(s)`);
 
       if (currentDraftId) {
@@ -421,6 +564,10 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
     setReplyMode(null);
     setShowCompose(false);
     setShowMembersList(false);
+    setAttachments([]);
+    setSelectedListIds([]);
+    setMemberSearchTerm('');
+    setShowMarketingLists(false);
   };
 
   const markAsRead = async (notificationId: string) => {
@@ -1165,12 +1312,23 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
 
                   {showMembersList && (
                     <div className="mt-3 space-y-3 border border-slate-700 rounded-lg p-4 bg-slate-900/30">
+                      <div className="relative">
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={memberSearchTerm}
+                          onChange={(e) => setMemberSearchTerm(e.target.value)}
+                          placeholder="Search members..."
+                          className="w-full pl-9 pr-4 py-2 rounded-lg border bg-slate-900/50 border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setComposeForm({
-                            ...composeForm,
-                            recipients: members.filter(m => m.user_id).map(m => m.user_id)
-                          })}
+                          onClick={() => {
+                            const allIds = members.map(m => m.user_id ? m.user_id : `email:${m.id}`);
+                            setComposeForm({ ...composeForm, recipients: allIds });
+                          }}
                           className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                         >
                           Select All
@@ -1184,7 +1342,6 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                       </div>
 
                       <div className="max-h-64 overflow-y-auto space-y-1">
-                        {/* Non-member recipients */}
                         {Array.from(nonMemberRecipients.values()).map((profile) => (
                           <div
                             key={profile.id}
@@ -1219,47 +1376,110 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                           </div>
                         ))}
 
-                        {/* Regular members */}
-                        {members.filter(m => m.user_id && (replyMode === 'reply' || !nonMemberRecipients.has(m.user_id))).map((member) => (
-                          <label
-                            key={member.id}
-                            className="flex items-center gap-3 p-3 hover:bg-slate-700/30 cursor-pointer transition-colors rounded-lg"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={composeForm.recipients.includes(member.user_id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setComposeForm({
-                                    ...composeForm,
-                                    recipients: [...composeForm.recipients, member.user_id]
-                                  });
-                                } else {
-                                  setComposeForm({
-                                    ...composeForm,
-                                    recipients: composeForm.recipients.filter(id => id !== member.user_id)
-                                  });
-                                }
-                              }}
-                              className="w-4 h-4 text-green-600 rounded flex-shrink-0"
-                            />
-                            <UserAvatar
-                              name={`${member.first_name} ${member.last_name}`}
-                              avatarUrl={member.avatar_url}
-                              size={32}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white text-sm font-medium truncate">
-                                {member.first_name} {member.last_name}
-                              </p>
-                              <p className="text-slate-400 text-xs truncate">{member.email}</p>
-                            </div>
-                          </label>
-                        ))}
+                        {members
+                          .filter(m => {
+                            if (replyMode === 'reply') return !!m.user_id;
+                            if (m.user_id && nonMemberRecipients.has(m.user_id)) return false;
+                            if (!memberSearchTerm) return true;
+                            const term = memberSearchTerm.toLowerCase();
+                            return (
+                              (m.first_name || '').toLowerCase().includes(term) ||
+                              (m.last_name || '').toLowerCase().includes(term) ||
+                              (m.email || '').toLowerCase().includes(term)
+                            );
+                          })
+                          .map((member) => {
+                            const recipientKey = member.user_id ? member.user_id : `email:${member.id}`;
+                            const isEmailOnly = !member.user_id;
+                            return (
+                              <label
+                                key={member.id}
+                                className="flex items-center gap-3 p-3 hover:bg-slate-700/30 cursor-pointer transition-colors rounded-lg"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={composeForm.recipients.includes(recipientKey)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setComposeForm({
+                                        ...composeForm,
+                                        recipients: [...composeForm.recipients, recipientKey]
+                                      });
+                                    } else {
+                                      setComposeForm({
+                                        ...composeForm,
+                                        recipients: composeForm.recipients.filter(id => id !== recipientKey)
+                                      });
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-green-600 rounded flex-shrink-0"
+                                />
+                                <UserAvatar
+                                  name={`${member.first_name} ${member.last_name}`}
+                                  avatarUrl={member.avatar_url}
+                                  size={32}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-white text-sm font-medium truncate">
+                                    {member.first_name} {member.last_name}
+                                  </p>
+                                  <p className="text-slate-400 text-xs truncate">{member.email}</p>
+                                  {isEmailOnly && (
+                                    <p className="text-amber-400 text-xs">Email only</p>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
                       </div>
                     </div>
                   )}
                 </div>
+
+                {/* Marketing Lists */}
+                {marketingLists.length > 0 && (
+                  <div>
+                    <button
+                      onClick={() => setShowMarketingLists(!showMarketingLists)}
+                      className="flex items-center justify-between w-full px-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ListChecks size={18} />
+                        <span className="font-medium">Subscriber Lists</span>
+                        {selectedListIds.length > 0 && (
+                          <span className="text-xs text-green-400">
+                            ({selectedListIds.length} list{selectedListIds.length !== 1 ? 's' : ''} selected)
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight size={18} className={`transition-transform ${showMarketingLists ? 'rotate-90' : ''}`} />
+                    </button>
+
+                    {showMarketingLists && (
+                      <div className="mt-3 space-y-2 border border-slate-700 rounded-lg p-4 bg-slate-900/30 max-h-48 overflow-y-auto">
+                        {marketingLists.map((list) => (
+                          <label
+                            key={list.id}
+                            className="flex items-center gap-3 p-3 hover:bg-slate-700/30 cursor-pointer transition-colors rounded-lg"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedListIds.includes(list.id)}
+                              onChange={() => handleToggleList(list.id)}
+                              className="w-4 h-4 text-green-600 rounded flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-sm font-medium truncate">{list.name}</p>
+                              <p className="text-slate-400 text-xs">
+                                {list.active_subscriber_count || list.total_contacts || 0} subscriber{(list.active_subscriber_count || list.total_contacts || 0) !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <p className="text-xs text-slate-400 mt-2">
                   {composeForm.recipients.length + composeForm.externalEmails.length} recipient(s) selected
@@ -1332,6 +1552,45 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                         theme={darkMode ? ('dark' as any) : ('light' as any)}
                       />
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Attachments */}
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleAttachFile}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAttachment}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <Paperclip size={16} />
+                    {uploadingAttachment ? 'Uploading...' : 'Attach Files'}
+                  </button>
+                  <span className="text-xs text-slate-500">Max 10MB per file</span>
+                </div>
+                {attachments.length > 0 && (
+                  <div className="space-y-1.5">
+                    {attachments.map((att, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-slate-700/30 border border-slate-700/50 rounded-lg">
+                        <FileText size={14} className="text-slate-400 flex-shrink-0" />
+                        <span className="text-sm text-white truncate flex-1">{att.name}</span>
+                        <span className="text-xs text-slate-500 flex-shrink-0">{formatFileSize(att.size)}</span>
+                        <button
+                          onClick={() => removeAttachment(idx)}
+                          className="p-0.5 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
