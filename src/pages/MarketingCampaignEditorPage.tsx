@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import {
   getMarketingCampaign,
-  createMarketingCampaign,
   updateMarketingCampaign,
   getCampaignContent,
   saveCampaignContent,
@@ -17,6 +16,7 @@ import {
 } from '../utils/marketingStorage';
 import type { MarketingCampaign, MarketingSubscriberList, MarketingEmailTemplate } from '../types/marketing';
 import EnhancedEmailPageBuilder from '../components/marketing/EnhancedEmailPageBuilder';
+import CampaignCreationWizard from '../components/marketing/CampaignCreationWizard';
 
 interface EmailRow {
   id: string;
@@ -49,13 +49,6 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
   const [selectedLists, setSelectedLists] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isNewCampaign, setIsNewCampaign] = useState(id === 'new');
-  const [newCampaignName, setNewCampaignName] = useState('');
-  const [newCampaignSubject, setNewCampaignSubject] = useState('');
-  const [newCampaignFromName, setNewCampaignFromName] = useState('');
-  const [newCampaignFromEmail, setNewCampaignFromEmail] = useState('');
-  const [creatingCampaign, setCreatingCampaign] = useState(false);
-  const [createError, setCreateError] = useState('');
 
   const showNotification = (message: string, type: 'success' | 'error') => {
     if (notification?.showNotification) {
@@ -193,35 +186,6 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
     }
   }
 
-  async function handleCreateNewCampaign() {
-    if (!newCampaignName.trim() || !newCampaignSubject.trim() || !currentClub) return;
-    setCreatingCampaign(true);
-    setCreateError('');
-    try {
-      const created = await createMarketingCampaign({
-        club_id: currentClub.clubId,
-        name: newCampaignName.trim(),
-        subject: newCampaignSubject.trim(),
-        from_name: newCampaignFromName.trim() || currentClub.name || '',
-        from_email: newCampaignFromEmail.trim() || '',
-        status: 'draft',
-        list_ids: [],
-        total_recipients: 0,
-        total_sent: 0,
-        total_delivered: 0,
-        total_opened: 0,
-        total_clicked: 0,
-        total_bounced: 0,
-        total_unsubscribed: 0,
-      });
-      navigate(`/marketing/campaigns/${created.id}`, { replace: true });
-    } catch (err: any) {
-      setCreateError(err?.message || 'Failed to create campaign');
-    } finally {
-      setCreatingCampaign(false);
-    }
-  }
-
   const toggleList = (listId: string) => {
     setSelectedLists(prev =>
       prev.includes(listId)
@@ -238,121 +202,8 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
     );
   }
 
-  if (isNewCampaign || (id === 'new' && !campaign)) {
-    return (
-      <div className="p-16 flex items-start justify-center">
-        <div className={`rounded-xl max-w-lg w-full p-8 ${
-          darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-white shadow-sm border border-gray-200'
-        }`}>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <Mail className="w-5 h-5 text-white" />
-            </div>
-            <h2 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-              New Campaign
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                Campaign Name <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={newCampaignName}
-                onChange={(e) => setNewCampaignName(e.target.value)}
-                placeholder="e.g. Monthly Newsletter"
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  darkMode
-                    ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                Email Subject <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                value={newCampaignSubject}
-                onChange={(e) => setNewCampaignSubject(e.target.value)}
-                placeholder="e.g. What's new this month"
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  darkMode
-                    ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                }`}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                  From Name
-                </label>
-                <input
-                  type="text"
-                  value={newCampaignFromName}
-                  onChange={(e) => setNewCampaignFromName(e.target.value)}
-                  placeholder="Your club name"
-                  className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                  }`}
-                />
-              </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                  From Email
-                </label>
-                <input
-                  type="email"
-                  value={newCampaignFromEmail}
-                  onChange={(e) => setNewCampaignFromEmail(e.target.value)}
-                  placeholder="noreply@yourclub.com"
-                  className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    darkMode
-                      ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                  }`}
-                />
-              </div>
-            </div>
-
-            {createError && (
-              <p className="text-sm text-red-400">{createError}</p>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-3 mt-6">
-            <Link
-              to="/marketing/campaigns"
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                darkMode ? 'text-slate-300 hover:bg-slate-700/50' : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              Cancel
-            </Link>
-            <button
-              onClick={handleCreateNewCampaign}
-              disabled={!newCampaignName.trim() || !newCampaignSubject.trim() || creatingCampaign}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            >
-              {creatingCampaign ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Mail className="w-4 h-4" />
-              )}
-              Create Campaign
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  if (id === 'new') {
+    return <CampaignCreationWizard darkMode={darkMode} />;
   }
 
   if (!campaign) {
