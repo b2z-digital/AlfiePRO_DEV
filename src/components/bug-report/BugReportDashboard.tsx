@@ -218,11 +218,16 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
     if (!newComment.trim() || !user || !selectedReport) return;
     setSendingComment(true);
     try {
-      const profile = user.user_metadata;
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        setSendingComment(false);
+        return;
+      }
+      const profile = sessionData.session.user.user_metadata;
       const { error } = await supabase.from('bug_report_comments').insert({
         bug_report_id: selectedReport.id,
-        user_id: user.id,
-        commenter_name: profile?.full_name || profile?.name || profile?.first_name || user.email || '',
+        user_id: sessionData.session.user.id,
+        commenter_name: profile?.full_name || profile?.name || profile?.first_name || sessionData.session.user.email || '',
         comment: newComment.trim(),
         is_internal: false,
       });
