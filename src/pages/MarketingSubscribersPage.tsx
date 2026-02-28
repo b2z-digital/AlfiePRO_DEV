@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, Upload, Download, Search, MoreVertical, Edit, Trash2, X, Mail, MailX } from 'lucide-react';
+import { Plus, Users, Upload, Download, Search, MoreVertical, Edit, Trash2, X, Mail, MailX, UserPlus } from 'lucide-react';
 import Papa from 'papaparse';
+import { ImportListMembersModal } from '../components/marketing/ImportListMembersModal';
 import {
   getMarketingSubscriberLists,
   createMarketingSubscriberList,
@@ -41,9 +42,12 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
   const [memberEmailPreferences, setMemberEmailPreferences] = useState<Record<string, boolean>>({});
   const [updatingPreference, setUpdatingPreference] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [addContactEmail, setAddContactEmail] = useState('');
+  const [addContactFirstName, setAddContactFirstName] = useState('');
+  const [addContactLastName, setAddContactLastName] = useState('');
+  const [addingContact, setAddingContact] = useState(false);
+  const [addContactError, setAddContactError] = useState('');
 
   useEffect(() => {
     loadLists();
@@ -239,43 +243,38 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
     setShowListMenu(null);
   }
 
-  async function handleImportMembers() {
-    if (!importFile || !selectedList) return;
-
-    setImporting(true);
-    try {
-      const text = await importFile.text();
-      const result = Papa.parse(text, { header: true });
-
-      const members: Partial<MarketingListMember>[] = result.data
-        .filter((row: any) => row.Email || row.email)
-        .map((row: any) => ({
-          list_id: selectedList.id,
-          email: (row.Email || row.email).trim(),
-          first_name: (row['First Name'] || row.first_name || '').trim(),
-          last_name: (row['Last Name'] || row.last_name || '').trim(),
-          status: 'subscribed',
-          source: 'import'
-        }));
-
-      if (members.length === 0) {
-        alert('No valid email addresses found in CSV file');
-        return;
-      }
-
-      await addListMembers(members);
-
-      alert(`Successfully imported ${members.length} members`);
-      setShowImportModal(false);
-      setImportFile(null);
-
-      // Reload members
+  async function handleImportMembers(members: Partial<MarketingListMember>[]) {
+    await addListMembers(members);
+    setShowImportModal(false);
+    if (selectedList) {
       await handleViewMembers(selectedList);
-    } catch (error) {
-      console.error('Error importing members:', error);
-      alert('Failed to import members. Please check your CSV format.');
+    }
+    loadLists();
+  }
+
+  async function handleAddContact() {
+    if (!addContactEmail.trim() || !selectedList) return;
+    setAddingContact(true);
+    setAddContactError('');
+    try {
+      await addListMembers([{
+        list_id: selectedList.id,
+        email: addContactEmail.trim().toLowerCase(),
+        first_name: addContactFirstName.trim() || undefined,
+        last_name: addContactLastName.trim() || undefined,
+        status: 'subscribed',
+        source: 'manual',
+      }]);
+      setAddContactEmail('');
+      setAddContactFirstName('');
+      setAddContactLastName('');
+      setShowAddContactModal(false);
+      await handleViewMembers(selectedList);
+      loadLists();
+    } catch (err: any) {
+      setAddContactError(err?.message || 'Failed to add contact');
     } finally {
-      setImporting(false);
+      setAddingContact(false);
     }
   }
 
@@ -620,17 +619,36 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
                   />
                 </div>
                 {selectedList && selectedList.list_type !== 'all_members' && (
-                  <button
-                    onClick={() => setShowImportModal(true)}
-                    className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                      darkMode
-                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
-                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                    }`}
-                  >
-                    <Upload className="w-4 h-4" />
-                    Import
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setAddContactEmail('');
+                        setAddContactFirstName('');
+                        setAddContactLastName('');
+                        setAddContactError('');
+                        setShowAddContactModal(true);
+                      }}
+                      className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                        darkMode
+                          ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                          : 'bg-green-50 text-green-600 hover:bg-green-100'
+                      }`}
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Add Contact
+                    </button>
+                    <button
+                      onClick={() => setShowImportModal(true)}
+                      className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                        darkMode
+                          ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                          : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      }`}
+                    >
+                      <Upload className="w-4 h-4" />
+                      Import
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -765,95 +783,110 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
         </div>
       )}
 
-      {/* Import Members Modal */}
       {showImportModal && selectedList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <ImportListMembersModal
+          darkMode={darkMode}
+          listName={selectedList.name}
+          listId={selectedList.id}
+          onImport={handleImportMembers}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
+
+      {showAddContactModal && selectedList && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className={`rounded-xl max-w-md w-full p-6 ${
-            darkMode
-              ? 'bg-slate-800 border border-slate-700'
-              : 'bg-white'
+            darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white'
           }`}>
-            <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-              Import Members to {selectedList.name}
-            </h2>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                Add Contact
+              </h2>
+              <button
+                onClick={() => setShowAddContactModal(false)}
+                className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-gray-100 text-gray-500'}`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="space-y-4">
               <div>
-                <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                  Upload a CSV file with the following columns:
-                </p>
-                <div className={`p-3 rounded-lg text-sm font-mono ${
-                  darkMode ? 'bg-slate-900/50 text-slate-300' : 'bg-gray-50 text-gray-700'
-                }`}>
-                  Email, First Name, Last Name
+                <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={addContactEmail}
+                  onChange={(e) => setAddContactEmail(e.target.value)}
+                  placeholder="contact@example.com"
+                  className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    darkMode
+                      ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                  }`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={addContactFirstName}
+                    onChange={(e) => setAddContactFirstName(e.target.value)}
+                    placeholder="First"
+                    className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      darkMode
+                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                    }`}
+                  />
                 </div>
-                <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-gray-500'}`}>
-                  Email is required. First Name and Last Name are optional.
-                </p>
+                <div>
+                  <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={addContactLastName}
+                    onChange={(e) => setAddContactLastName(e.target.value)}
+                    placeholder="Last"
+                    className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      darkMode
+                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                    }`}
+                  />
+                </div>
               </div>
 
-              <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`w-full px-4 py-3 rounded-lg border-2 border-dashed transition-colors ${
-                    darkMode
-                      ? 'border-slate-600 hover:border-slate-500 text-slate-300'
-                      : 'border-gray-300 hover:border-gray-400 text-gray-700'
-                  }`}
-                >
-                  {importFile ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <Upload className="w-5 h-5" />
-                      <span>{importFile.name}</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center gap-2">
-                      <Upload className="w-5 h-5" />
-                      <span>Choose CSV file</span>
-                    </div>
-                  )}
-                </button>
-              </div>
+              {addContactError && (
+                <p className="text-sm text-red-400">{addContactError}</p>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => {
-                  setShowImportModal(false);
-                  setImportFile(null);
-                }}
-                disabled={importing}
+                onClick={() => setShowAddContactModal(false)}
                 className={`px-4 py-2 rounded-lg transition-colors ${
-                  darkMode
-                    ? 'text-slate-300 hover:bg-slate-700/50'
-                    : 'text-gray-700 hover:bg-gray-100'
+                  darkMode ? 'text-slate-300 hover:bg-slate-700/50' : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Cancel
               </button>
               <button
-                onClick={handleImportMembers}
-                disabled={!importFile || importing}
+                onClick={handleAddContact}
+                disabled={!addContactEmail.trim() || addingContact}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
-                {importing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Importing...
-                  </>
+                {addingContact ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    Import
-                  </>
+                  <UserPlus className="w-4 h-4" />
                 )}
+                Add Contact
               </button>
             </div>
           </div>
