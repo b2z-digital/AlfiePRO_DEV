@@ -46,6 +46,16 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
         return;
       }
 
+      if (linkStatus?.success && linkStatus.status === 'unlinked') {
+        const { data: selfLink } = await supabase.rpc('try_link_current_user_to_members');
+        if (selfLink?.success && selfLink.linked_count > 0) {
+          setLinkedClubs(selfLink.clubs);
+          setMode('already-linked');
+          setLoading(false);
+          return;
+        }
+      }
+
       const { data: memberApp } = await supabase
         .from('membership_applications')
         .select('id')
