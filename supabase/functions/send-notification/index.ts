@@ -42,7 +42,10 @@ Deno.serve(async (req) => {
       meeting_date,
       meeting_time,
       meeting_location,
-      attachments
+      attachments,
+      raw_html,
+      from_email,
+      from_name
     } = await req.json()
 
     const authHeader = req.headers.get('Authorization')
@@ -106,20 +109,23 @@ Deno.serve(async (req) => {
 
             if (send_email && recipient.email) {
               try {
-                await sendEmail(
-                  recipient.email,
-                  recipient.name || 'Member',
+                await sendEmail({
+                  to: recipient.email,
+                  recipientName: recipient.name || 'Member',
                   subject,
                   body,
-                  club_name,
-                  club_logo,
-                  type === 'meeting_invite' ? recipient.response_token : undefined,
-                  meeting_name,
-                  meeting_date,
-                  meeting_time,
-                  meeting_location,
-                  attachments
-                )
+                  clubName: club_name,
+                  clubLogo: club_logo,
+                  responseToken: type === 'meeting_invite' ? recipient.response_token : undefined,
+                  meetingName: meeting_name,
+                  meetingDate: meeting_date,
+                  meetingTime: meeting_time,
+                  meetingLocation: meeting_location,
+                  attachments,
+                  rawHtml: raw_html,
+                  fromEmail: from_email,
+                  fromName: from_name,
+                })
                 await supabaseClient
                   .from('notifications')
                   .update({ email_status: 'sent' })
@@ -140,20 +146,23 @@ Deno.serve(async (req) => {
           }
         } else if (recipient.email) {
           try {
-            await sendEmail(
-              recipient.email,
-              recipient.name || 'Member',
+            await sendEmail({
+              to: recipient.email,
+              recipientName: recipient.name || 'Member',
               subject,
               body,
-              club_name,
-              club_logo,
-              type === 'meeting_invite' ? recipient.response_token : undefined,
-              meeting_name,
-              meeting_date,
-              meeting_time,
-              meeting_location,
-              attachments
-            )
+              clubName: club_name,
+              clubLogo: club_logo,
+              responseToken: type === 'meeting_invite' ? recipient.response_token : undefined,
+              meetingName: meeting_name,
+              meetingDate: meeting_date,
+              meetingTime: meeting_time,
+              meetingLocation: meeting_location,
+              attachments,
+              rawHtml: raw_html,
+              fromEmail: from_email,
+              fromName: from_name,
+            })
             emailsSent++
             console.log('Email sent (no notification) to:', recipient.email)
           } catch (emailError: any) {
@@ -193,20 +202,25 @@ Deno.serve(async (req) => {
   }
 })
 
-async function sendEmail(
-  to: string,
-  recipientName: string,
-  subject: string,
-  body: string,
-  clubName: string,
-  clubLogo?: string,
-  responseToken?: string,
-  meetingName?: string,
-  meetingDate?: string,
-  meetingTime?: string,
-  meetingLocation?: string,
-  attachments?: Attachment[]
-) {
+interface SendEmailOptions {
+  to: string;
+  recipientName: string;
+  subject: string;
+  body: string;
+  clubName: string;
+  clubLogo?: string;
+  responseToken?: string;
+  meetingName?: string;
+  meetingDate?: string;
+  meetingTime?: string;
+  meetingLocation?: string;
+  attachments?: Attachment[];
+  rawHtml?: boolean;
+  fromEmail?: string;
+  fromName?: string;
+}
+
+async function sendEmail(opts: SendEmailOptions) {
   const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY')
   const defaultFromEmail = Deno.env.get('DEFAULT_FROM_EMAIL')
 
@@ -218,62 +232,54 @@ async function sendEmail(
     throw new Error('Default from email not configured')
   }
 
-  const displayClubName = clubName || 'Alfie PRO';
+  const senderEmail = opts.fromEmail || defaultFromEmail;
+  const displayClubName = opts.fromName || opts.clubName || 'Alfie PRO';
 
-  const isRichText = body.includes('<p>') || body.includes('<div>') || body.includes('<br');
-  const formattedBody = isRichText
-    ? body
-    : body
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">${line}</p>`)
-        .join('');
+  let htmlContent: string;
 
-  const isMeetingInvite = !!responseToken;
-  const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : '';
+  if (opts.rawHtml) {
+    htmlContent = opts.body;
+  } else {
+    const isRichText = opts.body.includes('<p>') || opts.body.includes('<div>') || opts.body.includes('<br');
+    const formattedBody = isRichText
+      ? opts.body
+      : opts.body
+          .split('\n')
+          .filter(line => line.trim())
+          .map(line => `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">${line}</p>`)
+          .join('');
 
-  let attachmentsHtml = '';
-  if (attachments && attachments.length > 0) {
-    const attachmentLinks = attachments.map(att => {
-      const sizeKB = Math.round(att.size / 1024);
-      const sizeLabel = sizeKB >= 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
-      return `<tr>
-        <td style="padding:8px 0">
-          <a href="${att.url}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:14px;font-weight:500">${att.name}</a>
-          <span style="color:#9ca3af;font-size:12px;margin-left:8px">(${sizeLabel})</span>
-        </td>
-      </tr>`;
-    }).join('');
+    const isMeetingInvite = !!opts.responseToken;
+    const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : '';
 
-    attachmentsHtml = `
-      <div style="background:#f9fafb;border-radius:10px;padding:20px 24px;margin:24px 0;border:1px solid #e5e7eb">
-        <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#374151">Attachments (${attachments.length})</p>
-        <table cellpadding="0" cellspacing="0" border="0" width="100%">
-          ${attachmentLinks}
-        </table>
-      </div>`;
-  }
+    let attachmentsHtml = '';
+    if (opts.attachments && opts.attachments.length > 0) {
+      const attachmentLinks = opts.attachments.map(att => {
+        const sizeKB = Math.round(att.size / 1024);
+        const sizeLabel = sizeKB >= 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+        return `<tr>
+          <td style="padding:8px 0">
+            <a href="${att.url}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:14px;font-weight:500">${att.name}</a>
+            <span style="color:#9ca3af;font-size:12px;margin-left:8px">(${sizeLabel})</span>
+          </td>
+        </tr>`;
+      }).join('');
 
-  const emailData: any = {
-    personalizations: [
-      {
-        to: [{ email: to, name: recipientName }],
-        subject: subject
-      }
-    ],
-    from: {
-      email: defaultFromEmail,
-      name: displayClubName
-    },
-    content: [
-      {
-        type: 'text/html',
-        value: `<!DOCTYPE html>
+      attachmentsHtml = `
+        <div style="background:#f9fafb;border-radius:10px;padding:20px 24px;margin:24px 0;border:1px solid #e5e7eb">
+          <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#374151">Attachments (${opts.attachments.length})</p>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${attachmentLinks}
+          </table>
+        </div>`;
+    }
+
+    htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${opts.subject}</title>
 </head>
 <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
@@ -282,14 +288,14 @@ async function sendEmail(
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
           <tr>
             <td style="background:linear-gradient(135deg,#0ea5e9 0%,#2563eb 100%);padding:40px 40px 30px;text-align:center">
-              ${clubLogo ? `<img src="${clubLogo}" alt="${displayClubName}" style="max-width:120px;height:auto;margin:0 0 16px;border-radius:8px;background:#fff;padding:8px" />` : ''}
+              ${opts.clubLogo ? `<img src="${opts.clubLogo}" alt="${displayClubName}" style="max-width:120px;height:auto;margin:0 0 16px;border-radius:8px;background:#fff;padding:8px" />` : ''}
               <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">${displayClubName}</h1>
               ${headerSubtitle ? `<p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">${headerSubtitle}</p>` : ''}
             </td>
           </tr>
           <tr>
             <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Dear ${recipientName},</p>
+              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Dear ${opts.recipientName},</p>
 
               <div style="margin:0 0 32px;font-size:16px;line-height:1.7;color:#374151">
                 ${formattedBody}
@@ -297,7 +303,7 @@ async function sendEmail(
 
               ${attachmentsHtml}
 
-              ${responseToken ? `
+              ${opts.responseToken ? `
               <div style="background:#f9fafb;border-radius:10px;padding:28px;margin:32px 0;border:1px solid #e5e7eb;text-align:center">
                 <p style="margin:0 0 20px;font-size:17px;color:#111827;font-weight:600">Will you be attending?</p>
                 <table width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -306,13 +312,13 @@ async function sendEmail(
                       <table cellpadding="0" cellspacing="0" border="0">
                         <tr>
                           <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=attending" style="display:inline-block;padding:14px 24px;background:#10b981;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Yes</a>
+                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=attending" style="display:inline-block;padding:14px 24px;background:#10b981;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Yes</a>
                           </td>
                           <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=maybe" style="display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Maybe</a>
+                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=maybe" style="display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Maybe</a>
                           </td>
                           <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=not_attending" style="display:inline-block;padding:14px 24px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">No</a>
+                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=not_attending" style="display:inline-block;padding:14px 24px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">No</a>
                           </td>
                         </tr>
                       </table>
@@ -340,7 +346,24 @@ async function sendEmail(
     </tr>
   </table>
 </body>
-</html>`
+</html>`;
+  }
+
+  const emailData: any = {
+    personalizations: [
+      {
+        to: [{ email: opts.to, name: opts.recipientName }],
+        subject: opts.subject
+      }
+    ],
+    from: {
+      email: senderEmail,
+      name: displayClubName
+    },
+    content: [
+      {
+        type: 'text/html',
+        value: htmlContent
       }
     ]
   }
@@ -360,5 +383,5 @@ async function sendEmail(
     throw new Error(`SendGrid API error: ${response.status} - ${errorText}`)
   }
 
-  console.log('Email sent successfully via SendGrid to:', to)
+  console.log('Email sent successfully via SendGrid to:', opts.to)
 }
