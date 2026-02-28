@@ -192,18 +192,26 @@ export async function deleteMarketingEmailTemplate(id: string): Promise<void> {
 // =====================================================
 
 export async function ensureClubMembersList(clubId: string): Promise<void> {
-  const { data: existing } = await supabase
-    .from('marketing_subscriber_lists')
-    .select('id')
-    .eq('club_id', clubId)
-    .eq('list_type', 'all_members')
-    .maybeSingle();
+  try {
+    const { data: existing, error: checkError } = await supabase
+      .from('marketing_subscriber_lists')
+      .select('id')
+      .eq('club_id', clubId)
+      .eq('list_type', 'all_members')
+      .maybeSingle();
 
-  if (!existing) {
-    const { error: rpcError } = await supabase.rpc('ensure_all_members_list', { p_club_id: clubId });
-    if (rpcError) {
-      console.error('Error ensuring Club Members list via RPC:', rpcError);
+    if (checkError) {
+      console.warn('Error checking for Club Members list (may be schema cache issue):', checkError);
     }
+
+    if (!existing && !checkError) {
+      const { error: rpcError } = await supabase.rpc('ensure_all_members_list', { p_club_id: clubId });
+      if (rpcError) {
+        console.error('Error ensuring Club Members list via RPC:', rpcError);
+      }
+    }
+  } catch (err) {
+    console.error('ensureClubMembersList unexpected error:', err);
   }
 }
 
@@ -214,7 +222,15 @@ export async function getMarketingSubscriberLists(clubId: string): Promise<Marke
     .eq('club_id', clubId)
     .order('name');
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching subscriber lists via table, trying RPC fallback:', error);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_club_subscriber_lists', { p_club_id: clubId });
+    if (rpcError) {
+      console.error('RPC fallback also failed:', rpcError);
+      throw rpcError;
+    }
+    return (rpcData || []) as MarketingSubscriberList[];
+  }
   return data || [];
 }
 
@@ -513,7 +529,7 @@ export async function getMarketingOverviewStats(clubId: string): Promise<Marketi
   const activeFlows = flows.filter(f => f.status === 'active');
   const recentFlows = flows.slice(0, 5);
 
-  const totalSubscribers = lists.reduce((sum, list) => sum + list.subscriber_count, 0);
+  const totalSubscribers = lists.reduce((sum, list) => sum + (list.active_subscriber_count || list.total_contacts || 0), 0);
 
   // Calculate period stats from recent campaigns (last 30 days)
   const thirtyDaysAgo = new Date();

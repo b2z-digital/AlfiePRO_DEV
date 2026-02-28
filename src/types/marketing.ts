@@ -72,7 +72,7 @@ export interface MarketingSubscriberList {
   state_association_id: string | null;
   national_association_id: string | null;
   event_id: string | null;
-  list_type: 'custom' | 'auto_members' | 'auto_registrants' | 'auto_class';
+  list_type: 'custom' | 'all_members' | 'auto_members' | 'auto_registrants' | 'auto_class';
   filter_criteria: Record<string, any> | null;
   total_contacts: number;
   active_subscriber_count: number;
