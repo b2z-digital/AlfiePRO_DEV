@@ -76,6 +76,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   const [conflictResolution, setConflictResolution] = useState<'overwrite' | 'skip' | null>(null);
   const [importedCount, setImportedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
   const [expandedMappings, setExpandedMappings] = useState(true);
 
   // Reset modal state when it closes
@@ -92,6 +93,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setConflictResolution(null);
     setImportedCount(0);
     setSkippedCount(0);
+    setErrorCount(0);
     setExpandedMappings(true);
   };
 
@@ -321,6 +323,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setImportProgress(0);
     setImportedCount(0);
     setSkippedCount(0);
+    setErrorCount(0);
 
     console.log('=== STARTING IMPORT ===');
     console.log('Total existing members:', members.length);
@@ -461,9 +464,10 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
         setImportedCount(prev => prev + 1);
         console.log('Import count increased');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error importing member:', error);
-        setSkippedCount(prev => prev + 1);
+        setErrorCount(prev => prev + 1);
+        setImportStatus(`Error on row ${i + 1}: ${error?.message || 'Unknown error'}`);
       }
 
       currentResolution = null;
@@ -706,13 +710,27 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
           {mode === 'import' && importStep === 'complete' && (
             <div className="space-y-6 text-center py-8">
-              <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
+              {errorCount > 0 && importedCount === 0 ? (
+                <AlertCircle className="w-16 h-16 mx-auto text-red-500" />
+              ) : errorCount > 0 ? (
+                <AlertCircle className="w-16 h-16 mx-auto text-yellow-500" />
+              ) : (
+                <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
+              )}
               <div>
-                <h3 className="text-xl font-semibold mb-2">Import Complete!</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  {errorCount > 0 && importedCount === 0 ? 'Import Failed' : 'Import Complete!'}
+                </h3>
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   Successfully imported {importedCount} member(s)
-                  {skippedCount > 0 && ` • Skipped ${skippedCount} duplicate(s)`}
+                  {skippedCount > 0 && ` | Skipped ${skippedCount} duplicate(s)`}
+                  {errorCount > 0 && ` | ${errorCount} error(s)`}
                 </p>
+                {errorCount > 0 && (
+                  <p className="text-sm text-red-400 mt-2">
+                    Some members could not be imported. Please check that you have admin access to this club and try again.
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => {
