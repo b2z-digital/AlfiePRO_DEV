@@ -1,14 +1,22 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 }
 
-serve(async (req) => {
+interface Attachment {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { status: 200, headers: corsHeaders })
   }
 
   try {
@@ -24,6 +32,7 @@ serve(async (req) => {
       type,
       club_id,
       send_email,
+      skip_notifications,
       sender_name,
       sender_avatar,
       club_name,
@@ -32,13 +41,13 @@ serve(async (req) => {
       meeting_name,
       meeting_date,
       meeting_time,
-      meeting_location
+      meeting_location,
+      attachments
     } = await req.json()
 
-    // Get sender user_id from the Authorization header
     const authHeader = req.headers.get('Authorization')
     const token = authHeader?.replace('Bearer ', '')
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token)
+    const { data: userData } = await supabaseClient.auth.getUser(token)
     const sender_id = userData?.user?.id || null
 
     console.log('Processing notification request:', {
@@ -48,8 +57,7 @@ serve(async (req) => {
       club_id,
       send_email,
       sender_name,
-      sender_avatar,
-      club_name,
+      attachmentCount: attachments?.length || 0,
       body_preview: body?.substring(0, 100)
     })
 
@@ -61,40 +69,76 @@ serve(async (req) => {
       throw new Error('Subject and body are required')
     }
 
-    // Create notifications for each recipient
-    const notifications = []
+    const notifications: any[] = []
+    let emailsSent = 0
+
     for (const recipient of recipients) {
       try {
-        // Create notification record
-        const { data: notification, error: notificationError } = await supabaseClient
-          .from('notifications')
-          .insert({
-            user_id: recipient.user_id,
-            club_id: club_id,
-            type: type || 'message',
-            subject: subject,
-            body: body,
-            read: false,
-            email_status: send_email ? 'pending' : 'not_sent',
-            sender_id: sender_id,
-            sender_name: sender_name || 'Unknown',
-            sender_avatar_url: sender_avatar,
-            recipient_name: recipient.name || `${recipient.first_name || ''} ${recipient.last_name || ''}`.trim() || 'Unknown',
-            is_rich_text: body.includes('<p>') || body.includes('<div>')
-          })
-          .select()
-          .single()
+        const hasUserId = !!recipient.user_id
+        const shouldCreateNotification = hasUserId && !skip_notifications
 
-        if (notificationError) {
-          console.error('Error creating notification:', notificationError)
-          continue
-        }
+        if (shouldCreateNotification) {
+          const { data: notification, error: notificationError } = await supabaseClient
+            .from('notifications')
+            .insert({
+              user_id: recipient.user_id,
+              club_id: club_id,
+              type: type || 'message',
+              subject: subject,
+              body: body,
+              read: false,
+              email_status: send_email ? 'pending' : 'not_sent',
+              sender_id: sender_id,
+              sender_name: sender_name || 'Unknown',
+              sender_avatar_url: sender_avatar,
+              recipient_name: recipient.name || `${recipient.first_name || ''} ${recipient.last_name || ''}`.trim() || 'Unknown',
+              is_rich_text: body.includes('<p>') || body.includes('<div>'),
+              attachments: attachments && attachments.length > 0 ? attachments : undefined
+            })
+            .select()
+            .single()
 
-        notifications.push(notification)
-        console.log('Created notification for:', recipient.name || recipient.email)
+          if (notificationError) {
+            console.error('Error creating notification:', notificationError)
+          } else {
+            notifications.push(notification)
+            console.log('Created notification for:', recipient.name || recipient.email)
 
-        // Send email if requested and email service is configured
-        if (send_email && recipient.email) {
+            if (send_email && recipient.email) {
+              try {
+                await sendEmail(
+                  recipient.email,
+                  recipient.name || 'Member',
+                  subject,
+                  body,
+                  club_name,
+                  club_logo,
+                  type === 'meeting_invite' ? recipient.response_token : undefined,
+                  meeting_name,
+                  meeting_date,
+                  meeting_time,
+                  meeting_location,
+                  attachments
+                )
+                await supabaseClient
+                  .from('notifications')
+                  .update({ email_status: 'sent' })
+                  .eq('id', notification.id)
+                emailsSent++
+                console.log('Email sent successfully to:', recipient.email)
+              } catch (emailError: any) {
+                console.error('Error sending email to', recipient.email, ':', emailError)
+                await supabaseClient
+                  .from('notifications')
+                  .update({
+                    email_status: 'failed',
+                    email_error_message: emailError.message
+                  })
+                  .eq('id', notification.id)
+              }
+            }
+          }
+        } else if (recipient.email) {
           try {
             await sendEmail(
               recipient.email,
@@ -107,27 +151,13 @@ serve(async (req) => {
               meeting_name,
               meeting_date,
               meeting_time,
-              meeting_location
+              meeting_location,
+              attachments
             )
-            
-            // Update notification status to sent
-            await supabaseClient
-              .from('notifications')
-              .update({ email_status: 'sent' })
-              .eq('id', notification.id)
-              
-            console.log('Email sent successfully to:', recipient.email)
-          } catch (emailError) {
+            emailsSent++
+            console.log('Email sent (no notification) to:', recipient.email)
+          } catch (emailError: any) {
             console.error('Error sending email to', recipient.email, ':', emailError)
-            
-            // Update notification status to failed
-            await supabaseClient
-              .from('notifications')
-              .update({ 
-                email_status: 'failed',
-                email_error_message: emailError.message 
-              })
-              .eq('id', notification.id)
           }
         }
       } catch (error) {
@@ -136,28 +166,28 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Successfully processed ${notifications.length} notifications`,
+      JSON.stringify({
+        success: true,
+        message: `Successfully processed ${notifications.length} notifications and ${emailsSent} emails`,
         notifications_created: notifications.length,
-        emails_requested: send_email ? recipients.filter(r => r.email).length : 0
+        emails_sent: emailsSent
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
+        status: 200
       }
     )
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in send-notification function:', error)
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
-        success: false 
+        success: false
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
+        status: 400
       }
     )
   }
@@ -174,7 +204,8 @@ async function sendEmail(
   meetingName?: string,
   meetingDate?: string,
   meetingTime?: string,
-  meetingLocation?: string
+  meetingLocation?: string,
+  attachments?: Attachment[]
 ) {
   const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY')
   const defaultFromEmail = Deno.env.get('DEFAULT_FROM_EMAIL')
@@ -189,14 +220,41 @@ async function sendEmail(
 
   const displayClubName = clubName || 'Alfie PRO';
 
-  // Convert body line breaks to HTML paragraphs
-  const formattedBody = body
-    .split('\n')
-    .filter(line => line.trim())
-    .map(line => `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">${line}</p>`)
-    .join('');
+  const isRichText = body.includes('<p>') || body.includes('<div>') || body.includes('<br');
+  const formattedBody = isRichText
+    ? body
+    : body
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => `<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">${line}</p>`)
+        .join('');
 
-  const emailData = {
+  const isMeetingInvite = !!responseToken;
+  const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : '';
+
+  let attachmentsHtml = '';
+  if (attachments && attachments.length > 0) {
+    const attachmentLinks = attachments.map(att => {
+      const sizeKB = Math.round(att.size / 1024);
+      const sizeLabel = sizeKB >= 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+      return `<tr>
+        <td style="padding:8px 0">
+          <a href="${att.url}" target="_blank" style="color:#2563eb;text-decoration:none;font-size:14px;font-weight:500">${att.name}</a>
+          <span style="color:#9ca3af;font-size:12px;margin-left:8px">(${sizeLabel})</span>
+        </td>
+      </tr>`;
+    }).join('');
+
+    attachmentsHtml = `
+      <div style="background:#f9fafb;border-radius:10px;padding:20px 24px;margin:24px 0;border:1px solid #e5e7eb">
+        <p style="margin:0 0 12px;font-size:14px;font-weight:600;color:#374151">Attachments (${attachments.length})</p>
+        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+          ${attachmentLinks}
+        </table>
+      </div>`;
+  }
+
+  const emailData: any = {
     personalizations: [
       {
         to: [{ email: to, name: recipientName }],
@@ -226,7 +284,7 @@ async function sendEmail(
             <td style="background:linear-gradient(135deg,#0ea5e9 0%,#2563eb 100%);padding:40px 40px 30px;text-align:center">
               ${clubLogo ? `<img src="${clubLogo}" alt="${displayClubName}" style="max-width:120px;height:auto;margin:0 0 16px;border-radius:8px;background:#fff;padding:8px" />` : ''}
               <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">${displayClubName}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">Meeting Invitation</p>
+              ${headerSubtitle ? `<p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">${headerSubtitle}</p>` : ''}
             </td>
           </tr>
           <tr>
@@ -237,6 +295,8 @@ async function sendEmail(
                 ${formattedBody}
               </div>
 
+              ${attachmentsHtml}
+
               ${responseToken ? `
               <div style="background:#f9fafb;border-radius:10px;padding:28px;margin:32px 0;border:1px solid #e5e7eb;text-align:center">
                 <p style="margin:0 0 20px;font-size:17px;color:#111827;font-weight:600">Will you be attending?</p>
@@ -246,13 +306,13 @@ async function sendEmail(
                       <table cellpadding="0" cellspacing="0" border="0">
                         <tr>
                           <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=attending" style="display:inline-block;padding:14px 24px;background:#10b981;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">✓ Yes</a>
+                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=attending" style="display:inline-block;padding:14px 24px;background:#10b981;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Yes</a>
                           </td>
                           <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=maybe" style="display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">? Maybe</a>
+                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=maybe" style="display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Maybe</a>
                           </td>
                           <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=not_attending" style="display:inline-block;padding:14px 24px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">✗ No</a>
+                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${responseToken}&status=not_attending" style="display:inline-block;padding:14px 24px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">No</a>
                           </td>
                         </tr>
                       </table>
@@ -261,11 +321,7 @@ async function sendEmail(
                 </table>
                 <p style="margin:20px 0 0;font-size:13px;color:#6b7280">Click one of the buttons above to confirm your attendance</p>
               </div>
-              ` : `
-              <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #bfdbfe">
-                <p style="margin:0;font-size:15px;color:#1e40af;font-weight:600">📅 Please add this meeting to your calendar and confirm your attendance.</p>
-              </div>
-              `}
+              ` : ''}
 
               <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
                 <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
