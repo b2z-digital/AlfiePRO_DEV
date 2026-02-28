@@ -400,22 +400,13 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       const club = pendingClubs.find(c => c.id === clubId);
 
       if (club?.registered_by_user_id) {
-        const { data: existingLink } = await supabase
+        await supabase
           .from('user_clubs')
-          .select('id')
-          .eq('user_id', club.registered_by_user_id)
-          .eq('club_id', clubId)
-          .maybeSingle();
-
-        if (!existingLink) {
-          await supabase
-            .from('user_clubs')
-            .insert({
-              user_id: club.registered_by_user_id,
-              club_id: clubId,
-              role: 'admin',
-            });
-        }
+          .upsert({
+            user_id: club.registered_by_user_id,
+            club_id: clubId,
+            role: 'admin',
+          }, { onConflict: 'user_id,club_id' });
       }
 
       addNotification('success', `${club?.name || 'Club'} has been approved`);

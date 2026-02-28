@@ -555,20 +555,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         .maybeSingle();
 
       if (existingMember?.user_id) {
-        const { data: existingRole } = await supabase
-          .from('user_clubs')
-          .select('id')
-          .eq('user_id', existingMember.user_id)
-          .eq('club_id', id)
-          .maybeSingle();
-
-        if (!existingRole) {
-          await supabase.from('user_clubs').insert({
-            user_id: existingMember.user_id,
-            club_id: id,
-            role: 'admin'
-          });
-        }
+        await supabase.from('user_clubs').upsert({
+          user_id: existingMember.user_id,
+          club_id: id,
+          role: 'admin'
+        }, { onConflict: 'user_id,club_id' });
       } else {
         await supabase.from('members').insert({
           club_id: id,
@@ -719,11 +710,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       if (existingMember?.user_id) {
         await supabase
           .from('user_clubs')
-          .insert({
+          .upsert({
             user_id: existingMember.user_id,
             club_id: club.id,
             role: 'admin'
-          });
+          }, { onConflict: 'user_id,club_id' });
       } else {
         await supabase
           .from('members')
