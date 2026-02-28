@@ -207,14 +207,18 @@ export async function updateSequence(
   }
 }
 
-export async function deleteSequence(sequenceId: string): Promise<boolean> {
+export async function deleteSequence(sequenceId: string, forceSystem?: boolean): Promise<boolean> {
   try {
-    const { error } = await supabase
+    let query = supabase
       .from('start_sequences')
       .delete()
-      .eq('id', sequenceId)
-      .eq('is_system_default', false);
+      .eq('id', sequenceId);
 
+    if (!forceSystem) {
+      query = query.eq('is_system_default', false);
+    }
+
+    const { error } = await query;
     if (error) throw error;
     return true;
   } catch (err) {

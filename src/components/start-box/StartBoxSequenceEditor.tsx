@@ -138,9 +138,11 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
     await loadData();
   };
 
-  const handleDelete = async (seqId: string) => {
-    await deleteSequence(seqId);
-    if (expandedId === seqId) setExpandedId(null);
+  const handleDelete = async (seq: StartSequence) => {
+    const label = seq.is_system_default ? `system sequence "${seq.name}"` : `"${seq.name}"`;
+    if (!confirm(`Are you sure you want to delete ${label}? This cannot be undone.`)) return;
+    await deleteSequence(seq.id, isSuperAdmin && seq.is_system_default);
+    if (expandedId === seq.id) setExpandedId(null);
     await loadData();
   };
 
@@ -313,7 +315,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                       <Edit2 size={14} />
                     </button>
                     <button
-                      onClick={e => { e.stopPropagation(); handleDelete(seq.id); }}
+                      onClick={e => { e.stopPropagation(); handleDelete(seq); }}
                       className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
                       title="Delete"
                     >
