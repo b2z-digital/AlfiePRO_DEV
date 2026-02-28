@@ -427,21 +427,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (mounted && session?.user) {
-          // Extract first name and last name from user metadata
-          const firstName = session.user.user_metadata?.first_name;
-          const lastName = session.user.user_metadata?.last_name;
+          const { data: { user: validatedUser }, error: validateError } = await supabase.auth.getUser();
+          if (validateError || !validatedUser) {
+            console.warn('Session exists but server validation failed, clearing session');
+            await supabase.auth.signOut().catch(() => {});
+            localStorage.removeItem('alfie-pro-auth');
+            if (mounted) {
+              currentUserIdRef.current = null;
+              setUser(null);
+              setOnboardingCompleted(false);
+              clearTimeout(loadingTimeout);
+              setLoading(false);
+            }
+            return;
+          }
 
-          // Create enhanced user object with first and last name
+          const firstName = validatedUser.user_metadata?.first_name;
+          const lastName = validatedUser.user_metadata?.last_name;
+
           const enhancedUser: AuthUser = {
-            ...session.user,
+            ...validatedUser,
             firstName,
             lastName
           };
 
           const previousUserId = currentUserIdRef.current;
-          currentUserIdRef.current = session.user.id;
+          currentUserIdRef.current = validatedUser.id;
 
-          if (previousUserId && previousUserId !== session.user.id) {
+          if (previousUserId && previousUserId !== validatedUser.id) {
             localStorage.removeItem('currentClubId');
             localStorage.removeItem('currentOrganization');
           }
@@ -451,16 +464,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { data: profileData } = await supabase
             .from('profiles')
             .select('onboarding_completed')
-            .eq('id', session.user.id)
+            .eq('id', validatedUser.id)
             .maybeSingle();
 
           setOnboardingCompleted(profileData?.onboarding_completed || false);
 
-          // Check for pending membership application
           const { data: pendingApp } = await supabase
             .from('membership_applications')
             .select('id, status')
-            .eq('user_id', session.user.id)
+            .eq('user_id', validatedUser.id)
             .eq('is_draft', false)
             .eq('status', 'pending')
             .limit(1)
@@ -468,19 +480,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           setHasPendingApplication(!!pendingApp);
 
-          // Check for pending club registration
           const { data: pendingClub } = await supabase
             .from('clubs')
             .select('id')
-            .eq('registered_by_user_id', session.user.id)
+            .eq('registered_by_user_id', validatedUser.id)
             .eq('approval_status', 'pending_approval')
             .limit(1)
             .maybeSingle();
 
           setHasPendingClubApplication(!!pendingClub);
 
-          // CRITICAL: Load user clubs on initial auth (pass user ID explicitly)
-          await refreshUserClubs(session.user.id);
+          await refreshUserClubs(validatedUser.id);
 
           // Restore currentOrganization from localStorage if exists
           try {
