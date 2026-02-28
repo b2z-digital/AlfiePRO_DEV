@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -21,6 +21,7 @@ import { OfflineIndicator } from './OfflineIndicator';
 import { useAuth } from '../contexts/AuthContext';
 import { SettingsPage } from './pages/SettingsPage';
 import { MembershipDashboard } from './pages/MembershipDashboard';
+import { MemberMembershipView } from './pages/MemberMembershipView';
 import { useNotifications } from '../contexts/NotificationContext';
 import { SuperAdminEventModal } from './SuperAdminEventModal';
 import { getPublicEvents } from '../utils/publicEventStorage';
@@ -882,6 +883,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/membership-dashboard',
           featureKey: 'membership'
         },
+        ...(!isMember ? [{
+          id: 'my-membership',
+          label: 'My Membership',
+          icon: UserCircle,
+          description: 'View your personal membership details',
+          path: '/my-membership',
+          featureKey: 'membership'
+        }] : []),
         {
           id: 'meetings',
           label: 'Meetings',
@@ -1741,6 +1750,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <WysiwygDocumentBuilder />
               } />
               <Route path="/membership-dashboard" element={<MembershipDashboard darkMode={darkMode} />} />
+              <Route path="/my-membership" element={<MemberMembershipView darkMode={darkMode} />} />
               <Route path="/community" element={<CommunityPage darkMode={darkMode} />} />
               <Route path="/membership/:clubId" element={<MembershipPage />} />
               <Route path="/membership/:clubId/renew/:memberId" element={<MembershipPage />} />
