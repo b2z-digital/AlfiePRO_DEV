@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, ChevronDown, X } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, ChevronDown, X, Pencil } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
@@ -11,6 +11,7 @@ import { filterMembers as applyMemberFilters } from '../../utils/memberFilters';
 import { ManageFiltersModal } from './ManageFiltersModal';
 import { SaveFilterModal } from './SaveFilterModal';
 import AssociationMemberImportModal from './AssociationMemberImportModal';
+import { MemberEditModal } from './MemberEditModal';
 
 interface StateAssociationMembersProps {
   darkMode: boolean;
@@ -29,7 +30,7 @@ interface MemberWithClub {
   renewal_date: string;
   club_id: string;
   club_name: string;
-  membership_type_id?: string;
+  membership_status?: string;
   state_association_name: string;
   avatar_url?: string;
 }
@@ -56,6 +57,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [savedFilters, setSavedFilters] = useState<any[]>([]);
   const [boatClasses, setBoatClasses] = useState<string[]>([]);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editingMemberClubId, setEditingMemberClubId] = useState<string>('');
 
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [showBulkAssign, setShowBulkAssign] = useState(false);
@@ -155,7 +158,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       if (clubIds.length > 0) {
         const { data: clubMembersData } = await supabase
           .from('members')
-          .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_type_id')
+          .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status')
           .in('club_id', clubIds)
           .order('last_name');
         clubMembers = clubMembersData || [];
@@ -163,7 +166,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
       const { data: assocMembersData } = await supabase
         .from('members')
-        .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_type_id')
+        .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status')
         .eq('state_association_id', stateId)
         .order('last_name');
 
@@ -653,12 +656,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Financial Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Dates</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-slate-300 w-16"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
                 {filteredMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                       No members found
                     </td>
                   </tr>
@@ -754,6 +758,18 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           )}
                         </div>
                       </td>
+                      <td className="px-4 py-4 text-right">
+                        <button
+                          onClick={() => {
+                            setEditingMemberId(member.id);
+                            setEditingMemberClubId(member.club_id || '');
+                          }}
+                          className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                          title="Edit member"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -806,6 +822,24 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           associationType={currentOrganization.type as 'state' | 'national'}
           associationName={currentOrganization.name}
           clubs={clubs}
+        />
+      )}
+
+      {editingMemberId && (
+        <MemberEditModal
+          isOpen={true}
+          onClose={() => {
+            setEditingMemberId(null);
+            setEditingMemberClubId('');
+          }}
+          memberId={editingMemberId}
+          clubId={editingMemberClubId}
+          darkMode={darkMode}
+          onSuccess={() => {
+            setEditingMemberId(null);
+            setEditingMemberClubId('');
+            loadStateAssociationData();
+          }}
         />
       )}
     </div>
