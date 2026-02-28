@@ -344,7 +344,21 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
         .select('id, name, total_contacts, active_subscriber_count')
         .eq('club_id', contextId)
         .order('name');
-      if (error) throw error;
+      if (error) {
+        console.warn('Table query failed for marketing lists, trying RPC fallback:', error);
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_club_subscriber_lists', { p_club_id: contextId });
+        if (rpcError) {
+          console.error('RPC fallback also failed:', rpcError);
+          return;
+        }
+        setMarketingLists((rpcData || []).map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          total_contacts: l.total_contacts,
+          active_subscriber_count: l.active_subscriber_count
+        })));
+        return;
+      }
       setMarketingLists(data || []);
     } catch (err) {
       console.error('Error fetching marketing lists:', err);

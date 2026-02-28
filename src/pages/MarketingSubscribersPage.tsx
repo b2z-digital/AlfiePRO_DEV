@@ -13,7 +13,8 @@ import {
   removeListMember,
   updateMemberMarketingPreference,
   getBulkMemberMarketingPreferences,
-  addListMembers
+  addListMembers,
+  ensureClubMembersList
 } from '../utils/marketingStorage';
 import { getStoredMembers } from '../utils/storage';
 import { Avatar } from '../components/ui/Avatar';
@@ -73,6 +74,7 @@ export default function MarketingSubscribersPage({ darkMode = true }: MarketingS
 
     try {
       setLoading(true);
+      await ensureClubMembersList(currentClub.clubId);
       const data = await getMarketingSubscriberLists(currentClub.clubId);
       setLists(data);
     } catch (error) {

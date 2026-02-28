@@ -460,7 +460,32 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
     try {
       await handleSave();
 
-      const emailHtml = buildEmailHtml();
+      const bodyHtml = buildEmailHtml();
+      const bgColor = '#f3f4f6';
+      const contentBg = '#ffffff';
+      const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${campaign.subject || ''}</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:${bgColor}">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${bgColor};padding:40px 20px">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:${contentBg};border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
+          <tr>
+            <td>
+              ${bodyHtml || '<p style="padding:20px">No email content designed yet.</p>'}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -477,14 +502,16 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
         body: JSON.stringify({
           recipients: [{ email: testEmail.trim(), name: 'Test Recipient' }],
           subject: `[TEST] ${campaign.subject}`,
-          body: emailHtml || '<p>No email content designed yet.</p>',
+          body: fullHtml,
           type: 'campaign_test',
           club_id: currentClub?.clubId,
           send_email: true,
           skip_notifications: true,
+          raw_html: true,
+          from_email: campaign.from_email || undefined,
+          from_name: campaign.from_name || currentClub?.club?.abbreviation || 'Campaign',
           sender_name: campaign.from_name || currentClub?.club?.abbreviation || 'Campaign Test',
           club_name: campaign.from_name || currentClub?.club?.abbreviation || '',
-          club_logo: currentClub?.club?.logo,
         }),
       });
 
