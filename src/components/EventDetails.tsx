@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle, Radio } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle, Radio, Upload } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -20,6 +20,9 @@ import LiveTrackingQRCodeModal from './live-tracking/LiveTrackingQRCodeModal';
 import { getLiveTrackingEvent } from '../utils/liveTrackingStorage';
 import { EventWebsiteSettingsModal } from './events/EventWebsiteSettingsModal';
 import { EventLivestreamModal } from './livestream/EventLivestreamModal';
+import { ImportRoundResultsModal } from './ImportRoundResultsModal';
+import { getStoredRaceSeries } from '../utils/raceStorage';
+import { RaceSeries } from '../types/race';
 
 // Helper function to extract database UUID from app event ID
 function extractDbId(eventId: string): string {
@@ -100,6 +103,9 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   const [showLiveTrackingQR, setShowLiveTrackingQR] = useState(false);
   const [showLivestreamModal, setShowLivestreamModal] = useState(false);
   const [hasLivestreamSession, setHasLivestreamSession] = useState(false);
+  const [showImportResults, setShowImportResults] = useState(false);
+  const [importSeriesData, setImportSeriesData] = useState<RaceSeries | null>(null);
+  const [importRoundIndex, setImportRoundIndex] = useState<number>(0);
   const [checkingLivestream, setCheckingLivestream] = useState(true);
   const [showEventWebsiteModal, setShowEventWebsiteModal] = useState(false);
   const [hasEventWebsite, setHasEventWebsite] = useState(false);
@@ -2350,18 +2356,46 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             )}
             {/* Only show scoring button if user is from the host club (for public events) or if it's a regular club event */}
             {(!event.isPublicEvent || (event.isPublicEvent && event.clubId === currentClub?.clubId)) && (
-              <button
-                onClick={handleStartScoring}
-                className="
-                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                  bg-gradient-to-r from-green-600 to-emerald-600
-                  hover:from-green-700 hover:to-emerald-700
-                  transition-all duration-200
-                  animate-pulse
-                "
-              >
-                {getButtonText()}
-              </button>
+              <>
+                {event.isSeriesEvent && !shouldShowContinueScoring && (
+                  <button
+                    onClick={async () => {
+                      if (event.seriesId) {
+                        const allSeries = await getStoredRaceSeries();
+                        const s = allSeries.find(sr => sr.id === event.seriesId);
+                        if (s) {
+                          const idParts = event.id.split('-');
+                          const rIdx = parseInt(idParts[idParts.length - 1], 10);
+                          setImportSeriesData(s);
+                          setImportRoundIndex(isNaN(rIdx) ? 0 : rIdx);
+                          setShowImportResults(true);
+                        }
+                      }
+                    }}
+                    className="
+                      flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
+                      bg-gradient-to-r from-blue-600 to-cyan-600
+                      hover:from-blue-700 hover:to-cyan-700
+                      transition-all duration-200
+                    "
+                  >
+                    <Upload size={18} />
+                    Import Results
+                  </button>
+                )}
+                <button
+                  onClick={handleStartScoring}
+                  className="
+                    flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
+                    bg-gradient-to-r from-green-600 to-emerald-600
+                    hover:from-green-700 hover:to-emerald-700
+                    transition-all duration-200
+                    animate-pulse
+                  "
+                >
+                  {getButtonText()}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -3649,6 +3683,24 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             if (website?.id) {
               navigate(`/website/event-websites/${website.id}`);
             }
+          }}
+        />
+      )}
+
+      {showImportResults && importSeriesData && (
+        <ImportRoundResultsModal
+          isOpen={true}
+          onClose={() => {
+            setShowImportResults(false);
+            setImportSeriesData(null);
+          }}
+          darkMode={darkMode}
+          series={importSeriesData}
+          roundIndex={importRoundIndex}
+          onImportComplete={() => {
+            setShowImportResults(false);
+            setImportSeriesData(null);
+            onClose();
           }}
         />
       )}
