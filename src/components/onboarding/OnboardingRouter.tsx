@@ -93,10 +93,8 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
 
       if (clubApp) {
         setMode('start-club');
-      } else if (memberApp) {
-        setMode('join-club');
       } else {
-        setMode('choice');
+        setMode('join-club');
       }
     } catch (error) {
       console.error('Error checking applications:', error);

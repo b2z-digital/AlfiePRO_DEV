@@ -20,9 +20,12 @@ const PWAInstallPrompt: React.FC = () => {
     setIsIOS(isIOSDevice);
     setIsStandalone(isInStandaloneMode);
 
-    // Don't show on public club pages
     const isPublicPage = window.location.pathname.includes('/public/');
-    if (isPublicPage) {
+    const isAuthPage = window.location.pathname === '/login' ||
+                       window.location.pathname === '/register' ||
+                       window.location.pathname === '/forgot-password' ||
+                       window.location.pathname === '/reset-password';
+    if (isPublicPage || isAuthPage) {
       return;
     }
 
