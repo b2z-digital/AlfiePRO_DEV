@@ -2357,10 +2357,10 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             {/* Only show scoring button if user is from the host club (for public events) or if it's a regular club event */}
             {(!event.isPublicEvent || (event.isPublicEvent && event.clubId === currentClub?.clubId)) && (
               <>
-                {event.isSeriesEvent && !shouldShowContinueScoring && (
+                {!shouldShowContinueScoring && (
                   <button
                     onClick={async () => {
-                      if (event.seriesId) {
+                      if (event.isSeriesEvent && event.seriesId) {
                         const allSeries = await getStoredRaceSeries();
                         const s = allSeries.find(sr => sr.id === event.seriesId);
                         if (s) {
@@ -2368,9 +2368,11 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                           const rIdx = parseInt(idParts[idParts.length - 1], 10);
                           setImportSeriesData(s);
                           setImportRoundIndex(isNaN(rIdx) ? 0 : rIdx);
-                          setShowImportResults(true);
                         }
+                      } else {
+                        setImportSeriesData(null);
                       }
+                      setShowImportResults(true);
                     }}
                     className="
                       flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
@@ -3687,7 +3689,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         />
       )}
 
-      {showImportResults && importSeriesData && (
+      {showImportResults && (
         <ImportRoundResultsModal
           isOpen={true}
           onClose={() => {
@@ -3695,8 +3697,9 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             setImportSeriesData(null);
           }}
           darkMode={darkMode}
-          series={importSeriesData}
+          series={importSeriesData || undefined}
           roundIndex={importRoundIndex}
+          event={!importSeriesData ? event : undefined}
           onImportComplete={() => {
             setShowImportResults(false);
             setImportSeriesData(null);

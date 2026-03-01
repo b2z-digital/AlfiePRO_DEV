@@ -9,16 +9,17 @@ import {
   matchSkippersToMembers, buildSkippersArray, buildRoundResults,
   RESULTS_FIELD_OPTIONS, parseHTMLTable, isHTMLContent
 } from '../utils/importResultsUtils';
-import { RaceSeries } from '../types/race';
+import { RaceEvent, RaceSeries } from '../types/race';
 import { supabase } from '../utils/supabase';
-import { storeRaceSeries } from '../utils/raceStorage';
+import { storeRaceSeries, storeRaceEvent } from '../utils/raceStorage';
 
 interface ImportRoundResultsModalProps {
   isOpen: boolean;
   onClose: () => void;
   darkMode: boolean;
-  series: RaceSeries;
-  roundIndex: number;
+  series?: RaceSeries;
+  roundIndex?: number;
+  event?: RaceEvent;
   onImportComplete: () => void;
 }
 
@@ -29,7 +30,8 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
   onClose,
   darkMode,
   series,
-  roundIndex,
+  roundIndex = 0,
+  event,
   onImportComplete,
 }) => {
   const [step, setStep] = useState<ImportStep>('paste');
@@ -46,7 +48,11 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const round = series.rounds[roundIndex];
+  const isSeriesMode = !!series;
+  const round = series?.rounds?.[roundIndex];
+  const displayName = isSeriesMode
+    ? `${round?.name} - ${series?.seriesName}`
+    : event?.eventName || event?.clubName || 'Event';
 
   useEffect(() => {
     if (isOpen) {
@@ -199,26 +205,43 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
       const results = buildRoundResults(parsed.rows, raceColumns, mappings);
       setImportProgress(60);
 
-      const updatedRounds = [...series.rounds];
-      updatedRounds[roundIndex] = {
-        ...updatedRounds[roundIndex],
-        skippers,
-        results,
-        raceResults: undefined,
-        completed: true,
-        lastCompletedRace: numRacesInRound,
-        hasDeterminedInitialHcaps: true,
-        isManualHandicaps: true,
-        numRaces: numRacesInRound,
-      };
+      if (isSeriesMode && series) {
+        const updatedRounds = [...series.rounds];
+        updatedRounds[roundIndex] = {
+          ...updatedRounds[roundIndex],
+          skippers,
+          results,
+          raceResults: undefined,
+          completed: true,
+          lastCompletedRace: numRacesInRound,
+          hasDeterminedInitialHcaps: true,
+          isManualHandicaps: true,
+          numRaces: numRacesInRound,
+        };
 
-      const updatedSeries: RaceSeries = {
-        ...series,
-        rounds: updatedRounds,
-      };
+        const updatedSeries: RaceSeries = {
+          ...series,
+          rounds: updatedRounds,
+        };
 
-      setImportProgress(80);
-      await storeRaceSeries(updatedSeries);
+        setImportProgress(80);
+        await storeRaceSeries(updatedSeries);
+      } else if (event) {
+        const updatedEvent: RaceEvent = {
+          ...event,
+          skippers,
+          raceResults: results,
+          completed: true,
+          lastCompletedRace: numRacesInRound,
+          hasDeterminedInitialHcaps: true,
+          isManualHandicaps: true,
+          numRaces: numRacesInRound,
+        };
+
+        setImportProgress(80);
+        await storeRaceEvent(updatedEvent);
+      }
+
       setImportProgress(100);
       setStep('complete');
     } catch (err) {
@@ -279,7 +302,7 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                 Import Results
               </h2>
               <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                {round?.name} - {series.seriesName}
+                {displayName}
               </p>
             </div>
           </div>
@@ -684,7 +707,7 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                 </h3>
                 <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-green-700'}`}>
                   {skipperMatches.length} skippers across {raceColumns.length} races will be imported into{' '}
-                  <span className="font-semibold">{round?.name}</span>.
+                  <span className="font-semibold">{displayName}</span>.
                 </p>
               </div>
 
@@ -807,7 +830,7 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                 across <span className="font-semibold">{raceColumns.length}</span> races
               </p>
               <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                into <span className="font-semibold">{round?.name}</span> of {series.seriesName}
+                into <span className="font-semibold">{displayName}</span>
               </p>
             </div>
           )}
