@@ -179,7 +179,7 @@ const SortableRow: React.FC<SortableRowProps> = ({
 };
 
 export const CustomizableDashboard: React.FC = () => {
-  const { user, currentClub, currentOrganization } = useAuth();
+  const { user, currentClub, currentOrganization, clubsLoaded } = useAuth();
   const { addNotification } = useNotifications();
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [rows, setRows] = useState<DashboardRow[]>([]);
@@ -195,6 +195,7 @@ export const CustomizableDashboard: React.FC = () => {
   const [originalLayoutBeforeEdit, setOriginalLayoutBeforeEdit] = useState<{ widgets: WidgetConfig[], rows: DashboardRow[] } | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const newRowRef = useRef<HTMLDivElement | null>(null);
+  const loadCounterRef = useRef(0);
 
   const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
 
@@ -207,10 +208,10 @@ export const CustomizableDashboard: React.FC = () => {
   );
 
   useEffect(() => {
-    if (user) {
-      loadLayout();
-    }
-  }, [user, currentClub?.clubId, currentOrganization?.id, currentOrganization?.type]);
+    if (!user || !clubsLoaded) return;
+    if (!currentClub && !currentOrganization) return;
+    loadLayout();
+  }, [user, clubsLoaded, currentClub?.clubId, currentOrganization?.id, currentOrganization?.type]);
 
   const loadLayout = async () => {
     if (!user) {
@@ -219,9 +220,10 @@ export const CustomizableDashboard: React.FC = () => {
       return;
     }
 
+    const currentLoad = ++loadCounterRef.current;
+
     setLoading(true);
 
-    // Set a fallback timeout - if loading takes more than 10 seconds, stop loading state
     const loadTimeout = setTimeout(() => {
       console.warn('⚠️ Dashboard layout loading timeout - completing with empty state');
       setLoading(false);
@@ -285,24 +287,26 @@ export const CustomizableDashboard: React.FC = () => {
         }
       }
 
-      // Ensure rows have order field
+      if (currentLoad !== loadCounterRef.current) return;
+
       const sortedRows = layout.rows.map((row, index) => ({
         ...row,
         order: row.order ?? index
       })).sort((a, b) => a.order - b.order);
 
-      console.log('📋 Setting rows after load:', sortedRows.map(r => ({ id: r.id, height: r.height })));
-
       setWidgets(layout.widgets);
       setRows(sortedRows);
     } catch (error) {
       console.error('❌ Error loading layout:', error);
-      // Set empty state on error so dashboard doesn't hang
-      setWidgets([]);
-      setRows([]);
+      if (currentLoad === loadCounterRef.current) {
+        setWidgets([]);
+        setRows([]);
+      }
     } finally {
-      clearTimeout(loadTimeout);
-      setLoading(false);
+      if (currentLoad === loadCounterRef.current) {
+        clearTimeout(loadTimeout);
+        setLoading(false);
+      }
     }
   };
 
