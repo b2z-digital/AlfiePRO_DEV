@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Edit2, Trash2, MapPin, Calendar, Trophy, AlertTriangle } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, MapPin, Calendar, Trophy, AlertTriangle, Upload } from 'lucide-react';
+import { ImportRoundResultsModal } from './ImportRoundResultsModal';
 import { RaceType, BoatType } from '../types';
 import { RaceSeries as RaceSeriesType, RaceEvent } from '../types/race';
 import { storeRaceSeries, getStoredRaceSeries, deleteRaceSeries, setCurrentEvent } from '../utils/raceStorage';
@@ -41,6 +42,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<RaceSeriesType | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
+  const [importTarget, setImportTarget] = useState<{ series: RaceSeriesType; roundIndex: number } | null>(null);
   const [formData, setFormData] = useState({
     clubId: '',
     seriesName: '',
@@ -877,6 +879,24 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                                           Next
                                         </span>
                                       )}
+                                      {!round.cancelled && !round.completed && !(round.results && round.results.length > 0) && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setImportTarget({ series: s, roundIndex: originalIndex });
+                                          }}
+                                          className={`
+                                            flex items-center gap-1 px-2 py-0.5 rounded-full font-medium transition-colors
+                                            ${darkMode
+                                              ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30'
+                                              : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}
+                                          `}
+                                          title="Import results from spreadsheet"
+                                        >
+                                          <Upload size={12} />
+                                          Import
+                                        </button>
+                                      )}
                                     </div>
                                   </button>
                                 );
@@ -924,6 +944,25 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
           series={selectedSeries}
           darkMode={darkMode}
           onClose={() => setSelectedSeries(null)}
+        />
+      )}
+
+      {importTarget && (
+        <ImportRoundResultsModal
+          isOpen={true}
+          onClose={() => setImportTarget(null)}
+          darkMode={darkMode}
+          series={importTarget.series}
+          roundIndex={importTarget.roundIndex}
+          onImportComplete={async () => {
+            setImportTarget(null);
+            try {
+              const updatedSeries = await getStoredRaceSeries();
+              setSeries(updatedSeries);
+            } catch (err) {
+              console.error('Error refetching series after import:', err);
+            }
+          }}
         />
       )}
     </>
