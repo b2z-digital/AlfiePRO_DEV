@@ -259,7 +259,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       const selectedTypeObj = clubMembershipTypes.find(t => t.id === bulkMembershipTypeId);
       const updateData: Record<string, any> = {
         club_id: bulkClubId,
-        club: selectedClubObj?.name || ''
+        club: selectedClubObj?.name || '',
+        membership_status: 'active'
       };
       if (selectedTypeObj) updateData.membership_level = selectedTypeObj.name;
       if (bulkFinancialStatus === 'financial') updateData.is_financial = true;
