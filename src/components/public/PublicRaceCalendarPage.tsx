@@ -400,99 +400,119 @@ export const PublicRaceCalendarPage: React.FC = () => {
 
   const monthData = getMonthData();
 
+  const getEventDateParts = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const dayNum = d.getDate();
+    const dayName = d.toLocaleDateString('en-AU', { weekday: 'short' });
+    const monthShort = d.toLocaleDateString('en-AU', { month: 'short' });
+    return { dayNum, dayName, monthShort };
+  };
+
   const renderListView = () => (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {Object.entries(groupedEvents).map(([monthYear, events]) => (
         <div key={monthYear}>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">{monthYear}</h2>
-          <div className="grid gap-4">
-            {events.map(event => (
-              <div
-                key={event.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-200 overflow-hidden"
-              >
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    {event.cover_image && (
-                      <img
-                        src={event.cover_image}
-                        alt={event.name}
-                        className="w-24 h-24 object-cover rounded-lg"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {event.name}
-                      </h3>
-                      {event.series_name && (
-                        <p className="text-sm text-blue-600 font-medium mb-2">
-                          Part of {event.series_name}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <Clock size={16} />
-                          <span>{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin size={16} />
-                          <span>{event.venue}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Trophy size={16} />
-                          <span>Class: {event.race_class}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            event.race_format === 'handicap'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
-                          {event.race_format === 'handicap' ? 'Handicap' : 'Scratch'}
-                        </span>
-                        {event.type === 'series_round' && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Series Round
-                          </span>
-                        )}
-                        {event.type === 'single' && (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                            Single Event
-                          </span>
-                        )}
-                      </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-5">{monthYear}</h2>
+          <div className="grid gap-3">
+            {events.map(event => {
+              const dateParts = getEventDateParts(event.date);
+              return (
+                <div
+                  key={event.id}
+                  className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 overflow-hidden group"
+                >
+                  <div className="flex">
+                    <div className="flex-shrink-0 w-20 sm:w-24 flex flex-col items-center justify-center bg-gradient-to-b from-blue-600 to-blue-700 text-white py-4 px-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider opacity-90">{dateParts.dayName}</span>
+                      <span className="text-3xl sm:text-4xl font-bold leading-none mt-0.5">{dateParts.dayNum}</span>
+                      <span className="text-xs font-medium uppercase tracking-wider opacity-90 mt-0.5">{dateParts.monthShort}</span>
                     </div>
-                  </div>
 
-                  {/* Bottom section with registered count and register button */}
-                  <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {timeFilter === 'upcoming' && event.registered_count > 0 && (
-                        <>
-                          <Users size={18} className="text-gray-600" />
-                          <span className="text-sm font-medium text-gray-600">{event.registered_count} registered</span>
-                        </>
+                    <div className="flex-1 min-w-0 p-4 sm:p-5">
+                      <div className="flex items-start gap-4">
+                        {event.cover_image && (
+                          <img
+                            src={event.cover_image}
+                            alt={event.name}
+                            className="w-20 h-20 object-cover rounded-lg hidden sm:block"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+                            {event.name}
+                          </h3>
+                          {event.series_name && (
+                            <p className="text-sm text-blue-600 font-medium mt-0.5 truncate">
+                              Part of {event.series_name}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mt-2">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin size={14} className="flex-shrink-0" />
+                              <span className="truncate">{event.venue}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Trophy size={14} className="flex-shrink-0" />
+                              <span>Class: {event.race_class}</span>
+                            </div>
+                            {timeFilter === 'upcoming' && event.registered_count > 0 && (
+                              <div className="flex items-center gap-1.5">
+                                <Users size={14} className="flex-shrink-0" />
+                                <span>{event.registered_count} registered</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                event.race_format === 'handicap'
+                                  ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                                  : 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                              }`}
+                            >
+                              {event.race_format === 'handicap' ? 'Handicap' : 'Scratch'}
+                            </span>
+                            {event.type === 'series_round' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                                Series Round
+                              </span>
+                            )}
+                            {event.type === 'single' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 ring-1 ring-orange-200">
+                                Single Event
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {timeFilter === 'upcoming' && event.entry_fee && event.entry_fee > 0 && (
+                          <button
+                            onClick={() => setSelectedEventForRegistration(event)}
+                            className="hidden sm:flex flex-shrink-0 self-center px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors items-center gap-2 shadow-sm hover:shadow-md text-sm"
+                          >
+                            <UserPlus size={16} />
+                            <span>Register</span>
+                            <span className="font-normal opacity-90">
+                              ${event.entry_fee}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
+                      {timeFilter === 'upcoming' && event.entry_fee && event.entry_fee > 0 && (
+                        <button
+                          onClick={() => setSelectedEventForRegistration(event)}
+                          className="sm:hidden mt-3 w-full px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm text-sm"
+                        >
+                          <UserPlus size={16} />
+                          <span>Register - ${event.entry_fee}</span>
+                        </button>
                       )}
                     </div>
-                    {timeFilter === 'upcoming' && event.entry_fee && event.entry_fee > 0 && (
-                      <button
-                        onClick={() => setSelectedEventForRegistration(event)}
-                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-sm hover:shadow-md"
-                      >
-                        <UserPlus size={18} />
-                        <span>Register</span>
-                        <span className="ml-1 text-sm font-normal opacity-90">
-                          {event.currency || 'AUD'} ${event.entry_fee}
-                        </span>
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
