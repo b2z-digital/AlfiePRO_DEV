@@ -256,11 +256,12 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
     setBulkProcessing(true);
     try {
       const selectedClubObj = clubs.find(c => c.id === bulkClubId);
+      const selectedTypeObj = clubMembershipTypes.find(t => t.id === bulkMembershipTypeId);
       const updateData: Record<string, any> = {
         club_id: bulkClubId,
         club: selectedClubObj?.name || ''
       };
-      if (bulkMembershipTypeId) updateData.membership_type_id = bulkMembershipTypeId;
+      if (selectedTypeObj) updateData.membership_level = selectedTypeObj.name;
       if (bulkFinancialStatus === 'financial') updateData.is_financial = true;
       else if (bulkFinancialStatus === 'unfinancial') updateData.is_financial = false;
 
