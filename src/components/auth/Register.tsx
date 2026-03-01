@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
 import { GoogleIcon } from './GoogleIcon';
-import { User, Building, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 type RegistrationMode = 'choice' | 'user' | 'club';
 
 export const Register: React.FC = () => {
-  const [mode, setMode] = useState<RegistrationMode>('choice');
+  const [mode, setMode] = useState<RegistrationMode>('user');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -158,26 +158,14 @@ export const Register: React.FC = () => {
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700/50 overflow-hidden">
           <div className="flex justify-between items-center px-6 py-4 border-b border-slate-700/30">
             <button
-              onClick={() => setMode('choice')}
+              onClick={() => navigate('/login')}
               className="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-full transition-all duration-200"
             >
               <ArrowLeft size={16} />
-              Back
+              Sign In
             </button>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/login')}
-                className="px-5 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-full transition-all duration-200"
-              >
-                Sign In
-              </button>
-              <div className={`px-5 py-1.5 rounded-full text-white text-sm font-semibold shadow-lg ${
-                mode === 'club'
-                  ? 'bg-emerald-600 shadow-emerald-500/15'
-                  : 'bg-blue-600 shadow-blue-500/15'
-              }`}>
-                {mode === 'club' ? 'Club Registration' : 'Create Account'}
-              </div>
+            <div className="px-5 py-1.5 rounded-full text-white text-sm font-semibold shadow-lg bg-blue-600 shadow-blue-500/15">
+              Create Account
             </div>
           </div>
 
