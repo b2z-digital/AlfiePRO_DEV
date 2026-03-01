@@ -53,7 +53,26 @@ import { SubdomainProvider } from './contexts/SubdomainContext';
 import AlfieTVPage from './pages/AlfieTVPage';
 import StripeOAuthCallback from './components/StripeOAuthCallback';
 import { HMSValidatorPage } from './pages/HMSValidatorPage';
+import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import './styles/index.css';
+
+function useIsMobilePhone() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const width = window.innerWidth;
+      const isMobileWidth = width < 768;
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      setIsMobile(isMobileWidth && hasTouchScreen);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  return isMobile;
+}
 
 function App() {
   // Use lightMode from localStorage to match the rest of the app
@@ -76,6 +95,8 @@ function App() {
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
   const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs } = useAuth();
   const { notifications, removeNotification } = useNotifications();
+
+  const isMobilePhone = useIsMobilePhone();
 
   useDataPreloader();
 
@@ -317,6 +338,8 @@ function App() {
               </div>
             ) : userClubs.length === 0 && !onboardingCompleted ? (
               <Navigate to="/onboarding" />
+            ) : isMobilePhone ? (
+              <MobileAppComingSoon />
             ) : (
               <DashboardLayout
                 darkMode={darkMode}
