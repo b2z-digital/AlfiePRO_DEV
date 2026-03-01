@@ -23,6 +23,22 @@ interface DNSRecord {
   ssl_error_message?: string | null;
   verified_at: string | null;
   error_message: string | null;
+  is_custom_full_domain?: boolean;
+  amplify_domain_id?: string;
+}
+
+interface AmplifyDomainRecord {
+  id: string;
+  domain_name: string;
+  domain_status: string;
+  certificate_status: string;
+  certificate_verification_dns_record: {
+    name?: string;
+    value?: string;
+    type?: string;
+  } | null;
+  status_reason?: string;
+  last_checked_at?: string;
 }
 
 export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementSectionProps> = ({
@@ -49,6 +65,8 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
   const [newSubdomain, setNewSubdomain] = useState('');
   const [newCustomDomain, setNewCustomDomain] = useState('');
   const [switchToCustom, setSwitchToCustom] = useState(false);
+  const [amplifyDomain, setAmplifyDomain] = useState<AmplifyDomainRecord | null>(null);
+  const [checkingCustomDomain, setCheckingCustomDomain] = useState(false);
 
   const baseDomain = 'alfiepro.com.au';
   const recordType = entityType === 'club' ? 'club_website' : 'event_website';
@@ -57,6 +75,7 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
   useEffect(() => {
     loadDNSRecord();
     loadPublishStatus();
+    loadAmplifyDomainRecord();
   }, [entityId]);
 
   useEffect(() => {
@@ -114,6 +133,84 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
     }
   };
 
+  const loadAmplifyDomainRecord = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('amplify_custom_domains')
+        .select('*')
+        .eq('entity_id', entityId)
+        .eq('record_type', recordType)
+        .order('created_at', { ascending: false })
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading Amplify domain record:', error);
+        return;
+      }
+
+      if (data) {
+        setAmplifyDomain(data);
+        if (data.domain_status !== 'AVAILABLE' && data.domain_status !== 'failed') {
+          setShowDnsInstructions(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading Amplify domain record:', error);
+    }
+  };
+
+  const verifyCustomDomain = async () => {
+    if (!amplifyDomain) return;
+
+    setCheckingCustomDomain(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-aws-amplify`;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'check_status',
+          amplify_domain_id: amplifyDomain.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        await loadAmplifyDomainRecord();
+        await loadDNSRecord();
+
+        if (result.data.is_ready) {
+          addNotification('success', 'Custom domain is verified and SSL certificate is active!');
+          setShowDnsInstructions(false);
+        } else {
+          const statusMsg = result.data.domain_status === 'PENDING_VERIFICATION'
+            ? 'DNS records not yet detected. Please ensure you have added the required CNAME records and allow up to 48 hours for propagation.'
+            : result.data.domain_status === 'IN_PROGRESS'
+            ? 'Domain verification in progress. SSL certificate is being provisioned.'
+            : `Domain status: ${result.data.domain_status}. ${result.data.status_reason || ''}`;
+          addNotification('info', statusMsg);
+        }
+      } else {
+        addNotification('error', result.error || 'Failed to check domain status');
+      }
+    } catch (error: any) {
+      console.error('Error verifying custom domain:', error);
+      addNotification('error', 'Failed to verify custom domain status');
+    } finally {
+      setCheckingCustomDomain(false);
+    }
+  };
+
   const publishWebsite = async () => {
     if (!subdomain.trim() && !customDomain.trim()) {
       addNotification('error', 'Please enter a subdomain or custom domain');
@@ -166,6 +263,9 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
 
       setDnsRecord(result.data.record);
       setShowDnsInstructions(useCustomDomain);
+      if (useCustomDomain) {
+        await loadAmplifyDomainRecord();
+      }
 
       const tableName = entityType === 'club' ? 'clubs' : 'event_websites';
       await supabase
@@ -285,11 +385,10 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
           }),
         });
       } else {
-        // For custom domains, create AWS Amplify domain
         const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-aws-amplify`;
         const { data: { session } } = await supabase.auth.getSession();
 
-        await fetch(apiUrl, {
+        const amplifyResponse = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session?.access_token}`,
@@ -297,22 +396,28 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
           },
           body: JSON.stringify({
             action: 'add_domain',
+            domain_name: newCustomDomain.trim(),
             entity_id: entityId,
-            entity_type: entityType,
-            custom_domain: newCustomDomain.trim(),
+            record_type: recordType,
           }),
         });
+
+        const amplifyResult = await amplifyResponse.json();
+        if (!amplifyResult.success) {
+          throw new Error(amplifyResult.error || 'Failed to add custom domain');
+        }
       }
 
-      addNotification('success', `Domain type changed successfully! ${switchToCustom ? 'Please follow DNS instructions to complete setup.' : 'Your new subdomain is being set up.'}`);
+      addNotification('success', `Domain type changed successfully! ${switchToCustom ? 'Please add the DNS records shown below to complete setup.' : 'Your new subdomain is being set up.'}`);
 
       setShowDomainTypeChange(false);
       setNewSubdomain('');
       setNewCustomDomain('');
+      setUseCustomDomain(switchToCustom);
 
-      // Reload data
       await loadDNSRecord();
       await loadPublishStatus();
+      await loadAmplifyDomainRecord();
 
       if (onDomainUpdate) {
         onDomainUpdate();
@@ -406,12 +511,15 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
   };
 
   const getWebsiteStatus = () => {
-    if (!dnsRecord) return 'draft';
+    if (!dnsRecord && !amplifyDomain) return 'draft';
     if (!isPublished) return 'draft';
-    if (dnsRecord.status === 'pending' || dnsRecord.status === 'custom') return 'pending';
-    if (dnsRecord.status === 'active' && dnsRecord.ssl_status === 'active') return 'live';
-    if (dnsRecord.status === 'active') return 'pending';
-    if (dnsRecord.status === 'failed') return 'error';
+    if (amplifyDomain && amplifyDomain.domain_status === 'AVAILABLE') return 'live';
+    if (amplifyDomain && amplifyDomain.domain_status === 'failed') return 'error';
+    if (amplifyDomain && amplifyDomain.domain_status !== 'AVAILABLE') return 'pending';
+    if (dnsRecord?.status === 'pending' || dnsRecord?.status === 'custom') return 'pending';
+    if (dnsRecord?.status === 'active' && dnsRecord?.ssl_status === 'active') return 'live';
+    if (dnsRecord?.status === 'active') return 'pending';
+    if (dnsRecord?.status === 'failed') return 'error';
     return 'draft';
   };
 
@@ -592,63 +700,159 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
           </div>
         )}
 
-        {showDnsInstructions && useCustomDomain && dnsRecord && (
+        {showDnsInstructions && amplifyDomain && amplifyDomain.domain_status !== 'AVAILABLE' && (
           <div className={`mb-6 p-4 rounded-lg border ${darkMode ? 'bg-blue-500/10 border-blue-500/20' : 'bg-blue-50 border-blue-200'}`}>
             <h4 className={`text-sm font-semibold ${darkMode ? 'text-blue-400' : 'text-blue-600'} mb-3 flex items-center gap-2`}>
               <AlertCircle size={16} />
-              DNS Setup Instructions for Custom Domain
+              DNS Setup Required for {amplifyDomain.domain_name}
             </h4>
             <p className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-3`}>
-              AWS Amplify is provisioning SSL for your domain. Add these DNS records to your domain registrar to complete the verification:
+              Add the following DNS records at your domain registrar (where you purchased {amplifyDomain.domain_name}) to verify ownership and enable SSL:
             </p>
 
-            <div className={`space-y-3 ${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded`}>
-              <div className="space-y-2">
-                <h5 className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Step 1: Add SSL Verification Record
-                </h5>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="text-xs font-mono break-all">
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                        Type: CNAME<br />
-                        Host: Check AWS Amplify console for exact value<br />
-                        Value: Check AWS Amplify console for exact value
-                      </span>
+            <div className={`space-y-3 ${darkMode ? 'bg-slate-800' : 'bg-white'} p-4 rounded-lg`}>
+              {amplifyDomain.certificate_verification_dns_record?.name && (
+                <div className="space-y-2">
+                  <h5 className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'} flex items-center gap-2`}>
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">1</span>
+                    SSL Certificate Verification Record
+                  </h5>
+                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'} space-y-1.5`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Type</span>
+                      <span className={`text-xs font-mono font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>CNAME</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`}>Host</span>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className={`text-xs font-mono ${darkMode ? 'text-emerald-400' : 'text-emerald-700'} truncate`}>
+                          {amplifyDomain.certificate_verification_dns_record.name}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(amplifyDomain.certificate_verification_dns_record!.name!)}
+                          className={`p-1 rounded flex-shrink-0 ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'}`}
+                          title="Copy host"
+                        >
+                          <Copy size={12} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`}>Value</span>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <span className={`text-xs font-mono ${darkMode ? 'text-emerald-400' : 'text-emerald-700'} truncate`}>
+                          {amplifyDomain.certificate_verification_dns_record.value}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(amplifyDomain.certificate_verification_dns_record!.value!)}
+                          className={`p-1 rounded flex-shrink-0 ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'}`}
+                          title="Copy value"
+                        >
+                          <Copy size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {!amplifyDomain.certificate_verification_dns_record?.name && (
+                <div className="space-y-2">
+                  <h5 className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'} flex items-center gap-2`}>
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">1</span>
+                    SSL Certificate Verification Record
+                  </h5>
+                  <div className={`p-3 rounded-lg ${darkMode ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                    <p className={`text-xs ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>
+                      SSL verification record is being generated. Click "Check DNS Status" below to refresh.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className={`border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-3 space-y-2`}>
-                <h5 className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Step 2: Point Domain to AWS Amplify
+                <h5 className={`text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-700'} flex items-center gap-2`}>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold">2</span>
+                  Point Domain to Your Website
                 </h5>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="text-xs font-mono break-all">
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                        Type: CNAME<br />
-                        Host: www (or your subdomain)<br />
-                        Target: d3jmzkpreoudd5.cloudfront.net
+                <div className={`p-3 rounded-lg ${darkMode ? 'bg-slate-900/50' : 'bg-slate-50'} space-y-1.5`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Type</span>
+                    <span className={`text-xs font-mono font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>CNAME</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`}>Host</span>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-xs font-mono ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        {amplifyDomain.domain_name.startsWith('www.') ? 'www' : '@'}
                       </span>
+                      <button
+                        onClick={() => copyToClipboard(amplifyDomain.domain_name.startsWith('www.') ? 'www' : '@')}
+                        className={`p-1 rounded flex-shrink-0 ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'}`}
+                        title="Copy host"
+                      >
+                        <Copy size={12} />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard('d3jmzkpreoudd5.cloudfront.net')}
-                    className={`p-2 rounded ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
-                  >
-                    <Copy size={14} />
-                  </button>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} flex-shrink-0`}>Target</span>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-xs font-mono ${darkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                        d3jmzkpreoudd5.cloudfront.net
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard('d3jmzkpreoudd5.cloudfront.net')}
+                        className={`p-1 rounded flex-shrink-0 ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-200'}`}
+                        title="Copy target"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className={`mt-3 p-3 rounded ${darkMode ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <p className={`text-xs ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>
-                <strong>Note:</strong> SSL provisioning typically takes 5-30 minutes. Your website will be fully accessible once AWS Amplify verifies your domain and issues the SSL certificate.
-              </p>
+            <div className={`mt-3 flex items-center justify-between`}>
+              <div className={`flex-1 p-3 rounded ${darkMode ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                <p className={`text-xs ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>
+                  <strong>Status:</strong>{' '}
+                  {amplifyDomain.domain_status === 'PENDING_VERIFICATION'
+                    ? 'Waiting for DNS records to be detected. This can take up to 48 hours after adding records.'
+                    : amplifyDomain.domain_status === 'IN_PROGRESS'
+                    ? 'DNS verified! SSL certificate is being provisioned (5-30 minutes).'
+                    : amplifyDomain.domain_status === 'failed'
+                    ? `Setup failed: ${amplifyDomain.status_reason || 'Unknown error'}`
+                    : `Current status: ${amplifyDomain.domain_status || 'Pending'}`
+                  }
+                </p>
+              </div>
             </div>
+
+            <button
+              onClick={verifyCustomDomain}
+              disabled={checkingCustomDomain}
+              className={`mt-3 w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                checkingCustomDomain
+                  ? 'bg-slate-600 cursor-not-allowed text-slate-400'
+                  : darkMode
+                  ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-600/30'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300'
+              }`}
+            >
+              {checkingCustomDomain ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Checking DNS Status...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} />
+                  Check DNS Status
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -870,7 +1074,7 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
             </button>
           ) : (
             <>
-              {dnsRecord && !useCustomDomain && (
+              {dnsRecord && !dnsRecord.is_custom_full_domain && (
                 <button
                   onClick={verifyDomain}
                   disabled={verifying}
@@ -886,6 +1090,25 @@ export const EnhancedDomainManagementSection: React.FC<EnhancedDomainManagementS
                     <RefreshCw size={18} />
                   )}
                   Verify
+                </button>
+              )}
+
+              {amplifyDomain && amplifyDomain.domain_status !== 'AVAILABLE' && (
+                <button
+                  onClick={verifyCustomDomain}
+                  disabled={checkingCustomDomain}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                    darkMode
+                      ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                      : 'bg-slate-200 hover:bg-slate-300 text-slate-900'
+                  }`}
+                >
+                  {checkingCustomDomain ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={18} />
+                  )}
+                  Check DNS
                 </button>
               )}
 
