@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Copy, Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader2, Crosshair, RotateCcw, Pause } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { ConfirmationModal } from '../ConfirmationModal';
 import type { StartSequence, StartSequenceSound, StartBoxSound, SequenceType } from '../../types/startBox';
 import {
   getSequences, getSounds, createSequence, updateSequence, deleteSequence,
@@ -46,6 +47,8 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
   const [formType, setFormType] = useState<SequenceType>('standard');
   const [formDuration, setFormDuration] = useState(120);
   const [formRaceDefault, setFormRaceDefault] = useState<string>('');
+
+  const [deleteTarget, setDeleteTarget] = useState<StartSequence | null>(null);
 
   const [addingSoundToSeq, setAddingSoundToSeq] = useState<string | null>(null);
   const [newSoundId, setNewSoundId] = useState('');
@@ -138,9 +141,11 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
     await loadData();
   };
 
-  const handleDelete = async (seqId: string) => {
-    await deleteSequence(seqId);
-    if (expandedId === seqId) setExpandedId(null);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await deleteSequence(deleteTarget.id, isSuperAdmin && deleteTarget.is_system_default);
+    if (expandedId === deleteTarget.id) setExpandedId(null);
+    setDeleteTarget(null);
     await loadData();
   };
 
@@ -313,7 +318,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                       <Edit2 size={14} />
                     </button>
                     <button
-                      onClick={e => { e.stopPropagation(); handleDelete(seq.id); }}
+                      onClick={e => { e.stopPropagation(); setDeleteTarget(seq); }}
                       className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
                       title="Delete"
                     >
@@ -652,6 +657,18 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
           </div>
         ))}
       </div>
+
+      <ConfirmationModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Delete Sequence"
+        message={deleteTarget ? `Are you sure you want to delete "${deleteTarget.name}"?${deleteTarget.is_system_default ? ' This is a system sequence and will be removed for all clubs.' : ''} This cannot be undone.` : ''}
+        confirmText="Delete"
+        cancelText="Cancel"
+        darkMode={darkMode}
+        variant="danger"
+      />
     </div>
   );
 };

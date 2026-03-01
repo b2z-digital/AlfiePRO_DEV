@@ -1021,7 +1021,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' },
           { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
           { id: 'engagement', label: 'Engagement Analytics', icon: Activity, description: 'Login & usage tracking', path: '/engagement' },
-          { id: 'resources', label: 'Resource & Costs', icon: Server, description: 'Hosting & DB costs', path: '/resources' },
+          { id: 'resource-costs', label: 'Resource & Costs', icon: Server, description: 'Hosting & DB costs', path: '/resource-costs' },
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
           { id: 'integrations', label: 'Platform Integrations', icon: Link, description: 'Manage integrations', path: '/integrations' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
@@ -1608,7 +1608,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <EngagementAnalyticsTab darkMode={true} />
                 </div></div>
               } />
-              <Route path="/resources" element={
+              <Route path="/resource-costs" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <ResourceCostsTab darkMode={true} />
                 </div></div>
