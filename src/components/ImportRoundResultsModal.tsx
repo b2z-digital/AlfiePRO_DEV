@@ -7,7 +7,7 @@ import {
   ParsedResults, ColumnMapping, SkipperMatch, RaceColumnInfo,
   parseTSVData, autoDetectMappings, detectRaceColumns,
   matchSkippersToMembers, buildSkippersArray, buildRoundResults,
-  RESULTS_FIELD_OPTIONS
+  RESULTS_FIELD_OPTIONS, parseHTMLTable, isHTMLContent
 } from '../utils/importResultsUtils';
 import { RaceSeries } from '../types/race';
 import { supabase } from '../utils/supabase';
@@ -104,6 +104,22 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
     };
     reader.readAsText(file);
   };
+
+  const handlePasteEvent = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const htmlData = e.clipboardData.getData('text/html');
+    if (htmlData && htmlData.includes('<table')) {
+      e.preventDefault();
+      const result = parseHTMLTable(htmlData);
+      if (result.headers.length >= 2 && result.rows.length > 0) {
+        setParsed(result);
+        const detected = autoDetectMappings(result.headers, result.rows);
+        setMappings(detected);
+        setError(null);
+        setStep('mapping');
+        return;
+      }
+    }
+  }, []);
 
   const handleMappingChange = (csvField: string, targetField: string) => {
     setMappings(prev =>
@@ -345,11 +361,14 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                   How to import your results
                 </h3>
                 <ol className={`text-sm space-y-1 list-decimal list-inside ${darkMode ? 'text-slate-300' : 'text-blue-700'}`}>
-                  <li>Open your results spreadsheet (Excel, Google Sheets, etc.)</li>
+                  <li>Open your results (spreadsheet, HTML results page, or CSV file)</li>
                   <li>Select all the data including headers (Ctrl+A or Cmd+A)</li>
                   <li>Copy (Ctrl+C or Cmd+C)</li>
                   <li>Click in the text area below and paste (Ctrl+V or Cmd+V)</li>
                 </ol>
+                <p className={`text-xs mt-2 ${darkMode ? 'text-slate-400' : 'text-blue-600'}`}>
+                  Supports: Excel, Google Sheets, CSV, HTML results tables, and space-separated results
+                </p>
               </div>
 
               <div className="relative">
@@ -357,7 +376,8 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                   ref={textareaRef}
                   value={pasteData}
                   onChange={(e) => setPasteData(e.target.value)}
-                  placeholder="Paste your results data here...&#10;&#10;Example:&#10;Name&#9;Sail No&#9;R1&#9;R2&#9;R3&#10;John Smith&#9;1234&#9;1&#9;3&#9;2&#10;Jane Doe&#9;5678&#9;2&#9;1&#9;DNS"
+                  onPaste={handlePasteEvent}
+                  placeholder="Paste your results data here...&#10;&#10;Supports: Spreadsheet data, CSV, HTML tables&#10;&#10;Example:&#10;Name&#9;Sail No&#9;R1&#9;R2&#9;R3&#10;John Smith&#9;1234&#9;1&#9;3&#9;2&#10;Jane Doe&#9;5678&#9;2&#9;1&#9;DNS"
                   className={`
                     w-full h-64 p-4 rounded-lg font-mono text-sm resize-none
                     ${darkMode
@@ -398,7 +418,7 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.tsv,.txt"
+                  accept=".csv,.tsv,.txt,.html,.htm"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -412,7 +432,7 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
                   `}
                 >
                   <Upload size={18} />
-                  <span className="text-sm font-medium">Upload CSV file</span>
+                  <span className="text-sm font-medium">Upload CSV or HTML file</span>
                 </button>
               </div>
             </div>

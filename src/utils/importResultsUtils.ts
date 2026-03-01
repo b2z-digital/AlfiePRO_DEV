@@ -55,7 +55,148 @@ export function parseCSVData(text: string): ParsedResults {
   };
 }
 
+export function parseHTMLTable(html: string): ParsedResults {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const table = doc.querySelector('table');
+  if (!table) return { headers: [], rows: [] };
+
+  const allRows = Array.from(table.querySelectorAll('tr'));
+
+  let headerRow: Element | null = null;
+  let dataStartIdx = 0;
+
+  for (let i = 0; i < allRows.length; i++) {
+    const cells = allRows[i].querySelectorAll('th, td');
+    if (cells.length < 2) continue;
+
+    const cellTexts = Array.from(cells).map(c => (c.textContent || '').trim());
+    const hasColSpan = Array.from(cells).some(c => parseInt(c.getAttribute('colspan') || '1') > 1);
+    if (hasColSpan) continue;
+
+    const looksLikeHeader = cellTexts.some(t => {
+      const lower = t.toLowerCase().replace(/\s+/g, '');
+      return ['sail', 'sailor', 'name', 'skipper', 'club', 'rank', 'r1', 'r2', 'race1', 'helm'].includes(lower);
+    });
+
+    if (looksLikeHeader) {
+      headerRow = allRows[i];
+      dataStartIdx = i + 1;
+      break;
+    }
+  }
+
+  if (!headerRow) return { headers: [], rows: [] };
+
+  const headers = Array.from(headerRow.querySelectorAll('th, td')).map(
+    cell => (cell.textContent || '').trim()
+  );
+
+  const rows: ImportedRow[] = [];
+  for (let i = dataStartIdx; i < allRows.length; i++) {
+    const cells = allRows[i].querySelectorAll('th, td');
+    if (cells.length < 2) continue;
+
+    const hasColSpan = Array.from(cells).some(c => parseInt(c.getAttribute('colspan') || '1') > 1);
+    if (hasColSpan) continue;
+
+    const row: ImportedRow = {};
+    let hasData = false;
+    Array.from(cells).forEach((cell, colIdx) => {
+      if (colIdx < headers.length) {
+        const val = (cell.textContent || '').trim();
+        row[headers[colIdx]] = val;
+        if (val) hasData = true;
+      }
+    });
+
+    if (hasData) rows.push(row);
+  }
+
+  return { headers, rows };
+}
+
+export function parseFixedWidthData(text: string): ParsedResults {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { headers: [], rows: [] };
+
+  let headerLineIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i].trim();
+    const lower = line.toLowerCase().replace(/\s+/g, ' ');
+    if (
+      (lower.includes('sail') || lower.includes('name') || lower.includes('skipper') || lower.includes('sailor')) &&
+      (lower.includes('r 1') || lower.includes('r1') || lower.includes('race'))
+    ) {
+      headerLineIdx = i;
+      break;
+    }
+  }
+
+  if (headerLineIdx === -1) return { headers: [], rows: [] };
+
+  const headerLine = lines[headerLineIdx];
+
+  const headerTokens: { name: string; start: number; end: number }[] = [];
+  const headerRegex = /\S+(?:\s\d+)?/g;
+  let match: RegExpExecArray | null;
+  while ((match = headerRegex.exec(headerLine)) !== null) {
+    const token = match[0];
+    const rMulti = token.match(/^(R)\s*(\d+)$/i);
+    if (rMulti) {
+      headerTokens.push({ name: `R ${rMulti[2]}`, start: match.index, end: match.index + token.length });
+    } else {
+      headerTokens.push({ name: token, start: match.index, end: match.index + token.length });
+    }
+  }
+
+  const colBounds: { name: string; start: number; end: number }[] = [];
+  for (let i = 0; i < headerTokens.length; i++) {
+    const start = i === 0 ? 0 : Math.floor((headerTokens[i - 1].end + headerTokens[i].start) / 2);
+    const end = i === headerTokens.length - 1 ? 9999 : Math.floor((headerTokens[i].end + headerTokens[i + 1].start) / 2);
+    colBounds.push({ name: headerTokens[i].name, start, end });
+  }
+
+  const headers = colBounds.map(c => c.name);
+  const rows: ImportedRow[] = [];
+
+  for (let i = headerLineIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+
+    const lower = line.toLowerCase().trim();
+    if (lower.startsWith('scoring:') || lower.includes('made easy') || lower.includes('www.')) continue;
+
+    const row: ImportedRow = {};
+    let hasNumericData = false;
+
+    colBounds.forEach(col => {
+      const val = line.substring(col.start, Math.min(col.end, line.length)).trim();
+      row[col.name] = val;
+      if (/^\d+$/.test(val)) hasNumericData = true;
+    });
+
+    if (hasNumericData) rows.push(row);
+  }
+
+  return { headers, rows };
+}
+
+export function isHTMLContent(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.includes('<table') || trimmed.includes('<TABLE') ||
+    (trimmed.startsWith('<!') && trimmed.includes('<table')) ||
+    (trimmed.startsWith('<html') && trimmed.includes('<table'));
+}
+
 export function parseTSVData(text: string): ParsedResults {
+  if (isHTMLContent(text)) {
+    const htmlResult = parseHTMLTable(text);
+    if (htmlResult.headers.length >= 2 && htmlResult.rows.length > 0) {
+      return htmlResult;
+    }
+  }
+
   const result = Papa.parse(text.trim(), {
     header: true,
     skipEmptyLines: true,
@@ -63,8 +204,21 @@ export function parseTSVData(text: string): ParsedResults {
     delimiter: '\t',
   });
 
-  if ((result.meta.fields?.length || 0) <= 1) {
-    return parseCSVData(text);
+  if ((result.meta.fields?.length || 0) >= 2) {
+    return {
+      headers: result.meta.fields || [],
+      rows: result.data as ImportedRow[],
+    };
+  }
+
+  const csvResult = parseCSVData(text);
+  if (csvResult.headers.length >= 2) {
+    return csvResult;
+  }
+
+  const fixedResult = parseFixedWidthData(text);
+  if (fixedResult.headers.length >= 2 && fixedResult.rows.length > 0) {
+    return fixedResult;
   }
 
   return {
