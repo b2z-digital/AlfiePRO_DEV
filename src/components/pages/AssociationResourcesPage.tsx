@@ -708,10 +708,28 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       const categoryToUse = selectedCategory || await ensureCategoryExists();
       const category = categories.find(c => c.id === categoryToUse);
 
-      console.log('Syncing category:', category?.name, 'ID:', categoryToUse);
+      let folderId = category?.google_drive_folder_id;
 
-      if (!category?.google_drive_folder_id) {
-        addNotification('Category does not have a Google Drive folder configured', 'error');
+      if (!folderId) {
+        const tableName = organizationType === 'club' ? 'club_integrations' :
+                         organizationType === 'state' ? 'state_association_integrations' :
+                         'national_association_integrations';
+        const idColumn = organizationType === 'club' ? 'club_id' :
+                        organizationType === 'state' ? 'state_association_id' :
+                        'national_association_id';
+
+        const { data: integration } = await supabase
+          .from(tableName)
+          .select('google_drive_folder_id')
+          .eq(idColumn, organizationId)
+          .eq('provider', 'google_drive')
+          .maybeSingle();
+
+        folderId = integration?.google_drive_folder_id;
+      }
+
+      if (!folderId) {
+        addNotification('No Google Drive folder configured. Please set up Google Drive in Settings.', 'error');
         return;
       }
 
@@ -736,7 +754,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             action: 'sync',
             organizationId,
             organizationType,
-            folderId: category.google_drive_folder_id
+            folderId
           }),
         }
       );
@@ -813,10 +831,16 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
 
       console.log(`Sync complete: ${newCount} new, ${updatedCount} existing`);
 
-      // Reload resources to show the newly synced items
-      await loadResources();
+      if (!category?.google_drive_folder_id && categoryToUse && folderId) {
+        await supabase
+          .from('resource_categories')
+          .update({ google_drive_folder_id: folderId })
+          .eq('id', categoryToUse);
+      }
 
-      // Show notification with sync details
+      await loadResources();
+      await loadData();
+
       if (!silent || newCount > 0) {
         let message = 'Successfully synced! All files are up to date.';
 
