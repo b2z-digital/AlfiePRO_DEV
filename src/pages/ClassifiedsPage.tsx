@@ -13,7 +13,7 @@ type DisplayMode = 'grid' | 'list';
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'title';
 
 export default function ClassifiedsPage() {
-  const { user, currentClub } = useAuth();
+  const { user, currentClub, isSuperAdmin, isStateOrgAdmin } = useAuth();
   const { addNotification } = useNotifications();
   const [classifieds, setClassifieds] = useState<Classified[]>([]);
   const [filteredClassifieds, setFilteredClassifieds] = useState<Classified[]>([]);
@@ -204,6 +204,10 @@ export default function ClassifiedsPage() {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const canManageListing = (classified: Classified) => {
+    return classified.user_id === user?.id || classified.created_by_user_id === user?.id || isSuperAdmin || isStateOrgAdmin;
   };
 
   const getCategoryLabel = (categoryValue: string) => {
@@ -506,7 +510,7 @@ export default function ClassifiedsPage() {
                   {/* Action Buttons */}
                   <div className="absolute top-3 right-3 flex gap-2">
                     {/* Edit/Delete buttons - only show for user's own listings */}
-                    {classified.user_id === user?.id && (
+                    {canManageListing(classified) && (
                       <>
                         <button
                           onClick={(e) => handleEdit(classified, e)}
@@ -580,10 +584,14 @@ export default function ClassifiedsPage() {
                     {classified.condition}
                   </div>
 
-                  {/* Public Badge */}
                   {classified.is_public && (
                     <div className="mt-2 inline-block ml-2 px-3 py-1 bg-green-500/20 text-green-300 text-xs font-medium rounded-full">
                       Public Listing
+                    </div>
+                  )}
+                  {classified.is_external && (
+                    <div className="mt-2 inline-block ml-2 px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full">
+                      External
                     </div>
                   )}
                 </div>
@@ -619,7 +627,7 @@ export default function ClassifiedsPage() {
                         <p className="text-2xl font-bold text-green-400">{formatPrice(classified.price)}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {classified.user_id === user?.id && (
+                        {canManageListing(classified) && (
                           <>
                             <button
                               onClick={(e) => handleEdit(classified, e)}
@@ -673,6 +681,11 @@ export default function ClassifiedsPage() {
                       {classified.is_public && (
                         <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded text-xs">
                           Public Listing
+                        </span>
+                      )}
+                      {classified.is_external && (
+                        <span className="px-2 py-1 bg-amber-500/20 text-amber-300 rounded text-xs">
+                          External
                         </span>
                       )}
                     </div>

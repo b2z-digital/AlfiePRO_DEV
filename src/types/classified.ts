@@ -19,6 +19,11 @@ export interface Classified {
   expires_at?: string;
   created_at: string;
   updated_at: string;
+  is_external?: boolean;
+  external_contact_name?: string;
+  external_contact_email?: string;
+  external_contact_phone?: string;
+  created_by_user_id?: string;
 
   // Joined data
   user?: {
@@ -79,6 +84,10 @@ export interface ClassifiedFormData {
   boat_class?: string;
   featured?: boolean;
   expires_at?: string;
+  is_external?: boolean;
+  external_contact_name?: string;
+  external_contact_email?: string;
+  external_contact_phone?: string;
 }
 
 export const CLASSIFIED_CATEGORIES = [

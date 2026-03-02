@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, Trash2, ChevronDown } from 'lucide-react';
+import { X, Upload, Trash2, ChevronDown, UserPlus, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import type { Classified, ClassifiedFormData } from '../../types/classified';
@@ -23,12 +23,14 @@ const CATEGORIES = [
 const BOAT_CLASSES = ['DF65', 'DF95', '10R', 'IOM', 'Marblehead', 'A Class', 'RC Laser', 'Other'];
 
 export default function ClassifiedFormModal({ classified, onClose, onSave }: Props) {
-  const { user, currentClub } = useAuth();
+  const { user, currentClub, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin } = useAuth();
   const { addNotification } = useNotifications();
   const isEditing = !!classified;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [memberData, setMemberData] = useState<any>(null);
+
+  const canCreateExternal = isSuperAdmin || isNationalOrgAdmin || isStateOrgAdmin;
 
   const [formData, setFormData] = useState<ClassifiedFormData>({
     title: classified?.title || '',
@@ -42,7 +44,11 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
     contact_phone: classified?.contact_phone || '',
     club_id: classified?.club_id || currentClub?.clubId,
     is_public: classified?.is_public ?? false,
-    boat_class: (classified as any)?.boat_class || ''
+    boat_class: (classified as any)?.boat_class || '',
+    is_external: classified?.is_external || false,
+    external_contact_name: classified?.external_contact_name || '',
+    external_contact_email: classified?.external_contact_email || '',
+    external_contact_phone: classified?.external_contact_phone || ''
   });
 
   const [uploading, setUploading] = useState(false);
@@ -204,6 +210,46 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
 
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-88px)] p-6 pb-8">
           <div className="space-y-6">
+            {canCreateExternal && !isEditing && (
+              <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/50">
+                <label className="block text-sm font-medium text-blue-200 mb-3">
+                  Listing Type
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleChange('is_external', false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${
+                      !formData.is_external
+                        ? 'border-blue-500 bg-blue-500/10 text-white'
+                        : 'border-slate-600 bg-slate-800/50 text-slate-400 hover:border-slate-500'
+                    }`}
+                  >
+                    <User size={20} />
+                    <div className="text-left">
+                      <div className="font-medium text-sm">My Listing</div>
+                      <div className="text-xs opacity-75">Sell your own item</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleChange('is_external', true)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${
+                      formData.is_external
+                        ? 'border-blue-500 bg-blue-500/10 text-white'
+                        : 'border-slate-600 bg-slate-800/50 text-slate-400 hover:border-slate-500'
+                    }`}
+                  >
+                    <UserPlus size={20} />
+                    <div className="text-left">
+                      <div className="font-medium text-sm">External Listing</div>
+                      <div className="text-xs opacity-75">On behalf of a non-member</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-blue-200 mb-2">
@@ -438,35 +484,83 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
               </div>
             </div>
 
-            {/* Contact Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-blue-200 mb-2">
-                  Contact Email *
-                </label>
-                <input
-                  type="email"
-                  value={formData.contact_email}
-                  onChange={(e) => handleChange('contact_email', e.target.value)}
-                  required
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            {formData.is_external ? (
+              <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/50">
+                <h3 className="text-sm font-medium text-blue-200 mb-4">External Seller Contact Details</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-blue-200 mb-2">
+                      Seller Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.external_contact_name}
+                      onChange={(e) => handleChange('external_contact_name', e.target.value)}
+                      required
+                      className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., John Smith"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">
+                        Seller Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={formData.external_contact_email}
+                        onChange={(e) => handleChange('external_contact_email', e.target.value)}
+                        required
+                        className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="seller@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-200 mb-2">
+                        Seller Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.external_contact_phone}
+                        onChange={(e) => handleChange('external_contact_phone', e.target.value)}
+                        required
+                        className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 0400 000 000"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-blue-200 mb-2">
+                    Contact Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.contact_email}
+                    onChange={(e) => handleChange('contact_email', e.target.value)}
+                    required
+                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-blue-200 mb-2">
-                  Contact Phone *
-                </label>
-                <input
-                  type="tel"
-                  value={formData.contact_phone}
-                  onChange={(e) => handleChange('contact_phone', e.target.value)}
-                  required
-                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., 0400 000 000"
-                />
+                <div>
+                  <label className="block text-sm font-medium text-blue-200 mb-2">
+                    Contact Phone *
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.contact_phone}
+                    onChange={(e) => handleChange('contact_phone', e.target.value)}
+                    required
+                    className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., 0400 000 000"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Visibility Options */}
             <div className="bg-slate-800/50 rounded-xl p-4">
