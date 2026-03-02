@@ -45,7 +45,8 @@ Deno.serve(async (req) => {
       attachments,
       raw_html,
       from_email,
-      from_name
+      from_name,
+      link_url
     } = await req.json()
 
     const authHeader = req.headers.get('Authorization')
@@ -96,7 +97,8 @@ Deno.serve(async (req) => {
               sender_avatar_url: sender_avatar,
               recipient_name: recipient.name || `${recipient.first_name || ''} ${recipient.last_name || ''}`.trim() || 'Unknown',
               is_rich_text: body.includes('<p>') || body.includes('<div>'),
-              attachments: attachments && attachments.length > 0 ? attachments : undefined
+              attachments: attachments && attachments.length > 0 ? attachments : undefined,
+              link_url: link_url || null
             })
             .select()
             .single()

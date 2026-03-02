@@ -33,6 +33,7 @@ interface Notification {
   thread_id?: string | null;
   is_rich_text?: boolean;
   club_name?: string;
+  link_url?: string | null;
 }
 
 interface Member {
@@ -1172,6 +1173,20 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                     dangerouslySetInnerHTML={{ __html: selectedNotification.body }}
                   />
                 </div>
+
+                {selectedNotification.link_url && (
+                  <div className="mt-6">
+                    <a
+                      href={selectedNotification.link_url}
+                      target={selectedNotification.link_url.startsWith('http') ? '_blank' : undefined}
+                      rel={selectedNotification.link_url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
+                    >
+                      <ChevronRight size={16} />
+                      View Item
+                    </a>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-3 mt-8 pt-8 border-t border-slate-700/50">
                   {activeTab === 'inbox' && (

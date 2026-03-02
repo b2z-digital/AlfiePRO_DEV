@@ -12,7 +12,8 @@ import {
   ExternalLink,
   CheckCircle2,
   Eye,
-  EyeOff
+  EyeOff,
+  AlertTriangle
 } from 'lucide-react';
 import { alfieTVStorage, AlfieTVChannel, AlfieTVVideo } from '../../utils/alfieTVStorage';
 import AddVideoModal from './AddVideoModal';
@@ -329,12 +330,15 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
                           <Youtube className="w-10 h-10 text-white" />
                         </div>
                       )}
-                      {/* Sync status indicator */}
-                      {channel.last_imported_at && channel.video_count > 0 && (
+                      {channel.last_sync_error ? (
+                        <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-1 ring-4 ring-white dark:ring-slate-800" title={channel.last_sync_error}>
+                          <AlertTriangle className="w-4 h-4 text-white" />
+                        </div>
+                      ) : channel.last_imported_at && channel.video_count > 0 ? (
                         <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 ring-4 ring-white dark:ring-slate-800">
                           <CheckCircle2 className="w-4 h-4 text-white" />
                         </div>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className={`text-xl font-bold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>
@@ -372,6 +376,11 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
                         {channel.last_imported_at && (
                           <span className={`text-xs ${lightMode ? 'text-gray-500' : 'text-slate-500'}`}>
                             Last synced: {new Date(channel.last_imported_at).toLocaleDateString()}
+                          </span>
+                        )}
+                        {channel.last_sync_error && (
+                          <span className="px-2 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title={channel.last_sync_error}>
+                            Sync error
                           </span>
                         )}
                       </div>
