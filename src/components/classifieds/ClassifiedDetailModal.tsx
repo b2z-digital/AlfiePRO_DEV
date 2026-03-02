@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MapPin, Calendar, Eye, Heart, MessageCircle, DollarSign, Edit, Trash2, Check, ChevronLeft, ChevronRight, ZoomIn, Share2, Mail, Users, ChevronDown } from 'lucide-react';
+import { X, MapPin, Calendar, Eye, Heart, MessageCircle, DollarSign, Edit, Trash2, Check, ChevronLeft, ChevronRight, ZoomIn, Share2, Mail, Users, ChevronDown, Phone, ExternalLink } from 'lucide-react';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,7 +32,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
   const [showEnquiries, setShowEnquiries] = useState(false);
   const viewCountedRef = useRef(false);
 
-  const isOwner = user?.id === classified.user_id;
+  const isOwner = user?.id === classified.user_id || user?.id === classified.created_by_user_id;
 
   useEffect(() => {
     if (isOwner) {
@@ -201,8 +201,14 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                       {classified.condition}
                     </span>
                     {classified.is_public && (
-                      <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-sm font-medium rounded-full">
+                      <span className="px-3 py-1 bg-teal-500/20 text-teal-300 text-sm font-medium rounded-full">
                         Public Listing
+                      </span>
+                    )}
+                    {classified.is_external && (
+                      <span className="px-3 py-1 bg-amber-500/20 text-amber-300 text-sm font-medium rounded-full flex items-center gap-1">
+                        <ExternalLink size={14} />
+                        External Listing
                       </span>
                     )}
                   </div>
@@ -228,48 +234,90 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                   </div>
                 </div>
 
-                {/* Seller Information */}
-                <div className="bg-slate-800/50 rounded-xl p-4">
-                  <h3 className="text-lg font-semibold text-white mb-3">Seller Information</h3>
-                  <div className="flex items-center gap-3 mb-3">
-                    {classified.user?.avatar_url ? (
-                      <img
-                        src={classified.user.avatar_url}
-                        alt={`${classified.user.first_name} ${classified.user.last_name}`}
-                        className="w-12 h-12 rounded-full object-cover bg-slate-700"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg"
-                      style={{ display: classified.user?.avatar_url ? 'none' : 'flex' }}
-                    >
-                      {classified.user?.first_name?.[0]}{classified.user?.last_name?.[0]}
+                {classified.is_external ? (
+                  <div className="bg-slate-800/50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-lg font-semibold text-white">Seller Information</h3>
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full flex items-center gap-1">
+                        <ExternalLink size={12} />
+                        External
+                      </span>
                     </div>
-                    <div>
-                      <div className="font-semibold text-white">
-                        {classified.user?.first_name} {classified.user?.last_name}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 font-bold text-lg">
+                        {classified.external_contact_name?.[0]?.toUpperCase() || '?'}
                       </div>
-                      {classified.club && (
-                        <div className="text-sm text-blue-300">{classified.club.name}</div>
+                      <div>
+                        <div className="font-semibold text-white">
+                          {classified.external_contact_name}
+                        </div>
+                        <div className="text-xs text-slate-400">Non-member seller</div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      {classified.external_contact_email && (
+                        <a
+                          href={`mailto:${classified.external_contact_email}`}
+                          className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
+                        >
+                          <Mail size={16} />
+                          {classified.external_contact_email}
+                        </a>
+                      )}
+                      {classified.external_contact_phone && (
+                        <a
+                          href={`tel:${classified.external_contact_phone}`}
+                          className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
+                        >
+                          <Phone size={16} />
+                          {classified.external_contact_phone}
+                        </a>
                       )}
                     </div>
                   </div>
-                  <div className="space-y-2 text-sm text-blue-100">
-                    <div>Email: {classified.contact_email}</div>
-                    {classified.contact_phone && (
-                      <div>Phone: {classified.contact_phone}</div>
-                    )}
+                ) : (
+                  <div className="bg-slate-800/50 rounded-xl p-4">
+                    <h3 className="text-lg font-semibold text-white mb-3">Seller Information</h3>
+                    <div className="flex items-center gap-3 mb-3">
+                      {classified.user?.avatar_url ? (
+                        <img
+                          src={classified.user.avatar_url}
+                          alt={`${classified.user.first_name} ${classified.user.last_name}`}
+                          className="w-12 h-12 rounded-full object-cover bg-slate-700"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg"
+                        style={{ display: classified.user?.avatar_url ? 'none' : 'flex' }}
+                      >
+                        {classified.user?.first_name?.[0]}{classified.user?.last_name?.[0]}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-white">
+                          {classified.user?.first_name} {classified.user?.last_name}
+                        </div>
+                        {classified.club && (
+                          <div className="text-sm text-blue-300">{classified.club.name}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm text-blue-100">
+                      <div>Email: {classified.contact_email}</div>
+                      {classified.contact_phone && (
+                        <div>Phone: {classified.contact_phone}</div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {!isOwner && (
+                  {!isOwner && !classified.is_external && (
                     <>
                       <div className="grid grid-cols-2 gap-2">
                         <button
@@ -292,6 +340,47 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                           <DollarSign size={16} />
                           Make Offer
                         </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={handleToggleFavorite}
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Heart size={16} className={isFavorited ? 'fill-red-500 text-red-500' : ''} />
+                          {isFavorited ? 'Unfavorite' : 'Favorite'}
+                        </button>
+                        <button
+                          onClick={() => setShowShareModal(true)}
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Share2 size={16} />
+                          Share
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {!isOwner && classified.is_external && (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        {classified.external_contact_email && (
+                          <a
+                            href={`mailto:${classified.external_contact_email}?subject=Enquiry: ${encodeURIComponent(classified.title)}`}
+                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Mail size={16} />
+                            Email Seller
+                          </a>
+                        )}
+                        {classified.external_contact_phone && (
+                          <a
+                            href={`tel:${classified.external_contact_phone}`}
+                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Phone size={16} />
+                            Call Seller
+                          </a>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <button

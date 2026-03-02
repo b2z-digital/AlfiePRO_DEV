@@ -24,6 +24,10 @@ interface Classified {
   created_at: string;
   status: string;
   boat_class?: string;
+  is_external?: boolean;
+  external_contact_name?: string;
+  external_contact_email?: string;
+  external_contact_phone?: string;
 }
 
 const getClubInitials = (clubName: string): string => {
@@ -221,12 +225,26 @@ export const PublicClassifiedsPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="pt-4 border-t border-gray-100">
-                    <p className="text-sm font-medium text-gray-900 mb-1">Contact: {item.contact_name}</p>
-                    {item.contact_phone && (
-                      <a href={`tel:${item.contact_phone}`} className="text-sm text-gray-600 hover:text-gray-900">{item.contact_phone}</a>
-                    )}
-                    {item.contact_email && (
-                      <a href={`mailto:${item.contact_email}`} className="block text-sm text-gray-600 hover:text-gray-900">{item.contact_email}</a>
+                    {item.is_external ? (
+                      <>
+                        <p className="text-sm font-medium text-gray-900 mb-1">Contact: {item.external_contact_name}</p>
+                        {item.external_contact_phone && (
+                          <a href={`tel:${item.external_contact_phone}`} className="text-sm text-gray-600 hover:text-gray-900">{item.external_contact_phone}</a>
+                        )}
+                        {item.external_contact_email && (
+                          <a href={`mailto:${item.external_contact_email}`} className="block text-sm text-gray-600 hover:text-gray-900">{item.external_contact_email}</a>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-medium text-gray-900 mb-1">Contact: {item.contact_name}</p>
+                        {item.contact_phone && (
+                          <a href={`tel:${item.contact_phone}`} className="text-sm text-gray-600 hover:text-gray-900">{item.contact_phone}</a>
+                        )}
+                        {item.contact_email && (
+                          <a href={`mailto:${item.contact_email}`} className="block text-sm text-gray-600 hover:text-gray-900">{item.contact_email}</a>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

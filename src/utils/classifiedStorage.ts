@@ -127,7 +127,8 @@ export async function getUserClassifieds(userId: string) {
 
 export async function createClassified(classifiedData: ClassifiedFormData, userId: string) {
   try {
-    // Clean the data - remove undefined/optional fields
+    const isExternal = classifiedData.is_external || false;
+
     const cleanData: any = {
       title: classifiedData.title,
       description: classifiedData.description,
@@ -136,14 +137,25 @@ export async function createClassified(classifiedData: ClassifiedFormData, userI
       category: classifiedData.category,
       condition: classifiedData.condition,
       images: classifiedData.images,
-      contact_email: classifiedData.contact_email,
-      user_id: userId,
       status: 'active',
-      is_public: classifiedData.is_public || false
+      is_public: classifiedData.is_public || false,
+      is_external: isExternal
     };
 
-    // Only add optional fields if they have values
-    if (classifiedData.contact_phone) cleanData.contact_phone = classifiedData.contact_phone;
+    if (isExternal) {
+      cleanData.created_by_user_id = userId;
+      cleanData.user_id = userId;
+      cleanData.contact_email = classifiedData.external_contact_email || '';
+      cleanData.contact_phone = classifiedData.external_contact_phone || '';
+      cleanData.external_contact_name = classifiedData.external_contact_name;
+      cleanData.external_contact_email = classifiedData.external_contact_email;
+      cleanData.external_contact_phone = classifiedData.external_contact_phone;
+    } else {
+      cleanData.user_id = userId;
+      cleanData.contact_email = classifiedData.contact_email;
+      if (classifiedData.contact_phone) cleanData.contact_phone = classifiedData.contact_phone;
+    }
+
     if (classifiedData.club_id) cleanData.club_id = classifiedData.club_id;
 
     const { data, error } = await supabase
