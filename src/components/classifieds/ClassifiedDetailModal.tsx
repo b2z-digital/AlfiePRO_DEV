@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function ClassifiedDetailModal({ classified, onClose, onUpdate }: Props) {
-  const { user } = useAuth();
+  const { user, isSuperAdmin, isStateOrgAdmin } = useAuth();
   const { addNotification } = useNotifications();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -33,9 +33,10 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
   const viewCountedRef = useRef(false);
 
   const isOwner = user?.id === classified.user_id || user?.id === classified.created_by_user_id;
+  const canManage = isOwner || isSuperAdmin || isStateOrgAdmin;
 
   useEffect(() => {
-    if (isOwner) {
+    if (canManage) {
       loadInquiries();
     }
     checkIfFavorited();
@@ -317,7 +318,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {!isOwner && !classified.is_external && (
+                  {!canManage && !classified.is_external && (
                     <>
                       <div className="grid grid-cols-2 gap-2">
                         <button
@@ -360,7 +361,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                     </>
                   )}
 
-                  {!isOwner && classified.is_external && (
+                  {!canManage && classified.is_external && (
                     <>
                       <div className="grid grid-cols-2 gap-2">
                         {classified.external_contact_email && (
@@ -401,7 +402,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                     </>
                   )}
 
-                  {isOwner && (
+                  {canManage && (
                     <>
                       <div className="grid grid-cols-2 gap-2">
                         <button

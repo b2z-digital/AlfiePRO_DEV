@@ -89,7 +89,7 @@ export async function getUserClassifieds(userId: string) {
     const { data: classifieds, error } = await supabase
       .from('classifieds')
       .select('*')
-      .eq('user_id', userId)
+      .or(`user_id.eq.${userId},created_by_user_id.eq.${userId}`)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
