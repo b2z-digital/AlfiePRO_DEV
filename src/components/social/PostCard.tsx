@@ -32,7 +32,7 @@ interface PostCardProps {
 export default function PostCard({ post, onUpdate, darkMode = false }: PostCardProps) {
   const lightMode = !darkMode;
   const { addNotification } = useNotification();
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(true);
   const [isLiked, setIsLiked] = useState(!!post.user_reaction);
   const [likeCount, setLikeCount] = useState(post.like_count);
   const [commentCount, setCommentCount] = useState(post.comment_count || 0);

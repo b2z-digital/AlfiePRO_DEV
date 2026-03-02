@@ -174,6 +174,21 @@ export const socialStorage = {
     return data;
   },
 
+  async getPostById(postId: string): Promise<SocialPost | null> {
+    const { data, error } = await supabase
+      .from('social_posts')
+      .select(`
+        *,
+        author:profiles(id, full_name, avatar_url),
+        attachments:social_media_attachments(*)
+      `)
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
   async createPost(post: Partial<SocialPost>) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
