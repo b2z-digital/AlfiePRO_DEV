@@ -56,12 +56,16 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
   const handleDelete = async () => {
     try {
       await socialStorage.deletePost(post.id);
-      addNotification('Post deleted successfully', 'success');
       setShowDeleteConfirmation(false);
+      addNotification('Post deleted successfully', 'success');
       onUpdate?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting post:', error);
-      addNotification('Failed to delete post', 'error');
+      const msg = error?.message?.includes('permission')
+        ? 'You do not have permission to delete this post'
+        : 'Failed to delete post. Please try again.';
+      addNotification(msg, 'error');
+      setShowDeleteConfirmation(false);
     }
   };
 

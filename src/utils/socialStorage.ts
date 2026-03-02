@@ -204,12 +204,10 @@ export const socialStorage = {
   },
 
   async deletePost(postId: string) {
-    const { error } = await supabase
-      .from('social_posts')
-      .delete()
-      .eq('id', postId);
+    const { data, error } = await supabase.rpc('delete_social_post', { p_post_id: postId });
 
     if (error) throw error;
+    if (data === false) throw new Error('Post not found or already deleted');
   },
 
   async getComments(postId: string) {
