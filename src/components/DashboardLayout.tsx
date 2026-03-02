@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -95,7 +95,10 @@ import { UserManagementTab } from './super-admin/UserManagementTab';
 import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
 import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
 import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
+import { ImpersonationAuditTab } from './super-admin/ImpersonationAuditTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
+import { ImpersonationBanner } from './ImpersonationBanner';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -186,6 +189,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
   const { isFeatureEnabled } = useFeatureAccess();
+  const { isImpersonating } = useImpersonation();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -1028,6 +1032,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
           { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
+          { id: 'impersonation-log', label: 'Impersonation Log', icon: Eye, description: 'Admin audit trail', path: '/impersonation-log' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1041,6 +1046,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
+      <ImpersonationBanner />
       {/* Loading overlay when switching organizations or clubs */}
       {(isTransitioning || isSwitchingClub || localSwitchingClub) && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
@@ -1059,7 +1065,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       {!isPageEditor && (
       <div
         className={`
-          fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out
+          fixed left-0 z-40 transition-all duration-300 ease-in-out
+          ${isImpersonating ? 'top-[44px]' : 'top-0'} bottom-0
           ${(collapsed && !isHoveringNav) ? 'w-[70px]' : 'w-64'}
           ${lightMode ? 'bg-white/60' : darkMode ? 'bg-slate-800/50 border-r border-slate-700/50' : 'bg-white/10 border-r border-slate-200/20'}
           backdrop-blur-xl
@@ -1576,7 +1583,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[70px]' : 'ml-64')}`}>
+      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[70px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}>
         <div className="h-full">
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <Routes>
@@ -1641,6 +1648,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/bug-reports" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <BugReportDashboard darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/impersonation-log" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ImpersonationAuditTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />

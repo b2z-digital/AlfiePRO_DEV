@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, MapPin, Upload } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, MapPin, Upload, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
@@ -26,10 +27,12 @@ interface MemberWithClub {
   state_association_id: string;
   state_association_name: string;
   avatar_url?: string;
+  user_id?: string;
 }
 
 export const NationalAssociationMembers: React.FC<NationalAssociationMembersProps> = ({ darkMode }) => {
   const { user, currentOrganization } = useAuth();
+  const { startImpersonation, isImpersonating } = useImpersonation();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<MemberWithClub[]>([]);
@@ -165,7 +168,8 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
           date_joined,
           renewal_date,
           club_id,
-          avatar_url
+          avatar_url,
+          user_id
         `)
         .in('club_id', clubIds)
         .eq('membership_status', 'active')
@@ -496,12 +500,14 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
                   Dates
                 </th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-slate-300 w-16">
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     No members found
                   </td>
                 </tr>
@@ -608,6 +614,17 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      {!isImpersonating && member.user_id && (
+                        <button
+                          onClick={() => startImpersonation(member.id)}
+                          className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                          title={`View as ${member.first_name} ${member.last_name}`}
+                        >
+                          <Eye size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

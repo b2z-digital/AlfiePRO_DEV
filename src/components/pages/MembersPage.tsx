@@ -3,6 +3,7 @@ import { Users, Plus, Search, Filter, Mail, Phone, Edit2, Trash2, ChevronRight, 
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { Member } from '../../types/member';
 import { MembershipFormModal } from '../membership/MembershipFormModal';
 import { MemberEditModal } from '../membership/MemberEditModal';
@@ -25,7 +26,9 @@ interface MembersPageProps {
 }
 
 export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateToRemittances }) => {
-  const { currentClub } = useAuth();
+  const { currentClub, isSuperAdmin, isStateOrgAdmin, isNationalOrgAdmin } = useAuth();
+  const { startImpersonation, isImpersonating } = useImpersonation();
+  const canImpersonate = isSuperAdmin || isStateOrgAdmin || isNationalOrgAdmin;
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1054,6 +1057,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                             </button>
                           ) : (
                             <>
+                              {canImpersonate && !isImpersonating && member.user_id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startImpersonation(member.id);
+                                  }}
+                                  className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors"
+                                  title={`View as ${member.first_name} ${member.last_name}`}
+                                >
+                                  <Eye size={16} />
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
