@@ -260,6 +260,30 @@ export const socialStorage = {
     return data;
   },
 
+  async updateComment(commentId: string, content: string) {
+    const { data, error } = await supabase
+      .from('social_comments')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', commentId)
+      .select(`
+        *,
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
+      `)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteComment(commentId: string) {
+    const { error } = await supabase
+      .from('social_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (error) throw error;
+  },
+
   async toggleReaction(postId: string, reactionType: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');

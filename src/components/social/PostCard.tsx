@@ -294,7 +294,7 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
       {showComments && (
         <div className={`border-t ${lightMode ? 'border-gray-200' : 'border-slate-700/50'}`}>
-          <CommentSection postId={post.id} darkMode={darkMode} onCommentAdded={() => setCommentCount(prev => prev + 1)} />
+          <CommentSection postId={post.id} darkMode={darkMode} onCommentAdded={() => setCommentCount(prev => prev + 1)} onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} />
         </div>
       )}
 
