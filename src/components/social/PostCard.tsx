@@ -192,16 +192,35 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
           <div className={`mt-4 grid gap-2 ${post.attachments.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {post.attachments.map((attachment, index) => {
               const youtubeId = attachment.file_type === 'video' ? extractYouTubeId(attachment.file_url) : null;
+              const isBlobUrl = attachment.file_url?.startsWith('blob:');
 
               return (
                 <div key={attachment.id} className="relative">
                   {attachment.file_type === 'image' ? (
+                    isBlobUrl ? (
+                      <div
+                        className={`w-full rounded-xl flex items-center justify-center ${lightMode ? 'bg-gray-100 text-gray-400' : 'bg-slate-700/50 text-slate-500'}`}
+                        style={{ height: post.attachments!.length === 1 ? '300px' : '200px' }}
+                      >
+                        <span className="text-sm">Image unavailable</span>
+                      </div>
+                    ) : (
                     <img
                       src={attachment.file_url}
                       alt={`Attachment ${index + 1}`}
                       className="w-full rounded-xl object-cover shadow-lg"
                       style={{ maxHeight: post.attachments!.length === 1 ? '500px' : '300px' }}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = `w-full rounded-xl flex items-center justify-center ${lightMode ? 'bg-gray-100 text-gray-400' : 'bg-slate-700/50 text-slate-500'}`;
+                        placeholder.style.height = '200px';
+                        placeholder.innerHTML = '<span class="text-sm">Image unavailable</span>';
+                        target.parentNode?.appendChild(placeholder);
+                      }}
                     />
+                    )
                   ) : youtubeId ? (
                     <div className="relative w-full rounded-xl overflow-hidden shadow-lg" style={{ paddingTop: '56.25%' }}>
                       <iframe
