@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
 import { MyClubMembershipsWidget } from '../membership/MyClubMembershipsWidget';
@@ -125,6 +126,7 @@ const RenewalRing: React.FC<{ daysLeft: number; totalDays: number }> = ({ daysLe
 
 export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ darkMode }) => {
   const { currentClub, user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [memberData, setMemberData] = useState<MemberData | null>(null);
@@ -138,33 +140,42 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [processingPayment, setProcessingPayment] = useState(false);
 
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
+  const effectiveMemberId = isImpersonating ? impersonationSession?.targetMemberId : null;
+
   useEffect(() => {
-    if (currentClub?.clubId && user?.id) {
+    if (currentClub?.clubId && (effectiveUserId || effectiveMemberId)) {
       fetchAllData();
     } else {
       setLoading(false);
     }
-  }, [currentClub, user]);
+  }, [currentClub, effectiveUserId, effectiveMemberId]);
 
   const fetchAllData = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      let memberQuery = supabase
+        .from('members')
+        .select(`
+          id, first_name, last_name, email, phone,
+          street, city, state, postcode,
+          is_financial, renewal_date,
+          membership_level, membership_level_custom,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+          avatar_url, country, category, date_joined
+        `)
+        .eq('club_id', currentClub?.clubId);
+
+      if (effectiveMemberId) {
+        memberQuery = memberQuery.eq('id', effectiveMemberId);
+      } else {
+        memberQuery = memberQuery.eq('user_id', effectiveUserId);
+      }
+
       const [memberResult, typesResult] = await Promise.all([
-        supabase
-          .from('members')
-          .select(`
-            id, first_name, last_name, email, phone,
-            street, city, state, postcode,
-            is_financial, renewal_date,
-            membership_level, membership_level_custom,
-            emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-            avatar_url, country, category, date_joined
-          `)
-          .eq('club_id', currentClub?.clubId)
-          .eq('user_id', user?.id)
-          .maybeSingle(),
+        memberQuery.maybeSingle(),
         supabase
           .from('membership_types')
           .select('*')
