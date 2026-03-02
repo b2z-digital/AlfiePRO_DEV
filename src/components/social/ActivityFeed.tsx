@@ -59,22 +59,22 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
     loadPosts(true);
   }, [groupId, privacy]);
 
-  // Subscribe to feed updates
   useEffect(() => {
-    const unsubscribe = socialStorage.subscribeToFeed((payload) => {
-      if (payload.eventType === 'INSERT') {
-        // Just prepend the new post instead of reloading everything
-        if (payload.new) {
-          setPosts(prev => {
-            // Check if post already exists
-            if (prev.some(p => p.id === payload.new.id)) {
-              return prev;
-            }
-            return [payload.new as SocialPost, ...prev];
-          });
+    const unsubscribe = socialStorage.subscribeToFeed(async (payload) => {
+      if (payload.eventType === 'INSERT' && payload.new?.id) {
+        if (posts.some(p => p.id === payload.new.id)) return;
+        try {
+          const fullPost = await socialStorage.getPostById(payload.new.id);
+          if (fullPost) {
+            setPosts(prev => {
+              if (prev.some(p => p.id === fullPost.id)) return prev;
+              return [fullPost, ...prev];
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching new post:', err);
         }
       } else if (payload.eventType === 'DELETE') {
-        // Remove the deleted post from the list
         setPosts(prev => prev.filter(p => p.id !== payload.old?.id));
       }
     });

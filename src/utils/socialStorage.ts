@@ -174,6 +174,21 @@ export const socialStorage = {
     return data;
   },
 
+  async getPostById(postId: string): Promise<SocialPost | null> {
+    const { data, error } = await supabase
+      .from('social_posts')
+      .select(`
+        *,
+        author:profiles(id, full_name, avatar_url),
+        attachments:social_media_attachments(*)
+      `)
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
   async createPost(post: Partial<SocialPost>) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -215,7 +230,7 @@ export const socialStorage = {
       .from('social_comments')
       .select(`
         *,
-        author:profiles!social_comments_author_id_fkey(id, full_name, avatar_url)
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .eq('post_id', postId)
       .is('parent_comment_id', null)
@@ -237,12 +252,36 @@ export const socialStorage = {
       })
       .select(`
         *,
-        author:profiles!social_comments_author_id_fkey(id, full_name, avatar_url)
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .single();
 
     if (error) throw error;
     return data;
+  },
+
+  async updateComment(commentId: string, content: string) {
+    const { data, error } = await supabase
+      .from('social_comments')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', commentId)
+      .select(`
+        *,
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
+      `)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteComment(commentId: string) {
+    const { error } = await supabase
+      .from('social_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (error) throw error;
   },
 
   async toggleReaction(postId: string, reactionType: string) {

@@ -32,9 +32,10 @@ interface PostCardProps {
 export default function PostCard({ post, onUpdate, darkMode = false }: PostCardProps) {
   const lightMode = !darkMode;
   const { addNotification } = useNotification();
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(true);
   const [isLiked, setIsLiked] = useState(!!post.user_reaction);
   const [likeCount, setLikeCount] = useState(post.like_count);
+  const [commentCount, setCommentCount] = useState(post.comment_count || 0);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
@@ -255,7 +256,7 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
             onClick={() => setShowComments(!showComments)}
             className={`transition-colors ${lightMode ? 'hover:text-blue-600 hover:underline' : 'hover:text-blue-400 hover:underline'}`}
           >
-            {post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}
+            {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
           </button>
         </div>
       </div>
@@ -293,7 +294,7 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
       {showComments && (
         <div className={`border-t ${lightMode ? 'border-gray-200' : 'border-slate-700/50'}`}>
-          <CommentSection postId={post.id} darkMode={darkMode} />
+          <CommentSection postId={post.id} darkMode={darkMode} onCommentAdded={() => setCommentCount(prev => prev + 1)} onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} />
         </div>
       )}
 
