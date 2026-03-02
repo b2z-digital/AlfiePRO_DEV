@@ -673,20 +673,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Note: Proactive session refresh is handled by Supabase's autoRefreshToken
   // and the health check in supabase.ts - no need for duplicate logic here
 
+  const impersonationOverrides = React.useMemo(() => {
+    try {
+      const stored = sessionStorage.getItem('impersonation_session');
+      if (!stored) return null;
+      const imp = JSON.parse(stored);
+      if (!imp || !imp.targetMemberId) return null;
+
+      const targetClubs: UserClub[] = (imp.targetClubs || []).map((tc: any) => ({
+        id: `imp_${tc.club_id}`,
+        clubId: tc.club_id,
+        role: tc.role || 'member',
+        club: {
+          id: tc.club_id,
+          name: tc.club_name,
+          abbreviation: tc.club_abbreviation,
+          logo: tc.club_logo,
+        },
+      }));
+
+      const defaultClubId = imp.targetDefaultClubId;
+      const targetCurrentClub = targetClubs.find(c => c.clubId === defaultClubId) || targetClubs[0] || null;
+
+      return {
+        userClubs: targetClubs,
+        currentClub: targetCurrentClub,
+        isSuperAdmin: imp.targetIsSuperAdmin === true,
+        isNationalOrgAdmin: false,
+        isStateOrgAdmin: false,
+        onboardingCompleted: imp.targetOnboardingCompleted !== false,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
   const value = {
     user,
-    userClubs,
-    currentClub,
-    currentOrganization,
+    userClubs: impersonationOverrides?.userClubs ?? userClubs,
+    currentClub: impersonationOverrides?.currentClub ?? currentClub,
+    currentOrganization: impersonationOverrides ? null : currentOrganization,
     loading,
     clubsLoaded,
     isLoggingOut,
     isSwitchingClub,
-    isSuperAdmin,
-    isNationalOrgAdmin,
-    isStateOrgAdmin,
+    isSuperAdmin: impersonationOverrides?.isSuperAdmin ?? isSuperAdmin,
+    isNationalOrgAdmin: impersonationOverrides?.isNationalOrgAdmin ?? isNationalOrgAdmin,
+    isStateOrgAdmin: impersonationOverrides?.isStateOrgAdmin ?? isStateOrgAdmin,
     userSubscription,
-    onboardingCompleted,
+    onboardingCompleted: impersonationOverrides?.onboardingCompleted ?? onboardingCompleted,
     hasPendingApplication,
     hasPendingClubApplication,
     signOut,
