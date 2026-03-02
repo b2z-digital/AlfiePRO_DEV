@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, ChevronDown, X, Pencil } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, ChevronDown, X, Pencil, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
@@ -33,13 +34,15 @@ interface MemberWithClub {
   membership_status?: string;
   state_association_name: string;
   avatar_url?: string;
+  user_id?: string;
 }
 
 export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = ({
   darkMode,
   stateAssociationId: propStateAssociationId
 }) => {
-  const { user, currentOrganization } = useAuth();
+  const { user, currentOrganization, isSuperAdmin } = useAuth();
+  const { startImpersonation, isImpersonating } = useImpersonation();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<MemberWithClub[]>([]);
@@ -158,7 +161,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       if (clubIds.length > 0) {
         const { data: clubMembersData } = await supabase
           .from('members')
-          .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status')
+          .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id')
           .in('club_id', clubIds)
           .order('last_name');
         clubMembers = clubMembersData || [];
@@ -166,7 +169,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 
       const { data: assocMembersData } = await supabase
         .from('members')
-        .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status')
+        .select('id, first_name, last_name, email, phone, membership_level, is_financial, date_joined, renewal_date, club_id, avatar_url, membership_status, user_id')
         .eq('state_association_id', stateId)
         .order('last_name');
 
@@ -761,16 +764,27 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                         </div>
                       </td>
                       <td className="px-4 py-4 text-right">
-                        <button
-                          onClick={() => {
-                            setEditingMemberId(member.id);
-                            setEditingMemberClubId(member.club_id || '');
-                          }}
-                          className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
-                          title="Edit member"
-                        >
-                          <Pencil size={16} />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {!isImpersonating && member.user_id && (
+                            <button
+                              onClick={() => startImpersonation(member.id)}
+                              className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                              title={`View as ${member.first_name} ${member.last_name}`}
+                            >
+                              <Eye size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setEditingMemberId(member.id);
+                              setEditingMemberClubId(member.club_id || '');
+                            }}
+                            className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                            title="Edit member"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

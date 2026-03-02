@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronRight, Building, Check, MapPin, Globe, Search, X, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
 import type { Organization } from '../types/club';
 import { Logo } from './Logo';
@@ -54,6 +55,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
   darkMode = true
 }) => {
   const { userClubs, currentClub, isSuperAdmin } = useAuth();
+  const { isImpersonating } = useImpersonation();
   const [isOpen, setIsOpen] = useState(false);
   const [showSlideout, setShowSlideout] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -76,15 +78,10 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
     });
   };
 
-  // Fetch all organizations (clubs, state, national)
   useEffect(() => {
     const fetchOrganizations = async () => {
-      const userId = (await supabase.auth.getUser()).data.user?.id;
-      if (!userId) return;
-
       const allOrgs: Organization[] = [];
 
-      // Fetch clubs
       if (userClubs && userClubs.length > 0) {
         userClubs.forEach(uc => {
           if (uc.club) {
@@ -99,81 +96,86 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         });
       }
 
-      // Fetch state associations
-      const { data: stateAssocs } = await supabase
-        .from('user_state_associations')
-        .select('state_association_id, role, state_associations(id, name, short_name, logo_url)')
-        .eq('user_id', userId);
+      if (!isImpersonating) {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        if (!userId) {
+          setOrganizations(allOrgs);
+          const current = allOrgs.find(o => o.id === currentClubId);
+          setCurrentOrg(current || null);
+          return;
+        }
 
-      if (stateAssocs) {
-        stateAssocs.forEach((sa: any) => {
-          if (sa.state_associations) {
-            allOrgs.push({
-              id: sa.state_associations.id,
-              name: sa.state_associations.short_name || sa.state_associations.name,
-              type: 'state',
-              logo: sa.state_associations.logo_url,
-              role: sa.role
-            });
-          }
-        });
-      }
+        const { data: stateAssocs } = await supabase
+          .from('user_state_associations')
+          .select('state_association_id, role, state_associations(id, name, short_name, logo_url)')
+          .eq('user_id', userId);
 
-      // Fetch national associations
-      const { data: nationalAssocs } = await supabase
-        .from('user_national_associations')
-        .select('national_association_id, role, national_associations(id, name, short_name, logo_url)')
-        .eq('user_id', userId);
+        if (stateAssocs) {
+          stateAssocs.forEach((sa: any) => {
+            if (sa.state_associations) {
+              allOrgs.push({
+                id: sa.state_associations.id,
+                name: sa.state_associations.short_name || sa.state_associations.name,
+                type: 'state',
+                logo: sa.state_associations.logo_url,
+                role: sa.role
+              });
+            }
+          });
+        }
 
-      if (nationalAssocs) {
-        nationalAssocs.forEach((na: any) => {
-          if (na.national_associations) {
-            allOrgs.push({
-              id: na.national_associations.id,
-              name: na.national_associations.short_name || na.national_associations.name,
-              type: 'national',
-              logo: na.national_associations.logo_url,
-              role: na.role
-            });
-          }
-        });
+        const { data: nationalAssocs } = await supabase
+          .from('user_national_associations')
+          .select('national_association_id, role, national_associations(id, name, short_name, logo_url)')
+          .eq('user_id', userId);
 
-        // If user is a national admin, fetch ALL state associations under their national association
-        const nationalAdminAssocs = nationalAssocs.filter((na: any) => na.role === 'national_admin');
-        for (const na of nationalAdminAssocs) {
-          const { data: allStateAssocs } = await supabase
-            .from('state_associations')
-            .select('id, name, short_name, logo_url')
-            .eq('national_association_id', na.national_association_id);
+        if (nationalAssocs) {
+          nationalAssocs.forEach((na: any) => {
+            if (na.national_associations) {
+              allOrgs.push({
+                id: na.national_associations.id,
+                name: na.national_associations.short_name || na.national_associations.name,
+                type: 'national',
+                logo: na.national_associations.logo_url,
+                role: na.role
+              });
+            }
+          });
 
-          if (allStateAssocs) {
-            // Only add state associations that aren't already in the list
-            const existingStateIds = new Set(allOrgs.filter(o => o.type === 'state').map(o => o.id));
+          const nationalAdminAssocs = nationalAssocs.filter((na: any) => na.role === 'national_admin');
+          for (const na of nationalAdminAssocs) {
+            const { data: allStateAssocs } = await supabase
+              .from('state_associations')
+              .select('id, name, short_name, logo_url')
+              .eq('national_association_id', na.national_association_id);
 
-            allStateAssocs.forEach((sa: any) => {
-              if (!existingStateIds.has(sa.id)) {
-                allOrgs.push({
-                  id: sa.id,
-                  name: sa.short_name || sa.name,
-                  type: 'state',
-                  logo: sa.logo_url,
-                  role: 'national_admin' // Inherited from national admin role
-                });
-              }
-            });
+            if (allStateAssocs) {
+              const existingStateIds = new Set(allOrgs.filter(o => o.type === 'state').map(o => o.id));
+
+              allStateAssocs.forEach((sa: any) => {
+                if (!existingStateIds.has(sa.id)) {
+                  allOrgs.push({
+                    id: sa.id,
+                    name: sa.short_name || sa.name,
+                    type: 'state',
+                    logo: sa.logo_url,
+                    role: 'national_admin'
+                  });
+                }
+              });
+            }
           }
         }
       }
 
       setOrganizations(allOrgs);
 
-      // Set current org
       const current = allOrgs.find(o => o.id === currentClubId);
       setCurrentOrg(current || null);
     };
 
     fetchOrganizations();
-  }, [userClubs, currentClubId]);
+  }, [userClubs, currentClubId, isImpersonating]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
