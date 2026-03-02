@@ -619,7 +619,13 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
                           <h3 className="text-xl font-bold text-white mb-1">
                             {boat.boat_type}
                           </h3>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {boat.hull_registration_number && (
+                              <>
+                                <span className="text-cyan-300/90 text-sm font-mono">{boat.hull_registration_number}</span>
+                                <span className="text-white/50">|</span>
+                              </>
+                            )}
                             <span className="text-white/90 text-sm">Sail #{boat.sail_number}</span>
                             {boat.hull && (
                               <>

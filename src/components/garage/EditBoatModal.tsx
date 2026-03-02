@@ -328,6 +328,25 @@ export const EditBoatModal: React.FC<EditBoatModalProps> = ({
 
               <div>
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Hull Registration #
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., IOM-AUS-123"
+                  value={formData.hull_registration_number}
+                  onChange={(e) => setFormData({ ...formData, hull_registration_number: e.target.value })}
+                  className={`
+                    w-full px-4 py-3 rounded-xl border transition-colors font-mono tracking-wide
+                    ${darkMode
+                      ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-cyan-500'
+                      : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500'}
+                    focus:outline-none focus:ring-2 focus:ring-cyan-500/20
+                  `}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                   Hull Type
                 </label>
                 <input
