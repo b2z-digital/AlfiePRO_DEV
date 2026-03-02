@@ -142,6 +142,8 @@ export async function createClassified(classifiedData: ClassifiedFormData, userI
       is_external: isExternal
     };
 
+    if (classifiedData.boat_class) cleanData.boat_class = classifiedData.boat_class;
+
     if (isExternal) {
       cleanData.created_by_user_id = userId;
       cleanData.user_id = userId;
