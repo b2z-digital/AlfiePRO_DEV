@@ -102,10 +102,29 @@ Thank you.
         setSending(false);
         return;
       }
-      
-      // In a real implementation, we would call an API endpoint to send emails
-      // For this demo, we'll simulate a successful send
-      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const recipientMembers = members.filter(m => recipients.includes(m.id));
+      const formattedRecipients = recipientMembers.map(member => ({
+        user_id: member.user_id || member.id,
+        email: member.email,
+        name: `${member.first_name} ${member.last_name}`,
+        first_name: member.first_name,
+        last_name: member.last_name
+      }));
+
+      const { error: sendError } = await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'meeting_minutes',
+          club_id: clubId,
+          recipients: formattedRecipients,
+          subject: subject,
+          body: message,
+          send_email: true,
+          link_url: `/meetings`
+        }
+      });
+
+      if (sendError) throw sendError;
       
       setSuccess(`Minutes shared with ${recipients.length} member${recipients.length !== 1 ? 's' : ''}`);
       
