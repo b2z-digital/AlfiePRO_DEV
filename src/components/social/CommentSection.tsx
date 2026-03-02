@@ -8,9 +8,10 @@ import { useNotification } from '../../contexts/NotificationContext';
 interface CommentSectionProps {
   postId: string;
   darkMode?: boolean;
+  onCommentAdded?: () => void;
 }
 
-export default function CommentSection({ postId, darkMode = false }: CommentSectionProps) {
+export default function CommentSection({ postId, darkMode = false, onCommentAdded }: CommentSectionProps) {
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const lightMode = !darkMode;
@@ -47,10 +48,10 @@ export default function CommentSection({ postId, darkMode = false }: CommentSect
 
       setComments(prev => [...prev, comment]);
       setNewComment('');
-      addNotification('Comment posted successfully', 'success');
+      onCommentAdded?.();
     } catch (error) {
       console.error('Error creating comment:', error);
-      addNotification('Failed to post comment', 'error');
+      addNotification('error', 'Failed to post comment');
     } finally {
       setIsSubmitting(false);
     }

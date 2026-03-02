@@ -215,7 +215,7 @@ export const socialStorage = {
       .from('social_comments')
       .select(`
         *,
-        author:profiles!social_comments_author_id_fkey(id, full_name, avatar_url)
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .eq('post_id', postId)
       .is('parent_comment_id', null)
@@ -237,7 +237,7 @@ export const socialStorage = {
       })
       .select(`
         *,
-        author:profiles!social_comments_author_id_fkey(id, full_name, avatar_url)
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .single();
 
