@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, Star } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { JoinAnotherClubModal } from './JoinAnotherClubModal';
 
 interface ClubMembership {
@@ -28,6 +29,8 @@ interface MyClubMembershipsWidgetProps {
 
 export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = ({ darkMode }) => {
   const { user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const [memberships, setMemberships] = useState<ClubMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -40,32 +43,32 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       fetchMemberships();
       fetchDefaultClub();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   const fetchDefaultClub = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
     const { data } = await supabase
       .from('profiles')
       .select('default_club_id')
-      .eq('id', user.id)
+      .eq('id', effectiveUserId)
       .maybeSingle();
 
     setDefaultClubId(data?.default_club_id || null);
   };
 
   const handleSetDefault = async (clubId: string) => {
-    if (!user) return;
+    if (!effectiveUserId || isImpersonating) return;
 
     setSettingDefault(clubId);
     try {
       const { error } = await supabase
         .from('profiles')
         .update({ default_club_id: clubId })
-        .eq('id', user.id);
+        .eq('id', effectiveUserId);
 
       if (error) throw error;
       setDefaultClubId(clubId);
@@ -77,7 +80,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
   };
 
   const fetchMemberships = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       setLoading(true);
@@ -93,7 +96,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
             logo
           )
         `)
-        .eq('member_id', user.id)
+        .eq('member_id', effectiveUserId)
         .in('status', ['active', 'pending'])
         .order('relationship_type', { ascending: false });
 
