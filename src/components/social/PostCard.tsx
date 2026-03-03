@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { SocialPost } from '../../utils/socialStorage';
 import { socialStorage } from '../../utils/socialStorage';
 import CommentSection from './CommentSection';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import ReportPostModal from './ReportPostModal';
 
 const extractYouTubeId = (url: string): string | null => {
   const patterns = [
@@ -32,12 +34,18 @@ interface PostCardProps {
 export default function PostCard({ post, onUpdate, darkMode = false }: PostCardProps) {
   const lightMode = !darkMode;
   const { addNotification } = useNotification();
+  const { user, currentClub, isSuperAdmin, isStateOrgAdmin } = useAuth();
   const [showComments, setShowComments] = useState(true);
   const [isLiked, setIsLiked] = useState(!!post.user_reaction);
   const [likeCount, setLikeCount] = useState(post.like_count);
   const [commentCount, setCommentCount] = useState(post.comment_count || 0);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  const isPostOwner = user?.id === post.author_id;
+  const isClubAdmin = currentClub?.role === 'admin' || currentClub?.role === 'super_admin';
+  const canDelete = isPostOwner || isClubAdmin || isSuperAdmin || isStateOrgAdmin;
 
   const handleLike = async () => {
     try {
@@ -56,7 +64,11 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
   const handleDelete = async () => {
     try {
-      await socialStorage.deletePost(post.id);
+      if (isPostOwner) {
+        await socialStorage.deletePost(post.id);
+      } else {
+        await socialStorage.deletePostAsAdmin(post.id);
+      }
       setShowDeleteConfirmation(false);
       addNotification('Post deleted successfully', 'success');
       onUpdate?.();
@@ -68,6 +80,11 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
       addNotification(msg, 'error');
       setShowDeleteConfirmation(false);
     }
+  };
+
+  const handleReportClick = () => {
+    setShowMenu(false);
+    setShowReportModal(true);
   };
 
   const getPrivacyIcon = () => {
@@ -127,17 +144,33 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
             {showMenu && (
               <div className={`absolute right-0 mt-2 w-48 rounded-xl shadow-xl border z-10 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
-                <button
-                  onClick={handleDeleteClick}
-                  className={`w-full flex items-center space-x-2 px-4 py-3 text-red-600 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Post</span>
-                </button>
-                <button className={`w-full flex items-center space-x-2 px-4 py-3 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'text-gray-700 hover:bg-gray-50' : 'text-slate-300 hover:bg-slate-700/50'}`}>
-                  <Flag className="w-4 h-4" />
-                  <span>Report Post</span>
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={handleDeleteClick}
+                    className={`w-full flex items-center space-x-2 px-4 py-3 text-red-600 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                  >
+                    {isPostOwner ? (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Post</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert className="w-4 h-4" />
+                        <span>Delete Post (Admin)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {!isPostOwner && (
+                  <button
+                    onClick={handleReportClick}
+                    className={`w-full flex items-center space-x-2 px-4 py-3 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'text-gray-700 hover:bg-gray-50' : 'text-slate-300 hover:bg-slate-700/50'}`}
+                  >
+                    <Flag className="w-4 h-4" />
+                    <span>Report Post</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -308,6 +341,18 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
         cancelText="Cancel"
         darkMode={darkMode}
         variant="danger"
+      />
+
+      <ReportPostModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        postId={post.id}
+        clubId={post.club_id}
+        groupId={post.group_id}
+        darkMode={darkMode}
+        onReported={() => {
+          addNotification('Post reported. Club admins have been notified.', 'success');
+        }}
       />
     </div>
   );
