@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Flag, AlertTriangle, Ban, MessageSquare, HelpCircle, ShieldAlert, Check } from 'lucide-react';
 import { socialStorage } from '../../utils/socialStorage';
 
@@ -54,8 +55,8 @@ export default function ReportPostModal({ isOpen, onClose, postId, clubId, group
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className="bg-gradient-to-r from-red-600 to-orange-600 p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -145,6 +146,7 @@ export default function ReportPostModal({ isOpen, onClose, postId, clubId, group
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
