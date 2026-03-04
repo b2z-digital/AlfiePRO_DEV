@@ -693,8 +693,8 @@ export const socialStorage = {
       .from('social_post_reports')
       .select(`
         *,
-        reporter:profiles!social_post_reports_reporter_id_fkey(id, first_name, last_name, avatar_url),
-        post:social_posts(id, content, author_id, author:profiles(id, first_name, last_name, avatar_url))
+        reporter:profiles!social_post_reports_reporter_id_profiles_fkey(id, first_name, last_name, avatar_url),
+        post:social_posts(id, content, author_id, author:profiles!social_posts_author_id_profiles_fkey(id, first_name, last_name, avatar_url))
       `)
       .order('created_at', { ascending: false });
 
