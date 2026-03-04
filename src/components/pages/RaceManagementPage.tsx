@@ -1884,7 +1884,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                           {round.name}
                         </div>
                         <div className="flex items-center gap-2">
-                          {s.enableLiveTracking && !round.completed && !round.cancelled && (
+                          {s.enableLiveTracking && !round.completed && !round.cancelled && isToday && (
                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/30 text-cyan-400" title="Live Tracking enabled">
                               <Radio size={12} />
                               Live
