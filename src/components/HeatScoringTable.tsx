@@ -411,18 +411,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Auto-update race status to "live" when scoring starts
   React.useEffect(() => {
     const autoUpdateRaceStatus = async () => {
-      if (!currentEvent?.id) return;
+      if (!currentEvent?.id || !currentEvent?.enableLiveTracking) return;
 
-      // Import the live tracking utilities dynamically
       const { getRaceStatus, updateRaceStatus } = await import('../utils/liveTrackingStorage');
 
-      // Check current status
       const statusData = await getRaceStatus(currentEvent.id);
 
-      // If status is not "live", automatically set it to "live"
-      if (statusData && statusData.status !== 'live') {
-        console.log('🟢 Auto-updating race status to "live" as scoring has begun');
-        await updateRaceStatus(currentEvent.id, 'live');
+      if (!statusData || (statusData.status !== 'live' && statusData.status !== 'event_complete')) {
+        await updateRaceStatus(currentEvent.id, 'live', undefined, currentEvent.clubId, currentEvent.currentDay || 1);
       }
     };
 

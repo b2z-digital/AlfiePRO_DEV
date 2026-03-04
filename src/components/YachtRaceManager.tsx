@@ -33,7 +33,7 @@ import { calculateHandicaps } from '../utils/handicapCalculator';
 import { RaceSettingsModal } from './RaceSettingsModal';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
-import { updateRaceStatus, getLiveTrackingEvent } from '../utils/liveTrackingStorage';
+import { updateRaceStatus } from '../utils/liveTrackingStorage';
 
 interface YachtRaceManagerProps {
   onExitScoring?: () => void;
@@ -135,28 +135,12 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   // Automatically set race status to 'on_hold' when race officer exits scoring
   useEffect(() => {
     return () => {
-      // Cleanup function runs when component unmounts
       const currentEvent = getCurrentEvent();
-      if (currentEvent?.id) {
-        console.log('🏁 YachtRaceManager: Exiting scoring, setting status to on_hold for event:', currentEvent.id);
-
-        // Check if live tracking is enabled for this event before updating status
-        getLiveTrackingEvent(currentEvent.id).then((trackingEvent) => {
-          if (trackingEvent && trackingEvent.enabled) {
-            updateRaceStatus(currentEvent.id, 'on_hold').then((success) => {
-              if (success) {
-                console.log('✅ Successfully set race status to on_hold');
-              } else {
-                console.error('❌ Failed to set race status to on_hold');
-              }
-            });
-          }
-        }).catch((error) => {
-          console.error('Error checking live tracking event:', error);
-        });
+      if (currentEvent?.id && currentEvent?.enableLiveTracking) {
+        updateRaceStatus(currentEvent.id, 'on_hold', undefined, currentEvent.clubId).catch(() => {});
       }
     };
-  }, []); // Empty deps array means this only runs on unmount
+  }, []);
 
   useEffect(() => {
     const currentEvent = getCurrentEvent();
@@ -1231,16 +1215,15 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     const autoUpdateStatusToLive = async () => {
       try {
         const currentEvent = getCurrentEvent();
-        if (currentEvent?.id && (position !== null || letterScore)) {
-          const trackingEvent = await getLiveTrackingEvent(currentEvent.id);
-          if (trackingEvent && trackingEvent.race_status !== 'live') {
-            await updateRaceStatus(currentEvent.id, 'live');
-            console.log('🚦 Auto-updated race status to live');
+        if (currentEvent?.id && currentEvent?.enableLiveTracking && (position !== null || letterScore)) {
+          const { getRaceStatus } = await import('../utils/liveTrackingStorage');
+          const statusData = await getRaceStatus(currentEvent.id);
+          if (!statusData || (statusData.status !== 'live' && statusData.status !== 'event_complete')) {
+            await updateRaceStatus(currentEvent.id, 'live', undefined, currentEvent.clubId);
           }
         }
       } catch (error) {
         console.error('❌ Error auto-updating race status:', error);
-        // Don't block result entry on status update error
       }
     };
 
@@ -1813,16 +1796,11 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     // Update race status to on_hold when exiting scoring
     try {
-      if (currentEvent?.id) {
-        const trackingEvent = await getLiveTrackingEvent(currentEvent.id);
-        if (trackingEvent) {
-          await updateRaceStatus(currentEvent.id, 'on_hold');
-          console.log('🔴 Updated race status to on_hold');
-        }
+      if (currentEvent?.id && currentEvent?.enableLiveTracking) {
+        await updateRaceStatus(currentEvent.id, 'on_hold', undefined, currentEvent.clubId);
       }
     } catch (error) {
       console.error('❌ Error updating race status:', error);
-      // Don't block navigation on status update error
     }
 
     // Always clear and navigate, even if save failed
@@ -2005,33 +1983,25 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     // Update race status based on completion state
     try {
       const currentEvent = getCurrentEvent();
-      if (currentEvent?.id) {
-        const trackingEvent = await getLiveTrackingEvent(currentEvent.id);
-        if (trackingEvent) {
-          // Determine the appropriate status
-          let newStatus: 'completed_for_day' | 'event_complete';
+      if (currentEvent?.id && currentEvent?.enableLiveTracking) {
+        let newStatus: 'completed_for_day' | 'event_complete';
 
-          if (currentEvent.multiDay) {
-            const totalDays = currentEvent.numberOfDays || 1;
-            const isLastDay = currentDay >= totalDays;
-
-            if (isLastDay) {
-              newStatus = 'event_complete';
-            } else {
-              newStatus = 'completed_for_day';
-            }
-          } else {
-            // Single day event
-            newStatus = 'event_complete';
-          }
-
-          await updateRaceStatus(currentEvent.id, newStatus);
-          console.log(`🏁 Updated race status to ${newStatus}`);
+        if (currentEvent.multiDay) {
+          const totalDays = currentEvent.numberOfDays || 1;
+          const isLastDay = currentDay >= totalDays;
+          newStatus = isLastDay ? 'event_complete' : 'completed_for_day';
+        } else {
+          newStatus = 'event_complete';
         }
+
+        const statusNote = newStatus === 'completed_for_day'
+          ? `Day ${currentDay} complete`
+          : 'Event complete';
+
+        await updateRaceStatus(currentEvent.id, newStatus, statusNote, currentEvent.clubId, currentDay);
       }
     } catch (error) {
       console.error('❌ Error updating race status:', error);
-      // Don't block navigation on status update error
     }
 
     // Always clear and navigate, even if there was an error

@@ -128,22 +128,17 @@ export const RaceTable: React.FC<RaceTableProps> = ({
   // Auto-update race status to "live" when scoring starts
   useEffect(() => {
     const autoUpdateRaceStatus = async () => {
-      if (!currentEvent?.id) return;
+      if (!currentEvent?.id || !currentEvent?.enableLiveTracking) return;
 
-      // Import the live tracking utilities dynamically
       const { getRaceStatus, updateRaceStatus } = await import('../utils/liveTrackingStorage');
 
-      // Check current status
       const statusData = await getRaceStatus(currentEvent.id);
       const activeRace = lastCompletedRace + 1;
       const raceNote = `Race ${activeRace}`;
 
-      // If status is not "live", automatically set it to "live" with race number
-      if (statusData && statusData.status !== 'live') {
-        console.log('🟢 Auto-updating race status to "live" as scoring has begun');
-        await updateRaceStatus(currentEvent.id, 'live', raceNote);
-      } else if (statusData && statusData.status === 'live' && statusData.notes !== raceNote) {
-        // Update race number if it has changed
+      if (!statusData || (statusData.status !== 'live' && statusData.status !== 'event_complete')) {
+        await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
+      } else if (statusData.status === 'live' && statusData.notes !== raceNote) {
         await updateRaceStatus(currentEvent.id, 'live', raceNote);
       }
     };
