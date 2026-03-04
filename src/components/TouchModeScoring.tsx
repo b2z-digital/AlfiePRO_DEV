@@ -813,7 +813,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       {/* Header - Race Navigation with StartBox + Race Timer */}
       <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-2">
-          {currentEvent?.id && currentEvent?.enableLiveTracking && (
+          {currentEvent?.id && currentEvent?.enableLiveTracking && !currentEvent?.completed && (
             <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
           )}
           <button

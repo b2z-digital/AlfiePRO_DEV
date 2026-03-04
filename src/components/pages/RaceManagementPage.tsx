@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Plus, Edit2, Trash2, Calendar, MapPin, Search, Filter, ChevronDown, ChevronUp, Grid, List, AlertTriangle, Flag, ArrowUpDown, Users, CheckCircle2, Clock, XCircle, PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, Edit, Send } from 'lucide-react';
+import { Trophy, Plus, Edit2, Trash2, Calendar, MapPin, Search, Filter, ChevronDown, ChevronUp, Grid, List, AlertTriangle, Flag, ArrowUpDown, Users, CheckCircle2, Clock, XCircle, PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, Edit, Send, Radio } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { getStoredRaceEvents, getStoredRaceSeries, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
@@ -1082,7 +1082,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
       cancellationReason: round.cancellationReason,
       media: seriesItem.media || [],
       livestreamUrl: seriesItem.livestreamUrl,
-      clubId: seriesItem.clubId
+      clubId: seriesItem.clubId,
+      heatManagement: round.heatManagement || null,
+      numRaces: round.numRaces,
+      dropRules: round.dropRules || [],
+      enableLiveTracking: seriesItem.enableLiveTracking,
+      enableLiveStream: round.enableLiveStream || seriesItem.enableLiveStream
     };
 
     onEventSelect(event);
@@ -1879,6 +1884,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                           {round.name}
                         </div>
                         <div className="flex items-center gap-2">
+                          {s.enableLiveTracking && !round.completed && !round.cancelled && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/30 text-cyan-400" title="Live Tracking enabled">
+                              <Radio size={12} />
+                              Live
+                            </div>
+                          )}
                           {round.completed ? (
                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
                               <CheckCircle2 size={12} />

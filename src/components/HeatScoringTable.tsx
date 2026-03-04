@@ -888,7 +888,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-wrap">
               {/* Race Status Control */}
-              {currentEvent?.id && (
+              {currentEvent?.id && currentEvent?.enableLiveTracking && !currentEvent?.completed && (
                 <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
               )}
 
