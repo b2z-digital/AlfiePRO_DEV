@@ -14,6 +14,7 @@ import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
+import { LiveStatusControl } from './LiveStatusControl';
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -816,7 +817,10 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
       {/* Header - Race Navigation with StartBox + Race Timer */}
       <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
-        <div className="w-[160px] flex items-center">
+        <div className="flex items-center gap-2">
+          {currentEvent?.id && currentEvent?.enableLiveTracking && (
+            <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
+          )}
           <button
             onClick={() => setShowStartBoxModal(true)}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all active:scale-95 ${
