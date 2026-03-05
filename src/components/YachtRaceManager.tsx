@@ -1425,17 +1425,21 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       if (raceType === 'handicap') {
         updateMemberHandicaps(race, newResults);
       }
-    }
-    
-    console.log('Setting new race results:', newResults);
-    setRaceResults(newResults);
 
-    // Auto-save to database for live tracking
-    autoSaveRaceResults(newResults);
+      console.log('Setting new race results:', newResults);
+      setRaceResults(newResults);
+
+      autoSaveRaceResults(newResults, highestConsecutiveRace);
+    } else {
+      console.log('Setting new race results:', newResults);
+      setRaceResults(newResults);
+
+      autoSaveRaceResults(newResults);
+    }
   };
 
   // Auto-save race results to database for live tracking
-  const autoSaveRaceResults = async (results: any[]) => {
+  const autoSaveRaceResults = async (results: any[], lastCompletedRaceOverride?: number) => {
     try {
       const currentEvent = getCurrentEvent();
       if (!currentEvent || !currentEvent.id) {
@@ -1443,15 +1447,16 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         return;
       }
 
-      // Update database to trigger live tracking sync
+      const effectiveLastCompletedRace = lastCompletedRaceOverride !== undefined ? lastCompletedRaceOverride : lastCompletedRace;
+
       await updateEventResults(
         currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
         results,
         skippers,
-        lastCompletedRace,
+        effectiveLastCompletedRace,
         hasDeterminedInitialHcaps,
         isManualHandicaps,
-        false, // Not completed yet
+        false,
         currentDay,
         heatManagement,
         currentNumRaces,
@@ -1459,10 +1464,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         currentEvent.multiDay ? currentEvent.dayResults : undefined
       );
 
-      console.log('✅ Auto-saved race results to database');
+      console.log('✅ Auto-saved race results to database, last_completed_race:', effectiveLastCompletedRace);
     } catch (error) {
       console.error('❌ Error auto-saving race results:', error);
-      // Don't block user interaction on save errors
     }
   };
 
@@ -3030,23 +3034,17 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     setLastCompletedRace(highestConsecutiveRace);
                     setEditingRace(null);
 
-                    // Update current_day in database for livestream overlay sync
+                    autoSaveRaceResults(raceResults, highestConsecutiveRace);
+
                     const updateCurrentDayInDB = async () => {
                       if (currentEvent?.id) {
                         try {
                           const nextRace = highestConsecutiveRace + 1;
-                          console.log('📊 Touch mode: Updating current_day to next race:', nextRace);
-                          const { data, error } = await supabase
+                          const actualEventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
+                          await supabase
                             .from('quick_races')
                             .update({ current_day: nextRace })
-                            .eq('id', currentEvent.id)
-                            .select();
-
-                          if (error) {
-                            console.error('❌ Error updating current_day:', error);
-                          } else {
-                            console.log('✅ Updated current_day to:', nextRace, data);
-                          }
+                            .eq('id', actualEventId);
                         } catch (error) {
                           console.error('❌ Exception updating current_day:', error);
                         }
