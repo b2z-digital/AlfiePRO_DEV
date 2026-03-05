@@ -95,6 +95,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const isCalculatingHandicaps = useRef(false);
+  const liveSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load user's scoring mode preference
   useEffect(() => {
@@ -1421,7 +1422,6 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       }
       setEditingRace(null);
 
-      // For handicap races, update member handicaps in the database after race completion
       if (raceType === 'handicap') {
         updateMemberHandicaps(race, newResults);
       }
@@ -1430,6 +1430,28 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       setRaceResults(newResults);
 
       autoSaveRaceResults(newResults, highestConsecutiveRace);
+
+      (async () => {
+        try {
+          const evt = getCurrentEvent();
+          if (evt?.id) {
+            const actualId = evt.isSeriesEvent ? evt.seriesId : evt.id;
+            const clubId = localStorage.getItem('currentClubId');
+            await supabase
+              .from('quick_races')
+              .update({
+                race_results: newResults,
+                last_completed_race: highestConsecutiveRace,
+                skippers: skippers,
+                current_day: highestConsecutiveRace + 1
+              })
+              .eq('id', actualId)
+              .eq('club_id', clubId);
+          }
+        } catch (e) {
+          console.error('❌ Direct DB sync error:', e);
+        }
+      })();
     } else {
       console.log('Setting new race results:', newResults);
       setRaceResults(newResults);
@@ -2995,11 +3017,26 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 raceResults={raceResults}
                 dropRules={currentDropRules}
                 updateRaceResults={(results: RaceResult[]) => {
-                  // Batch update all results from touch mode scoring
-                  // DO NOT update lastCompletedRace here - wait for user confirmation
                   console.log('📊 Touch mode: Updating race results (not marking as complete yet)');
                   setRaceResults(results);
                   autoSaveRaceResults(results);
+
+                  if (liveSyncTimerRef.current) clearTimeout(liveSyncTimerRef.current);
+                  liveSyncTimerRef.current = setTimeout(async () => {
+                    if (currentEvent?.id) {
+                      try {
+                        const actualEventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
+                        const clubId = localStorage.getItem('currentClubId');
+                        await supabase
+                          .from('quick_races')
+                          .update({ race_results: results, skippers: skippers })
+                          .eq('id', actualEventId)
+                          .eq('club_id', clubId);
+                      } catch (e) {
+                        console.error('❌ Live sync error:', e);
+                      }
+                    }
+                  }, 2000);
                 }}
                 onConfirmResults={() => {
                   // User clicked "Confirm & Apply Results" - NOW mark the race as complete
@@ -3034,23 +3071,37 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                     setLastCompletedRace(highestConsecutiveRace);
                     setEditingRace(null);
 
-                    autoSaveRaceResults(raceResults, highestConsecutiveRace);
-
-                    const updateCurrentDayInDB = async () => {
+                    const syncLiveResultsToDatabase = async () => {
                       if (currentEvent?.id) {
                         try {
                           const nextRace = highestConsecutiveRace + 1;
                           const actualEventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
-                          await supabase
+                          const clubId = localStorage.getItem('currentClubId');
+                          console.log('📊 Touch mode: Direct DB sync - race_results:', raceResults.length, 'last_completed_race:', highestConsecutiveRace, 'current_day:', nextRace);
+                          const { error } = await supabase
                             .from('quick_races')
-                            .update({ current_day: nextRace })
-                            .eq('id', actualEventId);
+                            .update({
+                              current_day: nextRace,
+                              race_results: raceResults,
+                              last_completed_race: highestConsecutiveRace,
+                              skippers: skippers
+                            })
+                            .eq('id', actualEventId)
+                            .eq('club_id', clubId);
+
+                          if (error) {
+                            console.error('❌ Error syncing live results to database:', error);
+                          } else {
+                            console.log('✅ Live results synced to database successfully');
+                          }
                         } catch (error) {
-                          console.error('❌ Exception updating current_day:', error);
+                          console.error('❌ Exception syncing live results:', error);
                         }
                       }
                     };
-                    updateCurrentDayInDB();
+                    syncLiveResultsToDatabase();
+
+                    autoSaveRaceResults(raceResults, highestConsecutiveRace);
 
                     // Auto-extend races if we've completed all current races
                     if (highestConsecutiveRace >= currentNumRaces) {
