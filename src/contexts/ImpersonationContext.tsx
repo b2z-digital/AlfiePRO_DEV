@@ -86,6 +86,7 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
     }
 
     sessionStorage.removeItem('impersonation_session');
+    localStorage.removeItem('currentClubId');
     setSession(null);
 
     window.location.href = '/';

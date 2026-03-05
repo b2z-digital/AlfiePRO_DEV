@@ -82,7 +82,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const currentUserIdRef = useRef<string | null>(null);
 
   const refreshUserClubs = async (userId?: string) => {
-    // Use provided userId or fall back to current user state
+    const impersonationActive = !!sessionStorage.getItem('impersonation_session');
+    if (impersonationActive) {
+      setClubsLoaded(true);
+      return [];
+    }
+
     const effectiveUserId = userId || user?.id;
 
     if (!effectiveUserId) {

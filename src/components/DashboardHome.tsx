@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase, retryQuery } from '../utils/supabase';
 import { protectedQuery, protectedCount, QUERY_TIMEOUTS } from '../utils/queryHelpers';
 import { isValidUUID } from '../utils/storage';
@@ -50,6 +51,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user, currentClub } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [taskCount, setTaskCount] = useState<number>(0);
   const [userFirstName, setUserFirstName] = useState<string>('');
@@ -165,11 +167,17 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, [currentClub?.clubId]);
 
   const fetchUserAvatar = async () => {
+    if (isImpersonating && impersonationSession) {
+      const fullName = impersonationSession.targetName || '';
+      const firstName = fullName.split(' ')[0] || '';
+      setUserFirstName(firstName);
+      setUserAvatarUrl(impersonationSession.targetAvatarUrl || null);
+      return;
+    }
+
     if (!user) return;
 
-    // Skip if offline
     if (!navigator.onLine) {
-      console.log('Offline - skipping user avatar fetch');
       setUserFirstName(user?.user_metadata?.first_name || '');
       return;
     }
@@ -188,12 +196,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
       if (result.data) {
         setUserAvatarUrl(result.data.avatar_url);
-        // Use profile first_name which is synced from members table
         setUserFirstName(result.data.first_name || user?.user_metadata?.first_name || '');
       }
     } catch (err) {
       console.error('Error fetching user avatar:', err);
-      // Fallback to user metadata
       setUserFirstName(user?.user_metadata?.first_name || '');
     }
   };
