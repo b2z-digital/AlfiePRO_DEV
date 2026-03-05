@@ -25,6 +25,7 @@ import {
   savePushSubscription,
   getRaceStatus,
   subscribeToRaceStatus,
+  getLiveTrackingEventByToken,
   RaceStatus,
 } from '../utils/liveTrackingStorage';
 import { calculateEventStandings } from '../utils/standingsCalculator';
@@ -43,6 +44,8 @@ type TabView = 'overview' | 'results' | 'performance' | 'heat';
 export default function LiveDashboardPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const isShortCode = window.location.pathname.startsWith('/t/');
+  const basePrefix = isShortCode ? `/t/${token}` : `/live/${token}`;
 
   const [session, setSession] = useState<LiveTrackingSession | null>(null);
   const [tracking, setTracking] = useState<SessionSkipperTracking | null>(null);
@@ -100,17 +103,20 @@ export default function LiveDashboardPage() {
     try {
       setLoading(true);
 
-      const { data: trackingEvent, error: eventError } = await supabase
-        .from('live_tracking_events')
-        .select('event_id')
-        .eq('access_token', token)
-        .single();
+      if (!token) {
+        navigate('/');
+        return;
+      }
 
-      if (eventError) throw eventError;
+      const trackingEvent = await getLiveTrackingEventByToken(token);
+      if (!trackingEvent) {
+        navigate(basePrefix);
+        return;
+      }
 
       const currentSession = await getCurrentTrackingSession(trackingEvent.event_id);
       if (!currentSession) {
-        navigate(`/live/${token}`);
+        navigate(basePrefix);
         return;
       }
 
@@ -464,7 +470,7 @@ export default function LiveDashboardPage() {
           console.log('🔄 Redirecting to skipper selection page...');
           localStorage.removeItem('alfie_current_tracking_session');
           localStorage.removeItem('alfie_tracking_skipper');
-          navigate(`/live/${token}`);
+          navigate(basePrefix);
           return;
         }
       }
@@ -742,7 +748,7 @@ export default function LiveDashboardPage() {
     sessionStorage.removeItem('alfie_live_notifications_enabled');
 
     // Navigate to skipper selection
-    navigate(`/live/${token}`);
+    navigate(basePrefix);
   };
 
   const getHeatColor = (heat: HeatDesignation): string => {
