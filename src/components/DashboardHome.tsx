@@ -51,7 +51,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user, currentClub } = useAuth();
-  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const { isImpersonating, effectiveProfile: impersonatedProfile } = useImpersonation();
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [taskCount, setTaskCount] = useState<number>(0);
   const [userFirstName, setUserFirstName] = useState<string>('');
@@ -167,11 +167,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, [currentClub?.clubId]);
 
   const fetchUserAvatar = async () => {
-    if (isImpersonating && impersonationSession) {
-      const targetName = impersonationSession.targetName || '';
-      const targetFirstName = targetName.split(' ')[0] || '';
-      setUserFirstName(targetFirstName);
-      setUserAvatarUrl(impersonationSession.targetAvatarUrl || null);
+    if (isImpersonating && impersonatedProfile) {
+      setUserFirstName(impersonatedProfile.firstName);
+      setUserAvatarUrl(impersonatedProfile.avatarUrl);
       return;
     }
 

@@ -22,9 +22,18 @@ interface ImpersonationSession {
   targetOnboardingCompleted: boolean;
 }
 
+interface EffectiveProfile {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  avatarUrl: string | null;
+}
+
 interface ImpersonationContextType {
   isImpersonating: boolean;
   session: ImpersonationSession | null;
+  effectiveUserId: string | null;
+  effectiveProfile: EffectiveProfile | null;
   startImpersonation: (memberId: string, reason?: string) => Promise<void>;
   stopImpersonation: () => Promise<void>;
 }
@@ -91,10 +100,26 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
     window.location.href = '/';
   }, [session]);
 
+  const effectiveUserId = session?.targetUserId ?? null;
+
+  const effectiveProfile: EffectiveProfile | null = session ? (() => {
+    const nameParts = (session.targetName || '').split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    return {
+      firstName,
+      lastName,
+      fullName: session.targetName || '',
+      avatarUrl: session.targetAvatarUrl || null,
+    };
+  })() : null;
+
   return (
     <ImpersonationContext.Provider value={{
       isImpersonating: !!session,
       session,
+      effectiveUserId,
+      effectiveProfile,
       startImpersonation,
       stopImpersonation
     }}>
