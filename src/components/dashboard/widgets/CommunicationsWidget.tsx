@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, Bell, Mail, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useImpersonation } from '../../../contexts/ImpersonationContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
@@ -15,6 +16,7 @@ interface CommsStats {
 export const CommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { currentClub, user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const [stats, setStats] = useState<CommsStats>({
     unreadNotifications: 0,
     recentMessages: 0,
@@ -24,12 +26,14 @@ export const CommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
   const darkMode = true;
   const themeColors = useWidgetTheme(colorTheme);
 
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
+
   useEffect(() => {
     loadCommsStats();
-  }, [currentClub, user]);
+  }, [currentClub, effectiveUserId]);
 
   const loadCommsStats = async () => {
-    if (!currentClub?.clubId || !user?.id) {
+    if (!currentClub?.clubId || !effectiveUserId) {
       setLoading(false);
       return;
     }
@@ -38,7 +42,7 @@ export const CommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       const { data: notifications, error: notifError } = await supabase
         .from('notifications')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .eq('read', false);
 
       if (notifError) throw notifError;

@@ -233,6 +233,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsSwitchingClub(false);
       }
 
+      // During impersonation, skip overwriting currentClub/localStorage
+      // The impersonation context and overrides handle club selection
+      const isCurrentlyImpersonating = !!sessionStorage.getItem('impersonation_session');
+      if (isCurrentlyImpersonating) {
+        return validClubs;
+      }
+
       // Set current club if none is selected or restore from localStorage
       // Get user's default club preference
       let defaultClubId: string | null = null;
