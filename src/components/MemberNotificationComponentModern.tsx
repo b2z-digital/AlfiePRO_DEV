@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoreHorizontal, RefreshCw, Paperclip, Download, ListChecks } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
 import { RichTextEditor } from './communications/RichTextEditor';
 import EmojiPicker from 'emoji-picker-react';
@@ -66,8 +67,10 @@ interface MemberNotificationComponentModernProps {
 
 export const MemberNotificationComponentModern: React.FC<MemberNotificationComponentModernProps> = ({ darkMode, initialShowCompose = false }) => {
   const { user, currentClub, currentOrganization } = useAuth();
+  const { isImpersonating, effectiveUserId, effectiveProfile: impersonatedProfile } = useImpersonation();
   const contextId = currentOrganization?.id || currentClub?.clubId;
   const { addNotification } = useNotifications();
+  const viewingUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
 
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'drafts'>('inbox');
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -139,16 +142,15 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
     loadSidebarPreference();
   }, [user?.id]);
 
-  // Fetch data
   useEffect(() => {
-    if (user?.id) {
+    if (viewingUserId) {
       fetchNotifications();
       fetchMembers();
       fetchCurrentUserProfile();
       fetchDrafts();
       fetchMarketingLists();
     }
-  }, [contextId, user]);
+  }, [contextId, viewingUserId]);
 
   // Fetch non-member recipient details when recipients change
   useEffect(() => {
@@ -207,6 +209,15 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
   }, [composeForm.recipients, members, contextId]);
 
   const fetchCurrentUserProfile = async () => {
+    if (isImpersonating && impersonatedProfile) {
+      setCurrentUserProfile({
+        first_name: impersonatedProfile.firstName,
+        last_name: impersonatedProfile.lastName,
+        avatar_url: impersonatedProfile.avatarUrl || undefined,
+      });
+      return;
+    }
+
     if (!user?.id) return;
 
     try {
@@ -231,22 +242,21 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
   };
 
   const fetchNotifications = async () => {
-    if (!user?.id) return;
+    if (!viewingUserId) return;
 
     try {
       setLoading(true);
 
-      // Fetch ALL notifications for the user across all clubs
       const { data: inboxData, error: inboxError } = await supabase
         .from('notifications')
         .select('*, clubs(name)')
-        .eq('user_id', user.id)
+        .eq('user_id', viewingUserId)
         .order('sent_at', { ascending: false });
 
       const { data: sentData, error: sentError } = await supabase
         .from('notifications')
         .select('*, clubs(name)')
-        .eq('sender_id', user.id)
+        .eq('sender_id', viewingUserId)
         .order('sent_at', { ascending: false });
 
       if (inboxError) throw inboxError;

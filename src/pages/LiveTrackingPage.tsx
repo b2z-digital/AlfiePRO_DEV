@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Search, CheckCircle, Loader, Users, MonitorPlay } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import {
@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 export default function LiveTrackingPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePrefix = location.pathname.startsWith('/t/') ? `/t/${token}` : `/live/${token}`;
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -232,7 +234,7 @@ export default function LiveTrackingPage() {
       const existingSession = await getCurrentTrackingSession(event.event_id);
       if (existingSession) {
         // Redirect to dashboard
-        navigate(`/live/${token}/dashboard`);
+        navigate(`${basePrefix}/dashboard`);
         return;
       }
 
@@ -354,7 +356,7 @@ export default function LiveTrackingPage() {
       console.log('✅ Session created successfully:', session.id);
 
       // Navigate to dashboard
-      navigate(`/live/${token}/dashboard`);
+      navigate(`${basePrefix}/dashboard`);
     } catch (error: any) {
       console.error('❌ Error starting tracking:', error);
 
@@ -520,7 +522,7 @@ export default function LiveTrackingPage() {
 
                 {/* PRO Broadcast Tile */}
                 <button
-                  onClick={() => navigate(`/live/${token}/pro-broadcast`)}
+                  onClick={() => navigate(`${basePrefix}/pro-broadcast`)}
                   className="group relative overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                 >
                   <div className="relative z-10">

@@ -150,7 +150,17 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
 
   const loadReports = async () => {
     try {
-      const data = await socialStorage.getPostReports(clubId);
+      if (!user) return;
+      const { data: adminClubs } = await supabase
+        .from('user_clubs')
+        .select('club_id')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin']);
+
+      const clubIds = adminClubs?.map(c => c.club_id) || [];
+      if (clubIds.length === 0) return;
+
+      const data = await socialStorage.getPostReports(clubIds);
       setReports(data);
     } catch (error) {
       console.error('Error loading reports:', error);

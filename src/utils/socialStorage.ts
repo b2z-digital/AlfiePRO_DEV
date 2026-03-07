@@ -671,34 +671,48 @@ export const socialStorage = {
         .in('role', ['admin', 'super_admin']);
 
       if (admins && admins.length > 0) {
-        const notifications = admins.map(admin => ({
-          user_id: admin.user_id,
-          actor_id: user.id,
-          notification_type: 'post_reported',
-          post_id: postId,
-          title: 'Post Reported',
-          message: `A post has been reported for: ${reason}`,
-          is_read: false
-        }));
+        const { data: reporter } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .maybeSingle();
 
-        await supabase.from('social_notifications').insert(notifications);
+        const reporterName = reporter ? `${reporter.first_name || ''} ${reporter.last_name || ''}`.trim() : 'A member';
+        const reasonLabel = reason.charAt(0).toUpperCase() + reason.slice(1).replace(/_/g, ' ');
+
+        const notifications = admins
+          .filter(admin => admin.user_id !== user.id)
+          .map(admin => ({
+            user_id: admin.user_id,
+            club_id: clubId,
+            type: 'community',
+            subject: 'Post Reported',
+            body: `${reporterName} reported a post for: ${reasonLabel}. Please review in Community > Post Reports.`,
+            notification_category: 'community',
+            push_status: 'pending',
+            link_url: '/community'
+          }));
+
+        if (notifications.length > 0) {
+          await supabase.from('notifications').insert(notifications);
+        }
       }
     }
 
     return data;
   },
 
-  async getPostReports(clubId?: string, status?: string) {
+  async getPostReports(clubIds?: string[], status?: string) {
     let query = supabase
       .from('social_post_reports')
       .select(`
         *,
-        reporter:profiles!social_post_reports_reporter_id_fkey(id, first_name, last_name, avatar_url),
-        post:social_posts(id, content, author_id, author:profiles(id, first_name, last_name, avatar_url))
+        reporter:profiles!social_post_reports_reporter_id_profiles_fkey(id, first_name, last_name, avatar_url),
+        post:social_posts(id, content, author_id, author:profiles!social_posts_author_id_profiles_fkey(id, first_name, last_name, avatar_url))
       `)
       .order('created_at', { ascending: false });
 
-    if (clubId) query = query.eq('club_id', clubId);
+    if (clubIds && clubIds.length > 0) query = query.in('club_id', clubIds);
     if (status) query = query.eq('status', status);
 
     const { data, error } = await query;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
 import { Users, UserPlus, Settings, Clock, ArrowLeft, Star, ChevronDown, ChevronUp } from 'lucide-react';
 import PostCreationModal from '../components/social/PostCreationModal';
@@ -14,6 +15,7 @@ interface CommunityPageProps {
 
 export default function CommunityPage({ darkMode = false }: CommunityPageProps) {
   const { user, currentClub } = useAuth();
+  const { isImpersonating, effectiveProfile: impersonatedProfile, effectiveUserId } = useImpersonation();
   const lightMode = !darkMode;
   const [profile, setProfile] = useState<any>(null);
   const [coverImage, setCoverImage] = useState<string>('');
@@ -59,16 +61,40 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const loadProfile = async () => {
     if (!user) return;
 
+    const profileUserId = isImpersonating && effectiveUserId ? effectiveUserId : user.id;
+
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', profileUserId)
       .maybeSingle();
 
-    if (data) {
-      setProfile(data);
+    if (isImpersonating && impersonatedProfile && !data) {
+      setProfile({
+        id: effectiveUserId,
+        full_name: impersonatedProfile.fullName,
+        first_name: impersonatedProfile.firstName,
+        last_name: impersonatedProfile.lastName,
+        avatar_url: impersonatedProfile.avatarUrl,
+      });
+    } else if (data) {
+      if (isImpersonating && impersonatedProfile) {
+        setProfile({
+          ...data,
+          full_name: impersonatedProfile.fullName || data.full_name,
+          avatar_url: impersonatedProfile.avatarUrl || data.avatar_url,
+        });
+      } else {
+        setProfile(data);
+      }
+    }
 
-      const clubId = data.default_club_id || currentClub?.clubId;
+    const effectiveData = isImpersonating && impersonatedProfile
+      ? { default_club_id: currentClub?.clubId }
+      : data;
+
+    if (effectiveData) {
+      const clubId = effectiveData.default_club_id || currentClub?.clubId;
       if (clubId) {
         const { data: club } = await supabase
           .from('clubs')
@@ -127,11 +153,13 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const loadActivityPoints = async () => {
     if (!user) return;
 
+    const activityUserId = isImpersonating && effectiveUserId ? effectiveUserId : user.id;
+
     try {
       const { data } = await supabase
         .from('member_activity_points')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', activityUserId)
         .maybeSingle();
 
       setActivityPoints(data);

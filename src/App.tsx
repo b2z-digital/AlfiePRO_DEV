@@ -231,6 +231,8 @@ function App() {
 
         {/* Live Tracking Routes (Public) */}
         <Route path="/t/:token" element={<LiveTrackingPage />} />
+        <Route path="/t/:token/dashboard" element={<LiveDashboardPage />} />
+        <Route path="/t/:token/pro-broadcast" element={<ProBroadcastView />} />
         <Route path="/live/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token/dashboard" element={<LiveDashboardPage />} />
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
