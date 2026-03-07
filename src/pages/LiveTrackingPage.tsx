@@ -8,6 +8,7 @@ import {
   getCurrentTrackingSession,
 } from '../utils/liveTrackingStorage';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import type { LiveTrackingEvent } from '../types/liveTracking';
 import { format } from 'date-fns';
 
@@ -17,6 +18,8 @@ export default function LiveTrackingPage() {
   const location = useLocation();
   const basePrefix = location.pathname.startsWith('/t/') ? `/t/${token}` : `/live/${token}`;
   const { user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
 
   const [loading, setLoading] = useState(true);
   const [trackingEvent, setTrackingEvent] = useState<LiveTrackingEvent | null>(null);
@@ -40,12 +43,12 @@ export default function LiveTrackingPage() {
   // Look up member_id from user_id when user is authenticated
   useEffect(() => {
     const lookupMemberId = async () => {
-      if (user?.id) {
+      if (effectiveUserId) {
         try {
           const { data, error } = await supabase
             .from('members')
             .select('id')
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId)
             .maybeSingle();
 
           if (data) {
@@ -65,7 +68,7 @@ export default function LiveTrackingPage() {
     };
 
     lookupMemberId();
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   const loadTrackingEvent = async () => {
     try {

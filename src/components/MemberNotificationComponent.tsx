@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mail, Send, Inbox, Search, User, Clock, Check, AlertTriangle, X, Plus, Users, Filter, Trash2, ChevronLeft, ChevronRight, Star, Archive, MessageSquare, Smile, Paperclip, Calendar, Sparkles, Reply, Forward, MailCheck, MailX, MailWarning, Trophy, UserCheck, Newspaper, Bell, FileText, Save, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
 import { RichTextEditor } from './communications/RichTextEditor';
 import { useRealtime } from './communications/useRealtime';
@@ -53,8 +54,9 @@ interface MemberNotificationComponentProps {
 
 export const MemberNotificationComponent: React.FC<MemberNotificationComponentProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
 
-  // Get current context ID (club or organization)
   const contextId = currentOrganization?.id || currentClub?.clubId;
   const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'compose' | 'drafts'>('inbox');
@@ -272,37 +274,35 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
   };
 
   const fetchNotifications = async () => {
-    if (!user || !contextId) return;
+    const queryUserId = effectiveUserId || user?.id;
+    if (!queryUserId || !contextId) return;
 
     try {
       setLoading(true);
 
-      // Get all clubs and associations the user belongs to
       const [clubsData, stateAssocData, nationalAssocData] = await Promise.all([
-        supabase.from('user_clubs').select('club_id').eq('user_id', user.id),
-        supabase.from('user_state_associations').select('state_association_id').eq('user_id', user.id),
-        supabase.from('user_national_associations').select('national_association_id').eq('user_id', user.id)
+        supabase.from('user_clubs').select('club_id').eq('user_id', queryUserId),
+        supabase.from('user_state_associations').select('state_association_id').eq('user_id', queryUserId),
+        supabase.from('user_national_associations').select('national_association_id').eq('user_id', queryUserId)
       ]);
 
       const userClubIds = clubsData.data?.map(c => c.club_id) || [];
       const userStateIds = stateAssocData.data?.map(s => s.state_association_id) || [];
       const userNationalIds = nationalAssocData.data?.map(n => n.national_association_id) || [];
 
-      // Fetch inbox notifications (received by current user from ANY of their clubs)
       const { data: inboxData, error: inboxError } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', queryUserId)
         .in('club_id', [...userClubIds, ...userStateIds, ...userNationalIds, contextId].filter(Boolean))
         .order('sent_at', { ascending: false });
 
       if (inboxError) throw inboxError;
 
-      // Fetch sent notifications (if user is admin/editor)
       const { data: userClub } = await supabase
         .from('user_clubs')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', queryUserId)
         .eq('club_id', contextId)
         .single();
 
@@ -640,7 +640,7 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId)
-        .eq('user_id', user?.id);
+        .eq('user_id', effectiveUserId);
 
       if (error) throw error;
 
@@ -2030,6 +2030,8 @@ interface MeetingAttendanceButtonsProps {
 
 const MeetingAttendanceButtons: React.FC<MeetingAttendanceButtonsProps> = ({ notificationId, darkMode, onResponse }) => {
   const { user } = useAuth();
+  const { isImpersonating, session: impSession } = useImpersonation();
+  const attendanceUserId = isImpersonating ? impSession?.targetUserId : user?.id;
   const { addNotification } = useNotifications();
   const [attendance, setAttendance] = useState<{status: string, responded_at: string} | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2058,7 +2060,7 @@ const MeetingAttendanceButtons: React.FC<MeetingAttendanceButtonsProps> = ({ not
       const { data, error } = await supabase
         .from('meeting_attendance')
         .select('status, responded_at')
-        .eq('user_id', user?.id)
+        .eq('user_id', attendanceUserId)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -2077,11 +2079,10 @@ const MeetingAttendanceButtons: React.FC<MeetingAttendanceButtonsProps> = ({ not
     try {
       setUpdating(true);
 
-      // Update attendance
       const { error } = await supabase
         .from('meeting_attendance')
         .update({ status, responded_at: new Date().toISOString() })
-        .eq('user_id', user?.id)
+        .eq('user_id', attendanceUserId)
         .order('created_at', { ascending: false })
         .limit(1);
 

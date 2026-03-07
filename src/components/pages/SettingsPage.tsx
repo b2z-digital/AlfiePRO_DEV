@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { ClubSettings } from './ClubSettings';
@@ -41,6 +42,8 @@ type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'assoc
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { can } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
@@ -194,7 +197,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
         .from('members')
         .select('is_financial, renewal_date')
         .eq('club_id', currentClub?.clubId)
-        .eq('user_id', user?.id)
+        .eq('user_id', effectiveUserId)
         .limit(1)
         .maybeSingle();
       

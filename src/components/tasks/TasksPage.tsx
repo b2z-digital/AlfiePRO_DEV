@@ -7,6 +7,7 @@ import { TaskListItem } from './TaskListItem';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
 import { Task as TaskType } from '../../types/task';
 import { createTask, updateTask } from '../../utils/taskStorage';
@@ -35,6 +36,8 @@ interface TasksPageProps {
 
 export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
   const { currentClub, currentOrganization, user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { can, isMember } = usePermissions();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,16 +70,16 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
       setLoading(true);
       setError(null);
 
-      if (!user?.id) {
+      const queryUserId = effectiveUserId || user?.id;
+      if (!queryUserId) {
         throw new Error('User not authenticated');
       }
 
-      // Get all clubs and associations the user belongs to
       const [clubsData, stateAssocData, nationalAssocData, memberData] = await Promise.all([
-        supabase.from('user_clubs').select('club_id').eq('user_id', user.id),
-        supabase.from('user_state_associations').select('state_association_id').eq('user_id', user.id),
-        supabase.from('user_national_associations').select('national_association_id').eq('user_id', user.id),
-        supabase.from('members').select('id').eq('user_id', user.id)
+        supabase.from('user_clubs').select('club_id').eq('user_id', queryUserId),
+        supabase.from('user_state_associations').select('state_association_id').eq('user_id', queryUserId),
+        supabase.from('user_national_associations').select('national_association_id').eq('user_id', queryUserId),
+        supabase.from('members').select('id').eq('user_id', queryUserId)
       ]);
 
       const userClubIds = clubsData.data?.map(c => c.club_id) || [];

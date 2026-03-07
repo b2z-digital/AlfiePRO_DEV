@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
 import {
   Play,
@@ -250,6 +251,8 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 
 export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const { user, currentClub, currentOrganization, isSuperAdmin } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
   const { addNotification } = useNotification();
 
@@ -542,7 +545,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               view_count
             )
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId!)
           .order('added_at', { ascending: false });
 
         if (watchlistData) {
