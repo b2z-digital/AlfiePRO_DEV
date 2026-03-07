@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star } from 'lucide-react';
+import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star, Users } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -7,6 +7,7 @@ import { Avatar } from '../ui/Avatar';
 import { AvatarCropModal } from '../ui/AvatarCropModal';
 import imageCompression from 'browser-image-compression';
 import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
+import { AdminAddToClubModal } from './AdminAddToClubModal';
 
 interface MemberEditModalProps {
   isOpen: boolean;
@@ -73,6 +74,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [memberClubs, setMemberClubs] = useState<Array<{ club_id: string; club_name: string }>>([]);
   const [defaultClubId, setDefaultClubId] = useState<string | null>(null);
   const [settingDefaultClub, setSettingDefaultClub] = useState(false);
+  const [showAddToClubModal, setShowAddToClubModal] = useState(false);
+  const [availableClubs, setAvailableClubs] = useState<Array<{ id: string; name: string; abbreviation?: string }>>([]);
 
   useEffect(() => {
     if (isOpen && memberId) {
@@ -153,6 +156,18 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       setMembershipTypes(data || []);
     } catch (error: any) {
       console.error('Error fetching membership types:', error);
+    }
+  };
+
+  const fetchAvailableClubs = async () => {
+    try {
+      const { data } = await supabase
+        .from('clubs')
+        .select('id, name, abbreviation')
+        .order('name', { ascending: true });
+      setAvailableClubs(data || []);
+    } catch (err) {
+      console.error('Error fetching clubs:', err);
     }
   };
 
@@ -895,6 +910,49 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                   </div>
                 </div>
 
+                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    <Users size={20} className="text-blue-400" />
+                    Club Memberships
+                  </h3>
+                  {memberClubs.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {memberClubs.map(mc => (
+                        <div
+                          key={mc.club_id}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg ${
+                            mc.club_id === clubId
+                              ? darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'
+                              : darkMode ? 'bg-slate-800/50 border border-slate-700/30' : 'bg-slate-50 border border-slate-200'
+                          }`}
+                        >
+                          <Building size={14} className={mc.club_id === clubId ? 'text-blue-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                          <span className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                            {mc.club_name}
+                          </span>
+                          {mc.club_id === clubId && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">Current</span>
+                          )}
+                          {mc.club_id === defaultClubId && (
+                            <Star size={12} className="text-amber-400 fill-amber-400" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchAvailableClubs();
+                      setShowAddToClubModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Add to Another Club
+                  </button>
+                </div>
+
                 {memberData.user_id && memberClubs.length > 1 && (
                   <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                     <h3 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -1052,6 +1110,18 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           darkMode={darkMode}
         />
       )}
+
+      <AdminAddToClubModal
+        isOpen={showAddToClubModal}
+        onClose={() => setShowAddToClubModal(false)}
+        memberIds={[memberId]}
+        availableClubs={availableClubs}
+        darkMode={darkMode}
+        onSuccess={() => {
+          fetchMemberData();
+          onSuccess?.();
+        }}
+      />
     </div>
   );
 };
