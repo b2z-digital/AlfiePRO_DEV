@@ -27,6 +27,11 @@ export const ImpersonationPreloaderModal: React.FC<ImpersonationPreloaderModalPr
       return;
     }
 
+    const htmlPreloader = document.getElementById('impersonation-preloader');
+    if (htmlPreloader) {
+      htmlPreloader.style.display = 'none';
+    }
+
     const steps: { step: LoadingStep; duration: number; progress: number }[] = [
       { step: 'switching', duration: 1200, progress: 33 },
       { step: 'loading', duration: 1500, progress: 66 },

@@ -87,6 +87,11 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
         setPreloaderTarget(null);
       }, 4000);
       return () => clearTimeout(timer);
+    } else {
+      const htmlPreloader = document.getElementById('impersonation-preloader');
+      if (htmlPreloader) {
+        htmlPreloader.style.display = 'none';
+      }
     }
   }, [showPreloader]);
 
