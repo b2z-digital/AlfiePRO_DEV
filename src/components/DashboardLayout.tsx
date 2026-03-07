@@ -189,7 +189,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
   const { isFeatureEnabled } = useFeatureAccess();
-  const { isImpersonating } = useImpersonation();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -1318,7 +1319,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       const { data: directRole } = await supabase
                         .from('user_state_associations')
                         .select('role')
-                        .eq('user_id', user?.id)
+                        .eq('user_id', effectiveUserId)
                         .eq('state_association_id', orgId)
                         .maybeSingle();
 
@@ -1329,7 +1330,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         const { data: nationalAdminRole } = await supabase
                           .from('user_national_associations')
                           .select('role')
-                          .eq('user_id', user?.id)
+                          .eq('user_id', effectiveUserId)
                           .eq('national_association_id', stateAssocInfo.national_association_id)
                           .maybeSingle();
 
@@ -1356,7 +1357,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     const { data: nationalAssoc } = await supabase
                       .from('user_national_associations')
                       .select('national_association_id, role, national_associations(name, short_name)')
-                      .eq('user_id', user?.id)
+                      .eq('user_id', effectiveUserId)
                       .eq('national_association_id', orgId)
                       .maybeSingle();
 

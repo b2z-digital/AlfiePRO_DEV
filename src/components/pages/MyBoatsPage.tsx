@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Anchor, Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 
 interface Boat {
@@ -18,6 +19,8 @@ interface MyBoatsPageProps {
 
 export const MyBoatsPage: React.FC<MyBoatsPageProps> = ({ darkMode }) => {
   const { user, currentClub } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { addNotification } = useNotifications();
   const [boats, setBoats] = useState<Boat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,10 +35,10 @@ export const MyBoatsPage: React.FC<MyBoatsPageProps> = ({ darkMode }) => {
   });
 
   useEffect(() => {
-    if (currentClub?.clubId && user?.id) {
+    if (currentClub?.clubId && effectiveUserId) {
       fetchMemberAndBoats();
     }
-  }, [currentClub, user]);
+  }, [currentClub, effectiveUserId]);
 
   const fetchMemberAndBoats = async () => {
     try {
@@ -45,7 +48,7 @@ export const MyBoatsPage: React.FC<MyBoatsPageProps> = ({ darkMode }) => {
         .from('members')
         .select('id')
         .eq('club_id', currentClub?.clubId)
-        .eq('user_id', user?.id)
+        .eq('user_id', effectiveUserId)
         .maybeSingle();
 
       if (memberError) throw memberError;

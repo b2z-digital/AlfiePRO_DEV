@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { BoatDetailView } from '../components/garage/BoatDetailView';
 import { AddBoatModal } from '../components/garage/AddBoatModal';
@@ -53,6 +54,8 @@ interface MyGaragePageProps {
 
 export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { addNotification } = useNotifications();
   const [boats, setBoats] = useState<Boat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +69,10 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
   const [boatForImageUpload, setBoatForImageUpload] = useState<Boat | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
+    if (effectiveUserId) {
       fetchGarageData();
     }
-  }, [currentClub, currentOrganization, user]);
+  }, [currentClub, currentOrganization, effectiveUserId]);
 
   const fetchGarageData = async () => {
     try {
@@ -80,7 +83,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
       const { data: memberData, error: memberError } = await supabase
         .from('members')
         .select('id, club_id')
-        .eq('user_id', user?.id);
+        .eq('user_id', effectiveUserId);
 
       if (memberError) throw memberError;
       if (!memberData || memberData.length === 0) {

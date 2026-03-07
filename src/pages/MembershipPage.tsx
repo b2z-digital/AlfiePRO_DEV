@@ -3,11 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { MembershipForm } from '../components/membership/MembershipForm';
 
 export const MembershipPage: React.FC = () => {
   const { clubId } = useParams<{ clubId: string }>();
   const { user, currentClub } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
@@ -51,7 +54,7 @@ export const MembershipPage: React.FC = () => {
             .from('members')
             .select('id, is_financial, renewal_date')
             .eq('club_id', targetClubId)
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId!)
             .maybeSingle();
           
           if (memberError) throw memberError;

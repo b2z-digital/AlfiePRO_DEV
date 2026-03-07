@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, ChevronDown, X, Pencil, Eye } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, X, Pencil, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
@@ -13,6 +13,7 @@ import { ManageFiltersModal } from './ManageFiltersModal';
 import { SaveFilterModal } from './SaveFilterModal';
 import AssociationMemberImportModal from './AssociationMemberImportModal';
 import { MemberEditModal } from './MemberEditModal';
+import { AdminAddToClubModal } from './AdminAddToClubModal';
 
 interface StateAssociationMembersProps {
   darkMode: boolean;
@@ -64,11 +65,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [editingMemberClubId, setEditingMemberClubId] = useState<string>('');
 
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
-  const [showBulkAssign, setShowBulkAssign] = useState(false);
-  const [bulkClubId, setBulkClubId] = useState('');
-  const [bulkMembershipTypeId, setBulkMembershipTypeId] = useState('');
-  const [bulkFinancialStatus, setBulkFinancialStatus] = useState<'financial' | 'unfinancial' | ''>('');
-  const [clubMembershipTypes, setClubMembershipTypes] = useState<any[]>([]);
+  const [showAddToClubModal, setShowAddToClubModal] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
 
   useEffect(() => {
@@ -85,24 +82,6 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   useEffect(() => {
     filterMembers();
   }, [members, searchTerm, selectedClub, selectedStatus, advancedFilterConfig]);
-
-  useEffect(() => {
-    if (bulkClubId) {
-      loadMembershipTypesForClub(bulkClubId);
-    } else {
-      setClubMembershipTypes([]);
-      setBulkMembershipTypeId('');
-    }
-  }, [bulkClubId]);
-
-  const loadMembershipTypesForClub = async (clubId: string) => {
-    const { data } = await supabase
-      .from('membership_types')
-      .select('id, name, amount')
-      .eq('club_id', clubId)
-      .order('name');
-    setClubMembershipTypes(data || []);
-  };
 
   const fetchRemittanceStatuses = async (memberIds: string[]) => {
     if (memberIds.length === 0) return;
@@ -254,39 +233,10 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
     }
   };
 
-  const handleBulkAssignClub = async () => {
-    if (!bulkClubId || selectedMemberIds.size === 0) return;
-    setBulkProcessing(true);
-    try {
-      const selectedClubObj = clubs.find(c => c.id === bulkClubId);
-      const selectedTypeObj = clubMembershipTypes.find(t => t.id === bulkMembershipTypeId);
-      const updateData: Record<string, any> = {
-        club_id: bulkClubId,
-        club: selectedClubObj?.name || '',
-        membership_status: 'active'
-      };
-      if (selectedTypeObj) updateData.membership_level = selectedTypeObj.name;
-      if (bulkFinancialStatus === 'financial') updateData.is_financial = true;
-      else if (bulkFinancialStatus === 'unfinancial') updateData.is_financial = false;
-
-      const ids = Array.from(selectedMemberIds);
-      const { error } = await supabase
-        .from('members')
-        .update(updateData)
-        .in('id', ids);
-      if (error) throw error;
-
-      setSelectedMemberIds(new Set());
-      setShowBulkAssign(false);
-      setBulkClubId('');
-      setBulkMembershipTypeId('');
-      setBulkFinancialStatus('');
-      loadStateAssociationData();
-    } catch (err) {
-      console.error('Error bulk assigning:', err);
-      alert('Failed to assign members. Please try again.');
-    }
-    setBulkProcessing(false);
+  const handleAddToClubSuccess = () => {
+    setSelectedMemberIds(new Set());
+    setShowAddToClubModal(false);
+    loadStateAssociationData();
   };
 
   const handleBulkSetFinancial = async (financial: boolean) => {
@@ -449,12 +399,12 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => setShowBulkAssign(!showBulkAssign)}
+                  onClick={() => setShowAddToClubModal(true)}
                   disabled={bulkProcessing}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
                 >
                   <UserPlus size={15} />
-                  Assign to Club
+                  Add to Club
                 </button>
                 <button
                   onClick={() => handleBulkSetFinancial(true)}
@@ -489,58 +439,6 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 </button>
               </div>
             </div>
-            {showBulkAssign && (
-              <div className="mt-4 pt-4 border-t border-blue-500/20">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Club</label>
-                    <select
-                      value={bulkClubId}
-                      onChange={(e) => setBulkClubId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm"
-                    >
-                      <option value="">Select Club...</option>
-                      {clubs.map(c => (
-                        <option key={c.id} value={c.id}>{c.abbreviation ? `${c.abbreviation} - ${c.name}` : c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Membership Type</label>
-                    <select
-                      value={bulkMembershipTypeId}
-                      onChange={(e) => setBulkMembershipTypeId(e.target.value)}
-                      disabled={!bulkClubId}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm disabled:opacity-50"
-                    >
-                      <option value="">Select Type...</option>
-                      {clubMembershipTypes.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}{t.amount ? ` ($${t.amount})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Financial Status</label>
-                    <select
-                      value={bulkFinancialStatus}
-                      onChange={(e) => setBulkFinancialStatus(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm"
-                    >
-                      <option value="">No Change</option>
-                      <option value="financial">Financial</option>
-                      <option value="unfinancial">Unfinancial</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={handleBulkAssignClub}
-                    disabled={!bulkClubId || bulkProcessing}
-                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
-                  >
-                    {bulkProcessing ? 'Applying...' : 'Apply'}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -856,6 +754,17 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
             setEditingMemberClubId('');
             loadStateAssociationData();
           }}
+        />
+      )}
+
+      {showAddToClubModal && (
+        <AdminAddToClubModal
+          isOpen={showAddToClubModal}
+          onClose={() => setShowAddToClubModal(false)}
+          memberIds={Array.from(selectedMemberIds)}
+          availableClubs={clubs}
+          darkMode={darkMode}
+          onSuccess={handleAddToClubSuccess}
         />
       )}
     </div>

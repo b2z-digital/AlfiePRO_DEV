@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, Calendar, CheckCircle2, ArrowUpRight, MapPin, Upload, Eye } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, MapPin, Upload, Eye, UserPlus, DollarSign, Trash2, X, Pencil } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
 import AssociationMemberImportModal from './AssociationMemberImportModal';
+import { MemberEditModal } from './MemberEditModal';
+import { AdminAddToClubModal } from './AdminAddToClubModal';
 
 interface NationalAssociationMembersProps {
   darkMode: boolean;
@@ -46,8 +48,12 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
   const [error, setError] = useState<string | null>(null);
   const [memberRemittanceStatus, setMemberRemittanceStatus] = useState<Record<string, { statePaid: boolean; nationalPaid: boolean }>>({});
   const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [showAddToClubModal, setShowAddToClubModal] = useState(false);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editingMemberClubId, setEditingMemberClubId] = useState<string>('');
 
-  // Check for viewClubId in location state
   useEffect(() => {
     const state = location.state as { viewClubId?: string } | null;
     if (state?.viewClubId) {
@@ -264,6 +270,66 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
     a.click();
   };
 
+  const toggleMemberSelection = (id: string) => {
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMemberIds.size === filteredMembers.length) {
+      setSelectedMemberIds(new Set());
+    } else {
+      setSelectedMemberIds(new Set(filteredMembers.map(m => m.id)));
+    }
+  };
+
+  const handleBulkSetFinancial = async (financial: boolean) => {
+    if (selectedMemberIds.size === 0) return;
+    setBulkProcessing(true);
+    try {
+      const ids = Array.from(selectedMemberIds);
+      const { error } = await supabase
+        .from('members')
+        .update({ is_financial: financial })
+        .in('id', ids);
+      if (error) throw error;
+      setSelectedMemberIds(new Set());
+      loadNationalAssociationData();
+    } catch (err) {
+      console.error('Error bulk update financial:', err);
+    }
+    setBulkProcessing(false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedMemberIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedMemberIds.size} member(s)? This cannot be undone.`)) return;
+    setBulkProcessing(true);
+    try {
+      const ids = Array.from(selectedMemberIds);
+      const { error } = await supabase
+        .from('members')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+      setSelectedMemberIds(new Set());
+      loadNationalAssociationData();
+    } catch (err) {
+      console.error('Error bulk deleting:', err);
+    }
+    setBulkProcessing(false);
+  };
+
+  const handleAddToClubSuccess = () => {
+    setSelectedMemberIds(new Set());
+    setShowAddToClubModal(false);
+    loadNationalAssociationData();
+  };
+
   const availableClubs = selectedState === 'all'
     ? clubs
     : clubs.filter(c => c.state_association_id === selectedState);
@@ -476,12 +542,71 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
         </div>
       </div>
 
+      {selectedMemberIds.size > 0 && (
+        <div className="mb-4 p-4 rounded-xl bg-blue-600/10 border border-blue-500/30">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <span className="text-sm text-blue-300 font-medium">
+              {selectedMemberIds.size} member{selectedMemberIds.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setShowAddToClubModal(true)}
+                disabled={bulkProcessing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+              >
+                <UserPlus size={15} />
+                Add to Club
+              </button>
+              <button
+                onClick={() => handleBulkSetFinancial(true)}
+                disabled={bulkProcessing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition disabled:opacity-50"
+              >
+                <DollarSign size={15} />
+                Set Financial
+              </button>
+              <button
+                onClick={() => handleBulkSetFinancial(false)}
+                disabled={bulkProcessing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium transition disabled:opacity-50"
+              >
+                <DollarSign size={15} />
+                Set Unfinancial
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkProcessing}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                Delete
+              </button>
+              <button
+                onClick={() => setSelectedMemberIds(new Set())}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition"
+              >
+                <X size={15} />
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Members Table */}
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-700/50">
               <tr>
+                <th className="px-3 py-3 text-left w-10">
+                  <input
+                    type="checkbox"
+                    checked={filteredMembers.length > 0 && selectedMemberIds.size === filteredMembers.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
                   Member
                 </th>
@@ -507,13 +632,21 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
             <tbody className="divide-y divide-slate-700/50">
               {filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
                     No members found
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-slate-700/30">
+                  <tr key={member.id} className={`hover:bg-slate-700/30 ${selectedMemberIds.has(member.id) ? 'bg-blue-900/20' : ''}`}>
+                    <td className="px-3 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedMemberIds.has(member.id)}
+                        onChange={() => toggleMemberSelection(member.id)}
+                        className="rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                      />
+                    </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         {member.avatar_url ? (
@@ -616,15 +749,27 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      {!isImpersonating && member.user_id && (
+                      <div className="flex items-center justify-end gap-1">
+                        {!isImpersonating && member.user_id && (
+                          <button
+                            onClick={() => startImpersonation(member.id)}
+                            className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
+                            title={`View as ${member.first_name} ${member.last_name}`}
+                          >
+                            <Eye size={16} />
+                          </button>
+                        )}
                         <button
-                          onClick={() => startImpersonation(member.id)}
-                          className="p-2 rounded-lg hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 transition"
-                          title={`View as ${member.first_name} ${member.last_name}`}
+                          onClick={() => {
+                            setEditingMemberId(member.id);
+                            setEditingMemberClubId(member.club_id || '');
+                          }}
+                          className="p-2 rounded-lg hover:bg-slate-600/50 text-slate-400 hover:text-white transition"
+                          title="Edit member"
                         >
-                          <Eye size={16} />
+                          <Pencil size={16} />
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -644,6 +789,35 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
           associationId={currentOrganization.id}
           associationType={currentOrganization.type as 'state' | 'national'}
           associationName={currentOrganization.name}
+        />
+      )}
+
+      {editingMemberId && (
+        <MemberEditModal
+          isOpen={true}
+          onClose={() => {
+            setEditingMemberId(null);
+            setEditingMemberClubId('');
+          }}
+          memberId={editingMemberId}
+          clubId={editingMemberClubId}
+          darkMode={darkMode}
+          onSuccess={() => {
+            setEditingMemberId(null);
+            setEditingMemberClubId('');
+            loadNationalAssociationData();
+          }}
+        />
+      )}
+
+      {showAddToClubModal && (
+        <AdminAddToClubModal
+          isOpen={showAddToClubModal}
+          onClose={() => setShowAddToClubModal(false)}
+          memberIds={Array.from(selectedMemberIds)}
+          availableClubs={clubs}
+          darkMode={darkMode}
+          onSuccess={handleAddToClubSuccess}
         />
       )}
     </div>

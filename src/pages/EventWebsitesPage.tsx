@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Globe, Plus, Edit, Trash2, Eye, Copy, Search, Calendar, MapPin, Users, ArrowLeft, MoreVertical, BookTemplate } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
 import { eventWebsiteStorage } from '../utils/eventWebsiteStorage';
 import { supabase } from '../utils/supabase';
@@ -11,6 +12,8 @@ import { SaveAsTemplateModal } from '../components/events/SaveAsTemplateModal';
 
 export const EventWebsitesPage: React.FC = () => {
   const { currentClub, user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const darkMode = localStorage.getItem('lightMode') !== 'true';
@@ -46,7 +49,7 @@ export const EventWebsitesPage: React.FC = () => {
       const { data, error } = await supabase
         .from('user_clubs')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId!)
         .eq('role', 'super_admin')
         .limit(1);
 
