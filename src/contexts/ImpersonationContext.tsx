@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { supabase } from '../utils/supabase';
+import { ImpersonationPreloaderModal } from '../components/ImpersonationPreloaderModal';
 
 interface ImpersonatedClub {
   club_id: string;
@@ -38,6 +39,8 @@ interface ImpersonationContextType {
   stopImpersonation: () => Promise<void>;
 }
 
+const PRELOADER_FLAG = 'impersonation_preloader_active';
+
 const ImpersonationContext = createContext<ImpersonationContextType | undefined>(undefined);
 
 export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -49,6 +52,43 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
       return null;
     }
   });
+
+  const [showPreloader, setShowPreloader] = useState(() => {
+    return sessionStorage.getItem(PRELOADER_FLAG) === 'true';
+  });
+
+  const [preloaderTarget, setPreloaderTarget] = useState<{
+    name: string;
+    avatarUrl: string | null;
+    clubName?: string;
+  } | null>(() => {
+    if (sessionStorage.getItem(PRELOADER_FLAG) === 'true') {
+      try {
+        const stored = sessionStorage.getItem('impersonation_session');
+        if (stored) {
+          const s = JSON.parse(stored);
+          const club = s.targetClubs?.find((c: ImpersonatedClub) => c.club_id === s.targetDefaultClubId) || s.targetClubs?.[0];
+          return {
+            name: s.targetName || '',
+            avatarUrl: s.targetAvatarUrl || null,
+            clubName: club?.club_name
+          };
+        }
+      } catch { /* ignore */ }
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (showPreloader) {
+      const timer = setTimeout(() => {
+        sessionStorage.removeItem(PRELOADER_FLAG);
+        setShowPreloader(false);
+        setPreloaderTarget(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [showPreloader]);
 
   const startImpersonation = useCallback(async (memberId: string, reason?: string) => {
     const { data, error } = await supabase.rpc('start_impersonation_session', {
@@ -80,7 +120,18 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
       localStorage.setItem('currentClubId', newSession.targetClubs[0].club_id);
     }
 
-    window.location.href = '/';
+    const club = newSession.targetClubs.find(c => c.club_id === newSession.targetDefaultClubId) || newSession.targetClubs[0];
+    setPreloaderTarget({
+      name: newSession.targetName,
+      avatarUrl: newSession.targetAvatarUrl,
+      clubName: club?.club_name
+    });
+    setShowPreloader(true);
+    sessionStorage.setItem(PRELOADER_FLAG, 'true');
+
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 800);
   }, []);
 
   const stopImpersonation = useCallback(async () => {
@@ -95,6 +146,7 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
     }
 
     sessionStorage.removeItem('impersonation_session');
+    sessionStorage.removeItem(PRELOADER_FLAG);
     setSession(null);
 
     window.location.href = '/';
@@ -124,6 +176,12 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
       stopImpersonation
     }}>
       {children}
+      <ImpersonationPreloaderModal
+        isOpen={showPreloader}
+        targetName={preloaderTarget?.name || ''}
+        targetAvatarUrl={preloaderTarget?.avatarUrl || null}
+        targetClubName={preloaderTarget?.clubName}
+      />
     </ImpersonationContext.Provider>
   );
 };
