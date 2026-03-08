@@ -83,6 +83,25 @@ function extractTextFromBinaryPdf(pdfBytes: Uint8Array): string {
   return textSegments.join("\n\n");
 }
 
+async function downloadFromStorage(storagePath: string): Promise<Uint8Array> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
+  const url = `${supabaseUrl}/storage/v1/object/alfie-knowledge/${encodedPath}`;
+  const res = await fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${serviceKey}`,
+      "apikey": serviceKey,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Storage download HTTP ${res.status}: ${body}`);
+  }
+  const arrayBuffer = await res.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
+
 async function processGuide(supabase: any, guideId: string) {
   const { data: guide, error: guideError } = await supabase
     .from("alfie_tuning_guides")
@@ -99,23 +118,20 @@ async function processGuide(supabase: any, guideId: string) {
     .update({ status: "processing" })
     .eq("id", guideId);
 
-  const { data: fileData, error: downloadError } = await supabase.storage
-    .from("alfie-knowledge")
-    .download(guide.storage_path);
-
-  if (downloadError || !fileData) {
+  let pdfBytes: Uint8Array;
+  try {
+    pdfBytes = await downloadFromStorage(guide.storage_path);
+  } catch (dlErr: any) {
     await supabase
       .from("alfie_tuning_guides")
       .update({
         status: "failed",
-        processing_error: `Download failed: ${downloadError?.message || "No file data"}`,
+        processing_error: dlErr.message,
       })
       .eq("id", guideId);
-    throw new Error("Failed to download file");
+    throw dlErr;
   }
 
-  const arrayBuffer = await fileData.arrayBuffer();
-  const pdfBytes = new Uint8Array(arrayBuffer);
   let extractedText = extractTextFromBinaryPdf(pdfBytes);
 
   if (extractedText.trim().length < 100) {
@@ -238,23 +254,20 @@ async function processDocument(supabase: any, documentId: string) {
     throw new Error("No file attached to this document");
   }
 
-  const { data: fileData, error: downloadError } = await supabase.storage
-    .from("alfie-knowledge")
-    .download(doc.storage_path);
-
-  if (downloadError || !fileData) {
+  let pdfBytes: Uint8Array;
+  try {
+    pdfBytes = await downloadFromStorage(doc.storage_path);
+  } catch (dlErr: any) {
     await supabase
       .from("alfie_knowledge_documents")
       .update({
         processing_status: "failed",
-        processing_error: `Download failed: ${downloadError?.message || "No file data"}`,
+        processing_error: dlErr.message,
       })
       .eq("id", documentId);
-    throw new Error("Failed to download file");
+    throw dlErr;
   }
 
-  const arrayBuffer = await fileData.arrayBuffer();
-  const pdfBytes = new Uint8Array(arrayBuffer);
   let extractedText = extractTextFromBinaryPdf(pdfBytes);
 
   if (extractedText.trim().length < 100) {
@@ -312,17 +325,22 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${supabaseServiceKey}` } }
+    });
 
     const authHeader = req.headers.get("Authorization");
     if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      if (authError || !user) {
-        return new Response(
-          JSON.stringify({ error: "Unauthorized" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (token !== supabaseServiceKey) {
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) {
+          return new Response(
+            JSON.stringify({ error: "Unauthorized" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 

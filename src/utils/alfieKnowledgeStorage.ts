@@ -343,6 +343,49 @@ export async function updateKnowledgeDocument(
   return data;
 }
 
+export async function reuploadKnowledgeDocumentFile(
+  id: string,
+  file: File
+): Promise<AlfieKnowledgeDocument> {
+  const { data: doc } = await supabase
+    .from('alfie_knowledge_documents')
+    .select('category, storage_path')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (doc?.storage_path) {
+    await supabase.storage.from('alfie-knowledge').remove([doc.storage_path]);
+  }
+
+  const timestamp = Date.now();
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const storagePath = `documents/${doc?.category || 'general'}/${timestamp}_${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('alfie-knowledge')
+    .upload(storagePath, file, { contentType: file.type, upsert: false });
+
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from('alfie_knowledge_documents')
+    .update({
+      storage_path: storagePath,
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      processing_status: 'pending',
+      processing_error: null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteKnowledgeDocument(id: string): Promise<void> {
   const { data: doc } = await supabase
     .from('alfie_knowledge_documents')

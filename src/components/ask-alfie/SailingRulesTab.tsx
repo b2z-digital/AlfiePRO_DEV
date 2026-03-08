@@ -7,7 +7,7 @@ import {
 import {
   AlfieKnowledgeDocument, getKnowledgeDocuments, uploadKnowledgeDocument,
   updateKnowledgeDocument, deleteKnowledgeDocument, triggerDocumentProcessing,
-  DOCUMENT_CATEGORIES
+  reuploadKnowledgeDocumentFile, DOCUMENT_CATEGORIES
 } from '../../utils/alfieKnowledgeStorage';
 import { useNotification } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';
@@ -32,6 +32,8 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const [processingDocs, setProcessingDocs] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [reuploadDocId, setReuploadDocId] = useState<string | null>(null);
+  const reuploadInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadForm, setUploadForm] = useState({
     title: '',
@@ -140,6 +142,19 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
     } finally {
       setDeleteConfirmOpen(false);
       setDocToDelete(null);
+    }
+  };
+
+  const handleReupload = async (file: File) => {
+    if (!reuploadDocId) return;
+    try {
+      const updated = await reuploadKnowledgeDocumentFile(reuploadDocId, file);
+      setDocuments(prev => prev.map(d => d.id === updated.id ? updated : d));
+      addNotification({ type: 'success', title: 'File Uploaded', message: `File attached. Click Process to extract knowledge chunks.` });
+    } catch (err: any) {
+      addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
+    } finally {
+      setReuploadDocId(null);
     }
   };
 
@@ -312,10 +327,26 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
                     {doc.processing_status === 'failed' && doc.processing_error && (
                       <p className="text-xs text-red-500 mt-1">Error: {doc.processing_error}</p>
                     )}
+                    {!doc.storage_path && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-xs ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                          File missing - please re-upload the PDF
+                        </span>
+                        <button
+                          onClick={() => {
+                            setReuploadDocId(doc.id);
+                            reuploadInputRef.current?.click();
+                          }}
+                          className="text-xs px-2 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3" /> Upload File
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {(doc.processing_status === 'pending' || doc.processing_status === 'failed' || !doc.processing_status) && (
+                  {doc.storage_path && (doc.processing_status === 'pending' || doc.processing_status === 'failed' || !doc.processing_status) && (
                     <button
                       onClick={() => handleProcess(doc)}
                       disabled={processingDocs.has(doc.id)}
@@ -552,6 +583,18 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
           </div>
         </div>
       )}
+
+      <input
+        ref={reuploadInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) handleReupload(file);
+          e.target.value = '';
+        }}
+      />
 
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
