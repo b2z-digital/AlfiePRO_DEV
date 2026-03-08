@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye, Bot } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -87,6 +87,7 @@ import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage'
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 import LivestreamPage from '../pages/LivestreamPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
+import AskAlfieManagementPage from '../pages/AskAlfieManagementPage';
 import { UsageStatisticsTab } from './super-admin/UsageStatisticsTab';
 import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
 import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
@@ -1034,6 +1035,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
           { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
           { id: 'impersonation-log', label: 'Impersonation Log', icon: Eye, description: 'Admin audit trail', path: '/impersonation-log' },
+          { id: 'ask-alfie-management', label: 'Ask Alfie', icon: Bot, description: 'AI knowledge management', path: '/ask-alfie-management' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1656,6 +1658,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <ImpersonationAuditTab darkMode={true} />
                 </div></div>
               } />
+              <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={true} />} />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
@@ -1806,6 +1809,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/media" element={<MediaPage darkMode={darkMode} />} />
               <Route path="/alfie-tv" element={<AlfieTVPage darkMode={darkMode} />} />
               <Route path="/alfie-tv/admin" element={<AlfieTVAdmin darkMode={darkMode} />} />
+              <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={darkMode} />} />
               <Route path="/livestream" element={<LivestreamPage />} />
 
               {/* Website Routes */}
