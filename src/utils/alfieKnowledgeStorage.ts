@@ -156,19 +156,27 @@ export async function triggerGuideProcessing(guideId: string): Promise<void> {
     .update({ status: 'processing', updated_at: new Date().toISOString() })
     .eq('id', guideId);
 
-  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ guideId })
-  });
+  try {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ guideId })
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Processing failed: ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Processing failed: ${errorText}`);
+    }
+  } catch (err: any) {
+    await supabase
+      .from('alfie_tuning_guides')
+      .update({ status: 'failed', processing_error: err.message || 'Network error', updated_at: new Date().toISOString() })
+      .eq('id', guideId);
+    throw err;
   }
 }
 
@@ -416,19 +424,27 @@ export async function triggerDocumentProcessing(documentId: string): Promise<voi
     .update({ processing_status: 'processing', updated_at: new Date().toISOString() })
     .eq('id', documentId);
 
-  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ documentId })
-  });
+  try {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ documentId })
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Processing failed: ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Processing failed: ${errorText}`);
+    }
+  } catch (err: any) {
+    await supabase
+      .from('alfie_knowledge_documents')
+      .update({ processing_status: 'failed', processing_error: err.message || 'Network error', updated_at: new Date().toISOString() })
+      .eq('id', documentId);
+    throw err;
   }
 }
 
