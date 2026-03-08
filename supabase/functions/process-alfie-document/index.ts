@@ -83,6 +83,227 @@ function extractTextFromBinaryPdf(pdfBytes: Uint8Array): string {
   return textSegments.join("\n\n");
 }
 
+async function processGuide(supabase: any, guideId: string) {
+  const { data: guide, error: guideError } = await supabase
+    .from("alfie_tuning_guides")
+    .select("*")
+    .eq("id", guideId)
+    .single();
+
+  if (guideError || !guide) {
+    throw new Error("Guide not found");
+  }
+
+  await supabase
+    .from("alfie_tuning_guides")
+    .update({ status: "processing" })
+    .eq("id", guideId);
+
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from("alfie-knowledge")
+    .download(guide.storage_path);
+
+  if (downloadError || !fileData) {
+    await supabase
+      .from("alfie_tuning_guides")
+      .update({
+        status: "failed",
+        processing_error: `Download failed: ${downloadError?.message || "No file data"}`,
+      })
+      .eq("id", guideId);
+    throw new Error("Failed to download file");
+  }
+
+  const arrayBuffer = await fileData.arrayBuffer();
+  const pdfBytes = new Uint8Array(arrayBuffer);
+  let extractedText = extractTextFromBinaryPdf(pdfBytes);
+
+  if (extractedText.trim().length < 100) {
+    extractedText = `Tuning guide for ${guide.boat_type || "RC yacht"}: ${guide.name}. ` +
+      `Version ${guide.version}. ${guide.description || ""}`;
+  }
+
+  const chunks = splitTextIntoChunks(extractedText);
+
+  await supabase
+    .from("alfie_knowledge_chunks")
+    .delete()
+    .eq("tuning_guide_id", guideId);
+
+  const { data: existingDoc } = await supabase
+    .from("alfie_knowledge_documents")
+    .select("id")
+    .eq("title", guide.name)
+    .eq("storage_path", guide.storage_path)
+    .maybeSingle();
+
+  let documentId: string;
+
+  if (existingDoc) {
+    documentId = existingDoc.id;
+    await supabase
+      .from("alfie_knowledge_documents")
+      .update({
+        category: "tuning-guide",
+        chunk_count: chunks.length,
+        processing_status: "completed",
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", documentId);
+  } else {
+    const { data: newDoc, error: docError } = await supabase
+      .from("alfie_knowledge_documents")
+      .insert({
+        title: guide.name,
+        category: "tuning-guide",
+        storage_path: guide.storage_path,
+        file_name: guide.file_name,
+        file_size: guide.file_size,
+        mime_type: "application/pdf",
+        chunk_count: chunks.length,
+        processing_status: "completed",
+        processed_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (docError) throw new Error(`Failed to create document record: ${docError.message}`);
+    documentId = newDoc.id;
+  }
+
+  const chunkRecords = chunks.map((content, index) => ({
+    document_id: documentId,
+    chunk_index: index,
+    content,
+    metadata: {
+      boat_type: guide.boat_type || "",
+      hull_type: guide.hull_type || "",
+      guide_name: guide.name,
+      version: guide.version,
+      source_type: "tuning-guide",
+    },
+    boat_type: guide.boat_type || "",
+    hull_type: guide.hull_type || "",
+    source_type: "tuning-guide",
+    tuning_guide_id: guideId,
+  }));
+
+  const batchSize = 50;
+  for (let i = 0; i < chunkRecords.length; i += batchSize) {
+    const batch = chunkRecords.slice(i, i + batchSize);
+    const { error: insertError } = await supabase
+      .from("alfie_knowledge_chunks")
+      .insert(batch);
+    if (insertError) console.error(`Chunk insert error (batch ${i}):`, insertError);
+  }
+
+  await supabase
+    .from("alfie_tuning_guides")
+    .update({
+      status: "completed",
+      chunk_count: chunks.length,
+      image_count: 0,
+      processed_at: new Date().toISOString(),
+      processing_error: null,
+    })
+    .eq("id", guideId);
+
+  return { chunksCreated: chunks.length, textLength: extractedText.length };
+}
+
+async function processDocument(supabase: any, documentId: string) {
+  const { data: doc, error: docError } = await supabase
+    .from("alfie_knowledge_documents")
+    .select("*")
+    .eq("id", documentId)
+    .single();
+
+  if (docError || !doc) {
+    throw new Error("Document not found");
+  }
+
+  await supabase
+    .from("alfie_knowledge_documents")
+    .update({ processing_status: "processing" })
+    .eq("id", documentId);
+
+  if (!doc.storage_path) {
+    await supabase
+      .from("alfie_knowledge_documents")
+      .update({
+        processing_status: "failed",
+        processing_error: "No file attached to this document",
+      })
+      .eq("id", documentId);
+    throw new Error("No file attached to this document");
+  }
+
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from("alfie-knowledge")
+    .download(doc.storage_path);
+
+  if (downloadError || !fileData) {
+    await supabase
+      .from("alfie_knowledge_documents")
+      .update({
+        processing_status: "failed",
+        processing_error: `Download failed: ${downloadError?.message || "No file data"}`,
+      })
+      .eq("id", documentId);
+    throw new Error("Failed to download file");
+  }
+
+  const arrayBuffer = await fileData.arrayBuffer();
+  const pdfBytes = new Uint8Array(arrayBuffer);
+  let extractedText = extractTextFromBinaryPdf(pdfBytes);
+
+  if (extractedText.trim().length < 100) {
+    extractedText = `${doc.title}: ${doc.category || "sailing rules document"}. ` +
+      (doc.content_text || "");
+  }
+
+  const chunks = splitTextIntoChunks(extractedText);
+
+  await supabase
+    .from("alfie_knowledge_chunks")
+    .delete()
+    .eq("document_id", documentId);
+
+  const chunkRecords = chunks.map((content, index) => ({
+    document_id: documentId,
+    chunk_index: index,
+    content,
+    metadata: {
+      document_title: doc.title,
+      category: doc.category,
+      source_type: "sailing-rules",
+    },
+    source_type: "sailing-rules",
+  }));
+
+  const batchSize = 50;
+  for (let i = 0; i < chunkRecords.length; i += batchSize) {
+    const batch = chunkRecords.slice(i, i + batchSize);
+    const { error: insertError } = await supabase
+      .from("alfie_knowledge_chunks")
+      .insert(batch);
+    if (insertError) console.error(`Chunk insert error (batch ${i}):`, insertError);
+  }
+
+  await supabase
+    .from("alfie_knowledge_documents")
+    .update({
+      processing_status: "completed",
+      chunk_count: chunks.length,
+      processed_at: new Date().toISOString(),
+      processing_error: null,
+      content_text: extractedText.slice(0, 5000),
+    })
+    .eq("id", documentId);
+
+  return { chunksCreated: chunks.length, textLength: extractedText.length };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -106,177 +327,51 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { guideId } = body;
+    const { guideId, documentId } = body;
 
-    if (!guideId) {
+    if (!guideId && !documentId) {
       return new Response(
-        JSON.stringify({ error: "guideId is required" }),
+        JSON.stringify({ error: "guideId or documentId is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { data: guide, error: guideError } = await supabase
-      .from("alfie_tuning_guides")
-      .select("*")
-      .eq("id", guideId)
-      .single();
+    let result;
 
-    if (guideError || !guide) {
+    if (guideId) {
+      result = await processGuide(supabase, guideId);
       return new Response(
-        JSON.stringify({ error: "Guide not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: true, guideId, ...result }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    await supabase
-      .from("alfie_tuning_guides")
-      .update({ status: "processing" })
-      .eq("id", guideId);
-
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("alfie-knowledge")
-      .download(guide.storage_path);
-
-    if (downloadError || !fileData) {
-      await supabase
-        .from("alfie_tuning_guides")
-        .update({
-          status: "failed",
-          processing_error: `Download failed: ${downloadError?.message || "No file data"}`,
-        })
-        .eq("id", guideId);
-
-      return new Response(
-        JSON.stringify({ error: "Failed to download file" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const arrayBuffer = await fileData.arrayBuffer();
-    const pdfBytes = new Uint8Array(arrayBuffer);
-    let extractedText = extractTextFromBinaryPdf(pdfBytes);
-
-    if (extractedText.trim().length < 100) {
-      extractedText = `Tuning guide for ${guide.boat_type || "RC yacht"}: ${guide.name}. ` +
-        `Version ${guide.version}. ${guide.description || ""}`;
-    }
-
-    const chunks = splitTextIntoChunks(extractedText);
-
-    await supabase
-      .from("alfie_knowledge_chunks")
-      .delete()
-      .eq("tuning_guide_id", guideId);
-
-    const { data: existingDoc } = await supabase
-      .from("alfie_knowledge_documents")
-      .select("id")
-      .eq("title", guide.name)
-      .eq("storage_path", guide.storage_path)
-      .maybeSingle();
-
-    let documentId: string;
-
-    if (existingDoc) {
-      documentId = existingDoc.id;
-      await supabase
-        .from("alfie_knowledge_documents")
-        .update({
-          category: "tuning-guide",
-          chunk_count: chunks.length,
-          processing_status: "completed",
-          processed_at: new Date().toISOString(),
-        })
-        .eq("id", documentId);
     } else {
-      const { data: newDoc, error: docError } = await supabase
-        .from("alfie_knowledge_documents")
-        .insert({
-          title: guide.name,
-          category: "tuning-guide",
-          storage_path: guide.storage_path,
-          file_name: guide.file_name,
-          file_size: guide.file_size,
-          mime_type: "application/pdf",
-          chunk_count: chunks.length,
-          processing_status: "completed",
-          processed_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (docError) {
-        throw new Error(`Failed to create document record: ${docError.message}`);
-      }
-      documentId = newDoc.id;
+      result = await processDocument(supabase, documentId);
+      return new Response(
+        JSON.stringify({ success: true, documentId, ...result }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-
-    const chunkRecords = chunks.map((content, index) => ({
-      document_id: documentId,
-      chunk_index: index,
-      content,
-      metadata: {
-        boat_type: guide.boat_type || "",
-        hull_type: guide.hull_type || "",
-        guide_name: guide.name,
-        version: guide.version,
-        source_type: "tuning-guide",
-      },
-      boat_type: guide.boat_type || "",
-      hull_type: guide.hull_type || "",
-      source_type: "tuning-guide",
-      tuning_guide_id: guideId,
-    }));
-
-    const batchSize = 50;
-    for (let i = 0; i < chunkRecords.length; i += batchSize) {
-      const batch = chunkRecords.slice(i, i + batchSize);
-      const { error: insertError } = await supabase
-        .from("alfie_knowledge_chunks")
-        .insert(batch);
-
-      if (insertError) {
-        console.error(`Chunk insert error (batch ${i}):`, insertError);
-      }
-    }
-
-    await supabase
-      .from("alfie_tuning_guides")
-      .update({
-        status: "completed",
-        chunk_count: chunks.length,
-        image_count: 0,
-        processed_at: new Date().toISOString(),
-        processing_error: null,
-      })
-      .eq("id", guideId);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        guideId,
-        chunksCreated: chunks.length,
-        textLength: extractedText.length,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   } catch (error: any) {
     console.error("Process error:", error);
 
     try {
-      const body = await req.clone().json().catch(() => ({}));
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+      const bodyText = await req.clone().text();
+      const body = JSON.parse(bodyText);
       if (body.guideId) {
-        const supabase = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-        );
         await supabase
           .from("alfie_tuning_guides")
-          .update({
-            status: "failed",
-            processing_error: error.message || "Unknown error",
-          })
+          .update({ status: "failed", processing_error: error.message || "Unknown error" })
           .eq("id", body.guideId);
+      }
+      if (body.documentId) {
+        await supabase
+          .from("alfie_knowledge_documents")
+          .update({ processing_status: "failed", processing_error: error.message || "Unknown error" })
+          .eq("id", body.documentId);
       }
     } catch (_) {}
 
