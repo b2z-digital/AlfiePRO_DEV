@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye, Bot } from 'lucide-react';
+import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye, Bot, LifeBuoy } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -88,6 +88,7 @@ import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowE
 import LivestreamPage from '../pages/LivestreamPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
 import AskAlfieManagementPage from '../pages/AskAlfieManagementPage';
+import HelpSupportPage from './help-support/HelpSupportPage';
 import { UsageStatisticsTab } from './super-admin/UsageStatisticsTab';
 import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
 import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
@@ -1036,6 +1037,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
           { id: 'impersonation-log', label: 'Impersonation Log', icon: Eye, description: 'Admin audit trail', path: '/impersonation-log' },
           { id: 'ask-alfie-management', label: 'Ask Alfie', icon: Bot, description: 'AI knowledge management', path: '/ask-alfie-management' },
+          { id: 'help-support', label: 'Help & Support', icon: LifeBuoy, description: 'FAQs, tutorials & tickets', path: '/help-support' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1659,6 +1661,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </div></div>
               } />
               <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={true} />} />
+              <Route path="/help-support" element={<HelpSupportPage darkMode={true} />} />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
