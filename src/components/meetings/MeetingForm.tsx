@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle, Users, Shield, Repeat, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Meeting, MeetingFormData } from '../../types/meeting';
+import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
 import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
@@ -54,6 +54,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     chairperson_id: string;
     minute_taker_id: string;
     meeting_type: 'in_person' | 'online' | 'hybrid';
+    meeting_category: MeetingCategory;
+    recurrence_type: RecurrenceType;
+    recurrence_end_date: string;
   }>({
     name: '',
     location: '',
@@ -64,14 +67,16 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     description: '',
     chairperson_id: '',
     minute_taker_id: '',
-    meeting_type: 'in_person'
+    meeting_type: 'in_person',
+    meeting_category: 'general',
+    recurrence_type: 'none',
+    recurrence_end_date: ''
   });
 
   useEffect(() => {
     fetchMembers();
     checkGoogleIntegration();
 
-    // If editing an existing meeting, populate the form
     if (meeting) {
       setFormData({
         name: meeting.name,
@@ -83,7 +88,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         description: meeting.description || '',
         chairperson_id: meeting.chairperson_id || '',
         minute_taker_id: meeting.minute_taker_id || '',
-        meeting_type: (meeting as any).meeting_type || 'in_person'
+        meeting_type: meeting.meeting_type || 'in_person',
+        meeting_category: meeting.meeting_category || 'general',
+        recurrence_type: meeting.recurrence_type || 'none',
+        recurrence_end_date: meeting.recurrence_end_date || ''
       });
 
       // Fetch agenda items
@@ -187,67 +195,159 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     }
   };
 
-  const fetchMembers = async () => {
+  const fetchMembers = async (category?: MeetingCategory) => {
+    const meetingCat = category || formData.meeting_category;
     try {
       if (clubId) {
-        // Fetch club members
-        const { data, error } = await supabase
-          .from('members')
-          .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-          .eq('club_id', clubId)
-          .order('first_name', { ascending: true });
+        if (meetingCat === 'committee') {
+          const { data: positions, error: posError } = await supabase
+            .from('committee_positions')
+            .select('member_id')
+            .eq('club_id', clubId);
 
-        if (error) throw error;
-        setMembers((data as Member[]) || []);
-      } else if (associationId && associationType) {
-        // Fetch association team members (from user_associations tables)
-        const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-        const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+          if (posError) throw posError;
 
-        const { data: userAssociations, error: assocError } = await supabase
-          .from(tableName)
-          .select('user_id')
-          .eq(idColumn, associationId);
+          const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+          if (memberIds.length === 0) {
+            setMembers([]);
+            return;
+          }
 
-        if (assocError) throw assocError;
+          const { data, error } = await supabase
+            .from('members')
+            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
+            .eq('club_id', clubId)
+            .in('id', memberIds)
+            .order('first_name', { ascending: true });
 
-        if (!userAssociations || userAssociations.length === 0) {
-          setMembers([]);
-          return;
+          if (error) throw error;
+          setMembers((data as Member[]) || []);
+        } else {
+          const { data, error } = await supabase
+            .from('members')
+            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
+            .eq('club_id', clubId)
+            .order('first_name', { ascending: true });
+
+          if (error) throw error;
+          setMembers((data as Member[]) || []);
         }
+      } else if (associationId && associationType) {
+        if (meetingCat === 'committee') {
+          const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+          const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
 
-        // Fetch profiles for these users
-        const userIds = userAssociations.map(ua => ua.user_id);
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', userIds)
-          .order('first_name', { ascending: true });
+          const { data: userAssociations, error: assocError } = await supabase
+            .from(tableName)
+            .select('user_id')
+            .eq(idColumn, associationId);
 
-        if (profilesError) throw profilesError;
+          if (assocError) throw assocError;
 
-        // Transform to Member format (with minimal required fields)
-        const transformedMembers = (profiles || []).map((profile: any) => ({
-          id: profile.id,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          email: profile.email,
-          club_id: '',
-          phone: '',
-          club: '',
-          street: '',
-          city: '',
-          state: '',
-          postcode: '',
-          date_joined: '',
-          membership_level: 'Full',
-          is_financial: true,
-          amount_paid: 0,
-          created_at: '',
-          updated_at: ''
-        })) as Member[];
+          if (!userAssociations || userAssociations.length === 0) {
+            setMembers([]);
+            return;
+          }
 
-        setMembers(transformedMembers);
+          const userIds = userAssociations.map(ua => ua.user_id);
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', userIds)
+            .order('first_name', { ascending: true });
+
+          if (profilesError) throw profilesError;
+
+          const transformedMembers = (profiles || []).map((profile: any) => ({
+            id: profile.id,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            club_id: '',
+            phone: '',
+            club: '',
+            street: '',
+            city: '',
+            state: '',
+            postcode: '',
+            date_joined: '',
+            membership_level: 'Full',
+            is_financial: true,
+            amount_paid: 0,
+            created_at: '',
+            updated_at: ''
+          })) as Member[];
+
+          setMembers(transformedMembers);
+        } else if (associationType === 'state') {
+          const { data: clubs, error: clubsError } = await supabase
+            .from('clubs')
+            .select('id')
+            .eq('state_association_id', associationId);
+
+          if (clubsError) throw clubsError;
+
+          const clubIds = (clubs || []).map(c => c.id);
+          if (clubIds.length === 0) {
+            setMembers([]);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from('members')
+            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
+            .in('club_id', clubIds)
+            .order('first_name', { ascending: true });
+
+          if (error) throw error;
+          setMembers((data as Member[]) || []);
+        } else {
+          const tableName = 'user_national_associations';
+          const idColumn = 'national_association_id';
+
+          const { data: userAssociations, error: assocError } = await supabase
+            .from(tableName)
+            .select('user_id')
+            .eq(idColumn, associationId);
+
+          if (assocError) throw assocError;
+
+          if (!userAssociations || userAssociations.length === 0) {
+            setMembers([]);
+            return;
+          }
+
+          const userIds = userAssociations.map(ua => ua.user_id);
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', userIds)
+            .order('first_name', { ascending: true });
+
+          if (profilesError) throw profilesError;
+
+          const transformedMembers = (profiles || []).map((profile: any) => ({
+            id: profile.id,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            club_id: '',
+            phone: '',
+            club: '',
+            street: '',
+            city: '',
+            state: '',
+            postcode: '',
+            date_joined: '',
+            membership_level: 'Full',
+            is_financial: true,
+            amount_paid: 0,
+            created_at: '',
+            updated_at: ''
+          })) as Member[];
+
+          setMembers(transformedMembers);
+        }
       }
     } catch (err) {
       console.error('Error fetching members:', err);
@@ -339,8 +439,11 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       if (!formData.date) {
         throw new Error('Meeting date is required');
       }
+
+      if (formData.recurrence_type !== 'none' && !formData.recurrence_end_date) {
+        throw new Error('Please select an end date for the recurring series');
+      }
       
-      // Prepare meeting data
       const meetingData: any = {
         name: formData.name,
         location: formData.location,
@@ -352,6 +455,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         chairperson_id: formData.chairperson_id || undefined,
         minute_taker_id: formData.minute_taker_id || undefined,
         meeting_type: formData.meeting_type,
+        meeting_category: formData.meeting_category,
+        recurrence_type: formData.recurrence_type,
+        recurrence_end_date: formData.recurrence_type !== 'none' ? formData.recurrence_end_date : undefined,
         agenda_items: agendaItems
       };
       
@@ -372,12 +478,52 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     }
   };
 
+  const handleCategoryChange = (category: MeetingCategory) => {
+    setFormData(prev => ({ ...prev, meeting_category: category }));
+    fetchMembers(category);
+  };
+
+  const recurrencePreviewDates = useMemo(() => {
+    if (formData.recurrence_type === 'none' || !formData.date || !formData.recurrence_end_date) return [];
+    const dates: string[] = [];
+    const start = new Date(formData.date);
+    const end = new Date(formData.recurrence_end_date);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return [];
+
+    let current = new Date(start);
+    const advance = () => {
+      switch (formData.recurrence_type) {
+        case 'weekly': current.setDate(current.getDate() + 7); break;
+        case 'fortnightly': current.setDate(current.getDate() + 14); break;
+        case 'monthly': current.setMonth(current.getMonth() + 1); break;
+        case 'quarterly': current.setMonth(current.getMonth() + 3); break;
+        case 'yearly': current.setFullYear(current.getFullYear() + 1); break;
+      }
+    };
+
+    advance();
+    while (current <= end && dates.length < 52) {
+      dates.push(current.toISOString().split('T')[0]);
+      advance();
+    }
+    return dates;
+  }, [formData.recurrence_type, formData.date, formData.recurrence_end_date]);
+
+  const recurrenceLabels: Record<RecurrenceType, string> = {
+    none: 'None',
+    weekly: 'Weekly',
+    fortnightly: 'Fortnightly',
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    yearly: 'Yearly'
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-16">
         <div className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700">
               <Calendar className="text-white" size={28} />
             </div>
             <div>
@@ -411,9 +557,82 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {!meeting && (
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+              <h3 className="text-lg font-medium text-white mb-4">Meeting Category</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleCategoryChange('general')}
+                  className={`
+                    relative p-4 rounded-xl border-2 transition-all text-left
+                    ${formData.meeting_category === 'general'
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2 rounded-lg ${formData.meeting_category === 'general' ? 'bg-blue-500/20' : 'bg-slate-600/50'}`}>
+                      <Users size={20} className={formData.meeting_category === 'general' ? 'text-blue-400' : 'text-slate-400'} />
+                    </div>
+                    <span className={`font-semibold ${formData.meeting_category === 'general' ? 'text-white' : 'text-slate-300'}`}>
+                      General Meeting
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 ml-11">
+                    All members can be assigned to agenda items and receive minutes
+                  </p>
+                  {formData.meeting_category === 'general' && (
+                    <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCategoryChange('committee')}
+                  className={`
+                    relative p-4 rounded-xl border-2 transition-all text-left
+                    ${formData.meeting_category === 'committee'
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2 rounded-lg ${formData.meeting_category === 'committee' ? 'bg-amber-500/20' : 'bg-slate-600/50'}`}>
+                      <Shield size={20} className={formData.meeting_category === 'committee' ? 'text-amber-400' : 'text-slate-400'} />
+                    </div>
+                    <span className={`font-semibold ${formData.meeting_category === 'committee' ? 'text-white' : 'text-slate-300'}`}>
+                      Committee Meeting
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 ml-11">
+                    Only committee members can be assigned and receive minutes
+                  </p>
+                  {formData.meeting_category === 'committee' && (
+                    <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                  )}
+                </button>
+              </div>
+              {formData.meeting_category === 'committee' && members.length === 0 && (
+                <div className="mt-3 p-3 rounded-lg bg-amber-900/20 border border-amber-500/30 flex items-start gap-2">
+                  <Info size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-300">
+                    No committee members found. Please assign committee roles in the Committee Management section first.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
             <h3 className="text-lg font-medium text-white mb-4">Meeting Details</h3>
-          
+
             <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">
@@ -612,6 +831,85 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                 </div>
               </div>
             
+              {!meeting && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Repeat size={16} className="text-slate-400" />
+                      Recurring Meeting
+                    </div>
+                  </label>
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                    {(Object.entries(recurrenceLabels) as [RecurrenceType, string][]).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, recurrence_type: key }))}
+                        className={`
+                          px-3 py-2 rounded-lg text-sm font-medium transition-all border
+                          ${formData.recurrence_type === key
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+                          }
+                        `}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {formData.recurrence_type !== 'none' && (
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">
+                          Repeat until
+                        </label>
+                        <div className="relative max-w-xs">
+                          <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="date"
+                            value={formData.recurrence_end_date}
+                            min={formData.date}
+                            onChange={(e) => setFormData(prev => ({ ...prev, recurrence_end_date: e.target.value }))}
+                            className="w-full pl-9 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {recurrencePreviewDates.length > 0 && (
+                        <div className="p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
+                          <p className="text-xs font-medium text-slate-300 mb-2">
+                            {recurrencePreviewDates.length + 1} meeting{recurrencePreviewDates.length > 0 ? 's' : ''} will be created:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="px-2 py-0.5 rounded text-xs bg-blue-600/30 text-blue-300 border border-blue-500/30">
+                              {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                            {recurrencePreviewDates.slice(0, 11).map((date, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded text-xs bg-slate-600/50 text-slate-300">
+                                {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            ))}
+                            {recurrencePreviewDates.length > 11 && (
+                              <span className="px-2 py-0.5 rounded text-xs text-slate-400">
+                                +{recurrencePreviewDates.length - 11} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.recurrence_type !== 'none' && !formData.recurrence_end_date && (
+                        <p className="text-xs text-amber-400 flex items-center gap-1">
+                          <Info size={12} />
+                          Please select an end date for the recurring series
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">

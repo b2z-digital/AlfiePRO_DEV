@@ -27,6 +27,7 @@ interface AgendaTaskManagerProps {
   agendaItemId: string;
   clubId: string;
   isReadOnly?: boolean;
+  meetingCategory?: 'general' | 'committee';
   onTasksChange?: (tasks: AgendaTask[]) => void;
 }
 
@@ -34,6 +35,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
   agendaItemId,
   clubId,
   isReadOnly = false,
+  meetingCategory = 'general',
   onTasksChange
 }) => {
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
@@ -48,15 +50,40 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, avatar_url')
-        .eq('club_id', clubId)
-        .eq('membership_status', 'active')
-        .order('first_name');
+      if (meetingCategory === 'committee') {
+        const { data: positions, error: posError } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq('club_id', clubId);
 
-      if (error) throw error;
-      setMembers(data || []);
+        if (posError) throw posError;
+
+        const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+        if (memberIds.length === 0) {
+          setMembers([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .eq('club_id', clubId)
+          .in('id', memberIds)
+          .order('first_name');
+
+        if (error) throw error;
+        setMembers(data || []);
+      } else {
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .eq('club_id', clubId)
+          .eq('membership_status', 'active')
+          .order('first_name');
+
+        if (error) throw error;
+        setMembers(data || []);
+      }
     } catch (error) {
       console.error('Error fetching members:', error);
     }

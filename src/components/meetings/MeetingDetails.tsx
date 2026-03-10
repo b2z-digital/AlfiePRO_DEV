@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, Edit2, Mail, Check, X, AlertTriangle, Play, Lock, Share } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, Edit2, Mail, Check, X, AlertTriangle, Play, Lock, Share, Shield, Users, Repeat } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';
@@ -378,6 +378,25 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                     <span className="text-slate-200 font-medium">{meeting.location}</span>
                   </div>
                 )}
+
+                {meeting.meeting_category && (
+                  <div className={`
+                    flex items-center gap-2 px-3 py-2 rounded-lg border font-medium
+                    ${meeting.meeting_category === 'committee'
+                      ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                      : 'bg-blue-500/20 border-blue-400/50 text-blue-300'}
+                  `}>
+                    {meeting.meeting_category === 'committee' ? <Shield size={16} /> : <Users size={16} />}
+                    <span>{meeting.meeting_category === 'committee' ? 'Committee Meeting' : 'General Meeting'}</span>
+                  </div>
+                )}
+
+                {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/20 rounded-lg border border-teal-400/50 text-teal-300 font-medium">
+                    <Repeat size={16} />
+                    <span>{meeting.recurrence_type.charAt(0).toUpperCase() + meeting.recurrence_type.slice(1)}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -621,7 +640,6 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         </div>
       )}
 
-      {/* Meeting Invite Modal */}
       <MeetingInviteModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
@@ -629,9 +647,9 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         meetingName={meeting.name}
         clubId={meeting.club_id}
         darkMode={darkMode}
+        meetingCategory={meeting.meeting_category}
       />
 
-      {/* Share Minutes Modal */}
       <ShareMinutesModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
@@ -639,6 +657,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         agendaItems={agendaItems}
         clubId={meeting.club_id}
         darkMode={darkMode}
+        meetingCategory={meeting.meeting_category}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Meeting, MeetingAgendaItem, MeetingFormData, MeetingAttendee, MeetingGuest } from '../types/meeting';
+import { Meeting, MeetingAgendaItem, MeetingFormData, MeetingAttendee, MeetingGuest, MeetingCategory, RecurrenceType } from '../types/meeting';
 
 // Get all meetings for a club or association
 export const getMeetings = async (
@@ -62,7 +62,33 @@ export const getMeetingById = async (meetingId: string): Promise<Meeting | null>
   }
 };
 
-// Create a new meeting
+function generateRecurringDates(startDate: string, recurrenceType: RecurrenceType, endDate: string): string[] {
+  const dates: string[] = [];
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  let current = new Date(start);
+
+  const advance = (d: Date): Date => {
+    const next = new Date(d);
+    switch (recurrenceType) {
+      case 'weekly': next.setDate(next.getDate() + 7); break;
+      case 'fortnightly': next.setDate(next.getDate() + 14); break;
+      case 'monthly': next.setMonth(next.getMonth() + 1); break;
+      case 'quarterly': next.setMonth(next.getMonth() + 3); break;
+      case 'yearly': next.setFullYear(next.getFullYear() + 1); break;
+      default: return next;
+    }
+    return next;
+  };
+
+  current = advance(current);
+  while (current <= end) {
+    dates.push(current.toISOString().split('T')[0]);
+    current = advance(current);
+  }
+  return dates;
+}
+
 export const createMeeting = async (
   clubId: string | undefined,
   meetingData: MeetingFormData,
@@ -70,7 +96,6 @@ export const createMeeting = async (
   associationType?: 'state' | 'national'
 ): Promise<Meeting> => {
   try {
-    // First, create the meeting
     const insertData: any = {
       name: meetingData.name,
       location: meetingData.location,
@@ -81,6 +106,11 @@ export const createMeeting = async (
       description: meetingData.description,
       chairperson_id: meetingData.chairperson_id,
       minute_taker_id: meetingData.minute_taker_id,
+      meeting_category: meetingData.meeting_category || 'general',
+      meeting_type: meetingData.meeting_type || 'in_person',
+      recurrence_type: meetingData.recurrence_type || 'none',
+      recurrence_end_date: meetingData.recurrence_end_date || null,
+      recurrence_index: 0,
       status: 'upcoming',
       minutes_status: 'not_started',
       members_present: [],
@@ -104,7 +134,6 @@ export const createMeeting = async (
 
     if (meetingError) throw meetingError;
 
-    // Then, create the agenda items
     if (meetingData.agenda_items && meetingData.agenda_items.length > 0) {
       const agendaItems = meetingData.agenda_items.map(item => ({
         meeting_id: meeting.id,
@@ -121,6 +150,47 @@ export const createMeeting = async (
         .insert(agendaItems);
 
       if (agendaError) throw agendaError;
+    }
+
+    const recurrenceType = meetingData.recurrence_type || 'none';
+    const recurrenceEndDate = meetingData.recurrence_end_date;
+
+    if (recurrenceType !== 'none' && recurrenceEndDate) {
+      const futureDates = generateRecurringDates(meetingData.date, recurrenceType, recurrenceEndDate);
+
+      for (let i = 0; i < futureDates.length; i++) {
+        const childData: any = {
+          ...insertData,
+          date: futureDates[i],
+          recurrence_parent_id: meeting.id,
+          recurrence_index: i + 1,
+        };
+        delete childData.recurrence_end_date;
+
+        const { data: childMeeting, error: childError } = await supabase
+          .from('meetings')
+          .insert(childData)
+          .select()
+          .single();
+
+        if (childError) {
+          console.error(`Error creating recurring meeting ${i + 1}:`, childError);
+          continue;
+        }
+
+        if (meetingData.agenda_items && meetingData.agenda_items.length > 0) {
+          const childAgenda = meetingData.agenda_items.map(item => ({
+            meeting_id: childMeeting.id,
+            item_number: item.item_number,
+            item_name: item.item_name,
+            owner_id: item.owner_id,
+            type: item.type,
+            duration: item.duration,
+            minutes_content: ''
+          }));
+          await supabase.from('meeting_agendas').insert(childAgenda);
+        }
+      }
     }
 
     return meeting;
@@ -145,7 +215,9 @@ export const updateMeeting = async (meetingId: string, meetingData: MeetingFormD
         conferencing_url: meetingData.conferencing_url,
         description: meetingData.description,
         chairperson_id: meetingData.chairperson_id,
-        minute_taker_id: meetingData.minute_taker_id
+        minute_taker_id: meetingData.minute_taker_id,
+        meeting_category: meetingData.meeting_category || 'general',
+        meeting_type: meetingData.meeting_type || 'in_person',
       })
       .eq('id', meetingId)
       .select()
@@ -397,15 +469,42 @@ export const deleteAgendaItem = async (agendaItemId: string): Promise<void> => {
   }
 };
 
-// Get club members for meeting attendance
 export const getClubMembersForMeeting = async (
   clubId?: string,
   associationId?: string,
-  associationType?: 'state' | 'national'
+  associationType?: 'state' | 'national',
+  meetingCategory?: MeetingCategory
 ): Promise<MeetingAttendee[]> => {
   try {
     if (clubId) {
-      // Get club members
+      if (meetingCategory === 'committee') {
+        const { data: positions, error: posError } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq('club_id', clubId)
+          .not('member_id', 'is', null);
+
+        if (posError) throw posError;
+
+        const memberIds = [...new Set((positions || []).map(p => p.member_id).filter(Boolean))];
+        if (memberIds.length === 0) return [];
+
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', memberIds)
+          .order('first_name', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map(member => ({
+          id: member.id,
+          name: `${member.first_name} ${member.last_name}`,
+          avatar_url: member.avatar_url,
+          isPresent: false
+        }));
+      }
+
       const { data, error } = await supabase
         .from('members')
         .select('id, first_name, last_name, avatar_url')
@@ -421,9 +520,56 @@ export const getClubMembersForMeeting = async (
         isPresent: false
       }));
     } else if (associationId && associationType) {
-      // Get association admins from user_associations tables
-      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      if (meetingCategory === 'committee') {
+        const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+        const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+        const { data, error } = await supabase
+          .from(tableName)
+          .select(`
+            user_id,
+            profiles:user_id(id, first_name, last_name)
+          `)
+          .eq(idColumn, associationId);
+
+        if (error) throw error;
+
+        return (data || []).map((item: any) => ({
+          id: item.profiles.id,
+          name: `${item.profiles.first_name} ${item.profiles.last_name}`,
+          isPresent: false
+        }));
+      }
+
+      if (associationType === 'state') {
+        const { data: clubs, error: clubsError } = await supabase
+          .from('clubs')
+          .select('id')
+          .eq('state_association_id', associationId);
+
+        if (clubsError) throw clubsError;
+
+        const clubIds = (clubs || []).map(c => c.id);
+        if (clubIds.length === 0) return [];
+
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .in('club_id', clubIds)
+          .order('first_name', { ascending: true });
+
+        if (error) throw error;
+
+        return (data || []).map(member => ({
+          id: member.id,
+          name: `${member.first_name} ${member.last_name}`,
+          avatar_url: member.avatar_url,
+          isPresent: false
+        }));
+      }
+
+      const tableName = 'user_national_associations';
+      const idColumn = 'national_association_id';
 
       const { data, error } = await supabase
         .from(tableName)

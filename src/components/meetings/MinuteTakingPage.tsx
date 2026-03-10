@@ -962,6 +962,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
                         clubId={meeting.club_id}
                         isReadOnly={isReadOnly}
                         onTasksChange={(tasks) => handleTasksChange(item.id, tasks)}
+                        meetingCategory={meeting.meeting_category}
                       />
                     </div>
 

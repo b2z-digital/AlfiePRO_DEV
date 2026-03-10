@@ -16,6 +16,7 @@ interface ShareMinutesModalProps {
   agendaItems: MeetingAgendaItem[];
   clubId: string;
   darkMode: boolean;
+  meetingCategory?: 'general' | 'committee';
 }
 
 export const ShareMinutesModal: React.FC<ShareMinutesModalProps> = ({
@@ -24,7 +25,8 @@ export const ShareMinutesModal: React.FC<ShareMinutesModalProps> = ({
   meeting,
   agendaItems,
   clubId,
-  darkMode
+  darkMode,
+  meetingCategory = 'general'
 }) => {
   const [recipientType, setRecipientType] = useState<'all' | 'selected' | 'individual'>('all');
   const [members, setMembers] = useState<Member[]>([]);
@@ -62,17 +64,41 @@ Thank you.
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, avatar_url')
-        .eq('club_id', clubId)
-        .order('first_name', { ascending: true });
+      if (meetingCategory === 'committee') {
+        const { data: positions, error: posError } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq('club_id', clubId);
 
-      if (error) throw error;
+        if (posError) throw posError;
 
-      // Filter out members without email addresses
-      const membersWithEmail = (data || []).filter(member => member.email);
-      setMembers(membersWithEmail);
+        const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+        if (memberIds.length === 0) {
+          setMembers([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, avatar_url')
+          .eq('club_id', clubId)
+          .in('id', memberIds)
+          .order('first_name', { ascending: true });
+
+        if (error) throw error;
+        const membersWithEmail = (data || []).filter(member => member.email);
+        setMembers(membersWithEmail);
+      } else {
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, avatar_url')
+          .eq('club_id', clubId)
+          .order('first_name', { ascending: true });
+
+        if (error) throw error;
+        const membersWithEmail = (data || []).filter(member => member.email);
+        setMembers(membersWithEmail);
+      }
     } catch (err) {
       console.error('Error fetching members:', err);
       setError('Failed to load members');

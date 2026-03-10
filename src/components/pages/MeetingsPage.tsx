@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, Filter, MapPin, Clock, Users, Edit2, Trash2, ChevronRight, AlertTriangle, Check } from 'lucide-react';
+import { Calendar, Plus, Search, Filter, MapPin, Clock, Users, Edit2, Trash2, ChevronRight, AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting } from '../../types/meeting';
 import { getMeetings, deleteMeeting, updateMeetingStatus } from '../../utils/meetingStorage';
@@ -485,6 +485,23 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                                     <div className="flex items-center gap-1">
                                       <MapPin size={14} />
                                       <span>{meeting.location}</span>
+                                    </div>
+                                  )}
+                                  {meeting.meeting_category && (
+                                    <div className={`
+                                      flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                                      ${meeting.meeting_category === 'committee'
+                                        ? 'bg-amber-900/30 text-amber-400'
+                                        : 'bg-blue-900/30 text-blue-400'}
+                                    `}>
+                                      {meeting.meeting_category === 'committee' ? <Shield size={12} /> : <Users size={12} />}
+                                      {meeting.meeting_category === 'committee' ? 'Committee' : 'General'}
+                                    </div>
+                                  )}
+                                  {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
+                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/30 text-teal-400">
+                                      <Repeat size={12} />
+                                      {meeting.recurrence_type.charAt(0).toUpperCase() + meeting.recurrence_type.slice(1)}
                                     </div>
                                   )}
                                   {meeting.status !== 'upcoming' && (
