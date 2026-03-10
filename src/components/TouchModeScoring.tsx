@@ -858,10 +858,28 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
 
   const canEditHandicaps = isHandicapEvent && !hasR1BeenScored;
 
+  const saveHandicapToBoat = async (skipperIndex: number, value: number) => {
+    const skipper = skippers[skipperIndex];
+    if (!skipper?.boatId) return;
+    await supabase
+      .from('member_boats')
+      .update({ handicap: value })
+      .eq('id', skipper.boatId);
+
+    setStoredHandicaps(prev =>
+      prev.map(sh =>
+        sh.skipperIndex === skipperIndex
+          ? { ...sh, storedHandicap: value }
+          : sh
+      )
+    );
+  };
+
   const handleTouchUpdateHandicap = (skipperIndex: number, value: number) => {
     if (updateSkipper) {
       updateSkipper(skipperIndex, { startHcap: value });
     }
+    saveHandicapToBoat(skipperIndex, value);
   };
 
   const handleTouchScratchStart = () => {
