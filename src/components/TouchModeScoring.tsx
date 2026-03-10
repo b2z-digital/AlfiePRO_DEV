@@ -30,6 +30,7 @@ interface TouchModeScoringProps {
   isScoringLastHeat?: boolean; // True when all other heats are complete and this is the last one
   onConfirmResults?: () => void; // Called when user confirms the finish order
   updateSkipper?: (skipperIndex: number, updates: Partial<Skipper>) => void;
+  setSkippers?: (skippers: Skipper[]) => void;
   heatObservers?: ObserverAssignment[];
   roundLabel?: string;
   allSkippers?: Skipper[];
@@ -60,6 +61,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   isScoringLastHeat = false,
   onConfirmResults,
   updateSkipper,
+  setSkippers: setSkippersProp,
   heatObservers = [],
   roundLabel,
   allSkippers,
@@ -883,19 +885,21 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   };
 
   const handleTouchScratchStart = () => {
-    skippers.forEach((_, index) => {
-      if (updateSkipper) {
-        updateSkipper(index, { startHcap: 0 });
-      }
-    });
+    if (!setSkippersProp) return;
+    const updated = skippers.map(s => ({ ...s, startHcap: 0 }));
+    setSkippersProp(updated);
   };
 
   const handleUsePreviousHandicaps = () => {
-    storedHandicaps.forEach((sh) => {
-      if (updateSkipper && sh.storedHandicap > 0) {
-        updateSkipper(sh.skipperIndex, { startHcap: sh.storedHandicap });
+    if (!setSkippersProp) return;
+    const updated = skippers.map((s, idx) => {
+      const stored = storedHandicaps.find(sh => sh.skipperIndex === idx);
+      if (stored && stored.storedHandicap > 0) {
+        return { ...s, startHcap: stored.storedHandicap };
       }
+      return s;
     });
+    setSkippersProp(updated);
   };
 
   return (

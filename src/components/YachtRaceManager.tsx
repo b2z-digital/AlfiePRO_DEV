@@ -3084,6 +3084,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 currentEvent={currentEvent}
                 isFullscreen={isFullscreenScoring}
                 updateSkipper={updateSkipper}
+                setSkippers={setSkippers}
               />
             ) : raceType === 'handicap' ? (
               <RaceTable
