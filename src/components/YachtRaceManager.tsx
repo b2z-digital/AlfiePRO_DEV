@@ -3083,6 +3083,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 darkMode={darkMode}
                 currentEvent={currentEvent}
                 isFullscreen={isFullscreenScoring}
+                updateSkipper={updateSkipper}
               />
             ) : raceType === 'handicap' ? (
               <RaceTable
