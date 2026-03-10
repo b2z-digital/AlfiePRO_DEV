@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Search, Users, Check, AlertTriangle, Send, Download, FileText } from 'lucide-react';
+import { X, Mail, Search, Users, Check, AlertTriangle, Send, Download, FileText, Shield } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
@@ -17,6 +17,8 @@ interface ShareMinutesModalProps {
   clubId: string;
   darkMode: boolean;
   meetingCategory?: 'general' | 'committee';
+  associationId?: string;
+  associationType?: 'state' | 'national';
 }
 
 export const ShareMinutesModal: React.FC<ShareMinutesModalProps> = ({
@@ -26,10 +28,13 @@ export const ShareMinutesModal: React.FC<ShareMinutesModalProps> = ({
   agendaItems,
   clubId,
   darkMode,
-  meetingCategory = 'general'
+  meetingCategory = 'general',
+  associationId,
+  associationType
 }) => {
-  const [recipientType, setRecipientType] = useState<'all' | 'selected' | 'individual'>('all');
+  const [recipientType, setRecipientType] = useState<'all' | 'committee' | 'selected' | 'individual'>('all');
   const [members, setMembers] = useState<Member[]>([]);
+  const [committeeMembers, setCommitteeMembers] = useState<Member[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [individualRecipient, setIndividualRecipient] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,30 +69,87 @@ Thank you.
     try {
       setLoading(true);
 
-      if (meetingCategory === 'committee') {
-        const { data: positions, error: posError } = await supabase
-          .from('committee_positions')
-          .select('member_id')
-          .eq('club_id', clubId);
+      const isAssociation = !!associationId && !!associationType;
 
-        if (posError) throw posError;
+      if (isAssociation) {
+        if (associationType === 'state') {
+          const { data: clubs, error: clubsError } = await supabase
+            .from('clubs')
+            .select('id, name')
+            .eq('state_association_id', associationId);
 
-        const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
-        if (memberIds.length === 0) {
-          setMembers([]);
-          return;
+          if (clubsError) throw clubsError;
+
+          const clubIds = (clubs || []).map(c => c.id);
+          if (clubIds.length > 0) {
+            const { data, error } = await supabase
+              .from('members')
+              .select('id, first_name, last_name, email, avatar_url, club_id, club')
+              .in('club_id', clubIds)
+              .order('first_name', { ascending: true });
+
+            if (error) throw error;
+            setMembers((data || []).filter(m => m.email) as Member[]);
+          } else {
+            setMembers([]);
+          }
+        } else {
+          const tableName = 'user_national_associations';
+          const idColumn = 'national_association_id';
+
+          const { data: userAssociations, error: assocError } = await supabase
+            .from(tableName)
+            .select('user_id')
+            .eq(idColumn, associationId);
+
+          if (assocError) throw assocError;
+
+          const userIds = (userAssociations || []).map(ua => ua.user_id);
+          if (userIds.length > 0) {
+            const { data: profiles, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email')
+              .in('id', userIds)
+              .order('first_name', { ascending: true });
+
+            if (profilesError) throw profilesError;
+
+            const transformed = (profiles || []).filter(p => p.email).map((p: any) => ({
+              ...p,
+              club_id: '',
+              club: '',
+            })) as Member[];
+            setMembers(transformed);
+          } else {
+            setMembers([]);
+          }
         }
 
-        const { data, error } = await supabase
-          .from('members')
-          .select('id, first_name, last_name, email, avatar_url')
-          .eq('club_id', clubId)
-          .in('id', memberIds)
-          .order('first_name', { ascending: true });
+        const assocTable = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+        const assocCol = associationType === 'state' ? 'state_association_id' : 'national_association_id';
 
-        if (error) throw error;
-        const membersWithEmail = (data || []).filter(member => member.email);
-        setMembers(membersWithEmail);
+        const { data: assocUsers, error: assocUsersError } = await supabase
+          .from(assocTable)
+          .select('user_id')
+          .eq(assocCol, associationId);
+
+        if (!assocUsersError && assocUsers && assocUsers.length > 0) {
+          const userIds = assocUsers.map(au => au.user_id);
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', userIds)
+            .order('first_name', { ascending: true });
+
+          if (!profilesError) {
+            const transformed = (profiles || []).filter(p => p.email).map((p: any) => ({
+              ...p,
+              club_id: '',
+              club: '',
+            })) as Member[];
+            setCommitteeMembers(transformed);
+          }
+        }
       } else {
         const { data, error } = await supabase
           .from('members')
@@ -96,8 +158,20 @@ Thank you.
           .order('first_name', { ascending: true });
 
         if (error) throw error;
-        const membersWithEmail = (data || []).filter(member => member.email);
-        setMembers(membersWithEmail);
+        setMembers((data || []).filter(m => m.email) as Member[]);
+
+        const { data: positions, error: posError } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq('club_id', clubId);
+
+        if (!posError && positions) {
+          const committeeMemberIds = positions.map(p => p.member_id).filter(Boolean);
+          if (committeeMemberIds.length > 0) {
+            const committeeList = (data || []).filter(m => committeeMemberIds.includes(m.id) && m.email);
+            setCommitteeMembers(committeeList as Member[]);
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching members:', err);
@@ -112,11 +186,12 @@ Thank you.
       setSending(true);
       setError(null);
       
-      // Determine recipients based on selection
       let recipients: string[] = [];
-      
+
       if (recipientType === 'all') {
         recipients = members.map(member => member.id);
+      } else if (recipientType === 'committee') {
+        recipients = committeeMembers.map(member => member.id);
       } else if (recipientType === 'selected') {
         recipients = selectedMembers;
       } else if (recipientType === 'individual') {
@@ -129,7 +204,8 @@ Thank you.
         return;
       }
 
-      const recipientMembers = members.filter(m => recipients.includes(m.id));
+      const allKnownMembers = [...members, ...committeeMembers.filter(cm => !members.some(m => m.id === cm.id))];
+      const recipientMembers = allKnownMembers.filter(m => recipients.includes(m.id));
       const formattedRecipients = recipientMembers.map(member => ({
         user_id: member.user_id || member.id,
         email: member.email,
@@ -502,11 +578,28 @@ Thank you.
                     onChange={() => setRecipientType('all')}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded"
                   />
-                  <label htmlFor="all-members" className="text-slate-300">
-                    All Club Members ({members.length})
+                  <label htmlFor="all-members" className="text-slate-300 flex items-center gap-2">
+                    <Users size={16} className="text-blue-400" />
+                    All {associationId ? 'Association' : 'Club'} Members ({members.length})
                   </label>
                 </div>
-                
+
+                {committeeMembers.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      id="committee-members"
+                      checked={recipientType === 'committee'}
+                      onChange={() => setRecipientType('committee')}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-600 rounded"
+                    />
+                    <label htmlFor="committee-members" className="text-slate-300 flex items-center gap-2">
+                      <Shield size={16} className="text-amber-400" />
+                      Committee Members ({committeeMembers.length})
+                    </label>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-3">
                   <input
                     type="radio"
@@ -519,7 +612,7 @@ Thank you.
                     Selected Members ({selectedMembers.length})
                   </label>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                   <input
                     type="radio"

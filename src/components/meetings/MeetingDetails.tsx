@@ -648,6 +648,8 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         clubId={meeting.club_id}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
+        associationId={meeting.state_association_id || meeting.national_association_id || undefined}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : undefined}
       />
 
       <ShareMinutesModal
@@ -658,6 +660,8 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         clubId={meeting.club_id}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
+        associationId={meeting.state_association_id || meeting.national_association_id || undefined}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : undefined}
       />
     </div>
   );
