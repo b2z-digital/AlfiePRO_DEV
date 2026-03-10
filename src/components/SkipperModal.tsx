@@ -83,6 +83,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [editingMemberBoat, setEditingMemberBoat] = useState<EditableBoatData | null>(null);
   const [attendingMembers, setAttendingMembers] = useState<string[]>([]);
   const [editingSkipperIndex, setEditingSkipperIndex] = useState<number | null>(null);
+  const [editMemberBoats, setEditMemberBoats] = useState<MemberBoat[]>([]);
+  const [showAddBoatForEdit, setShowAddBoatForEdit] = useState(false);
+  const [editNewBoatData, setEditNewBoatData] = useState({ sailNumber: '', hull: '' });
   const [showAddBoatModal, setShowAddBoatModal] = useState<Member | null>(null);
   const [newBoatData, setNewBoatData] = useState({ sailNumber: '', hull: '' });
   const [boatToDelete, setBoatToDelete] = useState<{ member: Member; boat: MemberBoat } | null>(null);
@@ -284,12 +287,11 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
     fetchMembers();
 
-    // Reset form data when modal opens
-    if (isOpen) {
+    if (isOpen && view !== 'edit') {
       setManualSkipper({
         name: '',
         sailNo: '',
-        hull: '', // Reset hull field
+        hull: '',
         club: '',
         country: 'Australia',
         countryCode: 'AU',
@@ -822,46 +824,69 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     }
   };
   
-  const handleEditSkipper = (index: number) => {
+  const handleEditSkipper = async (index: number) => {
     const skipper = skippers[index];
     setEditingSkipperIndex(index);
     setManualSkipper({
-      name: skipper.name,
-      sailNo: skipper.sailNo,
+      name: skipper.name || '',
+      sailNo: skipper.sailNo || '',
       hull: skipper.hull || '',
       club: skipper.club || '',
       country: skipper.country || 'Australia',
-      countryCode: skipper.countryCode || 'AU',
+      countryCode: skipper.country_code || 'AU',
       category: skipper.category || '',
-      clubState: skipper.clubState || '',
+      clubState: skipper.state || '',
       boatModel: currentEvent?.raceClass || '',
       startHcap: skipper.startHcap || 0
     });
+    setShowAddBoatForEdit(false);
+    setEditNewBoatData({ sailNumber: '', hull: '' });
+
+    if (skipper.memberId) {
+      try {
+        const { data: boats } = await supabase
+          .from('member_boats')
+          .select('*')
+          .eq('member_id', skipper.memberId)
+          .eq('boat_type', currentEvent?.raceClass || '');
+        setEditMemberBoats(boats || []);
+      } catch {
+        setEditMemberBoats([]);
+      }
+    } else {
+      setEditMemberBoats([]);
+    }
+
     setView('edit');
   };
 
   const handleUpdateSkipper = () => {
     if (editingSkipperIndex === null) return;
 
+    const existingSkipper = skippers[editingSkipperIndex];
+    const matchedBoat = editMemberBoats.find(
+      b => b.sail_number === manualSkipper.sailNo && (b.hull || '') === manualSkipper.hull
+    );
+
     const updatedSkippers = [...skippers];
     updatedSkippers[editingSkipperIndex] = {
-      ...updatedSkippers[editingSkipperIndex],
+      ...existingSkipper,
       name: manualSkipper.name,
       sailNo: manualSkipper.sailNo,
       hull: manualSkipper.hull,
       club: manualSkipper.club,
       country: manualSkipper.country,
-      countryCode: manualSkipper.countryCode,
+      country_code: manualSkipper.countryCode,
       category: manualSkipper.category,
-      clubState: manualSkipper.clubState,
-      boatModel: currentEvent?.raceClass || '',
+      state: manualSkipper.clubState,
+      boatModel: manualSkipper.hull || currentEvent?.raceClass || '',
+      ...(matchedBoat ? { boatId: matchedBoat.id } : {}),
     };
 
     onUpdateSkippers(updatedSkippers);
     setEditingSkipperIndex(null);
     setView('initial');
 
-    // Reset form
     setManualSkipper({
       name: '',
       sailNo: '',
@@ -874,6 +899,43 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       boatModel: currentEvent?.raceClass || '',
       startHcap: 0
     });
+  };
+
+  const handleAddBoatFromEdit = async () => {
+    if (editingSkipperIndex === null) return;
+    const skipper = skippers[editingSkipperIndex];
+    if (!skipper.memberId || !editNewBoatData.sailNumber || !editNewBoatData.hull) return;
+
+    setUpdateLoading(true);
+    setError(null);
+
+    try {
+      const { data: newBoat, error: boatError } = await supabase
+        .from('member_boats')
+        .insert({
+          member_id: skipper.memberId,
+          boat_type: currentEvent?.raceClass,
+          sail_number: editNewBoatData.sailNumber,
+          hull: editNewBoatData.hull
+        })
+        .select()
+        .single();
+
+      if (boatError) throw boatError;
+
+      setEditMemberBoats(prev => [...prev, newBoat]);
+      setManualSkipper(prev => ({
+        ...prev,
+        sailNo: newBoat.sail_number,
+        hull: newBoat.hull || ''
+      }));
+      setShowAddBoatForEdit(false);
+      setEditNewBoatData({ sailNumber: '', hull: '' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to add boat');
+    } finally {
+      setUpdateLoading(false);
+    }
   };
 
   const handleRemoveSkipper = (index: number) => {
@@ -1645,11 +1707,13 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
 
   // Edit view
   if (view === 'edit') {
+    const editingSkipper = editingSkipperIndex !== null ? skippers[editingSkipperIndex] : null;
+    const isMemberLinked = !!editingSkipper?.memberId;
+
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-          {/* Blue gradient header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+        <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <Edit2 className="text-white" size={24} />
               <div>
@@ -1672,18 +1736,12 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             </button>
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 overflow-y-auto">
             {error && (
-              <div className="mb-4 p-3 rounded-md bg-red-900/20 border border-red-900/30 text-red-400 text-sm">
+              <div className="p-3 rounded-md bg-red-900/20 border border-red-900/30 text-red-400 text-sm">
                 <div className="flex">
-                  <div className="flex-shrink-0">
-                    <AlertCircle className="h-4 w-4 text-red-400" aria-hidden="true" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-300">
-                      {error}
-                    </p>
-                  </div>
+                  <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                  <p className="ml-3 text-sm text-red-300">{error}</p>
                 </div>
               </div>
             )}
@@ -1702,38 +1760,151 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Sail Number *
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                required
-                value={manualSkipper.sailNo}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9]/g, '');
-                  setManualSkipper(prev => ({ ...prev, sailNo: value }));
-                }}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="Enter sail number"
-              />
-            </div>
+            {isMemberLinked && editMemberBoats.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-slate-300">
+                  Select Boat
+                </label>
+                <div className="space-y-1.5">
+                  {editMemberBoats.map((boat) => {
+                    const isSelected = manualSkipper.sailNo === boat.sail_number && manualSkipper.hull === (boat.hull || '');
+                    return (
+                      <button
+                        key={boat.id}
+                        type="button"
+                        onClick={() => {
+                          setManualSkipper(prev => ({
+                            ...prev,
+                            sailNo: boat.sail_number || '',
+                            hull: boat.hull || ''
+                          }));
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-900/30'
+                            : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                        }`}
+                      >
+                        <Sailboat size={16} className={isSelected ? 'text-blue-400' : 'text-slate-400'} />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-white">Sail # {boat.sail_number}</span>
+                          {boat.hull && (
+                            <span className="text-sm text-slate-400 ml-2">{boat.hull}</span>
+                          )}
+                        </div>
+                        {isSelected && <Check size={16} className="text-blue-400 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-slate-300">
-                Boat Design (Hull) *
-              </label>
-              <input
-                type="text"
-                required
-                value={manualSkipper.hull}
-                onChange={(e) => setManualSkipper(prev => ({ ...prev, hull: e.target.value }))}
-                className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
-                placeholder="Enter boat design (e.g., Trance, B6)"
-              />
-            </div>
+            {isMemberLinked && !showAddBoatForEdit && (
+              <button
+                type="button"
+                onClick={() => setShowAddBoatForEdit(true)}
+                className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-sm font-medium"
+              >
+                <Plus size={16} />
+                <span>Add New Boat for {manualSkipper.name.split(' ')[0]}</span>
+              </button>
+            )}
+
+            {isMemberLinked && showAddBoatForEdit && (
+              <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-900/10 space-y-3">
+                <p className="text-sm font-medium text-blue-300">New Boat</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-slate-400">Sail Number *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={editNewBoatData.sailNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setEditNewBoatData(prev => ({ ...prev, sailNumber: value }));
+                      }}
+                      className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 text-sm"
+                      placeholder="Sail #"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1 text-slate-400">Hull Design *</label>
+                    <input
+                      type="text"
+                      value={editNewBoatData.hull}
+                      onChange={(e) => setEditNewBoatData(prev => ({ ...prev, hull: e.target.value }))}
+                      className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 text-sm"
+                      placeholder="e.g., Trance"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddBoatForEdit(false);
+                      setEditNewBoatData({ sailNumber: '', hull: '' });
+                    }}
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddBoatFromEdit}
+                    disabled={updateLoading || !editNewBoatData.sailNumber || !editNewBoatData.hull}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {updateLoading ? (
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                    ) : (
+                      <Plus size={14} />
+                    )}
+                    Add Boat
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(!isMemberLinked || editMemberBoats.length === 0) && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-slate-300">
+                    Sail Number *
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    required
+                    value={manualSkipper.sailNo}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setManualSkipper(prev => ({ ...prev, sailNo: value }));
+                    }}
+                    className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                    placeholder="Enter sail number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-slate-300">
+                    Boat Design (Hull) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={manualSkipper.hull}
+                    onChange={(e) => setManualSkipper(prev => ({ ...prev, hull: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600"
+                    placeholder="Enter boat design (e.g., Trance, B6)"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-sm font-medium mb-1 text-slate-300">
@@ -1749,7 +1920,6 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               />
             </div>
 
-            {/* Country field */}
             <div>
               <label className="block text-sm font-medium mb-1 text-slate-300">
                 Country <span className="text-red-400">*</span>
@@ -1780,7 +1950,6 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               </div>
             </div>
 
-            {/* Category field */}
             <div>
               <label className="block text-sm font-medium mb-1 text-slate-300">
                 Category <span className="text-red-400">*</span>
@@ -1800,7 +1969,6 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               </select>
             </div>
 
-            {/* Show State field if event display settings require it */}
             {currentEvent?.show_club_state && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-slate-300">
