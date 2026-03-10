@@ -228,6 +228,17 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     }
   }, [initialRace]);
 
+  useEffect(() => {
+    if (!isLoadingPreferences) {
+      const isHcapEvent = currentEvent?.raceFormat === 'handicap' ||
+        (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
+      const hasR1 = raceResults.some(r => r.race === 1);
+      if (isHcapEvent && !hasR1 && currentRace === 1 && skippers.length > 0) {
+        setIsHandicapViewerOpen(true);
+      }
+    }
+  }, [isLoadingPreferences, skippers.length]);
+
   // Load existing results for current race
   useEffect(() => {
     console.log('🔄 Loading results for race:', currentRace, 'Total results:', raceResults.length);
@@ -804,9 +815,27 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     return after - before;
   };
 
+  const hasR1BeenScored = raceResults.some(r => r.race === 1);
+
   // Check if this is a handicap event - use raceFormat from event if available
   const isHandicapEvent = currentEvent?.raceFormat === 'handicap' ||
     (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
+
+  const canEditHandicaps = isHandicapEvent && !hasR1BeenScored;
+
+  const handleTouchUpdateHandicap = (skipperIndex: number, value: number) => {
+    if (updateSkipper) {
+      updateSkipper(skipperIndex, { startHcap: value });
+    }
+  };
+
+  const handleTouchScratchStart = () => {
+    skippers.forEach((_, index) => {
+      if (updateSkipper) {
+        updateSkipper(index, { startHcap: 0 });
+      }
+    });
+  };
 
   return (
     <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
@@ -1310,6 +1339,9 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         currentEvent={currentEvent}
         allSkippers={allSkippers}
         allRaceResults={allRaceResults}
+        canEditHandicaps={canEditHandicaps}
+        onUpdateHandicap={handleTouchUpdateHandicap}
+        onScratchStart={handleTouchScratchStart}
       />
 
       {/* Post-Race Handicap Modal */}
