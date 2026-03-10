@@ -89,6 +89,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [showAddBoatModal, setShowAddBoatModal] = useState<Member | null>(null);
   const [newBoatData, setNewBoatData] = useState({ sailNumber: '', hull: '' });
   const [boatToDelete, setBoatToDelete] = useState<{ member: Member; boat: MemberBoat } | null>(null);
+  const [showAllMembers, setShowAllMembers] = useState(false);
   const navigate = useNavigate();
 
   // Reset view to initial when modal closes
@@ -697,9 +698,22 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
         });
       });
 
+      if (editingBoat) {
+        setEditMemberBoats(prev => prev.map(b =>
+          b.id === boatToEdit.boatId
+            ? { ...b, sail_number: boatToEdit.sailNumber, hull: boatToEdit.hull }
+            : b
+        ));
+        setManualSkipper(prev => ({
+          ...prev,
+          sailNo: boatToEdit.sailNumber,
+          hull: boatToEdit.hull,
+          club: boatToEdit.club
+        }));
+      }
+
       setUpdateSuccess("Member information updated successfully");
 
-      // Clear the editing state after a short delay
       setTimeout(() => {
         setEditingBoat(null);
         setEditingMemberBoat(null);
@@ -1019,15 +1033,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     return `${firstName.charAt(0)}${lastName.charAt(0)}`;
   };
 
-  // Filter members to only show those with matching boats and sort alphabetically by last name
   const membersWithMatchingBoats = filteredMembers
-    .filter(hasMatchingBoats)
+    .filter(m => showAllMembers || hasMatchingBoats(m))
     .sort((a, b) => {
+      if (showAllMembers) {
+        const aHas = hasMatchingBoats(a) ? 0 : 1;
+        const bHas = hasMatchingBoats(b) ? 0 : 1;
+        if (aHas !== bHas) return aHas - bHas;
+      }
       const lastNameA = a.last_name.toLowerCase();
       const lastNameB = b.last_name.toLowerCase();
       if (lastNameA < lastNameB) return -1;
       if (lastNameA > lastNameB) return 1;
-      // If last names are equal, sort by first name
       const firstNameA = a.first_name.toLowerCase();
       const firstNameB = b.first_name.toLowerCase();
       return firstNameA.localeCompare(firstNameB);
@@ -1769,31 +1786,51 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                   {editMemberBoats.map((boat) => {
                     const isSelected = manualSkipper.sailNo === boat.sail_number && manualSkipper.hull === (boat.hull || '');
                     return (
-                      <button
-                        key={boat.id}
-                        type="button"
-                        onClick={() => {
-                          setManualSkipper(prev => ({
-                            ...prev,
-                            sailNo: boat.sail_number || '',
-                            hull: boat.hull || ''
-                          }));
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-900/30'
-                            : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
-                        }`}
-                      >
-                        <Sailboat size={16} className={isSelected ? 'text-blue-400' : 'text-slate-400'} />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium text-white">Sail # {boat.sail_number}</span>
-                          {boat.hull && (
-                            <span className="text-sm text-slate-400 ml-2">{boat.hull}</span>
-                          )}
-                        </div>
-                        {isSelected && <Check size={16} className="text-blue-400 flex-shrink-0" />}
-                      </button>
+                      <div key={boat.id} className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualSkipper(prev => ({
+                              ...prev,
+                              sailNo: boat.sail_number || '',
+                              hull: boat.hull || ''
+                            }));
+                          }}
+                          className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-900/30'
+                              : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                          }`}
+                        >
+                          <Sailboat size={16} className={isSelected ? 'text-blue-400' : 'text-slate-400'} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium text-white">Sail # {boat.sail_number}</span>
+                            {boat.hull && (
+                              <span className="text-sm text-slate-400 ml-2">{boat.hull}</span>
+                            )}
+                          </div>
+                          {isSelected && <Check size={16} className="text-blue-400 flex-shrink-0" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const skipper = editingSkipperIndex !== null ? skippers[editingSkipperIndex] : null;
+                            if (skipper?.memberId) {
+                              setEditingBoat({
+                                memberId: skipper.memberId,
+                                boatId: boat.id,
+                                sailNumber: boat.sail_number || '',
+                                hull: boat.hull || '',
+                                club: manualSkipper.club || ''
+                              });
+                            }
+                          }}
+                          className="p-2 rounded-lg border border-slate-600 bg-slate-700/50 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors flex-shrink-0"
+                          title="Edit boat details"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -2577,10 +2614,22 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
               />
             </div>
 
-            {/* Sort indicator */}
-            <div className="flex items-center gap-2 text-xs text-slate-400 px-2">
-              <ArrowUpDown size={14} />
-              <span>Sorted by last name (A-Z)</span>
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <ArrowUpDown size={14} />
+                <span>Sorted by last name (A-Z)</span>
+              </div>
+              <button
+                onClick={() => setShowAllMembers(prev => !prev)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  showAllMembers
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Users size={12} />
+                {showAllMembers ? 'All Members' : `${currentEvent?.raceClass || 'Class'} Only`}
+              </button>
             </div>
 
             {membersWithMatchingBoats.length > 0 && (
@@ -2614,12 +2663,21 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             <div className="text-center py-12 bg-slate-700/50 rounded-lg border border-slate-600 m-6">
               <Users size={48} className="mx-auto mb-4 text-slate-600" />
               <p className="text-lg font-medium text-slate-300 mb-2">No Members Found</p>
-              <p className="text-slate-400">No members found with {currentEvent?.raceClass} boats</p>
+              <p className="text-slate-400">No members found{showAllMembers ? '' : ` with ${currentEvent?.raceClass} boats`}</p>
+              {!showAllMembers && (
+                <button
+                  onClick={() => setShowAllMembers(true)}
+                  className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Show All Members
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
               {membersWithMatchingBoats.map((member) => {
                 const matchingBoats = getMatchingBoats(member);
+                const hasBoats = matchingBoats.length > 0;
                 const hasMultipleBoats = matchingBoats.length > 1;
 
                 return (
@@ -2646,19 +2704,17 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                           {member.first_name} {member.last_name}
                         </h3>
                         <p className="text-xs text-slate-400 truncate">
-                          {member.club || 'No club'} • {matchingBoats.length} boat{matchingBoats.length !== 1 ? 's' : ''}
+                          {member.club || 'No club'} • {hasBoats ? `${matchingBoats.length} boat${matchingBoats.length !== 1 ? 's' : ''}` : `No ${currentEvent?.raceClass || ''} boats`}
                         </p>
                       </div>
                     </div>
 
-                    {/* Boats List */}
                     <div className="divide-y divide-slate-600">
-                      {matchingBoats.map((boat) => {
+                      {hasBoats ? matchingBoats.map((boat) => {
                         const key = `${member.id}-${boat.id}`;
                         const isSelected = !!selectedMemberBoats[key];
                         const isValid = boat.isValid;
 
-                        // Check if this member/boat is already in the skippers list
                         const isAlreadyAdded = skippers.some(s =>
                           s.name === `${member.first_name} ${member.last_name}` &&
                           s.sailNo === boat.sail_number
@@ -2683,7 +2739,6 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                               }
                             }}
                           >
-                            {/* Boat info */}
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(30, 58, 138, 0.3)' }}>
                                 <Sailboat size={16} className="text-blue-400" />
@@ -2705,7 +2760,6 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                               </div>
                             </div>
 
-                            {/* Actions */}
                             <div className="flex items-center gap-2 flex-shrink-0">
                               {!isAlreadyAdded && isValid && (
                                 <button
@@ -2722,12 +2776,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                               {!isAlreadyAdded && (
                                 <button
                                   onClick={(e) => {
-                                    console.log('DELETE BUTTON CLICKED!', { member, boat });
                                     e.stopPropagation();
                                     e.preventDefault();
-                                    console.log('About to set boatToDelete');
                                     setBoatToDelete({ member, boat });
-                                    console.log('boatToDelete set');
                                   }}
                                   className="p-1.5 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 transition-colors"
                                   title="Delete boat"
@@ -2749,15 +2800,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                             </div>
                           </div>
                         );
-                      })}
+                      }) : (
+                        <div className="p-3 text-center">
+                          <p className="text-xs text-slate-500 mb-2">No {currentEvent?.raceClass} boat registered</p>
+                        </div>
+                      )}
 
-                      {/* Add New Boat Button */}
                       <button
                         onClick={() => setShowAddBoatModal(member)}
                         className="flex items-center gap-2 p-3 text-blue-400 hover:bg-slate-700/50 transition-colors w-full text-left"
                       >
                         <Plus size={16} />
-                        <span className="text-sm font-medium">Add New Boat for {member.first_name}</span>
+                        <span className="text-sm font-medium">Add New {currentEvent?.raceClass} Boat for {member.first_name}</span>
                       </button>
                     </div>
                   </div>
