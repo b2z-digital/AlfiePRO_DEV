@@ -326,9 +326,12 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         title: position.position_name,
         name: `${member.first_name} ${member.last_name}`,
         email: member.email,
-        member_id: memberId,
-        user_id: member.user_id
+        member_id: memberId
       };
+
+      if (member.user_id) {
+        insertData.user_id = member.user_id;
+      }
 
       if (isAssociationContext && effectiveAssocId) {
         if (effectiveAssocType === 'state') {
@@ -345,6 +348,38 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         .insert(insertData);
 
       if (error) throw error;
+
+      if (isAssociationContext && effectiveAssocId && member.user_id) {
+        const assocTable = effectiveAssocType === 'state' ? 'user_state_associations' : 'user_national_associations';
+        const assocIdCol = effectiveAssocType === 'state' ? 'state_association_id' : 'national_association_id';
+
+        const { data: existing } = await supabase
+          .from(assocTable)
+          .select('id')
+          .eq('user_id', member.user_id)
+          .eq(assocIdCol, effectiveAssocId)
+          .maybeSingle();
+
+        if (!existing) {
+          const accessLevel = position.access_level || 'editor';
+          let role = 'member';
+          if (accessLevel === 'admin') {
+            role = effectiveAssocType === 'state' ? 'state_admin' : 'national_admin';
+          } else if (accessLevel === 'editor') {
+            role = 'editor';
+          }
+
+          const accessData: Record<string, any> = {
+            user_id: member.user_id,
+            role,
+          };
+          accessData[assocIdCol] = effectiveAssocId;
+
+          await supabase
+            .from(assocTable)
+            .insert(accessData);
+        }
+      }
 
       addNotification('success', 'Member assigned successfully');
       fetchData();
