@@ -90,6 +90,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
   const [newBoatData, setNewBoatData] = useState({ sailNumber: '', hull: '' });
   const [boatToDelete, setBoatToDelete] = useState<{ member: Member; boat: MemberBoat } | null>(null);
   const [showAllMembers, setShowAllMembers] = useState(false);
+  const [showOtherClubs, setShowOtherClubs] = useState(false);
+  const [otherClubMembers, setOtherClubMembers] = useState<MemberWithValidation[]>([]);
+  const [otherClubAvatars, setOtherClubAvatars] = useState<{[key: string]: string}>({});
+  const [loadingOtherClubs, setLoadingOtherClubs] = useState(false);
   const navigate = useNavigate();
 
   // Reset view to initial when modal closes
@@ -105,6 +109,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       setPasteText('');
       setError(null);
       setEditingSkipperIndex(null);
+      setShowOtherClubs(false);
+      setShowAllMembers(false);
+      setOtherClubMembers([]);
+      setOtherClubAvatars({});
     }
   }, [isOpen]);
 
@@ -312,6 +320,72 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       }
     }
   }, [isOpen, currentEvent?.raceClass, view, skippers.length, currentEvent?.isInterclub, currentEvent?.otherClubId, currentEvent?.clubId]);
+
+  useEffect(() => {
+    const fetchOtherClubMembers = async () => {
+      if (!showOtherClubs || !currentEvent?.clubId || !currentEvent?.raceClass) return;
+      if (otherClubMembers.length > 0) return;
+
+      setLoadingOtherClubs(true);
+      try {
+        const clubIds = [currentEvent.clubId];
+        if (currentEvent.otherClubId) clubIds.push(currentEvent.otherClubId);
+
+        const { data: allMembers, error: fetchError } = await supabase
+          .from('members')
+          .select('*, boats:member_boats(*)')
+          .not('club_id', 'in', `(${clubIds.join(',')})`);
+
+        if (fetchError) throw fetchError;
+
+        const validated = (allMembers || []).map(member => {
+          const m = { ...member };
+          if (member.boats) {
+            m.boats = member.boats.map((boat: any) => ({
+              ...boat,
+              isValid: boat.boat_type === currentEvent.raceClass && !!boat.sail_number && !!boat.hull && !!member.club
+            }));
+          }
+          return m;
+        });
+
+        setOtherClubMembers(validated);
+
+        const avatarMap: {[key: string]: string} = {};
+        validated.forEach((member: any) => {
+          if (member.avatar_url) avatarMap[member.id] = member.avatar_url;
+        });
+
+        const needProfile = validated
+          .filter((m: any) => m.user_id && !avatarMap[m.id])
+          .map((m: any) => ({ id: m.id, user_id: m.user_id }));
+
+        if (needProfile.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, avatar_url')
+            .in('id', needProfile.map(m => m.user_id));
+
+          if (profiles) {
+            profiles.forEach(p => {
+              if (p.avatar_url) {
+                const mem = needProfile.find(m => m.user_id === p.id);
+                if (mem) avatarMap[mem.id] = p.avatar_url;
+              }
+            });
+          }
+        }
+
+        setOtherClubAvatars(avatarMap);
+      } catch (err) {
+        console.error('Error fetching other club members:', err);
+      } finally {
+        setLoadingOtherClubs(false);
+      }
+    };
+
+    fetchOtherClubMembers();
+  }, [showOtherClubs, currentEvent?.clubId, currentEvent?.raceClass, currentEvent?.otherClubId, otherClubMembers.length]);
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -733,7 +807,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     const newSkippers = [];
     
     for (const boat of Object.values(selectedMemberBoats)) {
-      const member = members.find(m => m.id === boat.member_id);
+      const member = members.find(m => m.id === boat.member_id) || otherClubMembers.find(m => m.id === boat.member_id);
       if (member && boat.boat_type === currentEvent?.raceClass) {
         // Check if this member is already in the skippers list
         const existingSkipper = skippers.find(s => 
@@ -755,7 +829,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             club: member.club || '',
             boatModel: boat.hull || boat.boat_type, // Use hull (boat model name) instead of boat_type
             startHcap: boat.handicap || 0,
-            avatarUrl: memberAvatars[member.id] ? memberAvatars[member.id] : undefined,
+            avatarUrl: (memberAvatars[member.id] || otherClubAvatars[member.id]) || undefined,
             memberId: member.id,
             boatId: boat.id,
             country_code: member.country_code,
@@ -1033,7 +1107,18 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     return `${firstName.charAt(0)}${lastName.charAt(0)}`;
   };
 
-  const membersWithMatchingBoats = filteredMembers
+  const baseMembers = showOtherClubs
+    ? otherClubMembers.filter(member => {
+        const fullName = `${member.first_name} ${member.last_name}`.toLowerCase();
+        return fullName.includes(searchTerm.toLowerCase());
+      })
+    : filteredMembers;
+
+  const activeAvatars = showOtherClubs
+    ? { ...memberAvatars, ...otherClubAvatars }
+    : memberAvatars;
+
+  const membersWithMatchingBoats = baseMembers
     .filter(m => showAllMembers || hasMatchingBoats(m))
     .sort((a, b) => {
       if (showAllMembers) {
@@ -2622,17 +2707,35 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                 <ArrowUpDown size={14} />
                 <span>Sorted by last name (A-Z)</span>
               </div>
-              <button
-                onClick={() => setShowAllMembers(prev => !prev)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  showAllMembers
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-700 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Users size={12} />
-                {showAllMembers ? 'All Members' : `${currentEvent?.raceClass || 'Class'} Only`}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setShowAllMembers(prev => !prev);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    showAllMembers
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Users size={12} />
+                  {showAllMembers ? 'All Boats' : `${currentEvent?.raceClass || 'Class'} Only`}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowOtherClubs(prev => !prev);
+                    setSelectedMemberBoats({});
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    showOtherClubs
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sailboat size={12} />
+                  Other Clubs
+                </button>
+              </div>
             </div>
 
             {membersWithMatchingBoats.length > 0 && (
@@ -2653,10 +2756,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
             )}
           </div>
 
-          {loading ? (
+          {(loading || (showOtherClubs && loadingOtherClubs)) ? (
             <div className="text-center py-12 bg-slate-700/50 rounded-lg border border-slate-600 m-6">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-slate-400">Loading members...</p>
+              <p className="text-slate-400">{showOtherClubs ? 'Loading other clubs...' : 'Loading members...'}</p>
             </div>
           ) : error ? (
             <div className="text-center py-12 bg-red-900/10 border border-red-900/20 rounded-lg m-6">
@@ -2688,9 +2791,9 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                     {/* Member Header */}
                     <div className="flex items-center gap-3 p-3 bg-slate-700">
                       <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
-                        {memberAvatars[member.id] ? (
+                        {activeAvatars[member.id] ? (
                           <img
-                            src={memberAvatars[member.id]}
+                            src={activeAvatars[member.id]}
                             alt={`${member.first_name} ${member.last_name}`}
                             className="w-full h-full object-cover"
                           />
