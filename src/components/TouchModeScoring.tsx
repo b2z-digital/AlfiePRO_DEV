@@ -7,7 +7,7 @@ import type { LetterScore } from '../types/letterScores';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { PostRaceHandicapModal } from './touch-mode/PostRaceHandicapModal';
-import { FloatingHandicapViewer } from './touch-mode/FloatingHandicapViewer';
+import { FloatingHandicapViewer, StoredHandicapData } from './touch-mode/FloatingHandicapViewer';
 import { HandicapChangeBadge } from './touch-mode/HandicapChangeBadge';
 import { HandicapProgressionModal } from './touch-mode/HandicapProgressionModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
@@ -30,6 +30,7 @@ interface TouchModeScoringProps {
   isScoringLastHeat?: boolean; // True when all other heats are complete and this is the last one
   onConfirmResults?: () => void; // Called when user confirms the finish order
   updateSkipper?: (skipperIndex: number, updates: Partial<Skipper>) => void;
+  setSkippers?: (skippers: Skipper[]) => void;
   heatObservers?: ObserverAssignment[];
   roundLabel?: string;
   allSkippers?: Skipper[];
@@ -54,12 +55,13 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   updateRaceResults,
   darkMode,
   onRaceChange,
-  dropRules = [],
+  dropRules = [4, 8, 16, 24, 32, 40],
   currentEvent,
   isHeatScoring = false,
   isScoringLastHeat = false,
   onConfirmResults,
   updateSkipper,
+  setSkippers: setSkippersProp,
   heatObservers = [],
   roundLabel,
   allSkippers,
@@ -84,6 +86,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [isHandicapViewerOpen, setIsHandicapViewerOpen] = useState(false);
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
+  const [storedHandicaps, setStoredHandicaps] = useState<StoredHandicapData[]>([]);
 
   const { user } = useAuth();
 
@@ -227,6 +230,51 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       setIsHandicapViewerOpen(false);
     }
   }, [initialRace]);
+
+  useEffect(() => {
+    if (!isLoadingPreferences) {
+      const isHcapEvent = currentEvent?.raceFormat === 'handicap' ||
+        (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
+      const hasR1 = raceResults.some(r => r.race === 1);
+      if (isHcapEvent && !hasR1 && currentRace === 1 && skippers.length > 0) {
+        setIsHandicapViewerOpen(true);
+      }
+    }
+  }, [isLoadingPreferences, skippers.length]);
+
+  useEffect(() => {
+    const fetchStoredHandicaps = async () => {
+      const boatIds = skippers
+        .map((s, idx) => ({ idx, boatId: s.boatId }))
+        .filter((item): item is { idx: number; boatId: string } => !!item.boatId);
+      if (boatIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('member_boats')
+        .select('id, handicap, boat_type')
+        .in('id', boatIds.map(b => b.boatId));
+
+      if (error || !data) return;
+
+      const stored: StoredHandicapData[] = boatIds
+        .map(({ idx, boatId }) => {
+          const boat = data.find(b => b.id === boatId);
+          return boat ? {
+            skipperIndex: idx,
+            boatId,
+            storedHandicap: boat.handicap || 0,
+            boatType: boat.boat_type || ''
+          } : null;
+        })
+        .filter((s): s is StoredHandicapData => s !== null);
+
+      setStoredHandicaps(stored);
+    };
+
+    if (skippers.length > 0) {
+      fetchStoredHandicaps();
+    }
+  }, [skippers.length]);
 
   // Load existing results for current race
   useEffect(() => {
@@ -804,9 +852,70 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     return after - before;
   };
 
+  const hasR1BeenScored = raceResults.some(r => r.race === 1);
+
   // Check if this is a handicap event - use raceFormat from event if available
   const isHandicapEvent = currentEvent?.raceFormat === 'handicap' ||
     (!currentEvent?.raceFormat && skippers.some(s => s.startHcap !== undefined && s.startHcap > 0));
+
+  const canEditHandicaps = isHandicapEvent && !hasR1BeenScored;
+
+  const saveHandicapToBoat = async (skipperIndex: number, value: number) => {
+    const skipper = skippers[skipperIndex];
+    if (!skipper?.boatId) return;
+    await supabase
+      .from('member_boats')
+      .update({ handicap: value })
+      .eq('id', skipper.boatId);
+
+    const { data: thisBoat } = await supabase
+      .from('member_boats')
+      .select('boat_type, member_id')
+      .eq('id', skipper.boatId)
+      .maybeSingle();
+
+    if (thisBoat?.boat_type) {
+      await supabase
+        .from('member_boats')
+        .update({ handicap: value })
+        .eq('member_id', thisBoat.member_id)
+        .eq('boat_type', thisBoat.boat_type)
+        .neq('id', skipper.boatId);
+    }
+
+    setStoredHandicaps(prev =>
+      prev.map(sh =>
+        sh.skipperIndex === skipperIndex
+          ? { ...sh, storedHandicap: value }
+          : sh
+      )
+    );
+  };
+
+  const handleTouchUpdateHandicap = (skipperIndex: number, value: number) => {
+    if (updateSkipper) {
+      updateSkipper(skipperIndex, { startHcap: value });
+    }
+    saveHandicapToBoat(skipperIndex, value);
+  };
+
+  const handleTouchScratchStart = () => {
+    if (!setSkippersProp) return;
+    const updated = skippers.map(s => ({ ...s, startHcap: 0 }));
+    setSkippersProp(updated);
+  };
+
+  const handleUsePreviousHandicaps = () => {
+    if (!setSkippersProp) return;
+    const updated = skippers.map((s, idx) => {
+      const stored = storedHandicaps.find(sh => sh.skipperIndex === idx);
+      if (stored && stored.storedHandicap > 0) {
+        return { ...s, startHcap: stored.storedHandicap };
+      }
+      return s;
+    });
+    setSkippersProp(updated);
+  };
 
   return (
     <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
@@ -1310,6 +1419,11 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         currentEvent={currentEvent}
         allSkippers={allSkippers}
         allRaceResults={allRaceResults}
+        canEditHandicaps={canEditHandicaps}
+        onUpdateHandicap={handleTouchUpdateHandicap}
+        onScratchStart={handleTouchScratchStart}
+        storedHandicaps={storedHandicaps}
+        onUsePreviousHandicaps={handleUsePreviousHandicaps}
       />
 
       {/* Post-Race Handicap Modal */}

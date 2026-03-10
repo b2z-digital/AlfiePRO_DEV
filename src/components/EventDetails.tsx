@@ -227,7 +227,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               isManualHandicaps: roundData.is_manual_handicaps || initialEvent.isManualHandicaps || false,
               heatManagement: roundData.heat_management || initialEvent.heatManagement || null,
               numRaces: roundData.num_races || initialEvent.numRaces,
-              dropRules: roundData.drop_rules || initialEvent.dropRules || [],
+              dropRules: roundData.drop_rules || initialEvent.dropRules || [4, 8, 16, 24, 32, 40],
               completed: roundData.completed || initialEvent.completed || false,
               multiDay: roundData.multi_day || initialEvent.multiDay || false,
               numberOfDays: roundData.number_of_days || initialEvent.numberOfDays || 1,
@@ -1485,7 +1485,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             is_manual_handicaps: latestEvent.isManualHandicaps || false,
             heat_management: latestEvent.heatManagement || null,
             num_races: latestEvent.numRaces || 12,
-            drop_rules: latestEvent.dropRules || []
+            drop_rules: latestEvent.dropRules || [4, 8, 16, 24, 32, 40]
           };
 
           if (existingRound) {

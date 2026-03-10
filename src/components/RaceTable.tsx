@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, MoreHorizontal, Trophy, TrendingUp, Settings, Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Trophy, TrendingUp, Settings, Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { RaceInput } from './RaceInput';
@@ -965,6 +965,19 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                     <div className="flex items-center justify-center gap-1">
                       <div className="w-2 h-2 rounded-full bg-amber-400"></div>
                       H'cap
+                      {!hasR1BeenScored && (
+                        <button
+                          onClick={() => {
+                            setManualHandicaps({});
+                            setHasManualHandicaps(false);
+                            skippers.forEach((_, index) => updateStartHcap(index, 0));
+                          }}
+                          title="Scratch Start - Reset all handicaps to 0"
+                          className={`ml-1 p-0.5 rounded transition-colors ${darkMode ? 'text-slate-500 hover:text-amber-400' : 'text-slate-400 hover:text-amber-600'}`}
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+                      )}
                     </div>
                   </th>
                   {/* Conditional columns based on event settings */}

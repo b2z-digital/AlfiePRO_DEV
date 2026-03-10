@@ -1085,7 +1085,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
       clubId: seriesItem.clubId,
       heatManagement: round.heatManagement || null,
       numRaces: round.numRaces,
-      dropRules: round.dropRules || [],
+      dropRules: round.dropRules || [4, 8, 16, 24, 32, 40],
       enableLiveTracking: seriesItem.enableLiveTracking,
       enableLiveStream: round.enableLiveStream || seriesItem.enableLiveStream
     };

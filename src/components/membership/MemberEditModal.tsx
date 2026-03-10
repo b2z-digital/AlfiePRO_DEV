@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star, Users } from 'lucide-react';
+import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -366,6 +366,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               boat_type: boat.boat_type,
               sail_number: boat.sail_number,
               hull: boat.hull,
+              handicap: boat.handicap || 0,
               updated_at: new Date().toISOString(),
             })
             .eq('id', boat.id);
@@ -377,6 +378,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               boat_type: boat.boat_type,
               sail_number: boat.sail_number,
               hull: boat.hull,
+              handicap: boat.handicap || 0,
             });
         }
       }
@@ -403,6 +405,23 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const updateBoat = (index: number, field: string, value: string | number) => {
     const newBoats = [...boats];
     newBoats[index] = { ...newBoats[index], [field]: value };
+
+    if (field === 'handicap' && newBoats[index].boat_type) {
+      const boatType = newBoats[index].boat_type;
+      newBoats.forEach((b, i) => {
+        if (i !== index && b.boat_type === boatType) {
+          newBoats[i] = { ...newBoats[i], handicap: value as number };
+        }
+      });
+    }
+
+    if (field === 'boat_type' && value) {
+      const existingBoatOfClass = newBoats.find((b, i) => i !== index && b.boat_type === value && b.handicap !== undefined);
+      if (existingBoatOfClass) {
+        newBoats[index] = { ...newBoats[index], handicap: existingBoatOfClass.handicap };
+      }
+    }
+
     setBoats(newBoats);
   };
 
@@ -730,112 +749,266 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'boats' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Boats
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={addBoat}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    <Plus size={16} />
-                    Add Boat
-                  </button>
-                </div>
+            {activeTab === 'boats' && (() => {
+              const classHandicaps: Record<string, number> = {};
+              boats.forEach(b => {
+                if (b.boat_type && !classHandicaps.hasOwnProperty(b.boat_type)) {
+                  classHandicaps[b.boat_type] = b.handicap || 0;
+                }
+              });
+              const uniqueClasses = [...new Set(boats.filter(b => b.boat_type).map(b => b.boat_type))];
 
-                {boats.map((boat, index) => (
-                  <div key={index} className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Boat {index + 1}
-                      </span>
-                      {boats.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeBoat(index)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Fleet
+                      </h3>
+                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {boats.length} {boats.length === 1 ? 'boat' : 'boats'} registered
+                      </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Boat Type
-                        </label>
-                        <select
-                          value={boat.boat_type}
-                          onChange={(e) => updateBoat(index, 'boat_type', e.target.value)}
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        >
-                          <option value="">Select boat type</option>
-                          <option value="10R">10R</option>
-                          <option value="IOM">IOM</option>
-                          <option value="DF65">DF65</option>
-                          <option value="DF95">DF95</option>
-                          <option value="Marblehead">Marblehead</option>
-                          <option value="A Class">A Class</option>
-                          <option value="RC Laser">RC Laser</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Sail Number
-                        </label>
-                        <input
-                          type="text"
-                          value={boat.sail_number}
-                          onChange={(e) => updateBoat(index, 'sail_number', e.target.value)}
-                          placeholder="e.g., 911"
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Hull Name
-                        </label>
-                        <input
-                          type="text"
-                          value={boat.hull}
-                          onChange={(e) => updateBoat(index, 'hull', e.target.value)}
-                          placeholder="e.g., Trance"
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Handicap
-                          <span className={`ml-2 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            (Auto-updated after races)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={boat.handicap || 0}
-                          onChange={(e) => updateBoat(index, 'handicap', parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          min="0"
-                          step="1"
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        />
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={addBoat}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all text-sm font-medium border border-blue-500/20"
+                    >
+                      <Plus size={15} />
+                      Add Boat
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {uniqueClasses.length > 0 && (
+                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-slate-800/60' : 'bg-slate-50'}`}>
+                      <p className={`text-[10px] uppercase tracking-wider font-semibold mb-2 ${
+                        darkMode ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        Class Handicaps
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {uniqueClasses.map(cls => (
+                          <div key={cls} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                            darkMode ? 'bg-slate-700/60' : 'bg-white border border-slate-200'
+                          }`}>
+                            <span className={`text-xs font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{cls}</span>
+                            <input
+                              type="number"
+                              value={classHandicaps[cls] || 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                const firstIdx = boats.findIndex(b => b.boat_type === cls);
+                                if (firstIdx >= 0) updateBoat(firstIdx, 'handicap', val);
+                              }}
+                              min="0"
+                              step="1"
+                              className={`w-16 px-2 py-0.5 rounded-md text-center text-sm font-bold ${
+                                darkMode
+                                  ? 'bg-slate-600/60 text-white border-slate-500/50'
+                                  : 'bg-slate-50 text-slate-900 border-slate-200'
+                              } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <p className={`text-[10px] mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Handicap is shared across all boats of the same class. Auto-updated after races.
+                      </p>
+                    </div>
+                  )}
+
+                  {boats.length === 0 && (
+                    <div className={`flex flex-col items-center justify-center py-12 rounded-2xl border-2 border-dashed ${
+                      darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                        darkMode ? 'bg-slate-700/50' : 'bg-slate-200'
+                      }`}>
+                        <Sailboat size={24} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                      </div>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>No boats registered</p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Add a boat to get started</p>
+                    </div>
+                  )}
+
+                  {boats.map((boat, index) => {
+                    const classColor = boat.boat_type === '10R' ? 'blue' :
+                      boat.boat_type === 'IOM' ? 'emerald' :
+                      boat.boat_type === 'DF65' ? 'amber' :
+                      boat.boat_type === 'DF95' ? 'orange' :
+                      boat.boat_type === 'Marblehead' ? 'cyan' :
+                      boat.boat_type === 'A Class' ? 'rose' :
+                      boat.boat_type === 'RC Laser' ? 'teal' : 'slate';
+
+                    const accentMap: Record<string, string> = {
+                      blue: 'from-blue-500/20 to-blue-600/5',
+                      emerald: 'from-emerald-500/20 to-emerald-600/5',
+                      amber: 'from-amber-500/20 to-amber-600/5',
+                      orange: 'from-orange-500/20 to-orange-600/5',
+                      cyan: 'from-cyan-500/20 to-cyan-600/5',
+                      rose: 'from-rose-500/20 to-rose-600/5',
+                      teal: 'from-teal-500/20 to-teal-600/5',
+                      slate: 'from-slate-500/20 to-slate-600/5',
+                    };
+                    const badgeMap: Record<string, string> = {
+                      blue: 'bg-blue-500/20 text-blue-300',
+                      emerald: 'bg-emerald-500/20 text-emerald-300',
+                      amber: 'bg-amber-500/20 text-amber-300',
+                      orange: 'bg-orange-500/20 text-orange-300',
+                      cyan: 'bg-cyan-500/20 text-cyan-300',
+                      rose: 'bg-rose-500/20 text-rose-300',
+                      teal: 'bg-teal-500/20 text-teal-300',
+                      slate: 'bg-slate-500/20 text-slate-300',
+                    };
+                    const iconMap: Record<string, string> = {
+                      blue: 'text-blue-400',
+                      emerald: 'text-emerald-400',
+                      amber: 'text-amber-400',
+                      orange: 'text-orange-400',
+                      cyan: 'text-cyan-400',
+                      rose: 'text-rose-400',
+                      teal: 'text-teal-400',
+                      slate: 'text-slate-400',
+                    };
+
+                    return (
+                      <div
+                        key={index}
+                        className={`relative rounded-2xl overflow-hidden transition-all ${
+                          darkMode
+                            ? 'bg-slate-800/70 border border-slate-700/60 hover:border-slate-600/80'
+                            : 'bg-white border border-slate-200 shadow-sm hover:shadow-md'
+                        }`}
+                      >
+                        {darkMode && (
+                          <div className={`absolute inset-0 bg-gradient-to-br ${accentMap[classColor] || accentMap.slate} pointer-events-none`} />
+                        )}
+
+                        <div className="relative p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                darkMode ? 'bg-slate-700/80' : 'bg-slate-100'
+                              }`}>
+                                <Sailboat size={18} className={darkMode ? (iconMap[classColor] || 'text-slate-400') : 'text-slate-500'} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    {boat.hull || boat.boat_type || `Boat ${index + 1}`}
+                                  </span>
+                                  {boat.boat_type && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                                      darkMode ? (badgeMap[classColor] || badgeMap.slate) : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {boat.boat_type}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`flex items-center gap-3 mt-0.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {boat.sail_number && (
+                                    <span className="flex items-center gap-1">
+                                      <Hash size={10} />
+                                      {boat.sail_number}
+                                    </span>
+                                  )}
+                                  {boat.boat_type && (
+                                    <span className="flex items-center gap-1">
+                                      <Trophy size={10} />
+                                      Hcap: {boat.handicap || 0}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {boats.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeBoat(index)}
+                                className={`p-2 rounded-xl transition-all shrink-0 ${
+                                  darkMode
+                                    ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+                                    : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
+                                }`}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className={`grid grid-cols-3 gap-2 pt-3 border-t ${
+                            darkMode ? 'border-slate-700/40' : 'border-slate-100'
+                          }`}>
+                            <div>
+                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
+                                darkMode ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                Class
+                              </label>
+                              <select
+                                value={boat.boat_type}
+                                onChange={(e) => updateBoat(index, 'boat_type', e.target.value)}
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm font-medium ${
+                                  darkMode
+                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50'
+                                    : 'bg-slate-50 text-slate-900 border-slate-200'
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                              >
+                                <option value="">Select</option>
+                                <option value="10R">10R</option>
+                                <option value="IOM">IOM</option>
+                                <option value="DF65">DF65</option>
+                                <option value="DF95">DF95</option>
+                                <option value="Marblehead">Marblehead</option>
+                                <option value="A Class">A Class</option>
+                                <option value="RC Laser">RC Laser</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
+                                darkMode ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                Sail No.
+                              </label>
+                              <input
+                                type="text"
+                                value={boat.sail_number}
+                                onChange={(e) => updateBoat(index, 'sail_number', e.target.value)}
+                                placeholder="58"
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm ${
+                                  darkMode
+                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50 placeholder-slate-500'
+                                    : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-400'
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
+                                darkMode ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                Hull / Design
+                              </label>
+                              <input
+                                type="text"
+                                value={boat.hull}
+                                onChange={(e) => updateBoat(index, 'hull', e.target.value)}
+                                placeholder="Trance"
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm ${
+                                  darkMode
+                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50 placeholder-slate-500'
+                                    : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-400'
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {activeTab === 'membership' && memberData && (
               <div className="space-y-6">
