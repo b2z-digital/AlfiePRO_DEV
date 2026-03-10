@@ -254,6 +254,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           <MeetingDetails
           meeting={selectedMeeting}
           darkMode={darkMode}
+          associationId={currentOrganization?.id}
+          associationType={currentOrganization?.type as 'state' | 'national' | undefined}
           onClose={handleCloseDetails}
           onEdit={() => handleEditMeeting(selectedMeeting)}
           onMarkAsCompleted={() => handleMarkAsCompleted(selectedMeeting.id)}

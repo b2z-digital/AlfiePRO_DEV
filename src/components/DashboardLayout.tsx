@@ -73,6 +73,7 @@ import { StateRemittanceDashboard } from './membership/StateRemittanceDashboard'
 import { NationalRemittanceDashboard } from './membership/NationalRemittanceDashboard';
 import { AssociationsManagementPage } from './pages/AssociationsManagementPage';
 import { ClubsManagementPage } from './pages/ClubsManagementPage';
+import { CommitteeManagement } from './pages/CommitteeManagement';
 import { AssociationFinancesPage } from '../pages/AssociationFinancesPage';
 import { AssociationResourcesPage } from './pages/AssociationResourcesPage';
 import WeatherPage from '../pages/WeatherPage';
@@ -827,6 +828,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: currentOrganization?.type === 'national' ? 'View all members across associations' : 'View all members in member clubs',
           path: '/association-members',
           permission: 'membership.view'
+        },
+        {
+          id: 'association-committee',
+          label: 'Committee',
+          icon: Shield,
+          description: 'Manage association committee positions and members',
+          path: '/association-committee',
+          permission: 'membership.manage'
         },
         {
           id: 'association-member-reports',
@@ -1673,6 +1682,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     darkMode={darkMode}
                     stateAssociationId={currentOrganization.id}
                   />
+                ) : null
+              } />
+              <Route path="/association-committee" element={
+                currentOrganization ? (
+                  <div className="h-full overflow-y-auto">
+                    <div className="p-4 sm:p-6 lg:p-16">
+                      <CommitteeManagement
+                        darkMode={darkMode}
+                        associationId={currentOrganization.id}
+                        associationType={currentOrganization.type as 'state' | 'national'}
+                      />
+                    </div>
+                  </div>
                 ) : null
               } />
               <Route path="/association-member-reports" element={

@@ -12,6 +12,8 @@ import { supabase } from '../../utils/supabase';
 interface MeetingDetailsProps {
   meeting: Meeting;
   darkMode: boolean;
+  associationId?: string;
+  associationType?: 'state' | 'national';
   onClose: () => void;
   onEdit: () => void;
   onMarkAsCompleted: () => void;
@@ -21,6 +23,8 @@ interface MeetingDetailsProps {
 export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   meeting,
   darkMode,
+  associationId,
+  associationType,
   onClose,
   onEdit,
   onMarkAsCompleted,
@@ -646,6 +650,8 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         meetingId={meeting.id}
         meetingName={meeting.name}
         clubId={meeting.club_id}
+        associationId={associationId}
+        associationType={associationType}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
         associationId={meeting.state_association_id || meeting.national_association_id || undefined}
@@ -656,6 +662,8 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         meeting={meeting}
+        associationId={associationId}
+        associationType={associationType}
         agendaItems={agendaItems}
         clubId={meeting.club_id}
         darkMode={darkMode}

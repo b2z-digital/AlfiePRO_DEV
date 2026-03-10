@@ -29,6 +29,8 @@ import { CSS } from '@dnd-kit/utilities';
 
 interface CommitteeManagementProps {
   darkMode: boolean;
+  associationId?: string;
+  associationType?: 'state' | 'national';
 }
 
 interface PositionDefinition {
@@ -62,8 +64,8 @@ interface Member {
   avatar_url?: string | null;
 }
 
-export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode }) => {
-  const { currentClub } = useAuth();
+export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode, associationId, associationType }) => {
+  const { currentClub, currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
   const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState<'positions' | 'assignments'>('assignments');
@@ -74,64 +76,141 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   const [editingPosition, setEditingPosition] = useState<PositionDefinition | null>(null);
   const [showPositionForm, setShowPositionForm] = useState(false);
 
+  const effectiveAssocId = associationId || currentOrganization?.id;
+  const effectiveAssocType = associationType || (currentOrganization?.type as 'state' | 'national' | undefined);
+  const isAssociationContext = !!effectiveAssocType && (effectiveAssocType === 'state' || effectiveAssocType === 'national');
+
   const canManage = isAdmin || isEditor || isStateAdmin || isNationalAdmin;
 
   useEffect(() => {
-    if (currentClub) {
+    if (isAssociationContext ? effectiveAssocId : currentClub) {
       fetchData();
     }
-  }, [currentClub]);
+  }, [currentClub, effectiveAssocId, effectiveAssocType]);
 
   const fetchData = async () => {
-    if (!currentClub) return;
+    if (!isAssociationContext && !currentClub) return;
 
     try {
       setLoading(true);
 
-      const { data: positionsData, error: positionsError } = await supabase
-        .from('committee_position_definitions')
-        .select('*')
-        .eq('club_id', currentClub.clubId)
-        .order('display_order');
+      if (isAssociationContext && effectiveAssocId) {
+        const assocColumn = effectiveAssocType === 'state' ? 'state_association_id' : 'national_association_id';
 
-      if (positionsError) throw positionsError;
-      setPositions(positionsData || []);
+        const { data: positionsData, error: positionsError } = await supabase
+          .from('committee_position_definitions')
+          .select('*')
+          .eq(assocColumn, effectiveAssocId)
+          .order('display_order');
 
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('committee_positions')
-        .select(`
-          id,
-          position_definition_id,
-          position_title,
-          member_id,
-          user_id,
-          members (first_name, last_name, avatar_url)
-        `)
-        .eq('club_id', currentClub.clubId);
+        if (positionsError) throw positionsError;
+        setPositions(positionsData || []);
 
-      if (assignmentsError) throw assignmentsError;
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('committee_positions')
+          .select(`
+            id,
+            position_definition_id,
+            position_title,
+            member_id,
+            user_id,
+            members (first_name, last_name, avatar_url)
+          `)
+          .eq(assocColumn, effectiveAssocId);
 
-      const formattedAssignments = assignmentsData?.map(a => ({
-        id: a.id,
-        position_definition_id: a.position_definition_id || '',
-        position_name: a.position_title || '',
-        member_id: a.member_id,
-        member_name: a.members ? `${a.members.first_name} ${a.members.last_name}` : null,
-        user_id: a.user_id,
-        avatar_url: a.members?.avatar_url
-      })) || [];
+        if (assignmentsError) throw assignmentsError;
 
-      setAssignments(formattedAssignments);
+        const formattedAssignments = assignmentsData?.map(a => ({
+          id: a.id,
+          position_definition_id: a.position_definition_id || '',
+          position_name: a.position_title || '',
+          member_id: a.member_id,
+          member_name: a.members ? `${a.members.first_name} ${a.members.last_name}` : null,
+          user_id: a.user_id,
+          avatar_url: a.members?.avatar_url
+        })) || [];
 
-      const { data: membersData, error: membersError } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, user_id, avatar_url')
-        .eq('club_id', currentClub.clubId)
-        .order('last_name');
+        setAssignments(formattedAssignments);
 
-      if (membersError) throw membersError;
-      setMembers(membersData || []);
+        let clubIds: string[] = [];
+        if (effectiveAssocType === 'state') {
+          const { data: clubs } = await supabase
+            .from('clubs')
+            .select('id')
+            .eq('state_association_id', effectiveAssocId);
+          clubIds = clubs?.map(c => c.id) || [];
+        } else {
+          const { data: states } = await supabase
+            .from('state_associations')
+            .select('id')
+            .eq('national_association_id', effectiveAssocId);
+          const stateIds = states?.map(s => s.id) || [];
+          if (stateIds.length > 0) {
+            const { data: clubs } = await supabase
+              .from('clubs')
+              .select('id')
+              .in('state_association_id', stateIds);
+            clubIds = clubs?.map(c => c.id) || [];
+          }
+        }
 
+        if (clubIds.length > 0) {
+          const { data: membersData, error: membersError } = await supabase
+            .from('members')
+            .select('id, first_name, last_name, email, user_id, avatar_url')
+            .in('club_id', clubIds)
+            .order('last_name');
+
+          if (membersError) throw membersError;
+          setMembers(membersData || []);
+        } else {
+          setMembers([]);
+        }
+      } else {
+        const { data: positionsData, error: positionsError } = await supabase
+          .from('committee_position_definitions')
+          .select('*')
+          .eq('club_id', currentClub!.clubId)
+          .order('display_order');
+
+        if (positionsError) throw positionsError;
+        setPositions(positionsData || []);
+
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('committee_positions')
+          .select(`
+            id,
+            position_definition_id,
+            position_title,
+            member_id,
+            user_id,
+            members (first_name, last_name, avatar_url)
+          `)
+          .eq('club_id', currentClub!.clubId);
+
+        if (assignmentsError) throw assignmentsError;
+
+        const formattedAssignments = assignmentsData?.map(a => ({
+          id: a.id,
+          position_definition_id: a.position_definition_id || '',
+          position_name: a.position_title || '',
+          member_id: a.member_id,
+          member_name: a.members ? `${a.members.first_name} ${a.members.last_name}` : null,
+          user_id: a.user_id,
+          avatar_url: a.members?.avatar_url
+        })) || [];
+
+        setAssignments(formattedAssignments);
+
+        const { data: membersData, error: membersError } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, user_id, avatar_url')
+          .eq('club_id', currentClub!.clubId)
+          .order('last_name');
+
+        if (membersError) throw membersError;
+        setMembers(membersData || []);
+      }
     } catch (error: any) {
       console.error('Error fetching committee data:', error);
       addNotification('error', 'Failed to load committee data');
@@ -141,7 +220,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   };
 
   const handleSavePosition = async (positionData: Partial<PositionDefinition>) => {
-    if (!currentClub) return;
+    if (!isAssociationContext && !currentClub) return;
 
     try {
       if (editingPosition) {
@@ -166,19 +245,30 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
           ? Math.max(...positions.map(p => p.display_order))
           : 0;
 
+        const insertData: Record<string, any> = {
+          position_name: positionData.position_name,
+          description: positionData.description,
+          is_executive: false,
+          display_order: maxOrder + 1,
+          dashboard_template_id: positionData.dashboard_template_id,
+          position_priority: positionData.position_priority,
+          show_on_website: positionData.show_on_website,
+          access_level: positionData.access_level
+        };
+
+        if (isAssociationContext && effectiveAssocId) {
+          if (effectiveAssocType === 'state') {
+            insertData.state_association_id = effectiveAssocId;
+          } else {
+            insertData.national_association_id = effectiveAssocId;
+          }
+        } else {
+          insertData.club_id = currentClub!.clubId;
+        }
+
         const { error } = await supabase
           .from('committee_position_definitions')
-          .insert({
-            club_id: currentClub.clubId,
-            position_name: positionData.position_name,
-            description: positionData.description,
-            is_executive: false,
-            display_order: maxOrder + 1,
-            dashboard_template_id: positionData.dashboard_template_id,
-            position_priority: positionData.position_priority,
-            show_on_website: positionData.show_on_website,
-            access_level: positionData.access_level
-          });
+          .insert(insertData);
 
         if (error) throw error;
         addNotification('success', 'Position created successfully');
@@ -212,7 +302,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   };
 
   const handleAddMember = async (positionDefId: string, memberId: string) => {
-    if (!currentClub) return;
+    if (!isAssociationContext && !currentClub) return;
 
     try {
       const position = positions.find(p => p.id === positionDefId);
@@ -230,18 +320,29 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         return;
       }
 
+      const insertData: Record<string, any> = {
+        position_definition_id: positionDefId,
+        position_title: position.position_name,
+        title: position.position_name,
+        name: `${member.first_name} ${member.last_name}`,
+        email: member.email,
+        member_id: memberId,
+        user_id: member.user_id
+      };
+
+      if (isAssociationContext && effectiveAssocId) {
+        if (effectiveAssocType === 'state') {
+          insertData.state_association_id = effectiveAssocId;
+        } else {
+          insertData.national_association_id = effectiveAssocId;
+        }
+      } else {
+        insertData.club_id = currentClub!.clubId;
+      }
+
       const { error } = await supabase
         .from('committee_positions')
-        .insert({
-          club_id: currentClub.clubId,
-          position_definition_id: positionDefId,
-          position_title: position.position_name,
-          title: position.position_name,
-          name: `${member.first_name} ${member.last_name}`,
-          email: member.email,
-          member_id: memberId,
-          user_id: member.user_id
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
@@ -330,8 +431,14 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Committee Management</h2>
-          <p className="text-slate-400 mt-1">Define positions and assign members to your committee</p>
+          <h2 className="text-2xl font-bold text-white">
+            {isAssociationContext ? 'Association Committee Management' : 'Committee Management'}
+          </h2>
+          <p className="text-slate-400 mt-1">
+            {isAssociationContext
+              ? 'Define positions and assign members to your association committee'
+              : 'Define positions and assign members to your committee'}
+          </p>
         </div>
       </div>
 
