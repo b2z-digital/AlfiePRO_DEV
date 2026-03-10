@@ -1728,6 +1728,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     const isMemberLinked = !!editingSkipper?.memberId;
 
     return (
+    <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
@@ -1814,10 +1815,10 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const skipper = editingSkipperIndex !== null ? skippers[editingSkipperIndex] : null;
-                            if (skipper?.memberId) {
+                            const mId = editingSkipper?.memberId || boat.member_id;
+                            if (mId) {
                               setEditingBoat({
-                                memberId: skipper.memberId,
+                                memberId: mId,
                                 boatId: boat.id,
                                 sailNumber: boat.sail_number || '',
                                 hull: boat.hull || '',
@@ -2043,6 +2044,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           </div>
         </div>
       </div>
+      {renderEditBoatModal()}
+    </>
     );
   }
 
