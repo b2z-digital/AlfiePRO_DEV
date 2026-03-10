@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { usePermissions } from '../../hooks/usePermissions';
+import AccessLevelManager from '../committee/AccessLevelManager';
 import {
   DndContext,
   closestCenter,
@@ -68,7 +69,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   const { currentClub, currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
   const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
-  const [activeTab, setActiveTab] = useState<'positions' | 'assignments'>('assignments');
+  const [activeTab, setActiveTab] = useState<'positions' | 'assignments' | 'access-levels'>('assignments');
   const [positions, setPositions] = useState<PositionDefinition[]>([]);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -507,6 +508,21 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             </div>
           </button>
         )}
+        {(isAdmin || isStateAdmin || isNationalAdmin) && (
+          <button
+            onClick={() => setActiveTab('access-levels')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'access-levels'
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <LayoutGrid size={16} />
+              Manage Access Levels
+            </div>
+          </button>
+        )}
       </div>
 
       {activeTab === 'assignments' && (
@@ -612,6 +628,18 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             </SortableContext>
           </DndContext>
         </div>
+      )}
+
+      {activeTab === 'access-levels' && (isAdmin || isStateAdmin || isNationalAdmin) && (
+        <AccessLevelManager
+          darkMode={darkMode}
+          scopeType={
+            isAssociationContext
+              ? effectiveAssocType === 'state' ? 'state_association' : 'national_association'
+              : 'club'
+          }
+          scopeId={isAssociationContext ? effectiveAssocId! : currentClub!.clubId}
+        />
       )}
     </div>
   );
