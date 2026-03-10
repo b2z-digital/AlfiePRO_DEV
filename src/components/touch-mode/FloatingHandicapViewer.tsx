@@ -1,9 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Award, ChevronLeft, RotateCcw, Edit3, Check } from 'lucide-react';
+import { X, Award, ChevronLeft, RotateCcw, Edit3, Check, History, Zap } from 'lucide-react';
 import { Skipper, RaceResult } from '../../types';
 import { RaceEvent } from '../../types/race';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCountryFlag, getIOCCode } from '../../utils/countryFlags';
+
+export interface StoredHandicapData {
+  skipperIndex: number;
+  boatId: string;
+  storedHandicap: number;
+  boatType: string;
+}
 
 interface FloatingHandicapViewerProps {
   skippers: Skipper[];
@@ -20,6 +27,8 @@ interface FloatingHandicapViewerProps {
   canEditHandicaps?: boolean;
   onUpdateHandicap?: (skipperIndex: number, value: number) => void;
   onScratchStart?: () => void;
+  storedHandicaps?: StoredHandicapData[];
+  onUsePreviousHandicaps?: () => void;
 }
 
 interface SkipperHandicap {
@@ -28,6 +37,7 @@ interface SkipperHandicap {
   sailNumber: string;
   avatarUrl?: string;
   currentHandicap: number;
+  storedHandicap?: number;
   change: number;
   previousHandicap: number;
 }
@@ -77,7 +87,9 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   allRaceResults,
   canEditHandicaps = false,
   onUpdateHandicap,
-  onScratchStart
+  onScratchStart,
+  storedHandicaps,
+  onUsePreviousHandicaps
 }) => {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [handicaps, setHandicaps] = useState<SkipperHandicap[]>([]);
@@ -100,6 +112,8 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
   const isInFinals = isShrs && shrsQualifyingRounds > 0 && currentRace > shrsQualifyingRounds;
 
   const allHandicapsZero = handicaps.every(h => h.currentHandicap === 0);
+  const hasStoredHandicaps = storedHandicaps && storedHandicaps.some(sh => sh.storedHandicap > 0);
+  const storedHandicapsApplied = canEditHandicaps && !allHandicapsZero && hasStoredHandicaps;
 
   const shrsFleetMap = useMemo(() => {
     if (!isInFinals || !currentEvent?.heatManagement) return null;
@@ -151,12 +165,15 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
         if (isNaN(change) || !isFinite(change)) change = 0;
       }
 
+      const stored = storedHandicaps?.find(sh => sh.skipperIndex === index);
+
       return {
         skipperIndex: index,
         skipperName: skipper.name,
         sailNumber: skipper.sailNumber || skipper.sailNo,
         avatarUrl: skipper.avatarUrl,
         currentHandicap,
+        storedHandicap: stored?.storedHandicap,
         change,
         previousHandicap: currentHandicap - change
       };
@@ -168,7 +185,7 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
       return sailA - sailB;
     });
     setHandicaps(skipperHandicaps);
-  }, [skippers, raceResults, currentRace]);
+  }, [skippers, raceResults, currentRace, storedHandicaps]);
 
   useEffect(() => {
     const rankingSkippers = (isInFinals && allSkippers) ? allSkippers : skippers;
@@ -388,9 +405,11 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
         className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-colors ${
-          canEditHandicaps && allHandicapsZero
-            ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:from-amber-400 hover:to-orange-500 animate-pulse'
-            : darkMode
+          canEditHandicaps && allHandicapsZero && hasStoredHandicaps
+            ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:from-green-400 hover:to-emerald-500 animate-pulse'
+            : canEditHandicaps && allHandicapsZero
+              ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:from-amber-400 hover:to-orange-500 animate-pulse'
+              : darkMode
               ? 'bg-gradient-to-br from-cyan-600 to-blue-700 text-white hover:from-cyan-500 hover:to-blue-600'
               : 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white hover:from-blue-500 hover:to-cyan-500'
         }`}
@@ -445,7 +464,9 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                             ? `Final ${currentRace - shrsQualifyingRounds} of Finals Series`
                             : `Qualifying Rd ${currentRace}`
                           : canEditHandicaps
-                            ? 'Tap a handicap to edit or use scratch start'
+                            ? hasStoredHandicaps && allHandicapsZero
+                              ? 'Load previous handicaps or start from scratch'
+                              : 'Tap a handicap to edit or use scratch start'
                             : `As of Race ${currentRace}`}
                       </p>
                     </div>
@@ -482,26 +503,55 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                 {viewMode === 'handicaps' && !isScratchEvent && !isShrs ? (
                   <>
                     {canEditHandicaps && (
-                      <div className="mb-4">
+                      <div className="mb-4 space-y-2">
+                        {hasStoredHandicaps && allHandicapsZero && (
+                          <button
+                            onClick={() => onUsePreviousHandicaps?.()}
+                            className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
+                              darkMode
+                                ? 'bg-green-500/20 border-2 border-green-500 text-green-400 hover:bg-green-500/30'
+                                : 'bg-green-50 border-2 border-green-500 text-green-700 hover:bg-green-100'
+                            }`}
+                          >
+                            <History size={16} />
+                            Use Previous Handicaps
+                          </button>
+                        )}
+                        {hasStoredHandicaps && !allHandicapsZero && storedHandicapsApplied && (
+                          <div className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm ${
+                            darkMode
+                              ? 'bg-green-500/15 border-2 border-green-500/50 text-green-400'
+                              : 'bg-green-50 border-2 border-green-400 text-green-700'
+                          }`}>
+                            <Check size={16} />
+                            Previous Handicaps Loaded
+                          </div>
+                        )}
                         <button
                           onClick={handleScratchStart}
                           className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
                             allHandicapsZero
-                              ? darkMode
-                                ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
-                                : 'bg-amber-50 border-2 border-amber-500 text-amber-700'
+                              ? hasStoredHandicaps
+                                ? darkMode
+                                  ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
+                                  : 'bg-amber-50 border-2 border-amber-500 text-amber-700'
+                                : darkMode
+                                  ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400'
+                                  : 'bg-amber-50 border-2 border-amber-500 text-amber-700'
                               : darkMode
                                 ? 'bg-slate-700/50 border border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500'
                                 : 'bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200'
                           }`}
                         >
                           <RotateCcw size={16} />
-                          {allHandicapsZero ? 'Scratch Start Active - All Handicaps at 0' : 'Scratch Start (Reset All to 0)'}
+                          {allHandicapsZero ? 'Scratch Start Active' : 'Scratch Start (Reset All to 0)'}
                         </button>
-                        <p className={`text-xs text-center mt-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                          {allHandicapsZero
-                            ? 'First race will be scored as scratch - handicaps calculated from results'
-                            : 'Tap a handicap value to edit, or use scratch start for equal starting positions'}
+                        <p className={`text-xs text-center mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {allHandicapsZero && hasStoredHandicaps
+                            ? 'Load stored handicaps or start from scratch - handicaps will build from race results'
+                            : allHandicapsZero
+                              ? 'First race scored as scratch - handicaps calculated from results'
+                              : 'Tap a handicap value to edit, or use scratch start for equal positions'}
                         </p>
                       </div>
                     )}
@@ -520,6 +570,19 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                         }`}>Handicap</span>
                       </div>
                     </div>
+
+                    {canEditHandicaps && hasStoredHandicaps && allHandicapsZero && (
+                      <div className={`mb-3 px-3 py-2 rounded-lg border ${
+                        darkMode ? 'bg-blue-900/20 border-blue-500/30' : 'bg-blue-50 border-blue-200'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <History size={14} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
+                          <span className={`text-xs font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                            Stored handicaps available for {currentEvent?.raceClass || 'this class'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       {handicaps.map((handicap) => {
@@ -590,13 +653,20 @@ export const FloatingHandicapViewer: React.FC<FloatingHandicapViewerProps> = ({
                                     </button>
                                   </div>
                                 ) : canEditHandicaps ? (
-                                  <button
-                                    onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)}
-                                    className="group flex items-center gap-1.5 transition-colors"
-                                  >
-                                    <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
-                                    <Edit3 size={14} className={`${darkMode ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`} />
-                                  </button>
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <button
+                                      onClick={() => handleStartEdit(handicap.skipperIndex, handicap.currentHandicap)}
+                                      className="group flex items-center gap-1.5 transition-colors"
+                                    >
+                                      <span className="text-xl font-bold text-green-500">{handicap.currentHandicap}</span>
+                                      <Edit3 size={14} className={`${darkMode ? 'text-slate-500 group-hover:text-slate-300' : 'text-slate-400 group-hover:text-slate-600'} transition-colors`} />
+                                    </button>
+                                    {handicap.storedHandicap !== undefined && handicap.storedHandicap > 0 && handicap.currentHandicap === 0 && (
+                                      <span className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        Stored: {handicap.storedHandicap}
+                                      </span>
+                                    )}
+                                  </div>
                                 ) : (
                                   <div className="text-xl font-bold text-green-500">{handicap.currentHandicap}</div>
                                 )}

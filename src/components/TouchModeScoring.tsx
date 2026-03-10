@@ -7,7 +7,7 @@ import type { LetterScore } from '../types/letterScores';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { PostRaceHandicapModal } from './touch-mode/PostRaceHandicapModal';
-import { FloatingHandicapViewer } from './touch-mode/FloatingHandicapViewer';
+import { FloatingHandicapViewer, StoredHandicapData } from './touch-mode/FloatingHandicapViewer';
 import { HandicapChangeBadge } from './touch-mode/HandicapChangeBadge';
 import { HandicapProgressionModal } from './touch-mode/HandicapProgressionModal';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
@@ -84,6 +84,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   const [isHandicapViewerOpen, setIsHandicapViewerOpen] = useState(false);
   const [showStartBoxModal, setShowStartBoxModal] = useState(false);
   const [raceTimerRunning, setRaceTimerRunning] = useState(false);
+  const [storedHandicaps, setStoredHandicaps] = useState<StoredHandicapData[]>([]);
 
   const { user } = useAuth();
 
@@ -238,6 +239,40 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       }
     }
   }, [isLoadingPreferences, skippers.length]);
+
+  useEffect(() => {
+    const fetchStoredHandicaps = async () => {
+      const boatIds = skippers
+        .map((s, idx) => ({ idx, boatId: s.boatId }))
+        .filter((item): item is { idx: number; boatId: string } => !!item.boatId);
+      if (boatIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('member_boats')
+        .select('id, handicap, boat_type')
+        .in('id', boatIds.map(b => b.boatId));
+
+      if (error || !data) return;
+
+      const stored: StoredHandicapData[] = boatIds
+        .map(({ idx, boatId }) => {
+          const boat = data.find(b => b.id === boatId);
+          return boat ? {
+            skipperIndex: idx,
+            boatId,
+            storedHandicap: boat.handicap || 0,
+            boatType: boat.boat_type || ''
+          } : null;
+        })
+        .filter((s): s is StoredHandicapData => s !== null);
+
+      setStoredHandicaps(stored);
+    };
+
+    if (skippers.length > 0) {
+      fetchStoredHandicaps();
+    }
+  }, [skippers.length]);
 
   // Load existing results for current race
   useEffect(() => {
@@ -837,6 +872,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     });
   };
 
+  const handleUsePreviousHandicaps = () => {
+    storedHandicaps.forEach((sh) => {
+      if (updateSkipper && sh.storedHandicap > 0) {
+        updateSkipper(sh.skipperIndex, { startHcap: sh.storedHandicap });
+      }
+    });
+  };
+
   return (
     <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
       {/* Header - Race Navigation with StartBox + Race Timer */}
@@ -1342,6 +1385,8 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         canEditHandicaps={canEditHandicaps}
         onUpdateHandicap={handleTouchUpdateHandicap}
         onScratchStart={handleTouchScratchStart}
+        storedHandicaps={storedHandicaps}
+        onUsePreviousHandicaps={handleUsePreviousHandicaps}
       />
 
       {/* Post-Race Handicap Modal */}
