@@ -868,6 +868,21 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
       .update({ handicap: value })
       .eq('id', skipper.boatId);
 
+    const { data: thisBoat } = await supabase
+      .from('member_boats')
+      .select('boat_type, member_id')
+      .eq('id', skipper.boatId)
+      .maybeSingle();
+
+    if (thisBoat?.boat_type) {
+      await supabase
+        .from('member_boats')
+        .update({ handicap: value })
+        .eq('member_id', thisBoat.member_id)
+        .eq('boat_type', thisBoat.boat_type)
+        .neq('id', skipper.boatId);
+    }
+
     setStoredHandicaps(prev =>
       prev.map(sh =>
         sh.skipperIndex === skipperIndex

@@ -1170,21 +1170,20 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   const updateMemberHandicaps = async (race: number, results: any[]) => {
     try {
-      // Get the adjusted handicaps for each skipper after this race
       const handicapUpdates = skippers
         .map((skipper, index) => {
           const result = results.find(r => r.race === race && r.skipperIndex === index);
           if (result && result.adjustedHcap !== undefined && skipper.boatId) {
             return {
               boatId: skipper.boatId,
+              memberId: skipper.memberId,
               handicap: result.adjustedHcap
             };
           }
           return null;
         })
-        .filter((update): update is { boatId: string; handicap: number } => update !== null);
+        .filter((update): update is { boatId: string; memberId?: string; handicap: number } => update !== null);
 
-      // Update each boat's handicap in the database
       for (const update of handicapUpdates) {
         const { error } = await supabase
           .from('member_boats')
@@ -1193,8 +1192,24 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
         if (error) {
           console.error(`Error updating handicap for boat ${update.boatId}:`, error);
-        } else {
-          console.log(`✅ Updated boat ${update.boatId} handicap to ${update.handicap}`);
+          continue;
+        }
+
+        if (update.memberId) {
+          const { data: thisBoat } = await supabase
+            .from('member_boats')
+            .select('boat_type, member_id')
+            .eq('id', update.boatId)
+            .maybeSingle();
+
+          if (thisBoat?.boat_type) {
+            await supabase
+              .from('member_boats')
+              .update({ handicap: update.handicap })
+              .eq('member_id', thisBoat.member_id)
+              .eq('boat_type', thisBoat.boat_type)
+              .neq('id', update.boatId);
+          }
         }
       }
     } catch (error) {
