@@ -173,16 +173,8 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 
   if (!currentVideo) return null;
 
-  // Parameters:
-  // - rel=0: No related videos at end
-  // - modestbranding=1: Hide YouTube logo
-  // - enablejsapi=1: Enable postMessage API for video end detection
-  // - fs=0: Disable fullscreen button (keeps users in app)
-  // - origin: Required for postMessage API
-  // - disablekb=1: Disable keyboard controls (prevents accidental navigation)
-  // - playsinline=1: Play inline on mobile
   const currentOrigin = window.location.origin;
-  const videoUrl = `https://www.youtube-nocookie.com/embed/${currentVideo.youtube_id}?autoplay=1&controls=1&modestbranding=1&rel=0&fs=0&iv_load_policy=3&cc_load_policy=0&enablejsapi=1&disablekb=1&playsinline=1&origin=${encodeURIComponent(currentOrigin)}`;
+  const videoUrl = `https://www.youtube-nocookie.com/embed/${currentVideo.youtube_id}?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&iv_load_policy=3&cc_load_policy=0&enablejsapi=1&playsinline=1&origin=${encodeURIComponent(currentOrigin)}`;
 
   const handleCloseClick = () => {
     console.log('✅✅✅ CLOSE BUTTON CLICKED - CLOSING VIDEO!');
@@ -191,19 +183,17 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 
   return (
     <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
-      {/* Video iframe */}
       <iframe
         ref={iframeRef}
         src={videoUrl}
         className="absolute inset-0 w-full h-full"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
         title={currentVideo?.title || 'Video'}
         loading="eager"
-        frameBorder="0"
+        style={{ border: 'none' }}
       />
 
-      {/* Overlays to block YouTube UI */}
-      <div className="absolute top-0 right-0 w-80 h-28" style={{ zIndex: 9001, pointerEvents: 'auto', background: 'transparent' }} onClick={handleCloseClick} />
       <div className="absolute bottom-0 right-0 w-36 h-20" style={{ zIndex: 9001, pointerEvents: 'auto', background: 'transparent' }} />
 
       {/* Close button - subtle design */}
