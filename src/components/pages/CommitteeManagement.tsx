@@ -385,7 +385,8 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
       fetchData();
     } catch (error: any) {
       console.error('Error assigning member:', error);
-      addNotification('error', 'Failed to assign member');
+      console.error('Error details:', error?.message, error?.code, error?.details, error?.hint);
+      addNotification('error', `Failed to assign member: ${error?.message || 'Unknown error'}`);
     }
   };
 
