@@ -55,7 +55,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   updateRaceResults,
   darkMode,
   onRaceChange,
-  dropRules = [],
+  dropRules = [4, 8, 16, 24, 32, 40],
   currentEvent,
   isHeatScoring = false,
   isScoringLastHeat = false,

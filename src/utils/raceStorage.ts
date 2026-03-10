@@ -535,7 +535,7 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
             cancellationReason: round.cancellation_reason,
             heatManagement: round.heat_management,
             numRaces: round.num_races || 12,
-            dropRules: round.drop_rules || [],
+            dropRules: (round.drop_rules && (Array.isArray(round.drop_rules) ? round.drop_rules.length > 0 : true)) ? round.drop_rules : [4, 8, 16, 24, 32, 40],
             multiDay: round.multi_day || false,
             numberOfDays: round.number_of_days || 1,
             dayResults: round.day_results || {},
@@ -1047,7 +1047,7 @@ export const updateEventResults = async (
   currentDay: number = 1,
   heatManagement: HeatManagement | null = null,
   numRaces: number = 12,
-  dropRules: number[] = [],
+  dropRules: number[] = [4, 8, 16, 24, 32, 40],
   dayResults?: Record<number, any>
 ): Promise<void> => {
   console.log('updateEventResults called with:', {
