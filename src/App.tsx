@@ -101,6 +101,15 @@ function App() {
 
   useDataPreloader();
 
+  // Public video player - bypass ALL auth checks entirely
+  if (window.location.pathname.startsWith('/play/')) {
+    return (
+      <Routes>
+        <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
+      </Routes>
+    );
+  }
+
   // Detect if we're on a subdomain or custom domain (for public club websites)
   const hostname = window.location.hostname;
   const isAlfieproDomain = hostname.includes('.alfiepro.com.au') || hostname === 'alfiepro.com.au';
