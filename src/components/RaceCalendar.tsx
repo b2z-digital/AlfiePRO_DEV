@@ -202,33 +202,126 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   // Fetch all public events and venues from all clubs for Location Explorer
   const fetchAllPublicEvents = async () => {
     try {
-      console.log('[RaceCalendar] Fetching all public events and venues for Location Explorer');
+      const today = new Date().toISOString().split('T')[0];
+      const allEvents: RaceEvent[] = [];
+      const seenIds = new Set<string>();
 
-      // Fetch all public events
-      const publicEvents = await getPublicEvents();
+      const [publicEventsResult, quickRacesResult, seriesRoundsResult, allVenuesResult] = await Promise.all([
+        getPublicEvents(),
+        supabase
+          .from('quick_races')
+          .select('id, event_name, club_name, race_date, end_date, race_venue, race_class, race_format, club_id, multi_day, number_of_days, is_paid, entry_fee, notice_of_race_url, sailing_instructions_url, is_interclub, other_club_name, completed')
+          .eq('completed', false)
+          .gte('race_date', today)
+          .order('race_date', { ascending: true }),
+        supabase
+          .from('race_series_rounds')
+          .select('id, round_name, date, venue, race_class, race_format, club_id, series_id, completed, cancelled')
+          .eq('cancelled', false)
+          .eq('completed', false)
+          .gte('date', today)
+          .order('date', { ascending: true }),
+        supabase
+          .from('venues')
+          .select('*')
+          .order('name')
+      ]);
 
-      // Convert public events to RaceEvent format
-      const allEvents = publicEvents
+      const publicEvents = publicEventsResult || [];
+      publicEvents
         .map(pe => convertToRaceEvent(pe))
-        .filter((event): event is RaceEvent => event !== null);
+        .filter((event): event is RaceEvent => event !== null)
+        .forEach(event => {
+          if (!seenIds.has(event.id)) {
+            seenIds.add(event.id);
+            allEvents.push(event);
+          }
+        });
 
-      console.log('[RaceCalendar] Loaded', allEvents.length, 'public events for Location Explorer');
+      const clubIds = new Set<string>();
+      (quickRacesResult.data || []).forEach(qr => { if (qr.club_id) clubIds.add(qr.club_id); });
+      (seriesRoundsResult.data || []).forEach(sr => { if (sr.club_id) clubIds.add(sr.club_id); });
+
+      let clubNameMap: Record<string, string> = {};
+      if (clubIds.size > 0) {
+        const { data: clubs } = await supabase
+          .from('clubs')
+          .select('id, name')
+          .in('id', [...clubIds]);
+        if (clubs) {
+          clubs.forEach(c => { clubNameMap[c.id] = c.name; });
+        }
+      }
+
+      let seriesNameMap: Record<string, string> = {};
+      const seriesIds = new Set<string>();
+      (seriesRoundsResult.data || []).forEach(sr => { if (sr.series_id) seriesIds.add(sr.series_id); });
+      if (seriesIds.size > 0) {
+        const { data: series } = await supabase
+          .from('race_series')
+          .select('id, series_name')
+          .in('id', [...seriesIds]);
+        if (series) {
+          series.forEach(s => { seriesNameMap[s.id] = s.series_name; });
+        }
+      }
+
+      (quickRacesResult.data || []).forEach(qr => {
+        if (seenIds.has(qr.id)) return;
+        seenIds.add(qr.id);
+        allEvents.push({
+          id: qr.id,
+          eventName: qr.event_name || 'Race Day',
+          clubName: qr.club_name || clubNameMap[qr.club_id] || '',
+          date: qr.race_date,
+          endDate: qr.end_date,
+          venue: qr.race_venue || '',
+          raceClass: qr.race_class as any,
+          raceFormat: qr.race_format as any,
+          multiDay: qr.multi_day,
+          numberOfDays: qr.number_of_days,
+          isPaid: qr.is_paid,
+          entryFee: qr.entry_fee,
+          noticeOfRaceUrl: qr.notice_of_race_url,
+          sailingInstructionsUrl: qr.sailing_instructions_url,
+          isInterclub: qr.is_interclub,
+          otherClubName: qr.other_club_name,
+          clubId: qr.club_id,
+          eventLevel: 'club',
+          completed: qr.completed
+        });
+      });
+
+      (seriesRoundsResult.data || []).forEach(sr => {
+        if (seenIds.has(sr.id)) return;
+        seenIds.add(sr.id);
+        const seriesName = sr.series_id ? seriesNameMap[sr.series_id] : '';
+        allEvents.push({
+          id: sr.id,
+          eventName: seriesName ? `${seriesName} - ${sr.round_name || 'Round'}` : (sr.round_name || 'Series Round'),
+          clubName: clubNameMap[sr.club_id] || '',
+          date: sr.date,
+          venue: sr.venue || '',
+          raceClass: sr.race_class as any,
+          raceFormat: sr.race_format as any,
+          isSeriesEvent: true,
+          seriesId: sr.series_id,
+          roundName: sr.round_name,
+          clubId: sr.club_id,
+          eventLevel: 'club',
+          completed: sr.completed
+        });
+      });
+
       setAllPublicEvents(allEvents);
 
-      // Fetch ALL venues from the database (not just current club)
-      const { data: allVenuesData, error: venuesError } = await supabase
-        .from('venues')
-        .select('*')
-        .order('name');
-
-      if (venuesError) {
-        console.error('[RaceCalendar] Error fetching all venues:', venuesError);
-      } else if (allVenuesData) {
-        console.log('[RaceCalendar] Loaded', allVenuesData.length, 'venues for Location Explorer');
-        setAllVenues(allVenuesData);
+      if (allVenuesResult.error) {
+        console.error('[RaceCalendar] Error fetching all venues:', allVenuesResult.error);
+      } else if (allVenuesResult.data) {
+        setAllVenues(allVenuesResult.data);
       }
     } catch (err) {
-      console.error('[RaceCalendar] Error fetching all public events:', err);
+      console.error('[RaceCalendar] Error fetching events for Location Explorer:', err);
     }
   };
 

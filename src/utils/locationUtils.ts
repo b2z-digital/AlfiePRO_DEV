@@ -139,15 +139,9 @@ export const filterEventsByRadius = (
   radiusKm: number
 ): EventWithDistance[] => {
   return events.filter(event => {
-    // If event has venue coordinates but distance is Infinity, it means the venue wasn't matched properly
-    // In this case, skip it
     if (event.distance === Infinity) return false;
-
-    // If no distance calculated at all, skip it
-    if (!event.distance) return false;
-
-    const distanceKm = event.distance;
-    return distanceKm <= radiusKm;
+    if (event.distance === undefined || event.distance === null) return false;
+    return event.distance <= radiusKm;
   });
 };
 

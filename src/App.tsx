@@ -53,6 +53,7 @@ import { SubdomainProvider } from './contexts/SubdomainContext';
 import AlfieTVPage from './pages/AlfieTVPage';
 import StripeOAuthCallback from './components/StripeOAuthCallback';
 import { HMSValidatorPage } from './pages/HMSValidatorPage';
+import PublicVideoPlayer from './components/public/PublicVideoPlayer';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import './styles/index.css';
 
@@ -100,6 +101,15 @@ function App() {
 
   useDataPreloader();
 
+  // Public video player - bypass ALL auth checks entirely
+  if (window.location.pathname.startsWith('/play/')) {
+    return (
+      <Routes>
+        <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
+      </Routes>
+    );
+  }
+
   // Detect if we're on a subdomain or custom domain (for public club websites)
   const hostname = window.location.hostname;
   const isAlfieproDomain = hostname.includes('.alfiepro.com.au') || hostname === 'alfiepro.com.au';
@@ -143,7 +153,8 @@ function App() {
   // Allow OAuth callbacks and public routes to work even during loading
   const isPublicRoute = window.location.pathname.startsWith('/stripe-oauth-callback') ||
                         window.location.pathname.startsWith('/auth/callback/youtube') ||
-                        window.location.pathname.startsWith('/mobile-stream');
+                        window.location.pathname.startsWith('/mobile-stream') ||
+                        window.location.pathname.startsWith('/play/');
 
   console.log('🔍 App.tsx auth check:', {
     loading,
@@ -239,6 +250,9 @@ function App() {
 
         {/* Mobile Livestream Route (Public) */}
         <Route path="/mobile-stream/:sessionId" element={<MobileStreamPage />} />
+
+        {/* Public Video Player (used by native mobile app for AlfieTV) */}
+        <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
 
         {/* AlfieTV Full-Screen Route */}
         <Route path="/alfie-tv" element={
