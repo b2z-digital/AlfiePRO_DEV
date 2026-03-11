@@ -976,10 +976,42 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </div>
 
             <div className="flex items-center gap-3 mt-2">
-              {meeting.attendingCount > 0 && (
-                <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <Users size={13} />
-                  <span className="font-medium">{meeting.attendingCount} attending</span>
+              {meeting.attendees && meeting.attendees.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {meeting.attendees.slice(0, 5).map((attendee, i) => {
+                      const initials = `${(attendee.first_name || '').charAt(0)}${(attendee.last_name || '').charAt(0)}`.toUpperCase();
+                      return (
+                        <div
+                          key={i}
+                          title={`${attendee.first_name} ${attendee.last_name}`}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 overflow-hidden ${
+                            darkMode ? 'ring-slate-800' : 'ring-white'
+                          }`}
+                        >
+                          {attendee.avatar_url ? (
+                            <img src={attendee.avatar_url} alt={`${attendee.first_name} ${attendee.last_name}`} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center ${
+                              darkMode ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white' : 'bg-gradient-to-br from-teal-400 to-emerald-400 text-white'
+                            }`}>
+                              {initials}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {meeting.attendees.length > 5 && (
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 ${
+                        darkMode ? 'bg-slate-700 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-700'
+                      }`}>
+                        +{meeting.attendees.length - 5}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {meeting.attendees.length} attending
+                  </span>
                 </div>
               )}
               {isPast && meeting.minutes_status === 'completed' && (
@@ -1440,11 +1472,43 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             )}
           </div>
 
-          {meeting.attendingCount > 0 && (
+          {meeting.attendees && meeting.attendees.length > 0 && (
             <div className={`mt-auto pt-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-              <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                <Users size={13} />
-                <span className="font-medium">{meeting.attendingCount} attending</span>
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-2">
+                  {meeting.attendees.slice(0, 4).map((attendee, i) => {
+                    const initials = `${(attendee.first_name || '').charAt(0)}${(attendee.last_name || '').charAt(0)}`.toUpperCase();
+                    return (
+                      <div
+                        key={i}
+                        title={`${attendee.first_name} ${attendee.last_name}`}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 overflow-hidden ${
+                          darkMode ? 'ring-slate-800' : 'ring-white'
+                        }`}
+                      >
+                        {attendee.avatar_url ? (
+                          <img src={attendee.avatar_url} alt={`${attendee.first_name} ${attendee.last_name}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center ${
+                            darkMode ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white' : 'bg-gradient-to-br from-teal-400 to-emerald-400 text-white'
+                          }`}>
+                            {initials}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {meeting.attendees.length > 4 && (
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 ${
+                      darkMode ? 'bg-slate-700 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-700'
+                    }`}>
+                      +{meeting.attendees.length - 4}
+                    </div>
+                  )}
+                </div>
+                <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {meeting.attendees.length} attending
+                </span>
               </div>
             </div>
           )}
