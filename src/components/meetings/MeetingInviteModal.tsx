@@ -11,7 +11,7 @@ interface MeetingInviteModalProps {
   onClose: () => void;
   meetingId: string;
   meetingName: string;
-  clubId: string;
+  clubId?: string;
   darkMode: boolean;
   meetingCategory?: 'general' | 'committee';
   associationId?: string;

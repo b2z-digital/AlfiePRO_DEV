@@ -9,6 +9,8 @@ import { getStoredRaceEvents, getStoredRaceSeries } from '../../../utils/raceSto
 import { getPublicEvents } from '../../../utils/publicEventStorage';
 import { getBoatClassBadge, getRaceFormatBadge } from '../../../constants/colors';
 import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
+import { CalendarMeetingDetailsModal } from '../../meetings/CalendarMeetingDetailsModal';
+import { CalendarMeeting } from '../../../utils/calendarMeetingStorage';
 
 interface RaceEvent {
   id: string;
@@ -28,10 +30,12 @@ interface RaceEvent {
   eventLevel?: 'state' | 'national';
   isPublicEvent?: boolean;
   isMeeting?: boolean;
+  isClubMeeting?: boolean;
   meetingCategory?: 'general' | 'committee';
   meetingTime?: string;
   meetingAttendingCount?: number;
   organizationName?: string;
+  rawMeeting?: any;
 }
 
 export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
@@ -40,6 +44,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
   const orgContext = useOrganizationContext();
   const [upcomingEvents, setUpcomingEvents] = useState<RaceEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMeeting, setSelectedMeeting] = useState<CalendarMeeting | null>(null);
   const darkMode = true;
   const themeColors = useWidgetTheme(colorTheme);
 
@@ -68,7 +73,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       if (isAssociation) {
         let query = supabase
           .from('meetings')
-          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs')
+          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
           .gte('date', todayStr)
           .eq('status', 'upcoming')
           .order('date', { ascending: true });
@@ -85,7 +90,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       } else if (clubId) {
         const { data: clubMeetings, error: clubErr } = await supabase
           .from('meetings')
-          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs')
+          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
           .gte('date', todayStr)
           .eq('status', 'upcoming')
           .eq('club_id', clubId)
@@ -104,7 +109,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         if (clubData?.state_association_id) {
           const { data: assocMeetings } = await supabase
             .from('meetings')
-            .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs')
+            .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
             .gte('date', todayStr)
             .eq('status', 'upcoming')
             .eq('state_association_id', clubData.state_association_id)
@@ -179,10 +184,12 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         venue: m.location || '',
         raceClass: '',
         isMeeting: true,
+        isClubMeeting: !!m.club_id && !m.state_association_id && !m.national_association_id,
         meetingCategory: m.meeting_category as 'general' | 'committee',
         meetingTime: m.start_time ? m.start_time.substring(0, 5) : undefined,
         meetingAttendingCount: attendanceCounts[m.id] || 0,
         organizationName: m.organization_name || '',
+        rawMeeting: m,
       }));
     } catch (error) {
       console.error('Error fetching meetings:', error);
@@ -457,13 +464,46 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     }
   };
 
+  const handleMeetingClick = (event: RaceEvent) => {
+    if (isEditMode) return;
+    if (event.isClubMeeting) {
+      navigate('/meetings');
+      return;
+    }
+    const raw = event.rawMeeting;
+    if (!raw) return;
+    const calMeeting: CalendarMeeting = {
+      id: raw.id,
+      club_id: raw.club_id || '',
+      name: raw.name,
+      location: raw.location || null,
+      date: raw.date,
+      start_time: raw.start_time || null,
+      end_time: null,
+      conferencing_url: null,
+      description: raw.description || null,
+      chairperson_id: null,
+      minute_taker_id: null,
+      created_at: raw.created_at || '',
+      updated_at: raw.updated_at || '',
+      status: raw.status || 'upcoming',
+      minutes_status: 'not_started',
+      organization_name: raw.organization_name || '',
+      meeting_category: raw.meeting_category || 'general',
+      state_association_id: raw.state_association_id || undefined,
+      national_association_id: raw.national_association_id || undefined,
+      visible_to_member_clubs: raw.visible_to_member_clubs,
+      organizationLevel: raw.state_association_id ? 'state_association' : raw.national_association_id ? 'national_association' : 'club',
+      attendingCount: event.meetingAttendingCount || 0,
+      attendees: [],
+    };
+    setSelectedMeeting(calMeeting);
+  };
+
   const renderMeetingCard = (event: RaceEvent) => (
     <div
       key={event.id}
-      onClick={() => {
-        if (isEditMode) return;
-        navigate('/meetings');
-      }}
+      onClick={() => handleMeetingClick(event)}
       className={`
         group relative overflow-hidden rounded-xl border transition-all duration-300
         ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
@@ -680,6 +720,14 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             event.isMeeting ? renderMeetingCard(event) : renderEventCard(event)
           ))}
         </div>
+      )}
+
+      {selectedMeeting && (
+        <CalendarMeetingDetailsModal
+          meeting={selectedMeeting}
+          darkMode={darkMode}
+          onClose={() => setSelectedMeeting(null)}
+        />
       )}
     </div>
   );
