@@ -71,19 +71,33 @@ export const getCalendarMeetings = async (
       const meetingIds = meetings.map(m => m.id);
       const { data: attendanceData } = await supabase
         .from('meeting_attendance')
-        .select('meeting_id, member_id, members:member_id(first_name, last_name, avatar_url)')
+        .select('meeting_id, member_id, user_id, members:member_id(first_name, last_name, avatar_url)')
         .in('meeting_id', meetingIds)
         .eq('status', 'attending');
 
       if (attendanceData) {
+        const needsProfile = attendanceData.filter((a: any) => !a.member_id && a.user_id);
+        let profileMap: Record<string, any> = {};
+        if (needsProfile.length > 0) {
+          const userIds = [...new Set(needsProfile.map((a: any) => a.user_id))];
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, avatar_url')
+            .in('id', userIds);
+          if (profiles) {
+            profiles.forEach((p: any) => { profileMap[p.id] = p; });
+          }
+        }
+
         const attendeeMap: Record<string, MeetingAttendee[]> = {};
         attendanceData.forEach((a: any) => {
           if (!attendeeMap[a.meeting_id]) attendeeMap[a.meeting_id] = [];
+          const profile = a.member_id ? null : profileMap[a.user_id];
           attendeeMap[a.meeting_id].push({
-            member_id: a.member_id,
-            first_name: a.members?.first_name || '',
-            last_name: a.members?.last_name || '',
-            avatar_url: a.members?.avatar_url || null,
+            member_id: a.member_id || a.user_id,
+            first_name: a.members?.first_name || profile?.first_name || '',
+            last_name: a.members?.last_name || profile?.last_name || '',
+            avatar_url: a.members?.avatar_url || profile?.avatar_url || null,
           });
         });
         meetings.forEach(m => {
