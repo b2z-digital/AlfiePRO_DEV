@@ -63,58 +63,96 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       const associationId = currentOrganization?.id;
       const associationType = currentOrganization?.type;
 
-      let query = supabase
-        .from('meetings')
-        .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id')
-        .gte('date', todayStr)
-        .eq('status', 'upcoming')
-        .order('date', { ascending: true });
+      let allMeetings: any[] = [];
 
       if (isAssociation) {
+        let query = supabase
+          .from('meetings')
+          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs')
+          .gte('date', todayStr)
+          .eq('status', 'upcoming')
+          .order('date', { ascending: true });
+
         if (associationType === 'state') {
           query = query.eq('state_association_id', associationId!);
         } else {
           query = query.eq('national_association_id', associationId!);
         }
+
+        const { data, error } = await query.limit(10);
+        if (error) throw error;
+        allMeetings = data || [];
       } else if (clubId) {
-        query = query.eq('club_id', clubId);
+        const { data: clubMeetings, error: clubErr } = await supabase
+          .from('meetings')
+          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs')
+          .gte('date', todayStr)
+          .eq('status', 'upcoming')
+          .eq('club_id', clubId)
+          .order('date', { ascending: true })
+          .limit(10);
+
+        if (clubErr) throw clubErr;
+        allMeetings = clubMeetings || [];
+
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', clubId)
+          .maybeSingle();
+
+        if (clubData?.state_association_id) {
+          const { data: assocMeetings } = await supabase
+            .from('meetings')
+            .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs')
+            .gte('date', todayStr)
+            .eq('status', 'upcoming')
+            .eq('state_association_id', clubData.state_association_id)
+            .order('date', { ascending: true })
+            .limit(10);
+
+          if (assocMeetings) {
+            allMeetings = [...allMeetings, ...assocMeetings];
+          }
+        }
       } else {
         return [];
       }
 
-      const { data: meetings, error } = await query.limit(10);
-      if (error) throw error;
-      if (!meetings || meetings.length === 0) return [];
+      if (allMeetings.length === 0) return [];
 
-      let committeeMeetingIds: string[] = [];
-      const generalMeetings = meetings.filter(m => m.meeting_category !== 'committee');
-      const committeeMeetings = meetings.filter(m => m.meeting_category === 'committee');
+      const generalMeetings = allMeetings.filter(m => {
+        if (m.meeting_category === 'committee') return false;
+        if (m.club_id) return true;
+        return m.visible_to_member_clubs === true;
+      });
+
+      const committeeMeetings = allMeetings.filter(m => m.meeting_category === 'committee');
+      let visibleCommitteeIds: string[] = [];
 
       if (committeeMeetings.length > 0 && user?.id) {
-        let posQuery = supabase
+        const { data: positions } = await supabase
           .from('committee_positions')
-          .select('id')
+          .select('id, club_id, state_association_id, national_association_id')
           .eq('user_id', user.id);
 
-        if (isAssociation) {
-          if (associationType === 'state') {
-            posQuery = posQuery.eq('state_association_id', associationId!);
-          } else {
-            posQuery = posQuery.eq('national_association_id', associationId!);
-          }
-        } else if (clubId) {
-          posQuery = posQuery.eq('club_id', clubId);
-        }
-
-        const { data: positions } = await posQuery.limit(1);
         if (positions && positions.length > 0) {
-          committeeMeetingIds = committeeMeetings.map(m => m.id);
+          visibleCommitteeIds = committeeMeetings
+            .filter(m => {
+              return positions.some(p => {
+                if (m.club_id && p.club_id === m.club_id) return true;
+                if (m.state_association_id && p.state_association_id === m.state_association_id) return true;
+                if (m.national_association_id && p.national_association_id === m.national_association_id) return true;
+                return false;
+              });
+            })
+            .map(m => m.id);
         }
       }
 
       const visibleMeetings = [
         ...generalMeetings,
-        ...committeeMeetings.filter(m => committeeMeetingIds.includes(m.id))
+        ...committeeMeetings.filter(m => visibleCommitteeIds.includes(m.id))
       ];
 
       const meetingIds = visibleMeetings.map(m => m.id);
@@ -262,7 +300,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       const meetingEvents = await meetingsPromise;
       allUpcoming = [...allUpcoming, ...meetingEvents]
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, 6);
+        .slice(0, 4);
 
       const nonMeetingEvents = allUpcoming.filter(e => !e.isMeeting);
 
