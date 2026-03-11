@@ -167,17 +167,36 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       if (meetingIds.length > 0) {
         const { data: attendance } = await supabase
           .from('meeting_attendance')
-          .select('meeting_id, member:members(first_name, last_name, avatar_url)')
+          .select('meeting_id, member_id, user_id, member:members(first_name, last_name, avatar_url)')
           .in('meeting_id', meetingIds)
           .eq('status', 'attending');
 
         if (attendance) {
+          const needsProfile = attendance.filter((a: any) => !a.member_id && a.user_id);
+          let profileMap: Record<string, any> = {};
+          if (needsProfile.length > 0) {
+            const userIds = [...new Set(needsProfile.map((a: any) => a.user_id))];
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, avatar_url')
+              .in('id', userIds);
+            if (profiles) {
+              profiles.forEach((p: any) => { profileMap[p.id] = p; });
+            }
+          }
+
           attendance.forEach((a: any) => {
-            if (!a.member) return;
+            const profile = a.member ? null : profileMap[a.user_id];
+            const info = a.member || profile;
+            if (!info) return;
             if (!attendanceByMeeting[a.meeting_id]) {
               attendanceByMeeting[a.meeting_id] = [];
             }
-            attendanceByMeeting[a.meeting_id].push(a.member);
+            attendanceByMeeting[a.meeting_id].push({
+              first_name: info.first_name || '',
+              last_name: info.last_name || '',
+              avatar_url: info.avatar_url || null,
+            });
           });
         }
       }
