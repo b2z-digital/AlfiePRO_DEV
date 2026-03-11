@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, Clock, UserPlus, LogOut, Save, Check } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, UserPlus, LogOut, Save, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { MemberSelect } from '../ui/MemberSelect';
 import { supabase } from '../../utils/supabase';
 import { Avatar } from '../ui/Avatar';
@@ -46,6 +46,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
   const [members, setMembers] = useState<TaskMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingTaskIndex, setSavingTaskIndex] = useState<number | null>(null);
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string | number>>(new Set());
 
   useEffect(() => {
     fetchMembers();
@@ -227,6 +228,18 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
     }
   };
 
+  const toggleTaskExpanded = (taskKey: string | number) => {
+    setExpandedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskKey)) {
+        next.delete(taskKey);
+      } else {
+        next.add(taskKey);
+      }
+      return next;
+    });
+  };
+
   const addNewTask = () => {
     const newTask: AgendaTask = {
       title: '',
@@ -240,6 +253,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
     };
     const updatedTasks = [...tasks, newTask];
     setTasks(updatedTasks);
+    setExpandedTaskIds(prev => new Set(prev).add(updatedTasks.length - 1));
   };
 
   const updateTask = (index: number, field: keyof AgendaTask, value: any) => {
@@ -431,260 +445,319 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {tasks.map((task, index) => (
-        <div
-          key={task.id || index}
-          className="border border-slate-300 rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex-1 space-y-3">
-              {/* Task Title */}
-              <div>
-                <input
-                  type="text"
-                  value={task.title}
-                  onChange={(e) => updateTask(index, 'title', e.target.value)}
-                  placeholder="Task title *"
-                  disabled={isReadOnly}
-                  className={`w-full px-3 py-2 border rounded-lg font-medium ${
-                    isReadOnly
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
-                  }`}
-                />
-              </div>
+  const renderTaskForm = (task: AgendaTask, index: number) => (
+    <div className="space-y-3 p-4">
+      <div>
+        <input
+          type="text"
+          value={task.title}
+          onChange={(e) => updateTask(index, 'title', e.target.value)}
+          placeholder="Task title *"
+          disabled={isReadOnly}
+          className={`w-full px-3 py-2 border rounded-lg font-medium ${
+            isReadOnly
+              ? 'bg-gray-50 border-gray-200'
+              : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
+          }`}
+        />
+      </div>
 
-              {/* Task Description */}
-              <div>
-                <textarea
-                  value={task.description}
-                  onChange={(e) => updateTask(index, 'description', e.target.value)}
-                  placeholder="Task description (optional)"
-                  disabled={isReadOnly}
-                  rows={2}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm resize-none ${
-                    isReadOnly
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
-                  }`}
-                />
-              </div>
+      <div>
+        <textarea
+          value={task.description}
+          onChange={(e) => updateTask(index, 'description', e.target.value)}
+          placeholder="Task description (optional)"
+          disabled={isReadOnly}
+          rows={2}
+          className={`w-full px-3 py-2 border rounded-lg text-sm resize-none ${
+            isReadOnly
+              ? 'bg-gray-50 border-gray-200'
+              : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
+          }`}
+        />
+      </div>
 
-              {/* Assignee and Priority Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Primary Assignee */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Assigned To *
-                  </label>
-                  {isReadOnly && task.assignee_id ? (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                      <Avatar
-                        firstName={getMemberById(task.assignee_id)?.first_name}
-                        lastName={getMemberById(task.assignee_id)?.last_name}
-                        imageUrl={getMemberById(task.assignee_id)?.avatar_url}
-                        size="xs"
-                      />
-                      <span className="text-sm">
-                        {getMemberById(task.assignee_id)?.first_name}{' '}
-                        {getMemberById(task.assignee_id)?.last_name}
-                      </span>
-                    </div>
-                  ) : (
-                    <MemberSelect
-                      members={members}
-                      value={task.assignee_id || ''}
-                      onChange={(memberId) => updateTask(index, 'assignee_id', memberId)}
-                      disabled={isReadOnly}
-                      placeholder="Select member"
-                      className="w-full"
-                      allowEmpty={false}
-                    />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">
+            Assigned To *
+          </label>
+          {isReadOnly && task.assignee_id ? (
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+              <Avatar
+                firstName={getMemberById(task.assignee_id)?.first_name}
+                lastName={getMemberById(task.assignee_id)?.last_name}
+                imageUrl={getMemberById(task.assignee_id)?.avatar_url}
+                size="xs"
+              />
+              <span className="text-sm">
+                {getMemberById(task.assignee_id)?.first_name}{' '}
+                {getMemberById(task.assignee_id)?.last_name}
+              </span>
+            </div>
+          ) : (
+            <MemberSelect
+              members={members}
+              value={task.assignee_id || ''}
+              onChange={(memberId) => updateTask(index, 'assignee_id', memberId)}
+              disabled={isReadOnly}
+              placeholder="Select member"
+              className="w-full"
+              allowEmpty={false}
+            />
+          )}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">
+            Priority
+          </label>
+          <select
+            value={task.priority}
+            onChange={(e) => updateTask(index, 'priority', e.target.value)}
+            disabled={isReadOnly}
+            className={`w-full px-3 py-2 border rounded-lg text-sm ${
+              isReadOnly
+                ? 'bg-gray-50 border-gray-200'
+                : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
+            } ${getPriorityColor(task.priority)}`}
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <Calendar className="inline w-3 h-3 mr-1" />
+            Due Date
+          </label>
+          <input
+            type="date"
+            value={task.due_date}
+            onChange={(e) => updateTask(index, 'due_date', e.target.value)}
+            disabled={isReadOnly}
+            className={`w-full px-3 py-2 border rounded-lg text-sm ${
+              isReadOnly
+                ? 'bg-gray-50 border-gray-200'
+                : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
+            }`}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <Clock className="inline w-3 h-3 mr-1" />
+            Due Time (optional)
+          </label>
+          <input
+            type="time"
+            value={task.due_time}
+            onChange={(e) => updateTask(index, 'due_time', e.target.value)}
+            disabled={isReadOnly}
+            className={`w-full px-3 py-2 border rounded-lg text-sm ${
+              isReadOnly
+                ? 'bg-gray-50 border-gray-200'
+                : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
+            }`}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-700 mb-2">
+          <UserPlus className="inline w-3 h-3 mr-1" />
+          Supporting Members (optional)
+        </label>
+
+        {task.supporting_members.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {task.supporting_members.map(memberId => {
+              const member = getMemberById(memberId);
+              return member ? (
+                <div
+                  key={memberId}
+                  className="flex items-center gap-1 px-2 py-1 bg-cyan-50 border border-cyan-200 rounded-full text-xs"
+                >
+                  <Avatar
+                    firstName={member.first_name}
+                    lastName={member.last_name}
+                    imageUrl={member.avatar_url}
+                    size="xs"
+                  />
+                  <span className="text-cyan-900">
+                    {member.first_name} {member.last_name}
+                  </span>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => removeSupportingMember(index, memberId)}
+                      className="text-cyan-600 hover:text-cyan-800"
+                    >
+                      <LogOut className="w-3 h-3" />
+                    </button>
                   )}
                 </div>
+              ) : null;
+            })}
+          </div>
+        )}
 
-                {/* Priority */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Priority
-                  </label>
-                  <select
-                    value={task.priority}
-                    onChange={(e) => updateTask(index, 'priority', e.target.value)}
-                    disabled={isReadOnly}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                      isReadOnly
-                        ? 'bg-gray-50 border-gray-200'
-                        : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
-                    } ${getPriorityColor(task.priority)}`}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-              </div>
+        {!isReadOnly && (
+          <MemberSelect
+            members={members.filter(m =>
+              m.id !== task.assignee_id &&
+              !task.supporting_members.includes(m.id)
+            )}
+            value=""
+            onChange={(memberId) => {
+              if (memberId) {
+                addSupportingMember(index, memberId);
+              }
+            }}
+            placeholder="+ Add supporting member"
+            allowEmpty={false}
+          />
+        )}
+      </div>
 
-              {/* Due Date and Time Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    <Calendar className="inline w-3 h-3 mr-1" />
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    value={task.due_date}
-                    onChange={(e) => updateTask(index, 'due_date', e.target.value)}
-                    disabled={isReadOnly}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                      isReadOnly
-                        ? 'bg-gray-50 border-gray-200'
-                        : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
-                    }`}
-                  />
-                </div>
+      {!isReadOnly && (
+        <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+          <button
+            onClick={() => saveTask(index)}
+            disabled={savingTaskIndex === index || !task.title || !task.assignee_id}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+              task.isSaved
+                ? 'bg-green-100 text-green-700 border-2 border-green-300'
+                : 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white hover:from-cyan-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {savingTaskIndex === index ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Saving...</span>
+              </>
+            ) : task.isSaved ? (
+              <>
+                <Check className="w-4 h-4" />
+                <span>Saved</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>Save Task</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    <Clock className="inline w-3 h-3 mr-1" />
-                    Due Time (optional)
-                  </label>
-                  <input
-                    type="time"
-                    value={task.due_time}
-                    onChange={(e) => updateTask(index, 'due_time', e.target.value)}
-                    disabled={isReadOnly}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm ${
-                      isReadOnly
-                        ? 'bg-gray-50 border-gray-200'
-                        : 'border-slate-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500'
-                    }`}
-                  />
-                </div>
-              </div>
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">High</span>;
+      case 'medium':
+        return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">Medium</span>;
+      case 'low':
+        return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">Low</span>;
+      default:
+        return null;
+    }
+  };
 
-              {/* Supporting Members */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">
-                  <UserPlus className="inline w-3 h-3 mr-1" />
-                  Supporting Members (optional)
-                </label>
+  return (
+    <div className="space-y-2">
+      {tasks.map((task, index) => {
+        const taskKey = task.id || index;
+        const isExpanded = expandedTaskIds.has(taskKey) || !task.isSaved;
+        const assignee = task.assignee_id ? getMemberById(task.assignee_id) : null;
 
-                {/* Display selected supporting members */}
-                {task.supporting_members.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {task.supporting_members.map(memberId => {
-                      const member = getMemberById(memberId);
-                      return member ? (
-                        <div
-                          key={memberId}
-                          className="flex items-center gap-1 px-2 py-1 bg-cyan-50 border border-cyan-200 rounded-full text-xs"
-                        >
+        return (
+          <div
+            key={taskKey}
+            className="border border-slate-200 rounded-lg bg-white overflow-hidden transition-shadow hover:shadow-sm"
+          >
+            {task.isSaved ? (
+              <>
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => toggleTaskExpanded(taskKey)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    )}
+                    <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <span className="font-medium text-gray-900 truncate">{task.title}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {getPriorityBadge(task.priority)}
+                      {assignee && (
+                        <div className="flex items-center gap-1.5">
                           <Avatar
-                            firstName={member.first_name}
-                            lastName={member.last_name}
-                            imageUrl={member.avatar_url}
+                            firstName={assignee.first_name}
+                            lastName={assignee.last_name}
+                            imageUrl={assignee.avatar_url}
                             size="xs"
                           />
-                          <span className="text-cyan-900">
-                            {member.first_name} {member.last_name}
+                          <span className="text-xs text-gray-500 hidden sm:inline">
+                            {assignee.first_name} {assignee.last_name}
                           </span>
-                          {!isReadOnly && (
-                            <button
-                              onClick={() => removeSupportingMember(index, memberId)}
-                              className="text-cyan-600 hover:text-cyan-800"
-                            >
-                              <LogOut className="w-3 h-3" />
-                            </button>
-                          )}
                         </div>
-                      ) : null;
-                    })}
+                      )}
+                      {task.due_date && (
+                        <span className="text-xs text-gray-400 hidden md:inline">
+                          Due: {new Date(task.due_date).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    {!isReadOnly && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Are you sure you want to delete this task?')) {
+                            removeTask(index);
+                          }
+                        }}
+                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Remove task"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div className="border-t border-gray-100">
+                    {renderTaskForm(task, index)}
                   </div>
                 )}
-
+              </>
+            ) : (
+              <div className="relative">
+                {renderTaskForm(task, index)}
                 {!isReadOnly && (
-                  <MemberSelect
-                    members={members.filter(m =>
-                      m.id !== task.assignee_id &&
-                      !task.supporting_members.includes(m.id)
-                    )}
-                    value=""
-                    onChange={(memberId) => {
-                      if (memberId) {
-                        addSupportingMember(index, memberId);
-                      }
-                    }}
-                    placeholder="+ Add supporting member"
-                    allowEmpty={false}
-                  />
+                  <button
+                    onClick={() => removeTask(index)}
+                    className="absolute top-4 right-4 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Remove task"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 )}
               </div>
-
-              {/* Save button for individual task */}
-              {!isReadOnly && (
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
-                  <button
-                    onClick={() => saveTask(index)}
-                    disabled={savingTaskIndex === index || !task.title || !task.assignee_id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                      task.isSaved
-                        ? 'bg-green-100 text-green-700 border-2 border-green-300'
-                        : 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white hover:from-cyan-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {savingTaskIndex === index ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Saving...</span>
-                      </>
-                    ) : task.isSaved ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        <span>Saved</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        <span>Save Task</span>
-                      </>
-                    )}
-                  </button>
-                  {task.isSaved && !task.title && !task.assignee_id && (
-                    <span className="text-xs text-gray-500 italic">
-                      Task title and assignee required
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Delete Button */}
-            {!isReadOnly && (
-              <button
-                onClick={() => {
-                  if (task.id) {
-                    if (confirm('Are you sure you want to delete this task?')) {
-                      removeTask(index);
-                    }
-                  } else {
-                    removeTask(index);
-                  }
-                }}
-                className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-                title="Remove task"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
             )}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
-      {/* Add Task Button */}
       {!isReadOnly && (
         <button
           onClick={addNewTask}

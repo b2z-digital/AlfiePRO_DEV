@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, Plus, Trash2, Check, AlertTriangle, User, Users, Clock, ChevronDown, ChevronUp, Paperclip, CheckSquare, FileText } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Check, AlertTriangle, User, Users, Clock, ChevronDown, ChevronUp, Paperclip, CheckSquare, FileText, Download, X, Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Meeting, MeetingAgendaItem, MeetingAttendee, MeetingGuest } from '../../types/meeting';
 import {
@@ -60,6 +60,8 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
   const [isLastItem, setIsLastItem] = useState(false);
   const [showActionItemsSummary, setShowActionItemsSummary] = useState(false);
   const [agendaItemTasks, setAgendaItemTasks] = useState<{ [agendaItemId: string]: any[] }>({});
+  const [uploadingAgendaItemId, setUploadingAgendaItemId] = useState<string | null>(null);
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   // Check if meeting is locked/completed (read-only mode)
   const isReadOnly = meeting?.status === 'completed' || meeting?.minutes_locked === true;
@@ -339,6 +341,112 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
       ...prev,
       [agendaItemId]: tasks
     }));
+  };
+
+  const handleAttachmentUpload = async (agendaItemId: string, files: FileList | null) => {
+    if (!files || files.length === 0 || !meetingId) return;
+
+    setUploadingAgendaItemId(agendaItemId);
+    try {
+      const item = agendaItems.find(i => i.id === agendaItemId);
+      const existingAttachments = item?.minutes_attachments || [];
+      const newAttachments = [...existingAttachments];
+
+      for (const file of Array.from(files)) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${meetingId}/${agendaItemId}/${Date.now()}_${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('meeting-attachments')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        newAttachments.push({
+          name: file.name,
+          path: filePath,
+          size: file.size,
+          type: file.type,
+          uploaded_at: new Date().toISOString()
+        });
+      }
+
+      setAgendaItems(agendaItems.map(i =>
+        i.id === agendaItemId ? { ...i, minutes_attachments: newAttachments } : i
+      ));
+
+      await supabase
+        .from('meeting_agendas')
+        .update({ minutes_attachments: newAttachments })
+        .eq('id', agendaItemId);
+
+    } catch (err) {
+      console.error('Error uploading attachment:', err);
+      setError('Failed to upload attachment');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setUploadingAgendaItemId(null);
+      if (fileInputRefs.current[agendaItemId]) {
+        fileInputRefs.current[agendaItemId]!.value = '';
+      }
+    }
+  };
+
+  const handleAttachmentDelete = async (agendaItemId: string, attachmentIndex: number) => {
+    try {
+      const item = agendaItems.find(i => i.id === agendaItemId);
+      if (!item?.minutes_attachments) return;
+
+      const attachment = item.minutes_attachments[attachmentIndex];
+      if (attachment?.path) {
+        await supabase.storage
+          .from('meeting-attachments')
+          .remove([attachment.path]);
+      }
+
+      const updatedAttachments = item.minutes_attachments.filter((_: any, i: number) => i !== attachmentIndex);
+
+      setAgendaItems(agendaItems.map(i =>
+        i.id === agendaItemId ? { ...i, minutes_attachments: updatedAttachments } : i
+      ));
+
+      await supabase
+        .from('meeting_agendas')
+        .update({ minutes_attachments: updatedAttachments })
+        .eq('id', agendaItemId);
+
+    } catch (err) {
+      console.error('Error deleting attachment:', err);
+      setError('Failed to delete attachment');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  const handleAttachmentDownload = async (attachment: any) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('meeting-attachments')
+        .download(attachment.path);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading attachment:', err);
+      setError('Failed to download attachment');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const saveAgendaTasks = async (agendaItemId: string, tasks: any[]) => {
@@ -709,18 +817,31 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
         </div>
         
         <div className="space-y-6">
-          {agendaItems.map((item) => (
-            <div 
+          {agendaItems.map((item, itemIndex) => {
+            const agendaColors = [
+              { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-600 text-white', hoverBg: 'hover:bg-blue-50/50' },
+              { bg: 'bg-teal-50', border: 'border-teal-200', badge: 'bg-teal-600 text-white', hoverBg: 'hover:bg-teal-50/50' },
+              { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-600 text-white', hoverBg: 'hover:bg-amber-50/50' },
+              { bg: 'bg-rose-50', border: 'border-rose-200', badge: 'bg-rose-600 text-white', hoverBg: 'hover:bg-rose-50/50' },
+              { bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-600 text-white', hoverBg: 'hover:bg-emerald-50/50' },
+              { bg: 'bg-sky-50', border: 'border-sky-200', badge: 'bg-sky-600 text-white', hoverBg: 'hover:bg-sky-50/50' },
+              { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-600 text-white', hoverBg: 'hover:bg-orange-50/50' },
+              { bg: 'bg-cyan-50', border: 'border-cyan-200', badge: 'bg-cyan-600 text-white', hoverBg: 'hover:bg-cyan-50/50' },
+            ];
+            const color = agendaColors[itemIndex % agendaColors.length];
+
+            return (
+            <div
               key={item.id}
               id={`agenda-item-${item.id}`}
-              className={`bg-white rounded-lg border ${item.isExpanded ? 'border-blue-200 shadow-md' : 'border-gray-200'} overflow-hidden`}
+              className={`bg-white rounded-lg border ${item.isExpanded ? `${color.border} shadow-md` : 'border-gray-200'} overflow-hidden`}
             >
-              <div 
-                className={`p-4 flex items-center justify-between cursor-pointer ${item.isExpanded ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+              <div
+                className={`p-4 flex items-center justify-between cursor-pointer ${item.isExpanded ? color.bg : color.hoverBg}`}
                 onClick={() => toggleAgendaItemExpansion(item.id)}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-medium">
+                  <div className={`w-8 h-8 rounded-full ${color.badge} flex items-center justify-center font-medium text-sm`}>
                     {item.item_number}
                   </div>
                   <div>
@@ -926,19 +1047,79 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
                       )}
                     </div>
 
-                    {!isReadOnly && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Attachments
-                        </label>
-                        <button
-                          className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <Paperclip size={16} />
-                          Add Attachments
-                        </button>
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Attachments
+                      </label>
+
+                      {(item.minutes_attachments || []).length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {(item.minutes_attachments || []).map((att: any, attIdx: number) => (
+                            <div
+                              key={attIdx}
+                              className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-md group"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText size={16} className="text-gray-400 flex-shrink-0" />
+                                <span className="text-sm text-gray-700 truncate">{att.name}</span>
+                                {att.size && (
+                                  <span className="text-xs text-gray-400 flex-shrink-0">
+                                    ({formatFileSize(att.size)})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  onClick={() => handleAttachmentDownload(att)}
+                                  className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                                  title="Download"
+                                >
+                                  <Download size={14} />
+                                </button>
+                                {!isReadOnly && (
+                                  <button
+                                    onClick={() => handleAttachmentDelete(item.id, attIdx)}
+                                    className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                                    title="Remove"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {!isReadOnly && (
+                        <>
+                          <input
+                            type="file"
+                            ref={(el) => { fileInputRefs.current[item.id] = el; }}
+                            onChange={(e) => handleAttachmentUpload(item.id, e.target.files)}
+                            className="hidden"
+                            multiple
+                          />
+                          <button
+                            onClick={() => fileInputRefs.current[item.id]?.click()}
+                            disabled={uploadingAgendaItemId === item.id}
+                            className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                          >
+                            {uploadingAgendaItemId === item.id ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Paperclip size={16} />
+                                Add Attachments
+                              </>
+                            )}
+                          </button>
+                        </>
+                      )}
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -997,7 +1178,8 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
 
           {!isReadOnly && (
             <div className="bg-white rounded-lg border border-gray-200 p-4">
