@@ -204,6 +204,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     meeting_category: MeetingCategory;
     recurrence_type: RecurrenceType;
     recurrence_end_date: string;
+    visible_to_member_clubs: boolean;
   }>({
     name: '',
     location: '',
@@ -217,7 +218,8 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     meeting_type: 'in_person',
     meeting_category: 'general',
     recurrence_type: 'none',
-    recurrence_end_date: ''
+    recurrence_end_date: '',
+    visible_to_member_clubs: true
   });
 
   useEffect(() => {
@@ -238,7 +240,8 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         meeting_type: meeting.meeting_type || 'in_person',
         meeting_category: meeting.meeting_category || 'general',
         recurrence_type: meeting.recurrence_type || 'none',
-        recurrence_end_date: meeting.recurrence_end_date || ''
+        recurrence_end_date: meeting.recurrence_end_date || '',
+        visible_to_member_clubs: meeting.visible_to_member_clubs ?? true
       });
 
       // Fetch agenda items
@@ -540,6 +543,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         meeting_category: formData.meeting_category,
         recurrence_type: formData.recurrence_type,
         recurrence_end_date: formData.recurrence_type !== 'none' ? formData.recurrence_end_date : undefined,
+        visible_to_member_clubs: associationId ? formData.visible_to_member_clubs : undefined,
         agenda_items: agendaItems
       };
       
@@ -710,6 +714,25 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {associationId && (
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.visible_to_member_clubs}
+                  onChange={(e) => setFormData(prev => ({ ...prev, visible_to_member_clubs: e.target.checked }))}
+                  className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-700 text-teal-500 focus:ring-2 focus:ring-teal-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-white">Show in member clubs' calendars</span>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    When enabled, this meeting will appear in the race calendar of all member clubs so their members can RSVP and view details.
+                  </p>
+                </div>
+              </label>
             </div>
           )}
 

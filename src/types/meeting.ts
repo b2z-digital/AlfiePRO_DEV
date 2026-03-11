@@ -28,6 +28,8 @@ export interface Meeting {
   meeting_type?: 'in_person' | 'online' | 'hybrid';
   state_association_id?: string | null;
   national_association_id?: string | null;
+  visible_to_member_clubs?: boolean;
+  organization_name?: string | null;
   chairperson?: {
     first_name: string;
     last_name: string;
@@ -75,6 +77,7 @@ export interface MeetingFormData {
   recurrence_type?: RecurrenceType;
   recurrence_end_date?: string;
   meeting_type?: 'in_person' | 'online' | 'hybrid';
+  visible_to_member_clubs?: boolean;
   agenda_items: {
     item_number: number;
     item_name: string;
