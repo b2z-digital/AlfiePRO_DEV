@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Search, Users, Check, AlertTriangle, Send } from 'lucide-react';
+import { X, Mail, Search, Users, Check, AlertTriangle, Send, Shield } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { Avatar } from '../ui/Avatar';
@@ -13,6 +13,9 @@ interface MeetingInviteModalProps {
   meetingName: string;
   clubId: string;
   darkMode: boolean;
+  meetingCategory?: 'general' | 'committee';
+  associationId?: string;
+  associationType?: 'state' | 'national';
 }
 
 export const MeetingInviteModal: React.FC<MeetingInviteModalProps> = ({
@@ -21,13 +24,17 @@ export const MeetingInviteModal: React.FC<MeetingInviteModalProps> = ({
   meetingId,
   meetingName,
   clubId,
-  darkMode
+  darkMode,
+  meetingCategory = 'general',
+  associationId,
+  associationType
 }) => {
   const { user, currentClub } = useAuth();
   const { addNotification } = useNotifications();
 
-  const [recipientType, setRecipientType] = useState<'all' | 'selected' | 'individual'>('all');
+  const [recipientType, setRecipientType] = useState<'all' | 'committee' | 'selected' | 'individual'>('all');
   const [members, setMembers] = useState<Member[]>([]);
+  const [committeeMembers, setCommitteeMembers] = useState<Member[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [individualRecipient, setIndividualRecipient] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,18 +69,108 @@ Thank you.
   const fetchMembers = async () => {
     try {
       setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, avatar_url, user_id')
-        .eq('club_id', clubId)
-        .order('first_name', { ascending: true });
-      
-      if (error) throw error;
-      
-      // Filter out members without email addresses
-      const membersWithEmail = (data || []).filter(member => member.email);
-      setMembers(membersWithEmail);
+
+      const isAssociation = !!associationId && !!associationType;
+
+      if (isAssociation) {
+        if (associationType === 'state') {
+          const { data: clubs, error: clubsError } = await supabase
+            .from('clubs')
+            .select('id, name')
+            .eq('state_association_id', associationId);
+
+          if (clubsError) throw clubsError;
+
+          const clubIds = (clubs || []).map(c => c.id);
+          if (clubIds.length > 0) {
+            const { data, error } = await supabase
+              .from('members')
+              .select('id, first_name, last_name, email, avatar_url, user_id, club_id, club')
+              .in('club_id', clubIds)
+              .order('first_name', { ascending: true });
+
+            if (error) throw error;
+            setMembers((data || []).filter(m => m.email) as Member[]);
+          } else {
+            setMembers([]);
+          }
+        } else {
+          const { data: userAssociations, error: assocError } = await supabase
+            .from('user_national_associations')
+            .select('user_id')
+            .eq('national_association_id', associationId);
+
+          if (assocError) throw assocError;
+
+          const userIds = (userAssociations || []).map(ua => ua.user_id);
+          if (userIds.length > 0) {
+            const { data: profiles, error: profilesError } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email')
+              .in('id', userIds)
+              .order('first_name', { ascending: true });
+
+            if (profilesError) throw profilesError;
+
+            setMembers((profiles || []).filter(p => p.email).map((p: any) => ({
+              ...p,
+              user_id: p.id,
+              club_id: '',
+              club: '',
+            })) as Member[]);
+          } else {
+            setMembers([]);
+          }
+        }
+
+        const assocTable = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+        const assocCol = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+        const { data: assocUsers } = await supabase
+          .from(assocTable)
+          .select('user_id')
+          .eq(assocCol, associationId);
+
+        if (assocUsers && assocUsers.length > 0) {
+          const userIds = assocUsers.map(au => au.user_id);
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', userIds)
+            .order('first_name', { ascending: true });
+
+          if (profiles) {
+            setCommitteeMembers((profiles || []).filter(p => p.email).map((p: any) => ({
+              ...p,
+              user_id: p.id,
+              club_id: '',
+              club: '',
+            })) as Member[]);
+          }
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, avatar_url, user_id')
+          .eq('club_id', clubId)
+          .order('first_name', { ascending: true });
+
+        if (error) throw error;
+        const membersWithEmail = (data || []).filter(member => member.email);
+        setMembers(membersWithEmail as Member[]);
+
+        const { data: positions } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq('club_id', clubId);
+
+        if (positions) {
+          const committeeMemberIds = positions.map(p => p.member_id).filter(Boolean);
+          if (committeeMemberIds.length > 0) {
+            setCommitteeMembers(membersWithEmail.filter(m => committeeMemberIds.includes(m.id)) as Member[]);
+          }
+        }
+      }
     } catch (err) {
       console.error('Error fetching members:', err);
       setError('Failed to load members');
@@ -87,11 +184,12 @@ Thank you.
       setSending(true);
       setError(null);
 
-      // Determine recipients based on selection
       let recipientIds: string[] = [];
 
       if (recipientType === 'all') {
         recipientIds = members.map(member => member.id);
+      } else if (recipientType === 'committee') {
+        recipientIds = committeeMembers.map(member => member.id);
       } else if (recipientType === 'selected') {
         recipientIds = selectedMembers;
       } else if (recipientType === 'individual') {
@@ -104,8 +202,8 @@ Thank you.
         return;
       }
 
-      // Get full member details for selected recipients
-      const recipientMembers = members.filter(m => recipientIds.includes(m.id));
+      const allKnownMembers = [...members, ...committeeMembers.filter(cm => !members.some(m => m.id === cm.id))];
+      const recipientMembers = allKnownMembers.filter(m => recipientIds.includes(m.id));
 
       // Get meeting details
       const { data: meeting, error: meetingError } = await supabase
@@ -369,10 +467,27 @@ Thank you.
                     onChange={() => setRecipientType('all')}
                     className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-slate-600"
                   />
+                  <Users size={18} className={darkMode ? 'text-slate-400' : 'text-gray-500'} />
                   <span className={`font-medium ${darkMode ? 'text-slate-200' : 'text-gray-900'}`}>
-                    All Club Members ({members.length})
+                    {associationId ? 'All Association Members' : 'All Club Members'} ({members.length})
                   </span>
                 </label>
+
+                {committeeMembers.length > 0 && (
+                  <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${darkMode ? 'border-slate-600 hover:bg-slate-700/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      id="committee-members"
+                      checked={recipientType === 'committee'}
+                      onChange={() => setRecipientType('committee')}
+                      className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-slate-600"
+                    />
+                    <Shield size={18} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                    <span className={`font-medium ${darkMode ? 'text-slate-200' : 'text-gray-900'}`}>
+                      Committee Members ({committeeMembers.length})
+                    </span>
+                  </label>
+                )}
 
                 <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${darkMode ? 'border-slate-600 hover:bg-slate-700/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                   <input

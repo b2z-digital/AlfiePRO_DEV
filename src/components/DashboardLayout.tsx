@@ -36,6 +36,7 @@ import { TasksPage } from './tasks/TasksPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
 import { useFeatureAccess } from '../hooks/useFeatureAccess';
+import { useCapabilities } from '../hooks/useCapabilities';
 import { YachtClassesRouter } from '../pages/YachtClassesRouter';
 import { BugReportButton } from './bug-report/BugReportButton';
 import { BugReportDashboard } from './bug-report/BugReportDashboard';
@@ -73,6 +74,7 @@ import { StateRemittanceDashboard } from './membership/StateRemittanceDashboard'
 import { NationalRemittanceDashboard } from './membership/NationalRemittanceDashboard';
 import { AssociationsManagementPage } from './pages/AssociationsManagementPage';
 import { ClubsManagementPage } from './pages/ClubsManagementPage';
+import { CommitteeManagement } from './pages/CommitteeManagement';
 import { AssociationFinancesPage } from '../pages/AssociationFinancesPage';
 import { AssociationResourcesPage } from './pages/AssociationResourcesPage';
 import WeatherPage from '../pages/WeatherPage';
@@ -92,6 +94,7 @@ import HelpSupportPage from './help-support/HelpSupportPage';
 import { UsageStatisticsTab } from './super-admin/UsageStatisticsTab';
 import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
 import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
+import { AccessLevelDefaultsTab } from './super-admin/AccessLevelDefaultsTab';
 import { BackupManagementTab } from './super-admin/BackupManagementTab';
 import { UserManagementTab } from './super-admin/UserManagementTab';
 import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
@@ -191,6 +194,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
   const { isFeatureEnabled } = useFeatureAccess();
+  const { canView: canViewFeature } = useCapabilities();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
@@ -829,6 +833,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           permission: 'membership.view'
         },
         {
+          id: 'association-committee',
+          label: 'Committee',
+          icon: Shield,
+          description: 'Manage association committee positions and members',
+          path: '/association-committee',
+          permission: 'membership.manage'
+        },
+        {
           id: 'association-member-reports',
           label: 'Member Reports',
           icon: TrendingUp,
@@ -1032,6 +1044,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
           { id: 'integrations', label: 'Platform Integrations', icon: Link, description: 'Manage integrations', path: '/integrations' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
+          { id: 'access-level-defaults', label: 'Access Level Defaults', icon: Shield, description: 'Role permission defaults', path: '/access-level-defaults' },
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
           { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
@@ -1045,6 +1058,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         items: section.items.filter((item: any) => {
           if (item.permission && !can(item.permission as any)) return false;
           if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+          if (item.featureKey && !canViewFeature(item.featureKey)) return false;
           return true;
         })
       })).filter(section => section.items.length > 0);
@@ -1640,6 +1654,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <FeatureAccessTab darkMode={true} />
                 </div></div>
               } />
+              <Route path="/access-level-defaults" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <AccessLevelDefaultsTab darkMode={true} />
+                </div></div>
+              } />
               <Route path="/backups" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <BackupManagementTab darkMode={true} />
@@ -1673,6 +1692,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     darkMode={darkMode}
                     stateAssociationId={currentOrganization.id}
                   />
+                ) : null
+              } />
+              <Route path="/association-committee" element={
+                currentOrganization ? (
+                  <div className="h-full overflow-y-auto">
+                    <div className="p-4 sm:p-6 lg:p-16">
+                      <CommitteeManagement
+                        darkMode={darkMode}
+                        associationId={currentOrganization.id}
+                        associationType={currentOrganization.type as 'state' | 'national'}
+                      />
+                    </div>
+                  </div>
                 ) : null
               } />
               <Route path="/association-member-reports" element={

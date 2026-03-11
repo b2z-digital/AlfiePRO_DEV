@@ -1069,7 +1069,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                             }`}
                           >
                             <Shield size={14} />
-                            Manage Admins
+                            Manage Access
                           </button>
                           <button
                             onClick={() => handleEditClub(club.id)}
@@ -1397,7 +1397,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                               }`}
                             >
                               <Shield size={14} />
-                              Manage Admins
+                              Manage Access
                             </button>
                             <button
                               onClick={() => handleEditClub(club.id)}

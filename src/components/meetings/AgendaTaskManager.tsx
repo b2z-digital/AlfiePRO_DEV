@@ -27,6 +27,9 @@ interface AgendaTaskManagerProps {
   agendaItemId: string;
   clubId: string;
   isReadOnly?: boolean;
+  meetingCategory?: 'general' | 'committee';
+  associationId?: string;
+  associationType?: 'state' | 'national';
   onTasksChange?: (tasks: AgendaTask[]) => void;
 }
 
@@ -34,6 +37,9 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
   agendaItemId,
   clubId,
   isReadOnly = false,
+  meetingCategory = 'general',
+  associationId,
+  associationType,
   onTasksChange
 }) => {
   const [tasks, setTasks] = useState<AgendaTask[]>([]);
@@ -44,19 +50,116 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
   useEffect(() => {
     fetchMembers();
     fetchExistingTasks();
-  }, [clubId, agendaItemId]);
+  }, [clubId, agendaItemId, associationId, associationType]);
 
   const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, avatar_url')
-        .eq('club_id', clubId)
-        .eq('membership_status', 'active')
-        .order('first_name');
+      const isAssociation = !!associationId && !!associationType;
 
-      if (error) throw error;
-      setMembers(data || []);
+      if (isAssociation) {
+        if (meetingCategory === 'committee') {
+          const assocTable = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+          const assocCol = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+          const { data: assocUsers } = await supabase
+            .from(assocTable)
+            .select('user_id')
+            .eq(assocCol, associationId);
+
+          if (assocUsers && assocUsers.length > 0) {
+            const userIds = assocUsers.map(au => au.user_id);
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, avatar_url')
+              .in('id', userIds)
+              .order('first_name', { ascending: true });
+
+            setMembers((profiles || []).map((p: any) => ({
+              id: p.id,
+              first_name: p.first_name,
+              last_name: p.last_name,
+              avatar_url: p.avatar_url,
+            })));
+          } else {
+            setMembers([]);
+          }
+        } else if (associationType === 'state') {
+          const { data: clubs } = await supabase
+            .from('clubs')
+            .select('id')
+            .eq('state_association_id', associationId);
+
+          const clubIds = (clubs || []).map(c => c.id);
+          if (clubIds.length > 0) {
+            const { data, error } = await supabase
+              .from('members')
+              .select('id, first_name, last_name, avatar_url')
+              .in('club_id', clubIds)
+              .order('first_name', { ascending: true });
+
+            if (error) throw error;
+            setMembers(data || []);
+          } else {
+            setMembers([]);
+          }
+        } else {
+          const { data: assocUsers } = await supabase
+            .from('user_national_associations')
+            .select('user_id')
+            .eq('national_association_id', associationId);
+
+          if (assocUsers && assocUsers.length > 0) {
+            const userIds = assocUsers.map(au => au.user_id);
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, avatar_url')
+              .in('id', userIds)
+              .order('first_name', { ascending: true });
+
+            setMembers((profiles || []).map((p: any) => ({
+              id: p.id,
+              first_name: p.first_name,
+              last_name: p.last_name,
+              avatar_url: p.avatar_url,
+            })));
+          } else {
+            setMembers([]);
+          }
+        }
+      } else if (meetingCategory === 'committee') {
+        const { data: positions, error: posError } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq('club_id', clubId);
+
+        if (posError) throw posError;
+
+        const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+        if (memberIds.length === 0) {
+          setMembers([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .eq('club_id', clubId)
+          .in('id', memberIds)
+          .order('first_name');
+
+        if (error) throw error;
+        setMembers(data || []);
+      } else {
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .eq('club_id', clubId)
+          .eq('membership_status', 'active')
+          .order('first_name');
+
+        if (error) throw error;
+        setMembers(data || []);
+      }
     } catch (error) {
       console.error('Error fetching members:', error);
     }

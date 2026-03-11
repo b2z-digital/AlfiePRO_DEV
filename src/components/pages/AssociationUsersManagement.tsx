@@ -20,6 +20,8 @@ interface AssociationUser {
   last_name: string;
   avatar_url: string | null;
   created_at: string;
+  committee_positions?: string[];
+  club_name?: string;
 }
 
 interface MatchedUser {
@@ -87,6 +89,32 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
 
       if (profilesError) throw profilesError;
 
+      const assocColumn = currentOrganization?.type === 'state' ? 'state_association_id' : 'national_association_id';
+      const { data: committeePositions } = await supabase
+        .from('committee_positions')
+        .select('user_id, position_title')
+        .eq(assocColumn, currentOrganization.id);
+
+      const positionsByUser = new Map<string, string[]>();
+      (committeePositions || []).forEach(cp => {
+        if (cp.user_id && cp.position_title) {
+          const existing = positionsByUser.get(cp.user_id) || [];
+          existing.push(cp.position_title);
+          positionsByUser.set(cp.user_id, existing);
+        }
+      });
+
+      const membersByUser = new Map<string, string>();
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('user_id, club')
+        .in('user_id', userIds.filter(Boolean));
+      (membersData || []).forEach(m => {
+        if (m.user_id && m.club) {
+          membersByUser.set(m.user_id, m.club);
+        }
+      });
+
       const mappedUsers: AssociationUser[] = associations.map(a => {
         const profile = profiles?.find(p => p.id === a.user_id);
         return {
@@ -98,6 +126,8 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
           last_name: profile?.last_name || '',
           avatar_url: profile?.avatar_url || null,
           created_at: a.created_at,
+          committee_positions: positionsByUser.get(a.user_id) || [],
+          club_name: membersByUser.get(a.user_id),
         };
       });
 
@@ -284,8 +314,26 @@ export const AssociationUsersManagement: React.FC<AssociationUsersManagementProp
                       <span className="text-[10px] font-medium text-blue-400 bg-blue-500/20 px-1.5 py-0.5 rounded">YOU</span>
                     )}
                   </div>
-                  {assocUser.email && (
-                    <p className="text-xs text-slate-400 truncate">{assocUser.email}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {assocUser.email && (
+                      <p className="text-xs text-slate-400 truncate">{assocUser.email}</p>
+                    )}
+                    {assocUser.club_name && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                        <Building size={10} />
+                        {assocUser.club_name}
+                      </span>
+                    )}
+                  </div>
+                  {assocUser.committee_positions && assocUser.committee_positions.length > 0 && (
+                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                      {assocUser.committee_positions.map((pos, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-400 bg-amber-500/15 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                          <Shield size={9} />
+                          {pos}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
