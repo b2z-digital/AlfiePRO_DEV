@@ -161,13 +161,15 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         <div className="flex flex-wrap gap-2 justify-end">
           {meeting.status === 'upcoming' && (
             <>
-              <button
-                onClick={onEdit}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
-              >
-                <Edit2 size={16} />
-                Edit
-              </button>
+              {meeting.minutes_status !== 'in_progress' && (
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+              )}
 
               {meeting.minutes_status !== 'in_progress' && (
                 <button
