@@ -252,7 +252,8 @@ async function sendEmail(opts: SendEmailOptions) {
           .join('');
 
     const isMeetingInvite = !!opts.responseToken;
-    const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : '';
+    const hasMeetingDetails = !!opts.meetingName;
+    const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : hasMeetingDetails ? 'Meeting Minutes' : '';
 
     let attachmentsHtml = '';
     if (opts.attachments && opts.attachments.length > 0) {
@@ -276,7 +277,7 @@ async function sendEmail(opts: SendEmailOptions) {
         </div>`;
     }
 
-    const meetingDetailsHtml = isMeetingInvite && opts.meetingName ? `
+    const meetingDetailsHtml = hasMeetingDetails ? `
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                 <tr>
                   <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:12px;padding:24px;">
