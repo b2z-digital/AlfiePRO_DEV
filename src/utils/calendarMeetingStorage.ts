@@ -12,7 +12,23 @@ export const getCalendarMeetings = async (
   nationalAssociationId?: string | null
 ): Promise<CalendarMeeting[]> => {
   try {
-    if (!clubId) return [];
+    if (!clubId && !stateAssociationId && !nationalAssociationId) return [];
+
+    const filters: string[] = [];
+
+    if (clubId) {
+      filters.push(`club_id.eq.${clubId}`);
+      filters.push(`and(state_association_id.not.is.null,visible_to_member_clubs.eq.true)`);
+      filters.push(`and(national_association_id.not.is.null,visible_to_member_clubs.eq.true)`);
+    }
+
+    if (stateAssociationId) {
+      filters.push(`state_association_id.eq.${stateAssociationId}`);
+    }
+
+    if (nationalAssociationId) {
+      filters.push(`national_association_id.eq.${nationalAssociationId}`);
+    }
 
     const { data, error } = await supabase
       .from('meetings')
@@ -21,15 +37,13 @@ export const getCalendarMeetings = async (
         chairperson:chairperson_id(first_name, last_name, avatar_url),
         minute_taker:minute_taker_id(first_name, last_name, avatar_url)
       `)
-      .or(
-        `club_id.eq.${clubId},and(state_association_id.not.is.null,visible_to_member_clubs.eq.true),and(national_association_id.not.is.null,visible_to_member_clubs.eq.true)`
-      )
+      .or(filters.join(','))
       .in('status', ['upcoming', 'completed'])
       .order('date', { ascending: true });
 
     if (error) throw error;
 
-    const meetings = (data || []).map((m: any) => {
+    return (data || []).map((m: any) => {
       let organizationLevel: 'club' | 'state_association' | 'national_association' = 'club';
       if (m.national_association_id) {
         organizationLevel = 'national_association';
@@ -43,27 +57,6 @@ export const getCalendarMeetings = async (
         attendingCount: 0,
       } as CalendarMeeting;
     });
-
-    if (meetings.length > 0) {
-      const meetingIds = meetings.map(m => m.id);
-      const { data: attendanceCounts } = await supabase
-        .from('meeting_attendance')
-        .select('meeting_id, status')
-        .in('meeting_id', meetingIds)
-        .eq('status', 'attending');
-
-      if (attendanceCounts) {
-        const countMap: Record<string, number> = {};
-        attendanceCounts.forEach(a => {
-          countMap[a.meeting_id] = (countMap[a.meeting_id] || 0) + 1;
-        });
-        meetings.forEach(m => {
-          m.attendingCount = countMap[m.id] || 0;
-        });
-      }
-    }
-
-    return meetings;
   } catch (error) {
     console.error('Error fetching calendar meetings:', error);
     return [];

@@ -354,7 +354,11 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           getStoredRaceSeries(),
           getStoredRaceEvents(),
           getPublicEvents(false, currentOrganization?.type, currentOrganization?.id),
-          getCalendarMeetings(currentClub?.clubId)
+          getCalendarMeetings(
+            currentClub?.clubId,
+            currentOrganization?.type === 'state' ? currentOrganization.id : null,
+            currentOrganization?.type === 'national' ? currentOrganization.id : null
+          )
         ]);
 
         setCalendarMeetings(meetings);
