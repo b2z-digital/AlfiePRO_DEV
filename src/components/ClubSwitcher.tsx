@@ -55,7 +55,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
   darkMode = true
 }) => {
   const { userClubs, currentClub, isSuperAdmin } = useAuth();
-  const { isImpersonating } = useImpersonation();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const [isOpen, setIsOpen] = useState(false);
   const [showSlideout, setShowSlideout] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -96,15 +96,14 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
         });
       }
 
-      if (!isImpersonating) {
-        const userId = (await supabase.auth.getUser()).data.user?.id;
-        if (!userId) {
-          setOrganizations(allOrgs);
-          const current = allOrgs.find(o => o.id === currentClubId);
-          setCurrentOrg(current || null);
-          return;
-        }
+      let userId: string | undefined;
+      if (isImpersonating) {
+        userId = impersonationSession?.targetUserId ?? undefined;
+      } else {
+        userId = (await supabase.auth.getUser()).data.user?.id;
+      }
 
+      if (userId) {
         const { data: stateAssocs } = await supabase
           .from('user_state_associations')
           .select('state_association_id, role, state_associations(id, name, short_name, logo_url)')
