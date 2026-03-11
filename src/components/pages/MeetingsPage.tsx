@@ -450,17 +450,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                                             <div
                                               key={idx}
                                               className="relative w-8 h-8 rounded-full border-2 border-slate-800 bg-slate-700 overflow-hidden"
-                                              title={`${attendance.member.first_name} ${attendance.member.last_name}`}
+                                              title={`${attendance.member?.first_name || ''} ${attendance.member?.last_name || ''}`}
                                             >
-                                              {attendance.member.avatar_url ? (
+                                              {attendance.member?.avatar_url ? (
                                                 <img
                                                   src={attendance.member.avatar_url}
-                                                  alt={`${attendance.member.first_name} ${attendance.member.last_name}`}
+                                                  alt={`${attendance.member?.first_name || ''} ${attendance.member?.last_name || ''}`}
                                                   className="w-full h-full object-cover"
                                                 />
                                               ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-slate-300">
-                                                  {attendance.member.first_name?.[0]}{attendance.member.last_name?.[0]}
+                                                  {attendance.member?.first_name?.[0]}{attendance.member?.last_name?.[0]}
                                                 </div>
                                               )}
                                             </div>

@@ -252,7 +252,8 @@ async function sendEmail(opts: SendEmailOptions) {
           .join('');
 
     const isMeetingInvite = !!opts.responseToken;
-    const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : '';
+    const hasMeetingDetails = !!opts.meetingName;
+    const headerSubtitle = isMeetingInvite ? 'Meeting Invitation' : hasMeetingDetails ? 'Meeting Minutes' : '';
 
     let attachmentsHtml = '';
     if (opts.attachments && opts.attachments.length > 0) {
@@ -276,6 +277,68 @@ async function sendEmail(opts: SendEmailOptions) {
         </div>`;
     }
 
+    const meetingDetailsHtml = hasMeetingDetails ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:12px;padding:24px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td>
+                          <p style="margin:0;color:rgba(255,255,255,0.75);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Meeting</p>
+                          <p style="margin:4px 0 0;color:#ffffff;font-size:22px;font-weight:700;">${opts.meetingName}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <tr>
+                  <td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;">
+                    <p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Meeting Details</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      ${opts.meetingDate ? `<tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:35%;">
+                          <span style="color:#64748b;font-size:13px;">Date</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:600;">${opts.meetingDate}</span>
+                        </td>
+                      </tr>` : ''}
+                      ${opts.meetingTime ? `<tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#64748b;font-size:13px;">Time</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:500;">${opts.meetingTime}</span>
+                        </td>
+                      </tr>` : ''}
+                      ${opts.meetingLocation ? `<tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#64748b;font-size:13px;">Location</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:500;">${opts.meetingLocation}</span>
+                        </td>
+                      </tr>` : ''}
+                      <tr>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#64748b;font-size:13px;">Organised By</span>
+                        </td>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:500;">${displayClubName}</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>` : '';
+
     htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -283,64 +346,90 @@ async function sendEmail(opts: SendEmailOptions) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${opts.subject}</title>
 </head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
+        <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
+
+          <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#0ea5e9 0%,#2563eb 100%);padding:40px 40px 30px;text-align:center">
-              ${opts.clubLogo ? `<img src="${opts.clubLogo}" alt="${displayClubName}" style="max-width:120px;height:auto;margin:0 0 16px;border-radius:8px;background:#fff;padding:8px" />` : ''}
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">${displayClubName}</h1>
-              ${headerSubtitle ? `<p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">${headerSubtitle}</p>` : ''}
+            <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:16px 16px 0 0;padding:32px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    ${opts.clubLogo ? `<img src="${opts.clubLogo}" alt="${displayClubName}" style="max-width:80px;height:auto;margin:0 0 12px;border-radius:8px;background:rgba(255,255,255,0.15);padding:6px" />` : ''}
+                    <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">${displayClubName}</h1>
+                    ${headerSubtitle ? `<p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${headerSubtitle}</p>` : ''}
+                  </td>
+                  <td align="right" valign="top">
+                    <div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;display:inline-block;">
+                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Alfie PRO</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Dear ${opts.recipientName},</p>
 
-              <div style="margin:0 0 32px;font-size:16px;line-height:1.7;color:#374151">
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#ffffff;padding:32px 40px;">
+              <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+                Dear ${opts.recipientName},
+              </p>
+
+              ${meetingDetailsHtml}
+
+              <div style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#374151;">
                 ${formattedBody}
               </div>
 
               ${attachmentsHtml}
 
               ${opts.responseToken ? `
-              <div style="background:#f9fafb;border-radius:10px;padding:28px;margin:32px 0;border:1px solid #e5e7eb;text-align:center">
-                <p style="margin:0 0 20px;font-size:17px;color:#111827;font-weight:600">Will you be attending?</p>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td align="center">
-                      <table cellpadding="0" cellspacing="0" border="0">
-                        <tr>
-                          <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=attending" style="display:inline-block;padding:14px 24px;background:#10b981;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Yes</a>
-                          </td>
-                          <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=maybe" style="display:inline-block;padding:14px 24px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">Maybe</a>
-                          </td>
-                          <td style="padding:0 8px">
-                            <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=not_attending" style="display:inline-block;padding:14px 24px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px">No</a>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-                <p style="margin:20px 0 0;font-size:13px;color:#6b7280">Click one of the buttons above to confirm your attendance</p>
-              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <tr>
+                  <td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;text-align:center;">
+                    <p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Response</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:24px;text-align:center;">
+                    <p style="margin:0 0 20px;font-size:16px;color:#0f172a;font-weight:600;">Will you be attending?</p>
+                    <table cellpadding="0" cellspacing="0" border="0" align="center">
+                      <tr>
+                        <td style="padding:0 6px">
+                          <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=attending" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;letter-spacing:0.3px;">Yes</a>
+                        </td>
+                        <td style="padding:0 6px">
+                          <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=maybe" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;letter-spacing:0.3px;">Maybe</a>
+                        </td>
+                        <td style="padding:0 6px">
+                          <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=not_attending" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;letter-spacing:0.3px;">No</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;">Click one of the buttons above to confirm your attendance</p>
+                  </td>
+                </tr>
+              </table>
               ` : ''}
 
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">${displayClubName}</p>
+              <div style="margin:24px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0;">
+                <p style="margin:0;font-size:15px;color:#334155;">Best regards,</p>
+                <p style="margin:6px 0 0;font-size:15px;font-weight:600;color:#0f172a;">${displayClubName}</p>
               </div>
             </td>
           </tr>
+
+          <!-- Footer -->
           <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by ${displayClubName}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
+            <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;">
+              <p style="margin:0 0 8px;font-size:13px;color:#64748b;line-height:1.5;">This email was sent by ${displayClubName}</p>
+              <p style="margin:0;color:#94a3b8;font-size:12px;">
+                Powered by <strong style="color:#0ea5e9;">Alfie PRO</strong> - RC Yacht Management Software
+              </p>
             </td>
           </tr>
         </table>

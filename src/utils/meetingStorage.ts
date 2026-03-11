@@ -108,6 +108,7 @@ export const createMeeting = async (
       minute_taker_id: meetingData.minute_taker_id || null,
       meeting_category: meetingData.meeting_category || 'general',
       meeting_type: meetingData.meeting_type || 'in_person',
+      visible_to_member_clubs: meetingData.visible_to_member_clubs ?? false,
       recurrence_type: meetingData.recurrence_type || 'none',
       recurrence_end_date: meetingData.recurrence_end_date || null,
       recurrence_index: 0,
@@ -218,6 +219,9 @@ export const updateMeeting = async (meetingId: string, meetingData: MeetingFormD
         minute_taker_id: meetingData.minute_taker_id,
         meeting_category: meetingData.meeting_category || 'general',
         meeting_type: meetingData.meeting_type || 'in_person',
+        ...(meetingData.visible_to_member_clubs !== undefined && {
+          visible_to_member_clubs: meetingData.visible_to_member_clubs
+        }),
       })
       .eq('id', meetingId)
       .select()
@@ -466,6 +470,85 @@ export const deleteAgendaItem = async (agendaItemId: string): Promise<void> => {
   } catch (error) {
     console.error('Error deleting agenda item:', error);
     throw error;
+  }
+};
+
+export const updateMeetingRsvp = async (
+  meetingId: string,
+  userId: string,
+  status: 'attending' | 'not_attending' | 'pending'
+): Promise<void> => {
+  try {
+    const { data: existing } = await supabase
+      .from('meeting_attendance')
+      .select('id')
+      .eq('meeting_id', meetingId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from('meeting_attendance')
+        .update({ status })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('meeting_attendance')
+        .insert({ meeting_id: meetingId, user_id: userId, status });
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error('Error updating meeting RSVP:', error);
+    throw error;
+  }
+};
+
+export const getMeetingRsvpStatus = async (
+  meetingId: string,
+  userId: string
+): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('meeting_attendance')
+      .select('status')
+      .eq('meeting_id', meetingId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.status || null;
+  } catch (error) {
+    console.error('Error fetching meeting RSVP:', error);
+    return null;
+  }
+};
+
+export const getMeetingAttendees = async (
+  meetingId: string
+): Promise<{ user_id: string; status: string; name: string; avatar_url?: string }[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('meeting_attendance')
+      .select(`
+        user_id,
+        status,
+        member_id,
+        profiles:user_id(first_name, last_name, avatar_url)
+      `)
+      .eq('meeting_id', meetingId);
+
+    if (error) throw error;
+
+    return (data || []).map((att: any) => ({
+      user_id: att.user_id,
+      status: att.status,
+      name: att.profiles ? `${att.profiles.first_name} ${att.profiles.last_name}` : 'Unknown',
+      avatar_url: att.profiles?.avatar_url
+    }));
+  } catch (error) {
+    console.error('Error fetching meeting attendees:', error);
+    return [];
   }
 };
 

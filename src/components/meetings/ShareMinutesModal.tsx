@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { Avatar } from '../ui/Avatar';
 import { MemberSelect } from '../ui/MemberSelect';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ShareMinutesModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export const ShareMinutesModal: React.FC<ShareMinutesModalProps> = ({
   associationId,
   associationType
 }) => {
+  const { currentClub } = useAuth();
   const [recipientType, setRecipientType] = useState<'all' | 'committee' | 'selected' | 'individual'>('all');
   const [members, setMembers] = useState<Member[]>([]);
   const [committeeMembers, setCommitteeMembers] = useState<Member[]>([]);
@@ -44,11 +46,13 @@ export const ShareMinutesModal: React.FC<ShareMinutesModalProps> = ({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [clubName, setClubName] = useState('');
+  const [clubLogo, setClubLogo] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchMembers();
-      // Generate default message
+      fetchClubData();
       const defaultMessage = `
 Please find attached the minutes from our recent meeting:
 
@@ -60,10 +64,32 @@ The minutes are attached to this email.
 
 Thank you.
       `.trim();
-      
+
       setMessage(defaultMessage);
     }
   }, [isOpen, meeting]);
+
+  const fetchClubData = async () => {
+    try {
+      if (associationId && associationType) {
+        const assocTable = associationType === 'state' ? 'state_associations' : 'national_associations';
+        const { data } = await supabase.from(assocTable).select('name, logo').eq('id', associationId).maybeSingle();
+        if (data) {
+          setClubName(data.name || '');
+          setClubLogo(data.logo || null);
+        }
+      } else if (clubId) {
+        const { data } = await supabase.from('clubs').select('name, logo').eq('id', clubId).maybeSingle();
+        if (data) {
+          setClubName(data.name || '');
+          setClubLogo(data.logo || null);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching club data:', err);
+      setClubName(currentClub?.name || '');
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -214,6 +240,25 @@ Thank you.
         last_name: member.last_name
       }));
 
+      const meetingDate = meeting.date
+        ? new Date(meeting.date).toLocaleDateString('en-AU', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })
+        : '';
+
+      const meetingTime = meeting.start_time
+        ? new Date(`2000-01-01T${meeting.start_time}`).toLocaleTimeString('en-AU', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })
+        : '';
+
+      const orgName = clubName || currentClub?.name || 'Your Organisation';
+
       const { error: sendError } = await supabase.functions.invoke('send-notification', {
         body: {
           type: 'meeting_minutes',
@@ -222,7 +267,13 @@ Thank you.
           subject: subject,
           body: message,
           send_email: true,
-          link_url: `/meetings`
+          link_url: `/meetings`,
+          club_name: orgName,
+          club_logo: clubLogo,
+          meeting_name: meeting.name,
+          meeting_date: meetingDate,
+          meeting_time: meetingTime,
+          meeting_location: meeting.location || ''
         }
       });
 

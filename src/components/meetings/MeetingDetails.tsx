@@ -667,14 +667,12 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         meeting={meeting}
-        associationId={associationId}
-        associationType={associationType}
+        associationId={meeting.state_association_id || meeting.national_association_id || associationId || undefined}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : associationType}
         agendaItems={agendaItems}
         clubId={meeting.club_id}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
-        associationId={meeting.state_association_id || meeting.national_association_id || undefined}
-        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : undefined}
       />
     </div>
   );
