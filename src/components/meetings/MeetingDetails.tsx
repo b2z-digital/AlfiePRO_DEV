@@ -325,13 +325,6 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                       </div>
                     )}
 
-                    <button
-                      onClick={() => setShowInviteModal(true)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium"
-                    >
-                      <Mail size={18} />
-                      Send Invites
-                    </button>
                   </div>
                 )}
               </div>
@@ -650,12 +643,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         meetingId={meeting.id}
         meetingName={meeting.name}
         clubId={meeting.club_id}
-        associationId={associationId}
-        associationType={associationType}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
-        associationId={meeting.state_association_id || meeting.national_association_id || undefined}
-        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : undefined}
+        associationId={meeting.state_association_id || meeting.national_association_id || associationId}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : associationType}
       />
 
       <ShareMinutesModal
