@@ -101,8 +101,14 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
         editDuration: item.duration || 0
       })));
       
-      // Fetch club members for attendance
-      const clubMembers = await getClubMembersForMeeting(meetingData.club_id);
+      const meetingAssociationId = meetingData.state_association_id || meetingData.national_association_id || undefined;
+      const meetingAssociationType = meetingData.state_association_id ? 'state' as const : meetingData.national_association_id ? 'national' as const : undefined;
+      const clubMembers = await getClubMembersForMeeting(
+        meetingData.club_id || undefined,
+        meetingAssociationId,
+        meetingAssociationType,
+        meetingData.meeting_category
+      );
 
       // If meeting has already started, load the saved attendance
       if (meetingData.minutes_status !== 'not_started' && meetingData.members_present) {
