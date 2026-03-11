@@ -403,8 +403,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                     return (
                       <div
                         key={meeting.id}
+                        onClick={() => handleViewMeeting(meeting)}
                         className={`
-                          rounded-lg border transition-all overflow-hidden
+                          rounded-lg border transition-all overflow-hidden cursor-pointer
                           ${meeting.status === 'cancelled'
                             ? 'bg-red-900/10 border-red-900/30'
                             : meeting.status === 'completed'
@@ -521,24 +522,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                               </div>
 
                               <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  onClick={() => handleViewMeeting(meeting)}
-                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
-                                >
-                                  View Details
-                                </button>
-
                                 {meeting.status === 'upcoming' && (
                                   <>
                                     <button
-                                      onClick={() => handleEditMeeting(meeting)}
+                                      onClick={(e) => { e.stopPropagation(); handleEditMeeting(meeting); }}
                                       className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
                                       title="Edit meeting"
                                     >
                                       <Edit2 size={18} />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteClick(meeting)}
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(meeting); }}
                                       className="p-1.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
                                       title="Delete meeting"
                                     >

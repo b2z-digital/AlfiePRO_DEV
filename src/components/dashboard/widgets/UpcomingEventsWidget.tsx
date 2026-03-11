@@ -35,6 +35,7 @@ interface RaceEvent {
   meetingCategory?: 'general' | 'committee';
   meetingTime?: string;
   meetingAttendingCount?: number;
+  meetingAttendees?: { first_name: string; last_name: string; avatar_url: string | null }[];
   organizationName?: string;
   rawMeeting?: any;
 }
@@ -162,17 +163,40 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       ];
 
       const meetingIds = visibleMeetings.map(m => m.id);
-      let attendanceCounts: Record<string, number> = {};
+      let attendanceByMeeting: Record<string, { first_name: string; last_name: string; avatar_url: string | null }[]> = {};
       if (meetingIds.length > 0) {
         const { data: attendance } = await supabase
           .from('meeting_attendance')
-          .select('meeting_id')
+          .select('meeting_id, member_id, user_id, member:members(first_name, last_name, avatar_url)')
           .in('meeting_id', meetingIds)
           .eq('status', 'attending');
 
         if (attendance) {
+          const needsProfile = attendance.filter((a: any) => !a.member_id && a.user_id);
+          let profileMap: Record<string, any> = {};
+          if (needsProfile.length > 0) {
+            const userIds = [...new Set(needsProfile.map((a: any) => a.user_id))];
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, avatar_url')
+              .in('id', userIds);
+            if (profiles) {
+              profiles.forEach((p: any) => { profileMap[p.id] = p; });
+            }
+          }
+
           attendance.forEach((a: any) => {
-            attendanceCounts[a.meeting_id] = (attendanceCounts[a.meeting_id] || 0) + 1;
+            const profile = a.member ? null : profileMap[a.user_id];
+            const info = a.member || profile;
+            if (!info) return;
+            if (!attendanceByMeeting[a.meeting_id]) {
+              attendanceByMeeting[a.meeting_id] = [];
+            }
+            attendanceByMeeting[a.meeting_id].push({
+              first_name: info.first_name || '',
+              last_name: info.last_name || '',
+              avatar_url: info.avatar_url || null,
+            });
           });
         }
       }
@@ -188,7 +212,8 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         isClubMeeting: !!m.club_id && !m.state_association_id && !m.national_association_id,
         meetingCategory: m.meeting_category as 'general' | 'committee',
         meetingTime: m.start_time ? m.start_time.substring(0, 5) : undefined,
-        meetingAttendingCount: attendanceCounts[m.id] || 0,
+        meetingAttendingCount: (attendanceByMeeting[m.id] || []).length,
+        meetingAttendees: attendanceByMeeting[m.id] || [],
         organizationName: m.organization_name || '',
         rawMeeting: m,
       }));
@@ -558,9 +583,33 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
               </span>
             )}
             {event.meetingAttendingCount !== undefined && event.meetingAttendingCount > 0 && (
-              <span className="text-xs text-slate-400">
-                {event.meetingAttendingCount} attending
-              </span>
+              <div className="flex items-center gap-1.5">
+                <div className="flex -space-x-1.5">
+                  {(event.meetingAttendees || []).slice(0, 3).map((att, idx) => (
+                    <div
+                      key={idx}
+                      className="w-5 h-5 rounded-full border border-slate-800 bg-slate-700 overflow-hidden flex-shrink-0"
+                      title={`${att.first_name} ${att.last_name}`}
+                    >
+                      {att.avatar_url ? (
+                        <img src={att.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[8px] font-semibold text-slate-300">
+                          {att.first_name?.[0]}{att.last_name?.[0]}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {event.meetingAttendingCount > 3 && (
+                    <div className="w-5 h-5 rounded-full border border-slate-800 bg-slate-700 flex items-center justify-center text-[8px] font-semibold text-slate-300 flex-shrink-0">
+                      +{event.meetingAttendingCount - 3}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-slate-400">
+                  {event.meetingAttendingCount} attending
+                </span>
+              </div>
             )}
           </div>
         </div>
