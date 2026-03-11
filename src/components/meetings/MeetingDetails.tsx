@@ -169,13 +169,15 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                 Edit
               </button>
 
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
-              >
-                <Mail size={16} />
-                Send Invites
-              </button>
+              {meeting.minutes_status !== 'in_progress' && (
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                >
+                  <Mail size={16} />
+                  Send Invites
+                </button>
+              )}
 
               {meeting.minutes_status === 'in_progress' ? (
                 <button
