@@ -104,8 +104,8 @@ export const createMeeting = async (
       end_time: meetingData.end_time,
       conferencing_url: meetingData.conferencing_url,
       description: meetingData.description,
-      chairperson_id: meetingData.chairperson_id,
-      minute_taker_id: meetingData.minute_taker_id,
+      chairperson_id: meetingData.chairperson_id || null,
+      minute_taker_id: meetingData.minute_taker_id || null,
       meeting_category: meetingData.meeting_category || 'general',
       meeting_type: meetingData.meeting_type || 'in_person',
       recurrence_type: meetingData.recurrence_type || 'none',
@@ -139,9 +139,9 @@ export const createMeeting = async (
         meeting_id: meeting.id,
         item_number: item.item_number,
         item_name: item.item_name,
-        owner_id: item.owner_id,
+        owner_id: item.owner_id || null,
         type: item.type,
-        duration: item.duration,
+        duration: item.duration || null,
         minutes_content: ''
       }));
 
@@ -183,9 +183,9 @@ export const createMeeting = async (
             meeting_id: childMeeting.id,
             item_number: item.item_number,
             item_name: item.item_name,
-            owner_id: item.owner_id,
+            owner_id: item.owner_id || null,
             type: item.type,
-            duration: item.duration,
+            duration: item.duration || null,
             minutes_content: ''
           }));
           await supabase.from('meeting_agendas').insert(childAgenda);
@@ -521,22 +521,30 @@ export const getClubMembersForMeeting = async (
       }));
     } else if (associationId && associationType) {
       if (meetingCategory === 'committee') {
-        const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-        const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+        const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+        const { data: positions, error: posError } = await supabase
+          .from('committee_positions')
+          .select('member_id')
+          .eq(assocColumn, associationId)
+          .not('member_id', 'is', null);
+
+        if (posError) throw posError;
+
+        const memberIds = [...new Set((positions || []).map(p => p.member_id).filter(Boolean))];
+        if (memberIds.length === 0) return [];
 
         const { data, error } = await supabase
-          .from(tableName)
-          .select(`
-            user_id,
-            profiles:user_id(id, first_name, last_name)
-          `)
-          .eq(idColumn, associationId);
+          .from('members')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', memberIds)
+          .order('first_name', { ascending: true });
 
         if (error) throw error;
 
-        return (data || []).map((item: any) => ({
-          id: item.profiles.id,
-          name: `${item.profiles.first_name} ${item.profiles.last_name}`,
+        return (data || []).map(member => ({
+          id: member.id,
+          name: `${member.first_name} ${member.last_name}`,
+          avatar_url: member.avatar_url,
           isPresent: false
         }));
       }

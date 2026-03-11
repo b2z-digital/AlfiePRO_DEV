@@ -1,11 +1,158 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle, Users, Shield, Repeat, Info } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
 import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { MemberSelect } from '../ui/MemberSelect';
+
+const recurrenceDescriptions: Record<RecurrenceType, string> = {
+  none: 'This meeting will not repeat',
+  weekly: 'Repeats every week on the same day',
+  fortnightly: 'Repeats every two weeks on the same day',
+  monthly: 'Repeats once a month on the same date',
+  quarterly: 'Repeats every three months',
+  yearly: 'Repeats once a year on the same date'
+};
+
+const RecurrenceSelector: React.FC<{
+  formData: { recurrence_type: RecurrenceType; recurrence_end_date: string; date: string };
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  recurrenceLabels: Record<RecurrenceType, string>;
+  recurrencePreviewDates: string[];
+}> = ({ formData, setFormData, recurrenceLabels, recurrencePreviewDates }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const isRecurring = formData.recurrence_type !== 'none';
+
+  return (
+    <div className="rounded-xl border border-slate-600/50 bg-slate-700/30 p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${isRecurring ? 'bg-blue-500/20' : 'bg-slate-600/50'}`}>
+            <Repeat size={18} className={isRecurring ? 'text-blue-400' : 'text-slate-400'} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">Recurring Meeting</p>
+            <p className="text-xs text-slate-400">
+              {recurrenceDescriptions[formData.recurrence_type]}
+            </p>
+          </div>
+        </div>
+
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
+              ${isRecurring
+                ? 'bg-blue-600/20 text-blue-300 border-blue-500/40 hover:bg-blue-600/30'
+                : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+              }
+            `}
+          >
+            {recurrenceLabels[formData.recurrence_type]}
+            <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isOpen && (
+            <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-slate-800 border border-slate-600/50 shadow-xl shadow-black/30 z-50 overflow-hidden">
+              {(Object.entries(recurrenceLabels) as [RecurrenceType, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev: any) => ({ ...prev, recurrence_type: key }));
+                    setIsOpen(false);
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors
+                    ${formData.recurrence_type === key
+                      ? 'bg-blue-600/20 text-blue-300'
+                      : 'text-slate-300 hover:bg-slate-700/70'
+                    }
+                  `}
+                >
+                  <span>{label}</span>
+                  {formData.recurrence_type === key && (
+                    <Check size={14} className="text-blue-400" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isRecurring && (
+        <div className="mt-4 pt-4 border-t border-slate-600/40 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                Repeat until
+              </label>
+              <div className="relative">
+                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={formData.recurrence_end_date}
+                  min={formData.date}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, recurrence_end_date: e.target.value }))}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm [color-scheme:dark]"
+                />
+              </div>
+            </div>
+            {recurrencePreviewDates.length > 0 && (
+              <p className="text-sm text-slate-300">
+                <span className="font-medium text-white">{recurrencePreviewDates.length + 1}</span> meetings will be created
+              </p>
+            )}
+          </div>
+
+          {recurrencePreviewDates.length > 0 && (
+            <div className="p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2 py-0.5 rounded text-xs bg-blue-600/30 text-blue-300 border border-blue-500/30">
+                  {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+                {recurrencePreviewDates.slice(0, 11).map((date, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded text-xs bg-slate-600/50 text-slate-300">
+                    {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                ))}
+                {recurrencePreviewDates.length > 11 && (
+                  <span className="px-2 py-0.5 rounded text-xs text-slate-400">
+                    +{recurrencePreviewDates.length - 11} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!formData.recurrence_end_date && (
+            <p className="text-xs text-amber-400 flex items-center gap-1">
+              <Info size={12} />
+              Please select an end date for the recurring series
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface MeetingFormProps {
   clubId?: string;
@@ -195,157 +342,95 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     }
   };
 
-  const fetchMembers = async (category?: MeetingCategory) => {
-    const meetingCat = category || formData.meeting_category;
-    try {
-      if (clubId) {
-        if (meetingCat === 'committee') {
-          const { data: positions, error: posError } = await supabase
-            .from('committee_positions')
-            .select('member_id')
-            .eq('club_id', clubId);
+  const fetchCommitteeMembers = async (): Promise<Member[]> => {
+    const memberFields = 'id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
 
-          if (posError) throw posError;
+    if (clubId) {
+      const { data: positions, error: posError } = await supabase
+        .from('committee_positions')
+        .select('member_id')
+        .eq('club_id', clubId);
 
-          const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
-          if (memberIds.length === 0) {
-            setMembers([]);
-            return;
-          }
+      if (posError) throw posError;
 
-          const { data, error } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-            .eq('club_id', clubId)
-            .in('id', memberIds)
-            .order('first_name', { ascending: true });
+      const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+      if (memberIds.length === 0) return [];
 
-          if (error) throw error;
-          setMembers((data as Member[]) || []);
-        } else {
-          const { data, error } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-            .eq('club_id', clubId)
-            .order('first_name', { ascending: true });
+      const { data, error } = await supabase
+        .from('members')
+        .select(memberFields)
+        .eq('club_id', clubId)
+        .in('id', memberIds)
+        .order('first_name', { ascending: true });
 
-          if (error) throw error;
-          setMembers((data as Member[]) || []);
-        }
-      } else if (associationId && associationType) {
-        if (meetingCat === 'committee') {
-          const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
-          const { data: positions } = await supabase
-            .from('committee_positions')
-            .select('member_id')
-            .eq(assocColumn, associationId);
-          const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+      if (error) throw error;
+      return (data as Member[]) || [];
+    } else if (associationId && associationType) {
+      const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      const { data: positions } = await supabase
+        .from('committee_positions')
+        .select('member_id')
+        .eq(assocColumn, associationId);
+      const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
 
-          if (committeeMemberIds.length > 0) {
-            const { data, error } = await supabase
-              .from('members')
-              .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-              .in('id', committeeMemberIds)
-              .order('first_name', { ascending: true });
-            if (error) throw error;
-            setMembers((data as Member[]) || []);
-          } else {
-            const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-            const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
-
-            const { data: userAssociations, error: assocError } = await supabase
-              .from(tableName)
-              .select('user_id')
-              .eq(idColumn, associationId);
-
-            if (assocError) throw assocError;
-
-            if (!userAssociations || userAssociations.length === 0) {
-              setMembers([]);
-              return;
-            }
-
-            const userIds = userAssociations.map(ua => ua.user_id);
-            const { data: profiles, error: profilesError } = await supabase
-              .from('profiles')
-              .select('id, first_name, last_name, email')
-              .in('id', userIds)
-              .order('first_name', { ascending: true });
-
-            if (profilesError) throw profilesError;
-
-            const transformedMembers = (profiles || []).map((profile: any) => ({
-              id: profile.id,
-              first_name: profile.first_name,
-              last_name: profile.last_name,
-              email: profile.email,
-              club_id: '',
-              phone: '',
-              club: '',
-              street: '',
-              city: '',
-              state: '',
-              postcode: '',
-              date_joined: '',
-              membership_level: 'Full',
-              is_financial: true,
-              amount_paid: 0,
-              created_at: '',
-              updated_at: ''
-            })) as Member[];
-
-            setMembers(transformedMembers);
-          }
-        } else if (associationType === 'state') {
-          const { data: clubs, error: clubsError } = await supabase
-            .from('clubs')
-            .select('id')
-            .eq('state_association_id', associationId);
-
-          if (clubsError) throw clubsError;
-
-          const clubIds = (clubs || []).map(c => c.id);
-          if (clubIds.length === 0) {
-            setMembers([]);
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-            .in('club_id', clubIds)
-            .order('first_name', { ascending: true });
-
-          if (error) throw error;
-          setMembers((data as Member[]) || []);
-        } else {
-          const { data: stateAssocs } = await supabase
-            .from('state_associations')
-            .select('id')
-            .eq('national_association_id', associationId);
-          const stateIds = (stateAssocs || []).map(s => s.id);
-          if (stateIds.length > 0) {
-            const { data: clubs } = await supabase
-              .from('clubs')
-              .select('id')
-              .in('state_association_id', stateIds);
-            const clubIds = (clubs || []).map(c => c.id);
-            if (clubIds.length > 0) {
-              const { data, error } = await supabase
-                .from('members')
-                .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-                .in('club_id', clubIds)
-                .order('first_name', { ascending: true });
-              if (error) throw error;
-              setMembers((data as Member[]) || []);
-            } else {
-              setMembers([]);
-            }
-          } else {
-            setMembers([]);
-          }
-        }
+      if (committeeMemberIds.length > 0) {
+        const { data, error } = await supabase
+          .from('members')
+          .select(memberFields)
+          .in('id', committeeMemberIds)
+          .order('first_name', { ascending: true });
+        if (error) throw error;
+        return (data as Member[]) || [];
       }
+
+      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+      const { data: userAssociations, error: assocError } = await supabase
+        .from(tableName)
+        .select('user_id')
+        .eq(idColumn, associationId);
+
+      if (assocError) throw assocError;
+      if (!userAssociations || userAssociations.length === 0) return [];
+
+      const userIds = userAssociations.map(ua => ua.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+        .order('first_name', { ascending: true });
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map((profile: any) => ({
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        club_id: '',
+        phone: '',
+        club: '',
+        street: '',
+        city: '',
+        state: '',
+        postcode: '',
+        date_joined: '',
+        membership_level: 'Full',
+        is_financial: true,
+        amount_paid: 0,
+        created_at: '',
+        updated_at: ''
+      })) as Member[];
+    }
+
+    return [];
+  };
+
+  const fetchMembers = async (_category?: MeetingCategory) => {
+    try {
+      const committeeMembers = await fetchCommitteeMembers();
+      setMembers(committeeMembers);
     } catch (err) {
       console.error('Error fetching members:', err);
       setError('Failed to load members');
@@ -467,9 +552,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       }
       
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving meeting:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save meeting');
+      const msg = err?.message || err?.details || err?.hint || 'Failed to save meeting';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -527,7 +613,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               <h1 className="text-3xl font-bold text-white mb-2">
                 {meeting ? 'Edit Meeting' : 'Create a New Meeting'}
               </h1>
-              <p className="text-slate-400">Schedule and organize your club meetings</p>
+              <p className="text-slate-400">Schedule and organize your {associationId ? 'association' : 'club'} meetings</p>
             </div>
           </div>
 
@@ -578,7 +664,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 ml-11">
-                    All members can be assigned to agenda items and receive minutes
+                    Committee members manage the meeting, all members can be assigned actions
                   </p>
                   {formData.meeting_category === 'general' && (
                     <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
@@ -607,7 +693,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 ml-11">
-                    Only committee members can be assigned and receive minutes
+                    Only committee members can manage and be assigned actions
                   </p>
                   {formData.meeting_category === 'committee' && (
                     <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
@@ -676,7 +762,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       required
                       value={formData.date}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -694,7 +780,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       name="start_time"
                       value={formData.start_time}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -710,7 +796,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       name="end_time"
                       value={formData.end_time}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -829,82 +915,12 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               </div>
             
               {!meeting && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Repeat size={16} className="text-slate-400" />
-                      Recurring Meeting
-                    </div>
-                  </label>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                    {(Object.entries(recurrenceLabels) as [RecurrenceType, string][]).map(([key, label]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, recurrence_type: key }))}
-                        className={`
-                          px-3 py-2 rounded-lg text-sm font-medium transition-all border
-                          ${formData.recurrence_type === key
-                            ? 'bg-blue-600 text-white border-blue-500'
-                            : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
-                          }
-                        `}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {formData.recurrence_type !== 'none' && (
-                    <div className="mt-4 space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">
-                          Repeat until
-                        </label>
-                        <div className="relative max-w-xs">
-                          <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <input
-                            type="date"
-                            value={formData.recurrence_end_date}
-                            min={formData.date}
-                            onChange={(e) => setFormData(prev => ({ ...prev, recurrence_end_date: e.target.value }))}
-                            className="w-full pl-9 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          />
-                        </div>
-                      </div>
-
-                      {recurrencePreviewDates.length > 0 && (
-                        <div className="p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
-                          <p className="text-xs font-medium text-slate-300 mb-2">
-                            {recurrencePreviewDates.length + 1} meeting{recurrencePreviewDates.length > 0 ? 's' : ''} will be created:
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            <span className="px-2 py-0.5 rounded text-xs bg-blue-600/30 text-blue-300 border border-blue-500/30">
-                              {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </span>
-                            {recurrencePreviewDates.slice(0, 11).map((date, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded text-xs bg-slate-600/50 text-slate-300">
-                                {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            ))}
-                            {recurrencePreviewDates.length > 11 && (
-                              <span className="px-2 py-0.5 rounded text-xs text-slate-400">
-                                +{recurrencePreviewDates.length - 11} more
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {formData.recurrence_type !== 'none' && !formData.recurrence_end_date && (
-                        <p className="text-xs text-amber-400 flex items-center gap-1">
-                          <Info size={12} />
-                          Please select an end date for the recurring series
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <RecurrenceSelector
+                  formData={formData}
+                  setFormData={setFormData}
+                  recurrenceLabels={recurrenceLabels}
+                  recurrencePreviewDates={recurrencePreviewDates}
+                />
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

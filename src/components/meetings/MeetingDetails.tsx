@@ -161,29 +161,43 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         <div className="flex flex-wrap gap-2 justify-end">
           {meeting.status === 'upcoming' && (
             <>
-              <button
-                onClick={onEdit}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
-              >
-                <Edit2 size={16} />
-                Edit
-              </button>
+              {meeting.minutes_status !== 'in_progress' && (
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+              )}
 
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
-              >
-                <Mail size={16} />
-                Send Invites
-              </button>
+              {meeting.minutes_status !== 'in_progress' && (
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                >
+                  <Mail size={16} />
+                  Send Invites
+                </button>
+              )}
 
-              <button
-                onClick={handleStartMeeting}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
-              >
-                <Play size={16} />
-                Start Meeting
-              </button>
+              {meeting.minutes_status === 'in_progress' ? (
+                <button
+                  onClick={handleStartMeeting}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                >
+                  <Edit2 size={16} />
+                  Continue Minutes
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartMeeting}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                >
+                  <Play size={16} />
+                  Start Meeting
+                </button>
+              )}
 
               <button
                 onClick={() => setShowStatusConfirm('cancel')}
@@ -195,10 +209,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             </>
           )}
 
-          {meeting.minutes_status === 'in_progress' && (
+          {meeting.status !== 'upcoming' && meeting.minutes_status === 'in_progress' && (
             <button
               onClick={handleStartMeeting}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
             >
               <Edit2 size={16} />
               Continue Minutes
@@ -325,13 +339,6 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                       </div>
                     )}
 
-                    <button
-                      onClick={() => setShowInviteModal(true)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium"
-                    >
-                      <Mail size={18} />
-                      Send Invites
-                    </button>
                   </div>
                 )}
               </div>
@@ -650,12 +657,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         meetingId={meeting.id}
         meetingName={meeting.name}
         clubId={meeting.club_id}
-        associationId={associationId}
-        associationType={associationType}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
-        associationId={meeting.state_association_id || meeting.national_association_id || undefined}
-        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : undefined}
+        associationId={meeting.state_association_id || meeting.national_association_id || associationId}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : associationType}
       />
 
       <ShareMinutesModal
