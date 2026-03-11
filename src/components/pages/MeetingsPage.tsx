@@ -234,7 +234,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       <div className="h-full overflow-y-auto">
         <div className="p-16">
           <MeetingForm
-          clubId={currentClub?.clubId}
+          clubId={currentOrganization ? undefined : currentClub?.clubId}
           associationId={currentOrganization?.id}
           associationType={currentOrganization?.type}
           meeting={editingMeeting}
