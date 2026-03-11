@@ -79,8 +79,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       setLoading(true);
       setError(null);
 
-      const isAssociation = !!currentOrganization && !currentClub;
-      const clubId = currentClub?.clubId;
+      const isAssociation = !!currentOrganization;
+      const clubId = isAssociation ? undefined : currentClub?.clubId;
       const associationId = currentOrganization?.id;
       const associationType = currentOrganization?.type;
 
@@ -273,7 +273,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
             <Calendar className="text-white" size={28} />
           </div>
-          <h2 className="text-3xl font-bold text-white">Club Meetings</h2>
+          <h2 className="text-3xl font-bold text-white">{currentOrganization ? 'Association Meetings' : 'Club Meetings'}</h2>
         </div>
 
         {error && (

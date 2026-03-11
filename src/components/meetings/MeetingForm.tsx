@@ -466,7 +466,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               <h1 className="text-3xl font-bold text-white mb-2">
                 {meeting ? 'Edit Meeting' : 'Create a New Meeting'}
               </h1>
-              <p className="text-slate-400">Schedule and organize your club meetings</p>
+              <p className="text-slate-400">Schedule and organize your {associationId ? 'association' : 'club'} meetings</p>
             </div>
           </div>
 
