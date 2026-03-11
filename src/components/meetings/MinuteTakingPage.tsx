@@ -55,7 +55,8 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
   const [newAgendaItem, setNewAgendaItem] = useState({
     item_name: '',
     type: 'for_discussion' as 'for_noting' | 'for_action' | 'for_discussion',
-    duration: 5
+    duration: 5,
+    owner_id: '' as string
   });
   const [isLastItem, setIsLastItem] = useState(false);
   const [showActionItemsSummary, setShowActionItemsSummary] = useState(false);
@@ -279,7 +280,8 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
         item_number: nextItemNumber,
         item_name: newAgendaItem.item_name,
         type: newAgendaItem.type,
-        duration: newAgendaItem.duration
+        duration: newAgendaItem.duration,
+        owner_id: newAgendaItem.owner_id || undefined
       });
       
       // Update local state
@@ -296,7 +298,8 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
       setNewAgendaItem({
         item_name: '',
         type: 'for_discussion',
-        duration: 5
+        duration: 5,
+        owner_id: ''
       });
       
       setSuccess('Agenda item added successfully');
@@ -1182,52 +1185,91 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
           })}
 
           {!isReadOnly && (
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Agenda Item</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Item Name
-                </label>
-                <input
-                  type="text"
-                  value={newAgendaItem.item_name}
-                  onChange={(e) => setNewAgendaItem({...newAgendaItem, item_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter agenda item name"
-                />
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg border-2 border-dashed border-teal-300 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
+                  <Plus size={16} className="text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-teal-800">Add New Agenda Item</h3>
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Type
-                </label>
-                <select
-                  value={newAgendaItem.type}
-                  onChange={(e) => setNewAgendaItem({
-                    ...newAgendaItem, 
-                    type: e.target.value as 'for_noting' | 'for_action' | 'for_discussion'
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-teal-700 mb-1">
+                    Item Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newAgendaItem.item_name}
+                    onChange={(e) => setNewAgendaItem({...newAgendaItem, item_name: e.target.value})}
+                    className="w-full px-3 py-2 border border-teal-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    placeholder="Enter agenda item name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-teal-700 mb-1">
+                    Owner
+                  </label>
+                  <select
+                    value={newAgendaItem.owner_id}
+                    onChange={(e) => setNewAgendaItem({...newAgendaItem, owner_id: e.target.value})}
+                    className="w-full px-3 py-2 border border-teal-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">Select owner...</option>
+                    {members.map(member => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-teal-700 mb-1">
+                    Type
+                  </label>
+                  <select
+                    value={newAgendaItem.type}
+                    onChange={(e) => setNewAgendaItem({
+                      ...newAgendaItem,
+                      type: e.target.value as 'for_noting' | 'for_action' | 'for_discussion'
+                    })}
+                    className="w-full px-3 py-2 border border-teal-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="for_noting">For Noting</option>
+                    <option value="for_action">For Action</option>
+                    <option value="for_discussion">For Discussion</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-teal-700 mb-1">
+                    Time Allocation (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={newAgendaItem.duration}
+                    onChange={(e) => setNewAgendaItem({...newAgendaItem, duration: parseInt(e.target.value) || 5})}
+                    className="w-full px-3 py-2 border border-teal-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleAddAgendaItem}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all shadow-sm hover:shadow-md"
                 >
-                  <option value="for_noting">For Noting</option>
-                  <option value="for_action">For Action</option>
-                  <option value="for_discussion">For Discussion</option>
-                </select>
+                  <Plus size={16} />
+                  Add Item
+                </button>
               </div>
             </div>
-            
-            <div className="flex justify-end">
-              <button
-                onClick={handleAddAgendaItem}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-              >
-                <Plus size={16} />
-                Add Item
-              </button>
-            </div>
-          </div>
           )}
         </div>
       </div>
