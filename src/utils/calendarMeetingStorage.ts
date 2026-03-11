@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { Meeting } from '../types/meeting';
 
 export interface MeetingAttendee {
-  user_id: string;
+  member_id: string;
   first_name: string;
   last_name: string;
   avatar_url: string | null;
@@ -71,7 +71,7 @@ export const getCalendarMeetings = async (
       const meetingIds = meetings.map(m => m.id);
       const { data: attendanceData } = await supabase
         .from('meeting_attendance')
-        .select('meeting_id, user_id, profiles:user_id(first_name, last_name, avatar_url)')
+        .select('meeting_id, member_id, members:member_id(first_name, last_name, avatar_url)')
         .in('meeting_id', meetingIds)
         .eq('status', 'attending');
 
@@ -80,10 +80,10 @@ export const getCalendarMeetings = async (
         attendanceData.forEach((a: any) => {
           if (!attendeeMap[a.meeting_id]) attendeeMap[a.meeting_id] = [];
           attendeeMap[a.meeting_id].push({
-            user_id: a.user_id,
-            first_name: a.profiles?.first_name || '',
-            last_name: a.profiles?.last_name || '',
-            avatar_url: a.profiles?.avatar_url || null,
+            member_id: a.member_id,
+            first_name: a.members?.first_name || '',
+            last_name: a.members?.last_name || '',
+            avatar_url: a.members?.avatar_url || null,
           });
         });
         meetings.forEach(m => {
