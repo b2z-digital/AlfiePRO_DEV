@@ -59,6 +59,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       // Group attendance by meeting_id
       const attendanceByMeeting: Record<string, {member: any, status: string}[]> = {};
       data?.forEach((attendance: any) => {
+        if (!attendance.member) return;
         if (!attendanceByMeeting[attendance.meeting_id]) {
           attendanceByMeeting[attendance.meeting_id] = [];
         }
