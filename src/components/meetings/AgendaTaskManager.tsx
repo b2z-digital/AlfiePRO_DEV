@@ -109,7 +109,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
           if (clubIds.length > 0) {
             const { data, error } = await supabase
               .from('members')
-              .select('id, first_name, last_name, avatar_url')
+              .select('id, first_name, last_name, avatar_url, club')
               .in('club_id', clubIds)
               .order('first_name', { ascending: true });
 
@@ -133,7 +133,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
             if (clubIds.length > 0) {
               const { data, error } = await supabase
                 .from('members')
-                .select('id, first_name, last_name, avatar_url')
+                .select('id, first_name, last_name, avatar_url, club')
                 .in('club_id', clubIds)
                 .order('first_name', { ascending: true });
               if (error) throw error;
@@ -264,7 +264,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
       const { data: userData } = await supabase.auth.getUser();
       const currentUserId = userData.user?.id || '';
 
-      const taskData = {
+      const taskData: Record<string, any> = {
         title: task.title,
         description: task.description || null,
         assignee_id: task.assignee_id,
@@ -272,11 +272,19 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
         due_time: task.due_time || null,
         priority: task.priority,
         supporting_members: task.supporting_members || [],
-        club_id: clubId,
+        club_id: clubId || null,
         meeting_agenda_id: agendaItemId,
         created_by: currentUserId,
         status: 'pending'
       };
+
+      if (associationId && associationType) {
+        if (associationType === 'state') {
+          taskData.state_association_id = associationId;
+        } else {
+          taskData.national_association_id = associationId;
+        }
+      }
 
       console.log('[AgendaTaskManager] Saving task:', {
         taskData,
@@ -598,29 +606,21 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
                   </div>
                 )}
 
-                {/* Add supporting member dropdown */}
                 {!isReadOnly && (
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        addSupportingMember(index, e.target.value);
-                        e.target.value = '';
+                  <MemberSelect
+                    members={members.filter(m =>
+                      m.id !== task.assignee_id &&
+                      !task.supporting_members.includes(m.id)
+                    )}
+                    value=""
+                    onChange={(memberId) => {
+                      if (memberId) {
+                        addSupportingMember(index, memberId);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
-                  >
-                    <option value="">+ Add supporting member</option>
-                    {members
-                      .filter(m =>
-                        m.id !== task.assignee_id &&
-                        !task.supporting_members.includes(m.id)
-                      )
-                      .map(member => (
-                        <option key={member.id} value={member.id}>
-                          {member.first_name} {member.last_name}
-                        </option>
-                      ))}
-                  </select>
+                    placeholder="+ Add supporting member"
+                    allowEmpty={false}
+                  />
                 )}
               </div>
 
