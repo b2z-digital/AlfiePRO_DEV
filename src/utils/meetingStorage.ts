@@ -282,16 +282,18 @@ export const deleteMeeting = async (meetingId: string): Promise<void> => {
 export const getMeetingAgenda = async (meetingId: string): Promise<MeetingAgendaItem[]> => {
   try {
     const { data, error } = await supabase
-      .from('meeting_agendas')
-      .select(`
-        *,
-        owner:owner_id(first_name, last_name, avatar_url)
-      `)
-      .eq('meeting_id', meetingId)
-      .order('item_number', { ascending: true });
+      .rpc('get_meeting_agenda_items', { p_meeting_id: meetingId });
 
     if (error) throw error;
-    return data || [];
+
+    return (data || []).map((row: any) => ({
+      ...row,
+      owner: row.owner_id ? {
+        first_name: row.owner_first_name,
+        last_name: row.owner_last_name,
+        avatar_url: row.owner_avatar_url,
+      } : null,
+    }));
   } catch (error) {
     console.error('Error fetching meeting agenda:', error);
     throw error;

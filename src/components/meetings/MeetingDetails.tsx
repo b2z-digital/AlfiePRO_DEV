@@ -58,10 +58,12 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
       if (error) throw error;
 
-      setAttendance(data?.map((a: any) => ({
-        member: a.member,
-        status: a.status
-      })) || []);
+      setAttendance((data || [])
+        .filter((a: any) => a.member)
+        .map((a: any) => ({
+          member: a.member,
+          status: a.status
+        })));
     } catch (error) {
       console.error('Error fetching attendance:', error);
     }
@@ -92,7 +94,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   const handleStartMeeting = async () => {
     // Store the attending members in session storage for the minute taking page to pre-select
     const attendingMemberIds = attendance
-      .filter(a => a.status === 'attending')
+      .filter(a => a.status === 'attending' && a.member)
       .map(a => a.member.id);
 
     if (attendingMemberIds.length > 0) {
@@ -302,19 +304,19 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                 {meeting.status === 'upcoming' && (
                   <div className="flex items-center gap-4">
                     {/* Attendance Avatars */}
-                    {attendance.filter(a => a.status === 'attending').length > 0 && (
+                    {attendance.filter(a => a.status === 'attending' && a.member).length > 0 && (
                       <div className="flex items-center gap-2">
                         <div className="flex -space-x-2">
                           {attendance
-                            .filter(a => a.status === 'attending')
+                            .filter(a => a.status === 'attending' && a.member)
                             .slice(0, 5)
                             .map((att, idx) => (
                               <div
                                 key={idx}
                                 className="relative w-9 h-9 rounded-full border-2 border-slate-800 bg-slate-700 overflow-hidden"
-                                title={`${att.member.first_name} ${att.member.last_name}`}
+                                title={`${att.member?.first_name || ''} ${att.member?.last_name || ''}`}
                               >
-                                {att.member.avatar_url ? (
+                                {att.member?.avatar_url ? (
                                   <img
                                     src={att.member.avatar_url}
                                     alt={`${att.member.first_name} ${att.member.last_name}`}
@@ -322,19 +324,19 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-slate-300">
-                                    {att.member.first_name?.[0]}{att.member.last_name?.[0]}
+                                    {att.member?.first_name?.[0]}{att.member?.last_name?.[0]}
                                   </div>
                                 )}
                               </div>
                             ))}
-                          {attendance.filter(a => a.status === 'attending').length > 5 && (
+                          {attendance.filter(a => a.status === 'attending' && a.member).length > 5 && (
                             <div className="relative w-9 h-9 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center text-xs font-semibold text-slate-300">
-                              +{attendance.filter(a => a.status === 'attending').length - 5}
+                              +{attendance.filter(a => a.status === 'attending' && a.member).length - 5}
                             </div>
                           )}
                         </div>
                         <span className="text-sm text-slate-400 font-medium">
-                          {attendance.filter(a => a.status === 'attending').length} attending
+                          {attendance.filter(a => a.status === 'attending' && a.member).length} attending
                         </span>
                       </div>
                     )}
@@ -656,7 +658,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         onClose={() => setShowInviteModal(false)}
         meetingId={meeting.id}
         meetingName={meeting.name}
-        clubId={meeting.club_id}
+        clubId={meeting.club_id || undefined}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
         associationId={meeting.state_association_id || meeting.national_association_id || associationId}
@@ -670,7 +672,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         associationId={meeting.state_association_id || meeting.national_association_id || associationId || undefined}
         associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : associationType}
         agendaItems={agendaItems}
-        clubId={meeting.club_id}
+        clubId={meeting.club_id || undefined}
         darkMode={darkMode}
         meetingCategory={meeting.meeting_category}
       />

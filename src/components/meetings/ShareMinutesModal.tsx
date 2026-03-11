@@ -15,7 +15,7 @@ interface ShareMinutesModalProps {
   onClose: () => void;
   meeting: Meeting;
   agendaItems: MeetingAgendaItem[];
-  clubId: string;
+  clubId?: string;
   darkMode: boolean;
   meetingCategory?: 'general' | 'committee';
   associationId?: string;
