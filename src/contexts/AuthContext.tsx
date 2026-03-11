@@ -77,6 +77,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  const [impersonatedAssociationRoles, setImpersonatedAssociationRoles] = useState<{
+    isNationalOrgAdmin: boolean;
+    isStateOrgAdmin: boolean;
+  }>({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+
   // CRITICAL: Track current user ID with ref to prevent duplicate SIGNED_IN processing
   // State updates are async, so we need a synchronous way to check current user
   const currentUserIdRef = useRef<string | null>(null);
@@ -680,6 +685,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Note: Proactive session refresh is handled by Supabase's autoRefreshToken
   // and the health check in supabase.ts - no need for duplicate logic here
 
+  useEffect(() => {
+    let mounted = true;
+    const checkImpersonatedAssociationRoles = async () => {
+      try {
+        const stored = sessionStorage.getItem('impersonation_session');
+        if (!stored) {
+          if (mounted) setImpersonatedAssociationRoles({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+          return;
+        }
+        const imp = JSON.parse(stored);
+        const targetUserId = imp?.targetUserId;
+        if (!targetUserId) {
+          if (mounted) setImpersonatedAssociationRoles({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+          return;
+        }
+
+        const [nationalResult, stateResult] = await Promise.all([
+          supabase
+            .from('user_national_associations')
+            .select('role')
+            .eq('user_id', targetUserId)
+            .eq('role', 'national_admin')
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('user_state_associations')
+            .select('role')
+            .eq('user_id', targetUserId)
+            .eq('role', 'state_admin')
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        if (mounted) {
+          setImpersonatedAssociationRoles({
+            isNationalOrgAdmin: nationalResult.data?.role === 'national_admin',
+            isStateOrgAdmin: stateResult.data?.role === 'state_admin',
+          });
+        }
+      } catch {
+        if (mounted) setImpersonatedAssociationRoles({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+      }
+    };
+
+    checkImpersonatedAssociationRoles();
+    return () => { mounted = false; };
+  }, []);
+
   const impersonationOverrides = React.useMemo(() => {
     try {
       const stored = sessionStorage.getItem('impersonation_session');
@@ -706,20 +759,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         userClubs: targetClubs,
         currentClub: targetCurrentClub,
         isSuperAdmin: imp.targetIsSuperAdmin === true,
-        isNationalOrgAdmin: false,
-        isStateOrgAdmin: false,
+        isNationalOrgAdmin: impersonatedAssociationRoles.isNationalOrgAdmin,
+        isStateOrgAdmin: impersonatedAssociationRoles.isStateOrgAdmin,
         onboardingCompleted: imp.targetOnboardingCompleted !== false,
       };
     } catch {
       return null;
     }
-  }, []);
+  }, [impersonatedAssociationRoles]);
 
   const value = {
     user,
     userClubs: impersonationOverrides?.userClubs ?? userClubs,
     currentClub: impersonationOverrides?.currentClub ?? currentClub,
-    currentOrganization: impersonationOverrides ? null : currentOrganization,
+    currentOrganization,
     loading,
     clubsLoaded,
     isLoggingOut,
