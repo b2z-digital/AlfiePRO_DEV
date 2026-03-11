@@ -195,157 +195,95 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     }
   };
 
-  const fetchMembers = async (category?: MeetingCategory) => {
-    const meetingCat = category || formData.meeting_category;
-    try {
-      if (clubId) {
-        if (meetingCat === 'committee') {
-          const { data: positions, error: posError } = await supabase
-            .from('committee_positions')
-            .select('member_id')
-            .eq('club_id', clubId);
+  const fetchCommitteeMembers = async (): Promise<Member[]> => {
+    const memberFields = 'id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
 
-          if (posError) throw posError;
+    if (clubId) {
+      const { data: positions, error: posError } = await supabase
+        .from('committee_positions')
+        .select('member_id')
+        .eq('club_id', clubId);
 
-          const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
-          if (memberIds.length === 0) {
-            setMembers([]);
-            return;
-          }
+      if (posError) throw posError;
 
-          const { data, error } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-            .eq('club_id', clubId)
-            .in('id', memberIds)
-            .order('first_name', { ascending: true });
+      const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+      if (memberIds.length === 0) return [];
 
-          if (error) throw error;
-          setMembers((data as Member[]) || []);
-        } else {
-          const { data, error } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-            .eq('club_id', clubId)
-            .order('first_name', { ascending: true });
+      const { data, error } = await supabase
+        .from('members')
+        .select(memberFields)
+        .eq('club_id', clubId)
+        .in('id', memberIds)
+        .order('first_name', { ascending: true });
 
-          if (error) throw error;
-          setMembers((data as Member[]) || []);
-        }
-      } else if (associationId && associationType) {
-        if (meetingCat === 'committee') {
-          const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
-          const { data: positions } = await supabase
-            .from('committee_positions')
-            .select('member_id')
-            .eq(assocColumn, associationId);
-          const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+      if (error) throw error;
+      return (data as Member[]) || [];
+    } else if (associationId && associationType) {
+      const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      const { data: positions } = await supabase
+        .from('committee_positions')
+        .select('member_id')
+        .eq(assocColumn, associationId);
+      const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
 
-          if (committeeMemberIds.length > 0) {
-            const { data, error } = await supabase
-              .from('members')
-              .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-              .in('id', committeeMemberIds)
-              .order('first_name', { ascending: true });
-            if (error) throw error;
-            setMembers((data as Member[]) || []);
-          } else {
-            const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-            const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
-
-            const { data: userAssociations, error: assocError } = await supabase
-              .from(tableName)
-              .select('user_id')
-              .eq(idColumn, associationId);
-
-            if (assocError) throw assocError;
-
-            if (!userAssociations || userAssociations.length === 0) {
-              setMembers([]);
-              return;
-            }
-
-            const userIds = userAssociations.map(ua => ua.user_id);
-            const { data: profiles, error: profilesError } = await supabase
-              .from('profiles')
-              .select('id, first_name, last_name, email')
-              .in('id', userIds)
-              .order('first_name', { ascending: true });
-
-            if (profilesError) throw profilesError;
-
-            const transformedMembers = (profiles || []).map((profile: any) => ({
-              id: profile.id,
-              first_name: profile.first_name,
-              last_name: profile.last_name,
-              email: profile.email,
-              club_id: '',
-              phone: '',
-              club: '',
-              street: '',
-              city: '',
-              state: '',
-              postcode: '',
-              date_joined: '',
-              membership_level: 'Full',
-              is_financial: true,
-              amount_paid: 0,
-              created_at: '',
-              updated_at: ''
-            })) as Member[];
-
-            setMembers(transformedMembers);
-          }
-        } else if (associationType === 'state') {
-          const { data: clubs, error: clubsError } = await supabase
-            .from('clubs')
-            .select('id')
-            .eq('state_association_id', associationId);
-
-          if (clubsError) throw clubsError;
-
-          const clubIds = (clubs || []).map(c => c.id);
-          if (clubIds.length === 0) {
-            setMembers([]);
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from('members')
-            .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-            .in('club_id', clubIds)
-            .order('first_name', { ascending: true });
-
-          if (error) throw error;
-          setMembers((data as Member[]) || []);
-        } else {
-          const { data: stateAssocs } = await supabase
-            .from('state_associations')
-            .select('id')
-            .eq('national_association_id', associationId);
-          const stateIds = (stateAssocs || []).map(s => s.id);
-          if (stateIds.length > 0) {
-            const { data: clubs } = await supabase
-              .from('clubs')
-              .select('id')
-              .in('state_association_id', stateIds);
-            const clubIds = (clubs || []).map(c => c.id);
-            if (clubIds.length > 0) {
-              const { data, error } = await supabase
-                .from('members')
-                .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-                .in('club_id', clubIds)
-                .order('first_name', { ascending: true });
-              if (error) throw error;
-              setMembers((data as Member[]) || []);
-            } else {
-              setMembers([]);
-            }
-          } else {
-            setMembers([]);
-          }
-        }
+      if (committeeMemberIds.length > 0) {
+        const { data, error } = await supabase
+          .from('members')
+          .select(memberFields)
+          .in('id', committeeMemberIds)
+          .order('first_name', { ascending: true });
+        if (error) throw error;
+        return (data as Member[]) || [];
       }
+
+      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+      const { data: userAssociations, error: assocError } = await supabase
+        .from(tableName)
+        .select('user_id')
+        .eq(idColumn, associationId);
+
+      if (assocError) throw assocError;
+      if (!userAssociations || userAssociations.length === 0) return [];
+
+      const userIds = userAssociations.map(ua => ua.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+        .order('first_name', { ascending: true });
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map((profile: any) => ({
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        club_id: '',
+        phone: '',
+        club: '',
+        street: '',
+        city: '',
+        state: '',
+        postcode: '',
+        date_joined: '',
+        membership_level: 'Full',
+        is_financial: true,
+        amount_paid: 0,
+        created_at: '',
+        updated_at: ''
+      })) as Member[];
+    }
+
+    return [];
+  };
+
+  const fetchMembers = async (_category?: MeetingCategory) => {
+    try {
+      const committeeMembers = await fetchCommitteeMembers();
+      setMembers(committeeMembers);
     } catch (err) {
       console.error('Error fetching members:', err);
       setError('Failed to load members');
@@ -578,7 +516,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 ml-11">
-                    All members can be assigned to agenda items and receive minutes
+                    Committee members manage the meeting, all members can be assigned actions
                   </p>
                   {formData.meeting_category === 'general' && (
                     <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
@@ -607,7 +545,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 ml-11">
-                    Only committee members can be assigned and receive minutes
+                    Only committee members can manage and be assigned actions
                   </p>
                   {formData.meeting_category === 'committee' && (
                     <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">

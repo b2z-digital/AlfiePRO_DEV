@@ -58,30 +58,46 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
 
       if (isAssociation) {
         if (meetingCategory === 'committee') {
-          const assocTable = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-          const assocCol = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+          const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+          const { data: positions } = await supabase
+            .from('committee_positions')
+            .select('member_id')
+            .eq(assocColumn, associationId);
+          const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
 
-          const { data: assocUsers } = await supabase
-            .from(assocTable)
-            .select('user_id')
-            .eq(assocCol, associationId);
-
-          if (assocUsers && assocUsers.length > 0) {
-            const userIds = assocUsers.map(au => au.user_id);
-            const { data: profiles } = await supabase
-              .from('profiles')
+          if (committeeMemberIds.length > 0) {
+            const { data } = await supabase
+              .from('members')
               .select('id, first_name, last_name, avatar_url')
-              .in('id', userIds)
+              .in('id', committeeMemberIds)
               .order('first_name', { ascending: true });
-
-            setMembers((profiles || []).map((p: any) => ({
-              id: p.id,
-              first_name: p.first_name,
-              last_name: p.last_name,
-              avatar_url: p.avatar_url,
-            })));
+            setMembers(data || []);
           } else {
-            setMembers([]);
+            const assocTable = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+            const assocCol = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+            const { data: assocUsers } = await supabase
+              .from(assocTable)
+              .select('user_id')
+              .eq(assocCol, associationId);
+
+            if (assocUsers && assocUsers.length > 0) {
+              const userIds = assocUsers.map(au => au.user_id);
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, avatar_url')
+                .in('id', userIds)
+                .order('first_name', { ascending: true });
+
+              setMembers((profiles || []).map((p: any) => ({
+                id: p.id,
+                first_name: p.first_name,
+                last_name: p.last_name,
+                avatar_url: p.avatar_url,
+              })));
+            } else {
+              setMembers([]);
+            }
           }
         } else if (associationType === 'state') {
           const { data: clubs } = await supabase
@@ -103,25 +119,28 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
             setMembers([]);
           }
         } else {
-          const { data: assocUsers } = await supabase
-            .from('user_national_associations')
-            .select('user_id')
+          const { data: stateAssocs } = await supabase
+            .from('state_associations')
+            .select('id')
             .eq('national_association_id', associationId);
-
-          if (assocUsers && assocUsers.length > 0) {
-            const userIds = assocUsers.map(au => au.user_id);
-            const { data: profiles } = await supabase
-              .from('profiles')
-              .select('id, first_name, last_name, avatar_url')
-              .in('id', userIds)
-              .order('first_name', { ascending: true });
-
-            setMembers((profiles || []).map((p: any) => ({
-              id: p.id,
-              first_name: p.first_name,
-              last_name: p.last_name,
-              avatar_url: p.avatar_url,
-            })));
+          const stateIds = (stateAssocs || []).map(s => s.id);
+          if (stateIds.length > 0) {
+            const { data: clubs } = await supabase
+              .from('clubs')
+              .select('id')
+              .in('state_association_id', stateIds);
+            const clubIds = (clubs || []).map(c => c.id);
+            if (clubIds.length > 0) {
+              const { data, error } = await supabase
+                .from('members')
+                .select('id, first_name, last_name, avatar_url')
+                .in('club_id', clubIds)
+                .order('first_name', { ascending: true });
+              if (error) throw error;
+              setMembers(data || []);
+            } else {
+              setMembers([]);
+            }
           } else {
             setMembers([]);
           }
