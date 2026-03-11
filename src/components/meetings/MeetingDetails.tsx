@@ -177,13 +177,23 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                 Send Invites
               </button>
 
-              <button
-                onClick={handleStartMeeting}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
-              >
-                <Play size={16} />
-                Start Meeting
-              </button>
+              {meeting.minutes_status === 'in_progress' ? (
+                <button
+                  onClick={handleStartMeeting}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                >
+                  <Edit2 size={16} />
+                  Continue Minutes
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartMeeting}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                >
+                  <Play size={16} />
+                  Start Meeting
+                </button>
+              )}
 
               <button
                 onClick={() => setShowStatusConfirm('cancel')}
@@ -195,10 +205,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             </>
           )}
 
-          {meeting.minutes_status === 'in_progress' && (
+          {meeting.status !== 'upcoming' && meeting.minutes_status === 'in_progress' && (
             <button
               onClick={handleStartMeeting}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
             >
               <Edit2 size={16} />
               Continue Minutes
