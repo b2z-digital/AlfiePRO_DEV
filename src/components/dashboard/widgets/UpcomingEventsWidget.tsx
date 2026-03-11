@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, MapPin, ChevronRight, X, Users, Clock, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -722,12 +723,13 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         </div>
       )}
 
-      {selectedMeeting && (
+      {selectedMeeting && createPortal(
         <CalendarMeetingDetailsModal
           meeting={selectedMeeting}
           darkMode={darkMode}
           onClose={() => setSelectedMeeting(null)}
-        />
+        />,
+        document.body
       )}
     </div>
   );

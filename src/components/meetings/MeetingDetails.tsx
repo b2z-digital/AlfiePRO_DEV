@@ -72,26 +72,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   const fetchAgendaItems = async () => {
     try {
       setLoading(true);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
-      const items = await Promise.race([getMeetingAgenda(meeting.id), timeoutPromise]);
+      const items = await getMeetingAgenda(meeting.id);
       setAgendaItems(items);
     } catch (err) {
       console.error('Error fetching agenda items:', err);
-      try {
-        const { data } = await supabase
-          .from('meeting_agendas')
-          .select('*')
-          .eq('meeting_id', meeting.id)
-          .order('item_number', { ascending: true });
-        if (data && data.length > 0) {
-          setAgendaItems(data);
-          return;
-        }
-      } catch (_fallbackErr) {
-        // ignore fallback error
-      }
       setError('Failed to load agenda items');
     } finally {
       setLoading(false);
