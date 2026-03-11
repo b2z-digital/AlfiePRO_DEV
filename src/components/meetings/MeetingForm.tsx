@@ -405,9 +405,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       }
       
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving meeting:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save meeting');
+      const msg = err?.message || err?.details || err?.hint || 'Failed to save meeting';
+      setError(msg);
     } finally {
       setLoading(false);
     }

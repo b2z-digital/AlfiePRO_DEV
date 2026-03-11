@@ -104,8 +104,8 @@ export const createMeeting = async (
       end_time: meetingData.end_time,
       conferencing_url: meetingData.conferencing_url,
       description: meetingData.description,
-      chairperson_id: meetingData.chairperson_id,
-      minute_taker_id: meetingData.minute_taker_id,
+      chairperson_id: meetingData.chairperson_id || null,
+      minute_taker_id: meetingData.minute_taker_id || null,
       meeting_category: meetingData.meeting_category || 'general',
       meeting_type: meetingData.meeting_type || 'in_person',
       recurrence_type: meetingData.recurrence_type || 'none',
@@ -139,9 +139,9 @@ export const createMeeting = async (
         meeting_id: meeting.id,
         item_number: item.item_number,
         item_name: item.item_name,
-        owner_id: item.owner_id,
+        owner_id: item.owner_id || null,
         type: item.type,
-        duration: item.duration,
+        duration: item.duration || null,
         minutes_content: ''
       }));
 
@@ -183,9 +183,9 @@ export const createMeeting = async (
             meeting_id: childMeeting.id,
             item_number: item.item_number,
             item_name: item.item_name,
-            owner_id: item.owner_id,
+            owner_id: item.owner_id || null,
             type: item.type,
-            duration: item.duration,
+            duration: item.duration || null,
             minutes_content: ''
           }));
           await supabase.from('meeting_agendas').insert(childAgenda);
