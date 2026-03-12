@@ -591,6 +591,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         `response_type=code&` +
         `access_type=offline&` +
         `prompt=consent&` +
+        `include_granted_scopes=true&` +
         `state=${encodeURIComponent(JSON.stringify(stateData))}`;
 
       window.location.href = authUrl;

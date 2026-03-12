@@ -65,94 +65,58 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    let integration;
-    let integrationError;
+    const idColumn = clubId ? 'club_id'
+      : associationType === 'state' ? 'state_association_id'
+      : 'national_association_id';
+    const orgId = clubId || associationId;
 
-    // Get the Google integration (club or association)
-    if (clubId) {
-      const result = await supabase
-        .from('club_integrations')
-        .select('*')
-        .eq('club_id', clubId)
-        .eq('provider', 'google')
-        .eq('is_enabled', true)
-        .maybeSingle();
-
-      integration = result.data;
-      integrationError = result.error;
-    } else if (associationId && associationType) {
-      const tableName = associationType === 'state'
-        ? 'state_association_integrations'
-        : 'national_association_integrations';
-      const idColumn = associationType === 'state'
-        ? 'state_association_id'
-        : 'national_association_id';
-
-      const result = await supabase
-        .from(tableName)
-        .select('*')
-        .eq(idColumn, associationId)
-        .eq('provider', 'google')
-        .eq('is_enabled', true)
-        .maybeSingle();
-
-      integration = result.data;
-      integrationError = result.error;
-    }
+    const { data: integration, error: integrationError } = await supabase
+      .from('integrations')
+      .select('id, credentials')
+      .eq(idColumn, orgId)
+      .eq('platform', 'google')
+      .eq('is_active', true)
+      .maybeSingle();
 
     if (integrationError) {
       throw new Error(`Failed to fetch integration: ${integrationError.message}`);
     }
 
-    if (!integration) {
+    if (!integration || !integration.credentials) {
       throw new Error('Google integration not found. Please connect Google Calendar first.');
     }
 
-    // Check if token is expired and refresh if needed
-    let accessToken = integration.access_token;
-    const expiresAt = new Date(integration.token_expires_at);
+    const creds = integration.credentials;
+    let accessToken = creds.access_token;
+    const expiresAt = new Date(creds.token_expires_at);
     const now = new Date();
 
-    if (now >= expiresAt && integration.refresh_token) {
-      accessToken = await refreshAccessToken(integration.refresh_token);
+    if (now >= expiresAt && creds.refresh_token) {
+      accessToken = await refreshAccessToken(creds.refresh_token);
 
-      // Update the new access token in the database
       const newExpiresAt = new Date(Date.now() + (3600 * 1000)).toISOString();
+      const updatedCredentials = {
+        ...creds,
+        access_token: accessToken,
+        token_expires_at: newExpiresAt,
+      };
 
-      if (clubId) {
-        await supabase
-          .from('club_integrations')
-          .update({
-            access_token: accessToken,
-            token_expires_at: newExpiresAt
-          })
-          .eq('id', integration.id);
-      } else if (associationId && associationType) {
-        const tableName = associationType === 'state'
-          ? 'state_association_integrations'
-          : 'national_association_integrations';
-
-        await supabase
-          .from(tableName)
-          .update({
-            access_token: accessToken,
-            token_expires_at: newExpiresAt
-          })
-          .eq('id', integration.id);
-      }
+      await supabase
+        .from('integrations')
+        .update({ credentials: updatedCredentials })
+        .eq('id', integration.id);
     }
 
-    // Create the calendar event with Google Meet
     const eventData = {
       summary: meetingName,
       description: meetingDescription || '',
       start: {
         dateTime: startDateTime,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timeZone: 'Australia/Sydney',
       },
       end: {
         dateTime: endDateTime,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timeZone: 'Australia/Sydney',
       },
       conferenceData: {
         createRequest: {
@@ -172,9 +136,9 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    const calendarId = integration.google_calendar_id || 'primary';
+    const calendarId = creds.google_calendar_id || 'primary';
     const calendarResponse = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?conferenceDataVersion=1`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1`,
       {
         method: 'POST',
         headers: {
@@ -192,7 +156,6 @@ Deno.serve(async (req: Request) => {
 
     const eventResult = await calendarResponse.json();
 
-    // Extract Google Meet link
     const meetLink = eventResult.hangoutLink || eventResult.conferenceData?.entryPoints?.find(
       (ep: any) => ep.entryPointType === 'video'
     )?.uri;

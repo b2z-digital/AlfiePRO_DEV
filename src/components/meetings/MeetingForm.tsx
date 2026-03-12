@@ -300,37 +300,23 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
   const checkGoogleIntegration = async () => {
     try {
-      if (clubId) {
-        const { data, error } = await supabase
-          .from('club_integrations')
-          .select('is_enabled')
-          .eq('club_id', clubId)
-          .eq('provider', 'google')
-          .eq('is_enabled', true)
-          .maybeSingle();
+      const idColumn = clubId ? 'club_id'
+        : associationType === 'state' ? 'state_association_id'
+        : 'national_association_id';
+      const orgId = clubId || associationId;
 
-        if (!error && data) {
-          setHasGoogleIntegration(true);
-        }
-      } else if (associationId && associationType) {
-        const tableName = associationType === 'state'
-          ? 'state_association_integrations'
-          : 'national_association_integrations';
-        const idColumn = associationType === 'state'
-          ? 'state_association_id'
-          : 'national_association_id';
+      if (!orgId) return;
 
-        const { data, error } = await supabase
-          .from(tableName)
-          .select('is_enabled')
-          .eq(idColumn, associationId)
-          .eq('provider', 'google')
-          .eq('is_enabled', true)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from('integrations')
+        .select('id, credentials')
+        .eq(idColumn, orgId)
+        .eq('platform', 'google')
+        .eq('is_active', true)
+        .maybeSingle();
 
-        if (!error && data) {
-          setHasGoogleIntegration(true);
-        }
+      if (!error && data?.credentials?.refresh_token) {
+        setHasGoogleIntegration(true);
       }
     } catch (err) {
       console.error('Error checking Google integration:', err);
