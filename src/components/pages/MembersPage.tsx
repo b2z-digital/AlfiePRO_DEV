@@ -33,7 +33,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'archived' | 'cancelled'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'cancelled'>('all');
   const [filterBoatClass, setFilterBoatClass] = useState<string>('all');
   const [boatClasses, setBoatClasses] = useState<string[]>([]);
   const [showMembershipForm, setShowMembershipForm] = useState(false);
@@ -335,13 +335,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         `)
         .eq('club_id', currentClub?.clubId);
 
-      // Filter by membership status
-      if (filterStatus === 'archived') {
-        query = query.eq('membership_status', 'archived');
-      } else if (filterStatus === 'cancelled') {
-        query = query.eq('membership_status', 'cancelled');
+      // Filter by membership status at DB level
+      if (filterStatus === 'cancelled') {
+        query = query.or('membership_status.eq.cancelled,membership_status.eq.archived');
       } else {
-        // For active views, exclude archived and cancelled members
+        // For all, active, and expired tabs - exclude cancelled/archived at DB level
+        // The active vs expired distinction is handled client-side via is_financial
         query = query.or('membership_status.eq.active,membership_status.is.null');
       }
 
@@ -400,7 +399,16 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     // Step 1: Apply advanced filter if active
     let filtered = hasActiveFilter ? filterMembers(members, filterConfig) : members;
 
-    // Step 2: Apply search filter
+    // Step 2: Apply tab-level status filter client-side
+    if (filterStatus === 'active') {
+      filtered = filtered.filter(m => m.is_financial === true);
+    } else if (filterStatus === 'expired') {
+      // Expired = active membership status but not financial (renewal overdue)
+      filtered = filtered.filter(m => m.is_financial === false || m.is_financial === null);
+    }
+    // 'all' and 'cancelled' use the data already scoped by the DB query
+
+    // Step 3: Apply search filter
     filtered = filtered.filter(member => {
       const matchesSearch =
         `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -642,7 +650,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <p className="text-slate-400 text-sm">
-            {filteredMembers.filter(m => m.is_financial).length} {filteredMembers.filter(m => m.is_financial).length === 1 ? 'Member' : 'Members'} Active
+            {members.filter(m => m.is_financial === true).length} {members.filter(m => m.is_financial === true).length === 1 ? 'Member' : 'Members'} Financial
+            {members.filter(m => m.is_financial === false || m.is_financial === null).length > 0 && (
+              <span className="ml-2 text-yellow-400">
+                · {members.filter(m => m.is_financial === false || m.is_financial === null).length} Overdue
+              </span>
+            )}
           </p>
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5 text-green-400">
@@ -810,26 +823,28 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       {/* Status Filter Tabs */}
       <div className="flex items-center gap-1 border-b border-slate-700/50 pb-0">
-        {(['all', 'active', 'expired', 'archived', 'cancelled'] as const).map((status) => {
+        {(['all', 'active', 'expired', 'cancelled'] as const).map((status) => {
+          const allNonCancelled = members;
+          const activeCnt = allNonCancelled.filter(m => m.is_financial === true).length;
+          const expiredCnt = allNonCancelled.filter(m => m.is_financial === false || m.is_financial === null).length;
+
           const labels: Record<string, string> = {
-            all: 'All Members',
-            active: 'Active',
-            expired: 'Expired',
-            archived: 'Archived',
+            all: `All Members`,
+            active: `Active (${activeCnt})`,
+            expired: `Overdue (${expiredCnt})`,
             cancelled: 'Cancelled',
           };
           const activeStyles: Record<string, string> = {
             all: 'border-blue-500 text-blue-400',
             active: 'border-green-500 text-green-400',
             expired: 'border-yellow-500 text-yellow-400',
-            archived: 'border-slate-400 text-slate-300',
             cancelled: 'border-red-500 text-red-400',
           };
           const isActive = filterStatus === status;
           return (
             <button
               key={status}
-              onClick={() => setFilterStatus(status)}
+              onClick={() => setFilterStatus(status as typeof filterStatus)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 isActive
                   ? activeStyles[status]
