@@ -162,18 +162,32 @@ serve(async (req) => {
       rootFolderId
     })
 
-    const { data: savedData, error: dbError } = await supabase
+    // Check if an existing record exists (partial unique indexes don't support onConflict strings)
+    const { data: existing } = await supabase
       .from('integrations')
-      .upsert(integrationData, {
-        onConflict: `${idColumn},platform`
-      })
-      .select()
+      .select('id')
+      .eq(idColumn, organizationId)
+      .eq('platform', 'google_drive')
+      .maybeSingle()
 
-    console.log('Database upsert result:', { savedData, dbError })
+    let dbError: unknown
+    if (existing?.id) {
+      const { error } = await supabase
+        .from('integrations')
+        .update(integrationData)
+        .eq('id', existing.id)
+      dbError = error
+    } else {
+      const { error } = await supabase
+        .from('integrations')
+        .insert(integrationData)
+      dbError = error
+    }
 
     if (dbError) {
+      const err = dbError as { message: string }
       console.error('Database error details:', dbError)
-      throw new Error(`Database error: ${dbError.message}`)
+      throw new Error(`Database error: ${err.message}`)
     }
 
     // Create a default resource category for Google Drive files
