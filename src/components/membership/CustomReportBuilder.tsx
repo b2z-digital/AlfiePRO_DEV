@@ -51,16 +51,21 @@ const AVAILABLE_METRICS = [
   { value: 'club', label: 'Club' },
   { value: 'date_joined', label: 'Join Date' },
   { value: 'renewal_date', label: 'Renewal Date' },
-  { value: 'boat_class', label: 'Boat Class' },
+  { value: 'category', label: 'Member Category' },
+  { value: 'state', label: 'State' },
+  { value: 'country', label: 'Country' },
 ];
 
 const GROUP_BY_OPTIONS = [
   { value: 'club', label: 'Club' },
   { value: 'membership_level', label: 'Membership Type' },
-  { value: 'boat_class', label: 'Boat Class' },
+  { value: 'category', label: 'Member Category' },
+  { value: 'state', label: 'State' },
+  { value: 'country', label: 'Country' },
   { value: 'month_joined', label: 'Month Joined' },
   { value: 'year_joined', label: 'Year Joined' },
   { value: 'financial_status', label: 'Financial Status' },
+  { value: 'payment_status', label: 'Payment Status' },
 ];
 
 const CHART_TYPES = [
@@ -153,7 +158,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
     let query = supabase
       .from('members')
-      .select('id, first_name, last_name, membership_level, club_id, club, date_joined, renewal_date, is_financial, membership_status, boat_class')
+      .select('id, first_name, last_name, membership_level, club_id, club, date_joined, renewal_date, is_financial, membership_status, category, state, country, payment_status')
       .in('club_id', clubIds);
 
     if (dateRange.from) query = query.gte('date_joined', dateRange.from);
@@ -183,7 +188,10 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
       club: 'club_id',
       date_joined: 'date_joined',
       renewal_date: 'renewal_date',
-      boat_class: 'boat_class',
+      category: 'category',
+      state: 'state',
+      country: 'country',
+      payment_status: 'payment_status',
     };
     return map[field] || null;
   };
@@ -204,7 +212,10 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
       let key = '';
       if (groupBy.field === 'club') key = clubMap.get(m.club_id) || m.club || 'Unknown';
       else if (groupBy.field === 'membership_level') key = m.membership_level || 'Unknown';
-      else if (groupBy.field === 'boat_class') key = m.boat_class || 'Unspecified';
+      else if (groupBy.field === 'category') key = m.category || 'Unspecified';
+      else if (groupBy.field === 'state') key = m.state || 'Unknown';
+      else if (groupBy.field === 'country') key = m.country || 'Unknown';
+      else if (groupBy.field === 'payment_status') key = m.payment_status || 'Unknown';
       else if (groupBy.field === 'month_joined') {
         if (m.date_joined) {
           const d = new Date(m.date_joined);
@@ -224,8 +235,8 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
     for (const [label, groupMembers] of groups) {
       const row: ReportRow = { [groupBy.label]: label };
       for (const metric of metrics) {
-        if (metric.field === 'total_members') row['Total Members'] = groupMembers.filter(m => m.membership_status === 'active').length;
-        else if (metric.field === 'financial_members') row['Financial Members'] = groupMembers.filter(m => m.is_financial).length;
+        if (metric.field === 'total_members') row[metric.label] = groupMembers.filter(m => m.membership_status === 'active').length;
+        else if (metric.field === 'financial_members') row[metric.label] = groupMembers.filter(m => m.is_financial).length;
         else row[metric.label] = groupMembers.length;
       }
       rows.push(row);
