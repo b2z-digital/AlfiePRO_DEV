@@ -201,27 +201,42 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
 
   const handleCancelSubscription = async () => {
     if (!clubToCancel) return;
-    
+
     try {
       setCancelLoading(true);
       setError(null);
-      
-      // Delete all club data
-      const { error: deleteError } = await supabase
+
+      // Cancel all active members for this club (set to cancelled, do NOT delete)
+      await supabase
+        .from('members')
+        .update({
+          membership_status: 'cancelled',
+          is_financial: false,
+          cancelled_at: new Date().toISOString(),
+          cancelled_reason: 'manual'
+        })
+        .eq('club_id', clubToCancel.club_id)
+        .in('membership_status', ['active', 'expired']);
+
+      // Mark the club subscription as cancelled rather than deleting the club
+      const { error: updateError } = await supabase
         .from('clubs')
-        .delete()
+        .update({
+          subscription_status: 'cancelled',
+          subscription_cancelled_at: new Date().toISOString()
+        })
         .eq('id', clubToCancel.club_id);
-      
-      if (deleteError) throw deleteError;
-      
+
+      if (updateError) throw updateError;
+
       // Refresh the data
       await fetchClubSubscriptions();
       await refreshUserClubs();
-      addNotification('success', 'Subscription cancelled successfully');
-      
+      addNotification('success', 'Subscription cancelled. Your data has been preserved and can be reactivated at any time.');
+
       setShowCancelModal(false);
       setClubToCancel(null);
-      
+
     } catch (err) {
       console.error('Error cancelling subscription:', err);
       setError(err instanceof Error ? err.message : 'Failed to cancel subscription');
@@ -480,10 +495,13 @@ export const SubscriptionManagement: React.FC<SubscriptionManagementProps> = ({ 
                       Are you sure?
                     </h3>
                     <p className={`text-center ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Cancelling this subscription will permanently delete all data for{' '}
-                      <strong>{clubToCancel.club_name}</strong>
-                      {clubToCancel.organization_type !== 'club' && ' and all associated clubs'}.
-                      This action cannot be undone.
+                      This will cancel the subscription for{' '}
+                      <strong>{clubToCancel.club_name}</strong>.
+                      All member data and history will be preserved. Members will have their
+                      membership status set to cancelled and will be prompted to renew when they next log in.
+                    </p>
+                    <p className={`text-center text-sm mt-3 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                      You can reactivate the subscription at any time.
                     </p>
                   </div>
 

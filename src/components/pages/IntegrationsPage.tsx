@@ -256,11 +256,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         data = result.data;
         error = result.error;
       } else if (currentOrganization?.id) {
-        console.log('Fetching integrations for association:', currentOrganization.id);
+        console.log('Fetching integrations for association:', currentOrganization.id, currentOrganization.type);
+        const idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
         const result = await supabase
           .from('integrations')
           .select('*')
-          .eq('club_id', currentOrganization.id);
+          .eq(idColumn, currentOrganization.id);
         data = result.data;
         error = result.error;
       }
@@ -449,6 +450,9 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       case 'stripe':
         await handleDisconnectStripe();
         break;
+      case 'google_drive':
+        await handleDisconnectGoogleDrive();
+        break;
       default:
         await toggleIntegrationEnabled(integrationId);
     }
@@ -529,7 +533,19 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
 
   const handleConnectGoogleDrive = async () => {
     try {
-      const clientId = import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID || '230273275079-723coi1ukfg2vngapur5djnug1cer6hd.apps.googleusercontent.com';
+      // Fetch the client ID from the edge function to guarantee it matches the server-side secret
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const clientIdRes = await fetch(`${supabaseUrl}/functions/v1/google-drive-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const clientIdData = await clientIdRes.json();
+      if (!clientIdData.clientId) {
+        throw new Error('Google Drive is not configured. Please contact support.');
+      }
+      const clientId = clientIdData.clientId;
+
       const redirectUri = `${window.location.origin}/settings`;
       const scope = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly';
 
@@ -553,7 +569,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       window.location.href = authUrl;
     } catch (err) {
       console.error('Error initiating Google Drive OAuth:', err);
-      addNotification('error', 'Failed to connect Google Drive');
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Google Drive');
     }
   };
 
@@ -667,6 +683,35 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     } catch (err) {
       console.error('Error disconnecting Stripe:', err);
       setError(err instanceof Error ? err.message : 'Failed to disconnect Stripe');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnectGoogleDrive = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      let query = supabase.from('integrations').delete().eq('platform', 'google_drive');
+
+      if (currentClub?.clubId) {
+        query = query.eq('club_id', currentClub.clubId);
+      } else if (currentOrganization?.id) {
+        const idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
+        query = query.eq(idColumn, currentOrganization.id);
+      } else {
+        throw new Error('No organisation found');
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+
+      await fetchIntegrationStatus();
+      addNotification('success', 'Google Drive disconnected successfully');
+    } catch (err) {
+      console.error('Error disconnecting Google Drive:', err);
+      setError(err instanceof Error ? err.message : 'Failed to disconnect Google Drive');
     } finally {
       setSaving(false);
     }

@@ -33,7 +33,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'archived'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'archived' | 'cancelled'>('all');
   const [filterBoatClass, setFilterBoatClass] = useState<string>('all');
   const [boatClasses, setBoatClasses] = useState<string[]>([]);
   const [showMembershipForm, setShowMembershipForm] = useState(false);
@@ -338,8 +338,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       // Filter by membership status
       if (filterStatus === 'archived') {
         query = query.eq('membership_status', 'archived');
+      } else if (filterStatus === 'cancelled') {
+        query = query.eq('membership_status', 'cancelled');
       } else {
-        // For non-archived views, exclude archived members
+        // For active views, exclude archived and cancelled members
         query = query.or('membership_status.eq.active,membership_status.is.null');
       }
 
@@ -500,6 +502,32 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     } catch (err) {
       console.error('Error restoring member:', err);
       addNotification(err instanceof Error ? err.message : 'Failed to restore member', 'error');
+    }
+  };
+
+  const handleReactivateMember = async (memberId: string) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+
+    if (!confirm(`Reactivate ${member.first_name} ${member.last_name}?\n\nThis will set their status to active and allow them to log in again.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('members').update({
+        membership_status: 'active',
+        is_financial: true,
+        cancelled_at: null,
+        cancelled_reason: null,
+      }).eq('id', memberId);
+
+      if (error) throw error;
+
+      addNotification(`${member.first_name} ${member.last_name} reactivated successfully`, 'success');
+      fetchMembers();
+    } catch (err) {
+      console.error('Error reactivating member:', err);
+      addNotification(err instanceof Error ? err.message : 'Failed to reactivate member', 'error');
     }
   };
 
@@ -780,6 +808,40 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           </div>
       </div>
 
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-1 border-b border-slate-700/50 pb-0">
+        {(['all', 'active', 'expired', 'archived', 'cancelled'] as const).map((status) => {
+          const labels: Record<string, string> = {
+            all: 'All Members',
+            active: 'Active',
+            expired: 'Expired',
+            archived: 'Archived',
+            cancelled: 'Cancelled',
+          };
+          const activeStyles: Record<string, string> = {
+            all: 'border-blue-500 text-blue-400',
+            active: 'border-green-500 text-green-400',
+            expired: 'border-yellow-500 text-yellow-400',
+            archived: 'border-slate-400 text-slate-300',
+            cancelled: 'border-red-500 text-red-400',
+          };
+          const isActive = filterStatus === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                isActive
+                  ? activeStyles[status]
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {labels[status]}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -907,6 +969,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
+                          {(member as any).membership_status === 'cancelled' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
+                              <UserX size={11} />
+                              Cancelled
+                            </span>
+                          ) : (
                           <span className={`
                             inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                             ${member.is_financial
@@ -915,6 +983,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                           `}>
                             {member.is_financial ? 'Financial' : 'Unfinancial'}
                           </span>
+                          )}
                           {(member as any).payment_status === 'pending' && (
                             <button
                               onClick={(e) => {
@@ -1054,6 +1123,17 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               title="Restore member"
                             >
                               <ArchiveRestore size={16} />
+                            </button>
+                          ) : filterStatus === 'cancelled' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReactivateMember(member.id);
+                              }}
+                              className="p-1.5 rounded-lg text-green-400 hover:bg-green-900/30 transition-colors"
+                              title="Reactivate membership"
+                            >
+                              <UserCheck size={16} />
                             </button>
                           ) : (
                             <>
