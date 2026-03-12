@@ -318,6 +318,40 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (action === 'rename_file') {
+      const { organizationId, organizationType, fileId, newName } = body;
+
+      if (!fileId || !newName) {
+        throw new Error('fileId and newName are required');
+      }
+
+      const accessToken = await getAccessToken(organizationId, organizationType);
+
+      const renameResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: newName }),
+        }
+      );
+
+      if (!renameResponse.ok) {
+        const error = await renameResponse.text();
+        console.error('Rename error:', error);
+        throw new Error('Failed to rename file in Google Drive');
+      }
+
+      const renamed = await renameResponse.json();
+      return new Response(
+        JSON.stringify({ success: true, file: renamed }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

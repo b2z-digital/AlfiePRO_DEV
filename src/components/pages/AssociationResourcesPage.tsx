@@ -70,6 +70,11 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ item: DriveItem; x: number; y: number } | null>(null);
 
+  // Drive rename modal
+  const [driveRenameItem, setDriveRenameItem] = useState<DriveItem | null>(null);
+  const [driveRenameName, setDriveRenameName] = useState('');
+  const [driveRenaming, setDriveRenaming] = useState(false);
+
   // Category modal
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ResourceStorage.ResourceCategory | null>(null);
@@ -280,6 +285,33 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     } catch (err: any) {
       addNotification(err.message || 'Failed to delete file', 'error');
     }
+  };
+
+  const handleDriveRename = async () => {
+    if (!driveRenameItem || !driveRenameName.trim()) return;
+    setDriveRenaming(true);
+    try {
+      await callDriveApi({
+        action: 'rename_file',
+        organizationId,
+        organizationType,
+        fileId: driveRenameItem.id,
+        newName: driveRenameName.trim(),
+      });
+      addNotification(`Renamed to "${driveRenameName.trim()}"`, 'success');
+      setDriveRenameItem(null);
+      setDriveRenameName('');
+      if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to rename', 'error');
+    } finally {
+      setDriveRenaming(false);
+    }
+  };
+
+  const openDriveRename = (item: DriveItem) => {
+    setDriveRenameItem(item);
+    setDriveRenameName(item.name);
   };
 
   const handleOpenDrive = () => {
@@ -852,6 +884,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 onItemClick={handleDriveItemClick}
                 onDownload={handleDriveDownload}
                 onDelete={handleDriveDelete}
+                onRename={openDriveRename}
                 getFileIcon={getFileIcon}
                 getFileIconColor={getFileIconColor}
                 getFileBgColor={getFileBgColor}
@@ -1084,6 +1117,43 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
                 {resourceSaving ? 'Saving...' : editingResource ? 'Update' : 'Add Resource'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drive Rename Modal */}
+      {driveRenameItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
+              <h3 className="text-lg font-semibold text-white">Rename</h3>
+              <button onClick={() => { setDriveRenameItem(null); setDriveRenameName(''); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5">
+              <label className="text-sm font-medium text-slate-300 block mb-1.5">New name</label>
+              <input
+                type="text"
+                value={driveRenameName}
+                onChange={e => setDriveRenameName(e.target.value)}
+                className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleDriveRename()}
+              />
+            </div>
+            <div className="p-5 pt-0 flex justify-end gap-3">
+              <button onClick={() => { setDriveRenameItem(null); setDriveRenameName(''); }} className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleDriveRename}
+                disabled={driveRenaming || !driveRenameName.trim()}
+                className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+              >
+                {driveRenaming ? 'Renaming...' : 'Rename'}
               </button>
             </div>
           </div>
@@ -1481,6 +1551,7 @@ const DriveView: React.FC<{
   onItemClick: (item: DriveItem) => void;
   onDownload: (item: DriveItem) => void;
   onDelete: (item: DriveItem) => void;
+  onRename: (item: DriveItem) => void;
   getFileIcon: (m?: string, f?: boolean) => React.ElementType;
   getFileIconColor: (m?: string, f?: boolean) => string;
   getFileBgColor: (m?: string, f?: boolean) => string;
@@ -1488,7 +1559,7 @@ const DriveView: React.FC<{
   formatDate: (iso?: string) => string;
   contextMenu: { item: DriveItem; x: number; y: number } | null;
   setContextMenu: React.Dispatch<React.SetStateAction<{ item: DriveItem; x: number; y: number } | null>>;
-}> = ({ items, loading, viewMode, hasGoogleDrive, driveRootFolderId, onItemClick, onDownload, onDelete, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, contextMenu, setContextMenu }) => {
+}> = ({ items, loading, viewMode, hasGoogleDrive, driveRootFolderId, onItemClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, contextMenu, setContextMenu }) => {
   if (!hasGoogleDrive) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -1547,6 +1618,7 @@ const DriveView: React.FC<{
                   onRightClick={handleRightClick}
                   onDownload={onDownload}
                   onDelete={onDelete}
+                  onRename={onRename}
                   getFileIcon={getFileIcon}
                   getFileIconColor={getFileIconColor}
                   getFileBgColor={getFileBgColor}
@@ -1568,6 +1640,7 @@ const DriveView: React.FC<{
                   onRightClick={handleRightClick}
                   onDownload={onDownload}
                   onDelete={onDelete}
+                  onRename={onRename}
                   getFileIcon={getFileIcon}
                   getFileIconColor={getFileIconColor}
                   getFileBgColor={getFileBgColor}
@@ -1585,6 +1658,7 @@ const DriveView: React.FC<{
             onOpen={onItemClick}
             onDownload={onDownload}
             onDelete={onDelete}
+            onRename={onRename}
             onClose={() => setContextMenu(null)}
           />
         )}
@@ -1625,12 +1699,15 @@ const DriveView: React.FC<{
                   <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">{formatDate(item.modifiedTime)}</td>
                   <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{formatFileSize(item.size)}</td>
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <div className="hidden group-hover:flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {!item.isFolder && (
                         <button onClick={() => onDownload(item)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Download">
                           <Download size={12} />
                         </button>
                       )}
+                      <button onClick={() => onRename(item)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Rename">
+                        <Edit2 size={12} />
+                      </button>
                       <button onClick={() => window.open(item.webViewLink, '_blank')} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors" title="Open in Drive">
                         <ExternalLink size={12} />
                       </button>
@@ -1653,6 +1730,7 @@ const DriveView: React.FC<{
           onOpen={onItemClick}
           onDownload={onDownload}
           onDelete={onDelete}
+          onRename={onRename}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -1666,11 +1744,12 @@ const DriveGridCard: React.FC<{
   onRightClick: (e: React.MouseEvent, item: DriveItem) => void;
   onDownload: (item: DriveItem) => void;
   onDelete: (item: DriveItem) => void;
+  onRename: (item: DriveItem) => void;
   getFileIcon: (m?: string, f?: boolean) => React.ElementType;
   getFileIconColor: (m?: string, f?: boolean) => string;
   getFileBgColor: (m?: string, f?: boolean) => string;
   formatFileSize: (b?: string | number) => string;
-}> = ({ item, onClick, onRightClick, onDownload, onDelete, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize }) => {
+}> = ({ item, onClick, onRightClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize }) => {
   const Icon = getFileIcon(item.mimeType, item.isFolder);
   const iconColor = getFileIconColor(item.mimeType, item.isFolder);
   const bgColor = getFileBgColor(item.mimeType, item.isFolder);
@@ -1691,6 +1770,9 @@ const DriveGridCard: React.FC<{
             <Download size={10} className="text-slate-300" />
           </button>
         )}
+        <button onClick={() => onRename(item)} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors" title="Rename">
+          <Edit2 size={10} className="text-slate-300" />
+        </button>
         <button onClick={() => window.open(item.webViewLink, '_blank')} className="p-1 bg-slate-700/90 rounded hover:bg-slate-600 transition-colors" title="Open in Drive">
           <ExternalLink size={10} className="text-slate-300" />
         </button>
@@ -1709,8 +1791,9 @@ const DriveContextMenu: React.FC<{
   onOpen: (item: DriveItem) => void;
   onDownload: (item: DriveItem) => void;
   onDelete: (item: DriveItem) => void;
+  onRename: (item: DriveItem) => void;
   onClose: () => void;
-}> = ({ item, x, y, onOpen, onDownload, onDelete, onClose }) => {
+}> = ({ item, x, y, onOpen, onDownload, onDelete, onRename, onClose }) => {
   return (
     <div
       className="fixed z-[9999] bg-slate-800 border border-slate-700/60 rounded-xl shadow-2xl py-1 min-w-[180px]"
@@ -1733,6 +1816,13 @@ const DriveContextMenu: React.FC<{
           Download
         </button>
       )}
+      <button
+        className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
+        onClick={() => { onRename(item); onClose(); }}
+      >
+        <Edit2 size={14} />
+        Rename
+      </button>
       <button
         className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors"
         onClick={() => { window.open(item.webViewLink, '_blank'); onClose(); }}
