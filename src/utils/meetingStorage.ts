@@ -99,6 +99,9 @@ export const createMeeting = async (
     const insertData: any = {
       name: meetingData.name,
       location: meetingData.location,
+      location_lat: (meetingData as any).location_lat || null,
+      location_lng: (meetingData as any).location_lng || null,
+      location_place_id: (meetingData as any).location_place_id || null,
       date: meetingData.date,
       start_time: meetingData.start_time,
       end_time: meetingData.end_time,
@@ -210,6 +213,9 @@ export const updateMeeting = async (meetingId: string, meetingData: MeetingFormD
       .update({
         name: meetingData.name,
         location: meetingData.location,
+        location_lat: (meetingData as any).location_lat || null,
+        location_lng: (meetingData as any).location_lng || null,
+        location_place_id: (meetingData as any).location_place_id || null,
         date: meetingData.date,
         start_time: meetingData.start_time,
         end_time: meetingData.end_time,
@@ -481,25 +487,13 @@ export const updateMeetingRsvp = async (
   status: 'attending' | 'not_attending' | 'pending'
 ): Promise<void> => {
   try {
-    const { data: existing } = await supabase
+    const { error } = await supabase
       .from('meeting_attendance')
-      .select('id')
-      .eq('meeting_id', meetingId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existing) {
-      const { error } = await supabase
-        .from('meeting_attendance')
-        .update({ status })
-        .eq('id', existing.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('meeting_attendance')
-        .insert({ meeting_id: meetingId, user_id: userId, status });
-      if (error) throw error;
-    }
+      .upsert(
+        { meeting_id: meetingId, user_id: userId, status },
+        { onConflict: 'meeting_id,user_id' }
+      );
+    if (error) throw error;
   } catch (error) {
     console.error('Error updating meeting RSVP:', error);
     throw error;

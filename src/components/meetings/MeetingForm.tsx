@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
@@ -6,6 +6,7 @@ import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { MemberSelect } from '../ui/MemberSelect';
+import { loadGoogleMaps } from '../../utils/googleMaps';
 
 const recurrenceDescriptions: Record<RecurrenceType, string> = {
   none: 'This meeting will not repeat',
@@ -190,9 +191,16 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     { item_number: 2, item_name: '', owner_id: undefined, type: 'for_discussion' }
   ]);
   
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<any>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
   const [formData, setFormData] = useState<{
     name: string;
     location: string;
+    location_lat: number | null;
+    location_lng: number | null;
+    location_place_id: string;
     date: string;
     start_time: string;
     end_time: string;
@@ -208,6 +216,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   }>({
     name: '',
     location: '',
+    location_lat: null,
+    location_lng: null,
+    location_place_id: '',
     date: new Date().toISOString().split('T')[0],
     start_time: '09:00',
     end_time: '10:00',
@@ -230,6 +241,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       setFormData({
         name: meeting.name,
         location: meeting.location || '',
+        location_lat: (meeting as any).location_lat || null,
+        location_lng: (meeting as any).location_lng || null,
+        location_place_id: (meeting as any).location_place_id || '',
         date: meeting.date,
         start_time: meeting.start_time?.substring(0, 5) || '09:00',
         end_time: meeting.end_time?.substring(0, 5) || '10:00',
@@ -244,10 +258,45 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         visible_to_member_clubs: meeting.visible_to_member_clubs ?? true
       });
 
-      // Fetch agenda items
       fetchAgendaItems();
     }
   }, [meeting, clubId, associationId, associationType]);
+
+  useEffect(() => {
+    loadGoogleMaps(() => setMapsLoaded(true));
+  }, []);
+
+  const initAutocomplete = useCallback(() => {
+    if (!mapsLoaded || !locationInputRef.current || autocompleteRef.current) return;
+
+    const autocomplete = new (window as any).google.maps.places.Autocomplete(locationInputRef.current, {
+      types: ['establishment', 'geocode'],
+      fields: ['formatted_address', 'geometry', 'place_id', 'name']
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry?.location) return;
+
+      const displayName = place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)
+        ? `${place.name}, ${place.formatted_address}`
+        : place.formatted_address || place.name || '';
+
+      setFormData(prev => ({
+        ...prev,
+        location: displayName,
+        location_lat: place.geometry!.location!.lat(),
+        location_lng: place.geometry!.location!.lng(),
+        location_place_id: place.place_id || ''
+      }));
+    });
+
+    autocompleteRef.current = autocomplete;
+  }, [mapsLoaded]);
+
+  useEffect(() => {
+    initAutocomplete();
+  }, [initAutocomplete]);
 
   const checkGoogleIntegration = async () => {
     try {
@@ -532,6 +581,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       const meetingData: any = {
         name: formData.name,
         location: formData.location,
+        location_lat: formData.location_lat,
+        location_lng: formData.location_lng,
+        location_place_id: formData.location_place_id || undefined,
         date: formData.date,
         start_time: formData.start_time,
         end_time: formData.end_time,
@@ -761,16 +813,31 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                     Location
                   </label>
                   <div className="relative">
-                    <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
                     <input
+                      ref={locationInputRef}
                       type="text"
                       name="location"
                       value={formData.location}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          location: e.target.value,
+                          location_lat: null,
+                          location_lng: null,
+                          location_place_id: ''
+                        }));
+                      }}
                       className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Meeting location"
+                      placeholder={mapsLoaded ? "Start typing an address..." : "Meeting location"}
                     />
                   </div>
+                  {formData.location_lat && formData.location_lng && (
+                    <p className="mt-1 text-xs text-emerald-400 flex items-center gap-1">
+                      <Check size={12} />
+                      Address verified with coordinates
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -846,7 +913,12 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, meeting_type: 'online' }))}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, meeting_type: 'online' }));
+                      if (hasGoogleIntegration && !formData.conferencing_url) {
+                        setTimeout(() => createGoogleMeet(), 100);
+                      }
+                    }}
                     className={`
                       px-4 py-3 rounded-lg text-sm font-medium transition-all border
                       ${formData.meeting_type === 'online'
@@ -860,7 +932,12 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, meeting_type: 'hybrid' }))}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, meeting_type: 'hybrid' }));
+                      if (hasGoogleIntegration && !formData.conferencing_url) {
+                        setTimeout(() => createGoogleMeet(), 100);
+                      }
+                    }}
                     className={`
                       px-4 py-3 rounded-lg text-sm font-medium transition-all border
                       ${formData.meeting_type === 'hybrid'
@@ -907,14 +984,20 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       placeholder={hasGoogleIntegration ? "Generate Google Meet or enter another video link" : "e.g., Zoom or Teams meeting link"}
                     />
                   </div>
-                  {hasGoogleIntegration && (
+                  {hasGoogleIntegration && !formData.conferencing_url && (
                     <p className="mt-1 text-xs text-slate-400">
                       Click "Generate Google Meet" to automatically create a meeting link, or enter your own Zoom/Teams link
                     </p>
                   )}
+                  {hasGoogleIntegration && formData.conferencing_url && (
+                    <p className="mt-1 text-xs text-emerald-400 flex items-center gap-1">
+                      <Check size={12} />
+                      Google Meet link generated
+                    </p>
+                  )}
                   {!hasGoogleIntegration && (
-                    <p className="mt-1 text-xs text-slate-400">
-                      Connect Google Calendar in Settings to automatically generate Google Meet links
+                    <p className="mt-1 text-xs text-amber-400">
+                      Google Calendar is not connected. Go to Settings &gt; Integrations to connect Google and auto-generate Meet links, or paste a Zoom/Teams link above.
                     </p>
                   )}
                 </div>
