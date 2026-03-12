@@ -99,6 +99,9 @@ export const createMeeting = async (
     const insertData: any = {
       name: meetingData.name,
       location: meetingData.location,
+      location_lat: (meetingData as any).location_lat || null,
+      location_lng: (meetingData as any).location_lng || null,
+      location_place_id: (meetingData as any).location_place_id || null,
       date: meetingData.date,
       start_time: meetingData.start_time,
       end_time: meetingData.end_time,
@@ -210,6 +213,9 @@ export const updateMeeting = async (meetingId: string, meetingData: MeetingFormD
       .update({
         name: meetingData.name,
         location: meetingData.location,
+        location_lat: (meetingData as any).location_lat || null,
+        location_lng: (meetingData as any).location_lng || null,
+        location_place_id: (meetingData as any).location_place_id || null,
         date: meetingData.date,
         start_time: meetingData.start_time,
         end_time: meetingData.end_time,

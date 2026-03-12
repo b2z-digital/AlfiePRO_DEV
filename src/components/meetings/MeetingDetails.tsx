@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, Edit2, Mail, Check, X, AlertTriangle, Play, Lock, Share, Shield, Users, Repeat } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, Edit2, Mail, Check, X, AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';
@@ -387,8 +387,19 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
                 {meeting.location && (
                   <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
-                    <MapPin size={16} className="text-amber-400" />
+                    <MapPin size={16} className="text-amber-400 flex-shrink-0" />
                     <span className="text-slate-200 font-medium">{meeting.location}</span>
+                    {(meeting as any).location_lat && (meeting as any).location_lng && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${(meeting as any).location_lat},${(meeting as any).location_lng}${(meeting as any).location_place_id ? `&destination_place_id=${(meeting as any).location_place_id}` : ''}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 text-xs font-medium transition-colors flex-shrink-0"
+                      >
+                        <Navigation size={12} />
+                        Directions
+                      </a>
+                    )}
                   </div>
                 )}
 
@@ -476,8 +487,8 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             {meeting.conferencing_url && (
               <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
                 <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-purple-500/20">
-                    <Video size={16} className="text-purple-400" />
+                  <div className="p-1.5 rounded-lg bg-blue-500/20">
+                    <Video size={16} className="text-blue-400" />
                   </div>
                   Video Conference
                 </h3>
@@ -485,9 +496,44 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                   href={meeting.conferencing_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 break-all font-medium underline decoration-blue-400/30 hover:decoration-blue-300 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 hover:text-blue-200 font-medium transition-colors"
                 >
-                  {meeting.conferencing_url}
+                  <Video size={16} />
+                  Join Meeting
+                  <ExternalLink size={14} />
+                </a>
+                <p className="mt-2 text-xs text-slate-400 break-all">{meeting.conferencing_url}</p>
+              </div>
+            )}
+
+            {(meeting as any).location_lat && (meeting as any).location_lng && (
+              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
+                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-emerald-500/20">
+                    <MapPin size={16} className="text-emerald-400" />
+                  </div>
+                  Venue Location
+                </h3>
+                <div className="rounded-lg overflow-hidden border border-slate-600/50 mb-3">
+                  <iframe
+                    src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${(meeting as any).location_lat},${(meeting as any).location_lng}&zoom=15`}
+                    width="100%"
+                    height="250"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${(meeting as any).location_lat},${(meeting as any).location_lng}${(meeting as any).location_place_id ? `&destination_place_id=${(meeting as any).location_place_id}` : ''}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 hover:text-emerald-200 font-medium transition-colors"
+                >
+                  <Navigation size={16} />
+                  Get Directions
+                  <ExternalLink size={14} />
                 </a>
               </div>
             )}
