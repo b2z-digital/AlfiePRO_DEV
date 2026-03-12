@@ -25,10 +25,10 @@ interface Integration {
     value: string;
     url?: string;
   };
-  subServices?: GoogleSubService[];
+  subServices?: SubService[];
 }
 
-interface GoogleSubService {
+interface SubService {
   id: string;
   name: string;
   connected: boolean;
@@ -82,6 +82,34 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       ],
     },
     {
+      id: 'meta_suite',
+      name: 'Meta Suite',
+      description: 'Facebook Pages and Instagram sharing integration.',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" fill="url(#metaGrad)" />
+          <path d="M21.5 11C21.5 11 20 9 16 9C12 9 10.5 12 10.5 14.5C10.5 17 11.5 18.5 13 20.5C14.5 22.5 15.5 23 16 23C16.5 23 17.5 22.5 19 20.5C20.5 18.5 21.5 17 21.5 14.5C21.5 12 21.5 11 21.5 11Z" stroke="white" strokeWidth="1.5" fill="none" />
+          <circle cx="13.5" cy="14.5" r="1.5" fill="white" />
+          <circle cx="18.5" cy="14.5" r="1.5" fill="white" />
+          <defs>
+            <linearGradient id="metaGrad" x1="2" y1="2" x2="30" y2="30" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#0081FB" />
+              <stop offset="0.5" stopColor="#0064E0" />
+              <stop offset="1" stopColor="#0052CC" />
+            </linearGradient>
+          </defs>
+        </svg>
+      ),
+      iconBg: 'bg-slate-700/50',
+      iconColor: 'text-white',
+      connected: false,
+      enabled: false,
+      subServices: [
+        { id: 'facebook', name: 'Facebook Pages', connected: false },
+        { id: 'instagram', name: 'Instagram', connected: false },
+      ],
+    },
+    {
       id: 'stripe',
       name: 'Stripe',
       description: 'Accept credit card payments for memberships and event entries.',
@@ -93,26 +121,6 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       ),
       iconBg: 'bg-slate-700/50',
       iconColor: 'text-white',
-      connected: false,
-      enabled: false,
-    },
-    {
-      id: 'facebook',
-      name: 'Facebook',
-      description: 'Connect with Facebook to directly reach and market to your followers.',
-      icon: <Facebook size={32} />,
-      iconBg: 'bg-blue-600/20',
-      iconColor: 'text-blue-400',
-      connected: false,
-      enabled: false,
-    },
-    {
-      id: 'instagram',
-      name: 'Instagram',
-      description: 'Share race photos and results directly to your Instagram account.',
-      icon: <Instagram size={32} />,
-      iconBg: 'bg-pink-600/20',
-      iconColor: 'text-pink-400',
       connected: false,
       enabled: false,
     },
@@ -262,7 +270,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
             setGoogleAnalyticsId(analytics.google_analytics_property_id || analytics.credentials?.property_id || '');
           }
 
-          const subServices: GoogleSubService[] = [
+          const subServices: SubService[] = [
             {
               id: 'google',
               name: 'Calendar & Meet',
@@ -318,27 +326,56 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
           };
         }
 
+        if (integration.id === 'meta_suite') {
+          const facebookData = data?.find(i => (i.platform === 'facebook' || i.platform === 'meta') && i.is_active);
+          const instagramData = data?.find(i => i.platform === 'instagram' && i.is_active);
+          const fbCreds = facebookData?.credentials || {};
+          const igCreds = instagramData?.credentials || {};
+
+          const metaSubServices: SubService[] = [
+            {
+              id: 'facebook',
+              name: 'Facebook Pages',
+              connected: !!facebookData,
+              connectedInfo: facebookData ? {
+                label: 'Page:',
+                value: fbCreds.page_name || 'Connected',
+                url: fbCreds.page_id ? `https://facebook.com/${fbCreds.page_id}` : undefined,
+              } : undefined,
+            },
+            {
+              id: 'instagram',
+              name: 'Instagram',
+              connected: !!instagramData,
+              connectedInfo: instagramData ? {
+                label: 'Account:',
+                value: igCreds.username ? `@${igCreds.username}` : 'Connected',
+                url: igCreds.username ? `https://instagram.com/${igCreds.username}` : undefined,
+              } : undefined,
+            },
+          ];
+
+          const anyMetaConnected = metaSubServices.some(s => s.connected);
+          const metaConnectedCount = metaSubServices.filter(s => s.connected).length;
+
+          return {
+            ...integration,
+            connected: anyMetaConnected,
+            enabled: anyMetaConnected,
+            subServices: metaSubServices,
+            connectedInfo: anyMetaConnected ? {
+              label: 'Connected services:',
+              value: `${metaConnectedCount} of ${metaSubServices.length} active`,
+            } : undefined,
+          };
+        }
+
         const dbIntegration = data?.find(i => i.platform === integration.id);
 
         if (dbIntegration && dbIntegration.is_active) {
           let connectedInfo;
-          const credentials = dbIntegration.credentials || {};
 
           switch (integration.id) {
-            case 'facebook':
-              connectedInfo = {
-                label: 'Connected to Facebook Page:',
-                value: credentials.page_name || '',
-                url: `https://facebook.com/${credentials.page_id}`
-              };
-              break;
-            case 'instagram':
-              connectedInfo = {
-                label: 'Connected to Instagram:',
-                value: `@${credentials.username || ''}`,
-                url: credentials.username ? `https://instagram.com/${credentials.username}` : undefined
-              };
-              break;
             case 'paypal':
               connectedInfo = {
                 label: 'PayPal Account:',
@@ -399,18 +436,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     const integration = integrations.find(i => i.id === integrationId);
     if (!integration) return;
 
-    if (integrationId === 'google_suite') {
+    if (integrationId === 'google_suite' || integrationId === 'meta_suite') {
       return;
     }
 
     if (!integration.connected) {
       switch (integrationId) {
-        case 'facebook':
-          handleConnectFacebook();
-          break;
-        case 'instagram':
-          handleConnectInstagram();
-          break;
         case 'stripe':
           await handleConnectStripe();
           break;
@@ -428,10 +459,6 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     }
 
     switch (integrationId) {
-      case 'facebook':
-        await handleDisconnectIntegration('meta');
-        break;
-      case 'instagram':
       case 'paypal':
         await handleDisconnectIntegration(integrationId);
         break;
@@ -816,6 +843,56 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     } catch (err) {
       console.error('Error disconnecting Google:', err);
       addNotification('error', 'Failed to disconnect Google');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleConnectMeta = () => {
+    handleConnectFacebook();
+  };
+
+  const handleMetaSubServiceToggle = async (subServiceId: string) => {
+    const metaSuite = integrations.find(i => i.id === 'meta_suite');
+    const sub = metaSuite?.subServices?.find(s => s.id === subServiceId);
+
+    if (sub?.connected) {
+      const platform = subServiceId === 'facebook' ? 'meta' : subServiceId;
+      await handleDisconnectIntegration(platform);
+    } else {
+      if (subServiceId === 'facebook') {
+        handleConnectFacebook();
+      } else if (subServiceId === 'instagram') {
+        handleConnectInstagram();
+      }
+    }
+  };
+
+  const handleDisconnectAllMeta = async () => {
+    try {
+      setSaving(true);
+      const orgId = currentClub?.clubId || currentOrganization?.id;
+      if (!orgId) return;
+
+      let idColumn = 'club_id';
+      if (!currentClub?.clubId && currentOrganization?.id) {
+        idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
+      }
+
+      const metaPlatforms = ['meta', 'facebook', 'instagram'];
+      for (const platform of metaPlatforms) {
+        await supabase
+          .from('integrations')
+          .delete()
+          .eq(idColumn, orgId)
+          .eq('platform', platform);
+      }
+
+      await fetchIntegrationStatus();
+      addNotification('success', 'Meta account disconnected');
+    } catch (err) {
+      console.error('Error disconnecting Meta:', err);
+      addNotification('error', 'Failed to disconnect Meta');
     } finally {
       setSaving(false);
     }
@@ -1279,7 +1356,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                   </div>
                 </div>
 
-                {integration.id === 'google_suite' ? (
+                {(integration.id === 'google_suite' || integration.id === 'meta_suite') ? (
                   integration.connected ? (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       <Check size={12} />
@@ -1393,7 +1470,75 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                 </div>
               )}
 
-              {integration.id !== 'google_suite' && integration.connectedInfo && (
+              {integration.id === 'meta_suite' && integration.subServices && (
+                <div className="mt-3">
+                  {!integration.connected ? (
+                    <button
+                      onClick={handleConnectMeta}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {saving ? <RefreshCw size={16} className="animate-spin" /> : null}
+                      Connect Meta Account
+                    </button>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Check size={14} className="text-emerald-400" />
+                          <span className="text-sm text-emerald-300 font-medium">
+                            {integration.subServices.find(s => s.id === 'facebook')?.connectedInfo?.value || 'Connected'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleDisconnectAllMeta}
+                          disabled={saving}
+                          className="text-xs px-2.5 py-1 rounded-md font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {integration.subServices.map(sub => (
+                          <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-700/30">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm text-slate-300">{sub.name}</span>
+                              {sub.connected && sub.connectedInfo && (
+                                <span className="text-xs text-slate-500 truncate">
+                                  {sub.connectedInfo.value}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleMetaSubServiceToggle(sub.id)}
+                              disabled={saving}
+                              className={`
+                                relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                transition-colors duration-200 ease-in-out
+                                ${sub.connected ? 'bg-emerald-500' : 'bg-slate-600'}
+                                ${saving ? 'opacity-50 cursor-not-allowed' : ''}
+                              `}
+                              role="switch"
+                              aria-checked={sub.connected}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`
+                                  pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0
+                                  transition duration-200 ease-in-out
+                                  ${sub.connected ? 'translate-x-4' : 'translate-x-0'}
+                                `}
+                              />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {integration.id !== 'google_suite' && integration.id !== 'meta_suite' && integration.connectedInfo && (
                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                   <div className="flex items-center justify-between">
                     <div>
