@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  User, 
-  Flag, 
-  Edit2, 
-  Trash2, 
-  CheckSquare, 
-  Paperclip, 
-  AlertTriangle, 
+  ArrowLeft,
+  Calendar,
+  Clock,
+  User,
+  Flag,
+  Edit2,
+  Trash2,
+  CheckSquare,
+  Paperclip,
+  AlertTriangle,
   Check,
   MessageSquare,
-  Eye
+  Eye,
+  XCircle
 } from 'lucide-react';
 import { Task } from '../../types/task';
 import { completeTask, getTaskAttachments } from '../../utils/taskStorage';
@@ -232,6 +233,14 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
           >
             <Trash2 size={18} />
             <span>Delete</span>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-700 text-white rounded-xl hover:from-green-700 hover:to-emerald-800 font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
+          >
+            <XCircle size={18} />
+            <span>Exit</span>
           </button>
         </div>
       </div>

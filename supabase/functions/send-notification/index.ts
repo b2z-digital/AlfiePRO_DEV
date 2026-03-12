@@ -234,7 +234,7 @@ async function sendEmail(opts: SendEmailOptions) {
     throw new Error('Default from email not configured')
   }
 
-  const senderEmail = opts.fromEmail || defaultFromEmail;
+  const senderEmail = opts.fromEmail || 'noreply@alfiepro.com.au';
   const displayClubName = opts.fromName || opts.clubName || 'Alfie PRO';
 
   let htmlContent: string;
@@ -387,34 +387,6 @@ async function sendEmail(opts: SendEmailOptions) {
 
               ${attachmentsHtml}
 
-              ${opts.responseToken ? `
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-                <tr>
-                  <td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;text-align:center;">
-                    <p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Response</p>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:24px;text-align:center;">
-                    <p style="margin:0 0 20px;font-size:16px;color:#0f172a;font-weight:600;">Will you be attending?</p>
-                    <table cellpadding="0" cellspacing="0" border="0" align="center">
-                      <tr>
-                        <td style="padding:0 6px">
-                          <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=attending" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;letter-spacing:0.3px;">Yes</a>
-                        </td>
-                        <td style="padding:0 6px">
-                          <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=maybe" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;letter-spacing:0.3px;">Maybe</a>
-                        </td>
-                        <td style="padding:0 6px">
-                          <a href="${Deno.env.get('SUPABASE_URL')}/functions/v1/meeting-attendance-response?token=${opts.responseToken}&status=not_attending" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:15px;letter-spacing:0.3px;">No</a>
-                        </td>
-                      </tr>
-                    </table>
-                    <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;">Click one of the buttons above to confirm your attendance</p>
-                  </td>
-                </tr>
-              </table>
-              ` : ''}
 
               <div style="margin:24px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0;">
                 <p style="margin:0;font-size:15px;color:#334155;">Best regards,</p>

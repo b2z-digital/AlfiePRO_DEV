@@ -97,6 +97,7 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
   const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]);
   const [membershipTypeBreakdown, setMembershipTypeBreakdown] = useState<MembershipTypeBreakdown[]>([]);
   const [showCustomReportBuilder, setShowCustomReportBuilder] = useState(false);
+  const [resolvedStateAssociationId, setResolvedStateAssociationId] = useState<string | undefined>(propStateAssociationId);
 
   useEffect(() => {
     if (user) {
@@ -127,6 +128,8 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
       if (!stateId) {
         throw new Error('No state association found');
       }
+
+      setResolvedStateAssociationId(stateId);
 
       // Get all clubs in this state
       const { data: clubs } = await supabase
@@ -804,6 +807,7 @@ export const AssociationMemberReports: React.FC<AssociationMemberReportsProps> =
         isOpen={showCustomReportBuilder}
         onClose={() => setShowCustomReportBuilder(false)}
         darkMode={darkMode}
+        stateAssociationId={resolvedStateAssociationId}
       />
     </div>
   );

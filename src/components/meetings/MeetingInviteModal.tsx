@@ -295,36 +295,21 @@ Thank you.
         .replace(/\[Meeting Time\]/g, meetingTime)
         .replace(/\[Meeting Location\]/g, meetingLocation);
 
-      const attendanceRecords = recipientMembers.map(member => ({
-        meeting_id: meetingId,
-        member_id: member.id,
-        user_id: member.user_id,
-        status: 'maybe'
-      }));
+      const seenUserIds = new Set<string>();
+      const deduplicatedRecipients = recipientMembers.filter(member => {
+        if (member.user_id) {
+          if (seenUserIds.has(member.user_id)) return false;
+          seenUserIds.add(member.user_id);
+        }
+        return true;
+      });
 
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('meeting_attendance')
-        .upsert(attendanceRecords, {
-          onConflict: 'meeting_id,member_id',
-          ignoreDuplicates: false
-        })
-        .select('member_id, response_token');
-
-      if (attendanceError) {
-        throw new Error('Failed to create attendance records');
-      }
-
-      const tokenMap = new Map(
-        attendanceData?.map(a => [a.member_id, a.response_token]) || []
-      );
-
-      const recipients = recipientMembers.map(member => ({
+      const recipients = deduplicatedRecipients.map(member => ({
         user_id: member.user_id,
         email: member.email,
         first_name: member.first_name,
         last_name: member.last_name,
         name: `${member.first_name} ${member.last_name}`,
-        response_token: tokenMap.get(member.id)
       }));
 
       const { data: clubData } = clubId
