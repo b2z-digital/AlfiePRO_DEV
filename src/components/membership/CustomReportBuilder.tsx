@@ -153,7 +153,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
     let query = supabase
       .from('members')
-      .select('id, first_name, last_name, membership_level, club_id, club_name, date_joined, renewal_date, is_financial, membership_status, boat_class')
+      .select('id, first_name, last_name, membership_level, club_id, club, date_joined, renewal_date, is_financial, membership_status, boat_class')
       .in('club_id', clubIds);
 
     if (dateRange.from) query = query.gte('date_joined', dateRange.from);
@@ -202,7 +202,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
     for (const m of members) {
       let key = '';
-      if (groupBy.field === 'club') key = clubMap.get(m.club_id) || m.club_name || 'Unknown';
+      if (groupBy.field === 'club') key = clubMap.get(m.club_id) || m.club || 'Unknown';
       else if (groupBy.field === 'membership_level') key = m.membership_level || 'Unknown';
       else if (groupBy.field === 'boat_class') key = m.boat_class || 'Unspecified';
       else if (groupBy.field === 'month_joined') {
