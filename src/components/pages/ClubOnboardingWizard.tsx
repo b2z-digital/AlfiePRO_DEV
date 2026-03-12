@@ -584,6 +584,20 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       }
     }
 
+    await supabase.from('club_sailing_days').delete().eq('club_id', id);
+    if (formData.sailingDays.length > 0) {
+      const sailingDaysToInsert = formData.sailingDays.map(day => ({
+        club_id: id,
+        day_of_week: day.day_of_week,
+        start_time: day.start_time,
+        end_time: day.end_time,
+        boat_class_id: day.boat_class_id || null,
+        description: day.description || null,
+        is_active: day.is_active,
+      }));
+      await supabase.from('club_sailing_days').insert(sailingDaysToInsert);
+    }
+
     addNotification('success', `${formData.name} has been updated successfully!`);
   };
 
