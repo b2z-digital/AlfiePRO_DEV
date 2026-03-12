@@ -481,25 +481,13 @@ export const updateMeetingRsvp = async (
   status: 'attending' | 'not_attending' | 'pending'
 ): Promise<void> => {
   try {
-    const { data: existing } = await supabase
+    const { error } = await supabase
       .from('meeting_attendance')
-      .select('id')
-      .eq('meeting_id', meetingId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existing) {
-      const { error } = await supabase
-        .from('meeting_attendance')
-        .update({ status })
-        .eq('id', existing.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('meeting_attendance')
-        .insert({ meeting_id: meetingId, user_id: userId, status });
-      if (error) throw error;
-    }
+      .upsert(
+        { meeting_id: meetingId, user_id: userId, status },
+        { onConflict: 'meeting_id,user_id' }
+      );
+    if (error) throw error;
   } catch (error) {
     console.error('Error updating meeting RSVP:', error);
     throw error;
