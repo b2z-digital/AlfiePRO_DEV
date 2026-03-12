@@ -256,11 +256,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         data = result.data;
         error = result.error;
       } else if (currentOrganization?.id) {
-        console.log('Fetching integrations for association:', currentOrganization.id);
+        console.log('Fetching integrations for association:', currentOrganization.id, currentOrganization.type);
+        const idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
         const result = await supabase
           .from('integrations')
           .select('*')
-          .eq('club_id', currentOrganization.id);
+          .eq(idColumn, currentOrganization.id);
         data = result.data;
         error = result.error;
       }
@@ -448,6 +449,9 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
         break;
       case 'stripe':
         await handleDisconnectStripe();
+        break;
+      case 'google_drive':
+        await handleDisconnectGoogleDrive();
         break;
       default:
         await toggleIntegrationEnabled(integrationId);
@@ -679,6 +683,35 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     } catch (err) {
       console.error('Error disconnecting Stripe:', err);
       setError(err instanceof Error ? err.message : 'Failed to disconnect Stripe');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnectGoogleDrive = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      let query = supabase.from('integrations').delete().eq('platform', 'google_drive');
+
+      if (currentClub?.clubId) {
+        query = query.eq('club_id', currentClub.clubId);
+      } else if (currentOrganization?.id) {
+        const idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
+        query = query.eq(idColumn, currentOrganization.id);
+      } else {
+        throw new Error('No organisation found');
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+
+      await fetchIntegrationStatus();
+      addNotification('success', 'Google Drive disconnected successfully');
+    } catch (err) {
+      console.error('Error disconnecting Google Drive:', err);
+      setError(err instanceof Error ? err.message : 'Failed to disconnect Google Drive');
     } finally {
       setSaving(false);
     }

@@ -128,33 +128,34 @@ serve(async (req) => {
     // Calculate token expiry time
     const expiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString()
 
-    // Store integration in Supabase
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Use appropriate table based on organization type
-    const tableName = organizationType === 'club' ? 'club_integrations' :
-                      organizationType === 'state' ? 'state_association_integrations' :
-                      'national_association_integrations'
-
+    // Determine which ID column to use in the unified integrations table
     const idColumn = organizationType === 'club' ? 'club_id' :
                      organizationType === 'state' ? 'state_association_id' :
                      'national_association_id'
 
-    const integrationData = {
+    // Store in the unified integrations table so all frontend queries work correctly
+    const integrationData: Record<string, unknown> = {
       [idColumn]: organizationId,
-      provider: 'google_drive',
-      google_drive_refresh_token: refresh_token,
-      google_drive_access_token: access_token,
-      google_drive_token_expiry: expiresAt,
-      google_drive_folder_id: rootFolderId,
-      google_drive_sync_enabled: true,
-      google_account_email: userEmail,
-      is_enabled: true,
-      connected_at: new Date().toISOString()
+      platform: 'google_drive',
+      is_active: true,
+      credentials: {
+        google_account_email: userEmail,
+        folder_id: rootFolderId,
+        access_token,
+        refresh_token,
+        token_expires_at: expiresAt,
+      },
+      connected_at: new Date().toISOString(),
     }
 
-    console.log('Attempting to save Google Drive integration:', {
-      tableName,
+    // Clear unrelated ID columns to avoid constraint issues
+    if (idColumn !== 'club_id') integrationData['club_id'] = null
+    if (idColumn !== 'state_association_id') integrationData['state_association_id'] = null
+    if (idColumn !== 'national_association_id') integrationData['national_association_id'] = null
+
+    console.log('Saving Google Drive integration to unified integrations table:', {
       idColumn,
       organizationId,
       userEmail,
@@ -162,9 +163,9 @@ serve(async (req) => {
     })
 
     const { data: savedData, error: dbError } = await supabase
-      .from(tableName)
+      .from('integrations')
       .upsert(integrationData, {
-        onConflict: `${idColumn},provider`
+        onConflict: `${idColumn},platform`
       })
       .select()
 
@@ -178,17 +179,6 @@ serve(async (req) => {
     // Create a default resource category for Google Drive files
     let categoryId: string | null = null
     try {
-      const categoryData = {
-        organization_id: organizationId,
-        organization_type: organizationType,
-        name: 'My Files',
-        description: 'Files synced from Google Drive',
-        is_public: false,
-        display_order: 0,
-        created_at: new Date().toISOString()
-      }
-
-      // Check if category already exists
       const { data: existingCategory } = await supabase
         .from('resource_categories')
         .select('id')
@@ -199,11 +189,18 @@ serve(async (req) => {
 
       if (existingCategory) {
         categoryId = existingCategory.id
-        console.log('Default category "My Files" already exists with ID:', categoryId)
       } else {
         const { data: newCategory, error: categoryError } = await supabase
           .from('resource_categories')
-          .insert(categoryData)
+          .insert({
+            organization_id: organizationId,
+            organization_type: organizationType,
+            name: 'My Files',
+            description: 'Files synced from Google Drive',
+            is_public: false,
+            display_order: 0,
+            created_at: new Date().toISOString()
+          })
           .select('id')
           .single()
 
@@ -211,7 +208,6 @@ serve(async (req) => {
           console.error('Failed to create default category:', categoryError)
         } else if (newCategory) {
           categoryId = newCategory.id
-          console.log('Default category "My Files" created successfully with ID:', categoryId)
         }
       }
     } catch (categoryError) {
@@ -236,10 +232,7 @@ serve(async (req) => {
           })
         })
 
-        if (syncResponse.ok) {
-          const syncData = await syncResponse.json()
-          console.log('Initial Google Drive sync completed:', syncData)
-        } else {
+        if (!syncResponse.ok) {
           const syncError = await syncResponse.text()
           console.error('Initial sync failed:', syncError)
         }
