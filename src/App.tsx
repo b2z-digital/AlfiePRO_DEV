@@ -19,6 +19,7 @@ import { useNotifications } from './contexts/NotificationContext';
 import { InvitationSignup } from './pages/InvitationSignup';
 import { OnboardingRouter } from './components/onboarding/OnboardingRouter';
 import { ApplicationPendingScreen } from './components/onboarding/ApplicationPendingScreen';
+import { CancelledMembershipScreen } from './components/onboarding/CancelledMembershipScreen';
 import { ClubSelfRegistration } from './components/auth/ClubSelfRegistration';
 import { ClubApplicationPendingScreen } from './components/auth/ClubApplicationPendingScreen';
 import { PublicClubHomepageNew } from './components/public/PublicClubHomepageNew';
@@ -94,7 +95,7 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
   const isMobilePhone = useIsMobilePhone();
@@ -308,6 +309,11 @@ function App() {
         <Route path="/application-pending" element={
           isAuthenticated ? <ApplicationPendingScreen darkMode={darkMode} /> : <Navigate to="/login" />
         } />
+        <Route path="/cancelled-membership" element={
+          isAuthenticated ? (
+            <CancelledMembershipScreen cancelledMemberships={cancelledMemberships} darkMode={darkMode} />
+          ) : <Navigate to="/login" />
+        } />
         <Route path="/onboarding/subscribe" element={<SubscriptionSelection />} />
         <Route path="/onboarding/success" element={<SubscriptionSuccess />} />
         <Route path="/onboarding/create-organization" element={
@@ -345,6 +351,8 @@ function App() {
               <Navigate to="/application-pending" />
             ) : hasPendingClubApplication ? (
               <Navigate to="/club-application-pending" />
+            ) : hasCancelledMembership ? (
+              <CancelledMembershipScreen cancelledMemberships={cancelledMemberships} darkMode={darkMode} />
             ) : !clubsLoaded ? (
               <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">

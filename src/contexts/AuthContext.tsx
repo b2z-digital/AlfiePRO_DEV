@@ -24,6 +24,14 @@ interface CurrentOrganization {
   role: string;
 }
 
+interface CancelledMembership {
+  club_id: string;
+  club_name: string;
+  cancelled_at: string | null;
+  cancelled_reason: string | null;
+  previous_membership_level: string | null;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   userClubs: UserClub[];
@@ -40,6 +48,8 @@ interface AuthContextType {
   onboardingCompleted: boolean;
   hasPendingApplication: boolean;
   hasPendingClubApplication: boolean;
+  hasCancelledMembership: boolean;
+  cancelledMemberships: CancelledMembership[];
   signOut: () => Promise<void>;
   refreshUserClubs: () => Promise<UserClub[]>;
   setCurrentClub: (club: UserClub | null) => void;
@@ -73,6 +83,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
   const [hasPendingClubApplication, setHasPendingClubApplication] = useState(false);
+  const [hasCancelledMembership, setHasCancelledMembership] = useState(false);
+  const [cancelledMemberships, setCancelledMemberships] = useState<CancelledMembership[]>([]);
   const [isStateOrgAdmin, setIsStateOrgAdmin] = useState(false);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -502,6 +514,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           setHasPendingClubApplication(!!pendingClub);
 
+          // Check for cancelled memberships - only show renewal gate if ALL memberships are cancelled
+          // and there are no active ones
+          const { data: cancelledData } = await supabase
+            .from('members')
+            .select('club_id, club, cancelled_at, cancelled_reason, previous_membership_level')
+            .eq('user_id', validatedUser.id)
+            .eq('membership_status', 'cancelled');
+
+          const { data: activeMemberData } = await supabase
+            .from('members')
+            .select('id')
+            .eq('user_id', validatedUser.id)
+            .in('membership_status', ['active', 'expired'])
+            .limit(1)
+            .maybeSingle();
+
+          const hasCancelled = (cancelledData || []).length > 0 && !activeMemberData;
+          setHasCancelledMembership(hasCancelled);
+          if (hasCancelled && cancelledData) {
+            setCancelledMemberships(cancelledData.map((m: any) => ({
+              club_id: m.club_id,
+              club_name: m.club,
+              cancelled_at: m.cancelled_at,
+              cancelled_reason: m.cancelled_reason,
+              previous_membership_level: m.previous_membership_level
+            })));
+          } else {
+            setCancelledMemberships([]);
+          }
+
           await refreshUserClubs(validatedUser.id);
 
           // Restore currentOrganization from localStorage if exists
@@ -521,6 +563,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           currentUserIdRef.current = null; // Clear ref when no session
           setUser(null);
           setOnboardingCompleted(false);
+          setHasCancelledMembership(false);
+          setCancelledMemberships([]);
           clearTimeout(loadingTimeout);
           setLoading(false);
         }
@@ -623,6 +667,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
               setHasPendingClubApplication(!!pendingClub);
 
+              // Check for cancelled memberships
+              const { data: cancelledData2 } = await supabase
+                .from('members')
+                .select('club_id, club, cancelled_at, cancelled_reason, previous_membership_level')
+                .eq('user_id', session.user.id)
+                .eq('membership_status', 'cancelled');
+
+              const { data: activeMemberData2 } = await supabase
+                .from('members')
+                .select('id')
+                .eq('user_id', session.user.id)
+                .in('membership_status', ['active', 'expired'])
+                .limit(1)
+                .maybeSingle();
+
+              const hasCancelled2 = (cancelledData2 || []).length > 0 && !activeMemberData2;
+              setHasCancelledMembership(hasCancelled2);
+              if (hasCancelled2 && cancelledData2) {
+                setCancelledMemberships(cancelledData2.map((m: any) => ({
+                  club_id: m.club_id,
+                  club_name: m.club,
+                  cancelled_at: m.cancelled_at,
+                  cancelled_reason: m.cancelled_reason,
+                  previous_membership_level: m.previous_membership_level
+                })));
+              } else {
+                setCancelledMemberships([]);
+              }
+
               // Refresh clubs with explicit user ID
               await refreshUserClubs(session.user.id);
             } else if (mounted) {
@@ -637,6 +710,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setOnboardingCompleted(false);
               setHasPendingApplication(false);
               setHasPendingClubApplication(false);
+              setHasCancelledMembership(false);
+              setCancelledMemberships([]);
               localStorage.removeItem('currentClubId');
             }
           }
@@ -784,6 +859,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     onboardingCompleted: impersonationOverrides?.onboardingCompleted ?? onboardingCompleted,
     hasPendingApplication,
     hasPendingClubApplication,
+    hasCancelledMembership,
+    cancelledMemberships,
     signOut,
     refreshUserClubs,
     setCurrentClub: handleSetCurrentClub,
