@@ -19,18 +19,31 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const clientId = Deno.env.get('GOOGLE_DRIVE_CLIENT_ID')
+  const clientSecret = Deno.env.get('GOOGLE_DRIVE_CLIENT_SECRET')
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  // GET request: return just the client ID so the frontend can initiate the correct OAuth flow
+  if (req.method === 'GET') {
+    if (!clientId) {
+      return new Response(
+        JSON.stringify({ error: 'Google Drive client ID not configured' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      )
+    }
+    return new Response(
+      JSON.stringify({ clientId }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    )
+  }
+
   try {
     const { code, state, redirectUri, organizationId, organizationType }: OAuthCallbackRequest = await req.json()
 
     if (!code || !state || !redirectUri || !organizationId || !organizationType) {
       throw new Error('Missing required parameters')
     }
-
-    // Get environment variables
-    const clientId = Deno.env.get('GOOGLE_DRIVE_CLIENT_ID')
-    const clientSecret = Deno.env.get('GOOGLE_DRIVE_CLIENT_SECRET')
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!clientId || !clientSecret || !supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing environment variables')
@@ -232,7 +245,6 @@ serve(async (req) => {
         }
       } catch (syncError) {
         console.error('Error triggering initial sync:', syncError)
-        // Don't fail the entire operation
       }
     }
 
@@ -251,7 +263,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Google Drive OAuth callback error:', error)
-    
+
     return new Response(
       JSON.stringify({
         error: error.message || 'Failed to process Google Drive OAuth callback'
