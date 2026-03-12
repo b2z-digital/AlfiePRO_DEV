@@ -101,6 +101,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
   const [saving, setSaving] = useState(false);
   const [reportData, setReportData] = useState<ReportRow[] | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [totalFetched, setTotalFetched] = useState<number | null>(null);
 
   const addMetric = () => {
     setMetrics([...metrics, {
@@ -156,28 +157,46 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
       .select('id, name')
       .in('id', clubIds);
 
-    let query = supabase
-      .from('members')
-      .select('id, first_name, last_name, membership_level, club_id, club, date_joined, renewal_date, is_financial, membership_status, category, state, country, payment_status')
-      .in('club_id', clubIds);
+    // Fetch all members using pagination to bypass the default 1000-row limit
+    const allMembers: any[] = [];
+    const pageSize = 1000;
+    let page = 0;
+    let hasMore = true;
 
-    if (dateRange.from) query = query.gte('date_joined', dateRange.from);
-    if (dateRange.to) query = query.lte('date_joined', dateRange.to);
+    while (hasMore) {
+      let query = supabase
+        .from('members')
+        .select('id, first_name, last_name, membership_level, club_id, club, date_joined, renewal_date, is_financial, membership_status, category, state, country, payment_status')
+        .in('club_id', clubIds)
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
-    // Apply filters
-    for (const f of filters) {
-      if (!f.value) continue;
-      const col = fieldToColumn(f.field);
-      if (!col) continue;
-      if (f.operator === 'equals') query = query.eq(col, f.value);
-      else if (f.operator === 'not_equals') query = query.neq(col, f.value);
-      else if (f.operator === 'contains') query = query.ilike(col, `%${f.value}%`);
+      // Only apply date range filter if dates are actually set
+      if (dateRange.from) query = query.gte('date_joined', dateRange.from);
+      if (dateRange.to) query = query.lte('date_joined', dateRange.to);
+
+      // Apply user-defined filters
+      for (const f of filters) {
+        if (!f.value) continue;
+        const col = fieldToColumn(f.field);
+        if (!col) continue;
+        if (f.operator === 'equals') query = query.eq(col, f.value);
+        else if (f.operator === 'not_equals') query = query.neq(col, f.value);
+        else if (f.operator === 'contains') query = query.ilike(col, `%${f.value}%`);
+      }
+
+      const { data: pageData, error } = await query;
+      if (error) throw error;
+
+      if (pageData && pageData.length > 0) {
+        allMembers.push(...pageData);
+        hasMore = pageData.length === pageSize;
+        page++;
+      } else {
+        hasMore = false;
+      }
     }
 
-    const { data: members, error } = await query;
-    if (error) throw error;
-
-    return { members: members || [], clubs: clubDetails || [] };
+    return { members: allMembers, clubs: clubDetails || [] };
   };
 
   const fieldToColumn = (field: string): string | null => {
@@ -196,14 +215,40 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
     return map[field] || null;
   };
 
+  const computeMetric = (field: string, members: any[]): number | string => {
+    switch (field) {
+      case 'total_members':
+        return members.length;
+      case 'financial_members':
+        return members.filter(m => m.is_financial === true).length;
+      case 'membership_level':
+        return [...new Set(members.map(m => m.membership_level).filter(Boolean))].join(', ') || '-';
+      case 'club':
+        return [...new Set(members.map(m => m.club).filter(Boolean))].join(', ') || '-';
+      case 'category':
+        return [...new Set(members.map(m => m.category).filter(Boolean))].join(', ') || '-';
+      case 'state':
+        return [...new Set(members.map(m => m.state).filter(Boolean))].join(', ') || '-';
+      case 'country':
+        return [...new Set(members.map(m => m.country).filter(Boolean))].join(', ') || '-';
+      case 'date_joined':
+        return members.length;
+      case 'renewal_date':
+        return members.length;
+      default:
+        return members.length;
+    }
+  };
+
   const groupMembers = (members: any[], clubs: any[]): ReportRow[] => {
     const clubMap = new Map(clubs.map((c: any) => [c.id, c.name]));
 
     if (!groupBy) {
-      // Summary row
-      const total = members.filter(m => m.membership_status === 'active').length;
-      const financial = members.filter(m => m.is_financial).length;
-      return [{ 'Group': 'All Members', 'Total Members': total, 'Financial Members': financial }];
+      const row: ReportRow = { 'Group': 'All Members' };
+      for (const metric of metrics) {
+        row[metric.label] = computeMetric(metric.field, members);
+      }
+      return [row];
     }
 
     const groups = new Map<string, any[]>();
@@ -235,9 +280,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
     for (const [label, groupMembers] of groups) {
       const row: ReportRow = { [groupBy.label]: label };
       for (const metric of metrics) {
-        if (metric.field === 'total_members') row[metric.label] = groupMembers.filter(m => m.membership_status === 'active').length;
-        else if (metric.field === 'financial_members') row[metric.label] = groupMembers.filter(m => m.is_financial).length;
-        else row[metric.label] = groupMembers.length;
+        row[metric.label] = computeMetric(metric.field, groupMembers);
       }
       rows.push(row);
     }
@@ -257,6 +300,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
     try {
       const { members, clubs } = await fetchMembersData();
+      setTotalFetched(members.length);
       const rows = groupMembers(members, clubs);
       setReportData(rows);
     } catch (err: any) {
@@ -393,8 +437,8 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
 
           {/* Date Range */}
           <div className="mb-6">
-            <h3 className={`text-sm font-semibold mb-3 uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Date Range (Join Date)
+            <h3 className={`text-sm font-semibold mb-1 uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Date Range (Join Date) <span className="normal-case font-normal text-xs ml-1 opacity-60">— Optional. Leave blank to include all members.</span>
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -586,11 +630,16 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
           {reportData && !running && (
             <div className={`rounded-xl border ${darkMode ? 'border-slate-700 bg-slate-900/30' : 'border-slate-200 bg-slate-50'}`}>
               <div className={`flex items-center justify-between px-4 py-3 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {chartType === 'table' ? <Table size={16} className="text-blue-400" /> : <BarChart3 size={16} className="text-blue-400" />}
                   <span className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                     {reportData.length} {reportData.length === 1 ? 'row' : 'rows'}
                   </span>
+                  {totalFetched !== null && (
+                    <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      ({totalFetched} members in scope)
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={handleExportCsv}
