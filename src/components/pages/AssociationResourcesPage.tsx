@@ -578,7 +578,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   );
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="flex flex-col h-full min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Page Header */}
       <div className="flex-shrink-0 px-6 py-5 border-b border-slate-700/50 bg-slate-900/60">
         <div className="flex items-center justify-between">
