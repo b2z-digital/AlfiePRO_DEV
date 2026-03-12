@@ -304,37 +304,12 @@ Thank you.
         return true;
       });
 
-      const attendanceRecords = deduplicatedRecipients.map(member => ({
-        meeting_id: meetingId,
-        member_id: member.id,
-        user_id: member.user_id,
-        status: 'maybe'
-      }));
-
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('meeting_attendance')
-        .upsert(attendanceRecords, {
-          onConflict: 'meeting_id,member_id',
-          ignoreDuplicates: false
-        })
-        .select('member_id, response_token');
-
-      if (attendanceError) {
-        console.error('Attendance upsert error:', attendanceError);
-        throw new Error(`Cannot create attendance records: ${attendanceError.message}`);
-      }
-
-      const tokenMap = new Map(
-        attendanceData?.map(a => [a.member_id, a.response_token]) || []
-      );
-
       const recipients = deduplicatedRecipients.map(member => ({
         user_id: member.user_id,
         email: member.email,
         first_name: member.first_name,
         last_name: member.last_name,
         name: `${member.first_name} ${member.last_name}`,
-        response_token: tokenMap.get(member.id)
       }));
 
       const { data: clubData } = clubId
