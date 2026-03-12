@@ -3,7 +3,8 @@ import {
   Database, Cloud, DollarSign, HardDrive, Server, TrendingUp,
   RefreshCw, Plus, Calendar, Building,
   Globe2, AlertTriangle, CheckCircle, Zap, BarChart3,
-  Save, Archive, FolderOpen, Loader2, CloudOff
+  Save, Archive, FolderOpen, Loader2, CloudOff, Bot, MessageSquare,
+  Activity, Users, Cpu
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
@@ -79,7 +80,7 @@ interface AmplifyInfo {
   branches: { branchName: string; stage: string; lastDeployTime: string; status: string }[];
 }
 
-type ViewMode = 'overview' | 'breakdown' | 'storage' | 'aws' | 'forecast' | 'entry';
+type ViewMode = 'overview' | 'breakdown' | 'storage' | 'aws' | 'forecast' | 'entry' | 'ai_usage';
 
 const SOURCE_LABELS: Record<string, string> = {
   aws: 'AWS Amplify',
@@ -89,6 +90,7 @@ const SOURCE_LABELS: Record<string, string> = {
   domain: 'Domain & DNS',
   email: 'Email Services',
   cdn: 'CDN / Cloudflare',
+  ai: 'AI / Anthropic',
   other: 'Other',
 };
 
@@ -104,6 +106,7 @@ const COST_CATEGORIES = [
   { key: 'domain_dns', label: 'Domain & DNS', source: 'domain' },
   { key: 'email_services', label: 'Email Services', source: 'email' },
   { key: 'cdn_cloudflare', label: 'CDN / Cloudflare', source: 'cdn' },
+  { key: 'ai_askalfie', label: 'AskAlfie AI (Anthropic)', source: 'ai' },
   { key: 'other', label: 'Other Services', source: 'other' },
 ];
 
@@ -227,6 +230,11 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   const [compressing, setCompressing] = useState(false);
   const [compressionResult, setCompressionResult] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [aiUsageSummary, setAiUsageSummary] = useState<any>(null);
+  const [aiDailyData, setAiDailyData] = useState<any[]>([]);
+  const [aiModelPricing, setAiModelPricing] = useState<any[]>([]);
+  const [aiUsageLoading, setAiUsageLoading] = useState(false);
+  const [aiDateRange, setAiDateRange] = useState(30);
 
   const runCompressionPreview = async () => {
     setPreviewLoading(true);
@@ -348,6 +356,30 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     setAwsLoading(false);
   }, []);
 
+  const loadAiUsageData = useCallback(async (days = 30) => {
+    setAiUsageLoading(true);
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      const startStr = startDate.toISOString().split('T')[0];
+      const endStr = new Date().toISOString().split('T')[0];
+
+      const [statsRes, dailyRes, pricingRes] = await Promise.all([
+        supabase.rpc('get_askalfie_usage_stats', { p_start_date: startStr, p_end_date: endStr }),
+        supabase.rpc('get_askalfie_daily_breakdown', { p_days: days }),
+        supabase.from('ai_model_pricing').select('*').eq('is_active', true).order('provider').order('model_name'),
+      ]);
+
+      if (statsRes.data) setAiUsageSummary(statsRes.data);
+      if (dailyRes.data) setAiDailyData(dailyRes.data);
+      if (pricingRes.data) setAiModelPricing(pricingRes.data);
+    } catch (err) {
+      console.error('Error loading AI usage data:', err);
+    } finally {
+      setAiUsageLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -355,6 +387,12 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
   useEffect(() => {
     loadAwsData();
   }, [loadAwsData]);
+
+  useEffect(() => {
+    if (viewMode === 'ai_usage') {
+      loadAiUsageData(aiDateRange);
+    }
+  }, [viewMode, aiDateRange, loadAiUsageData]);
 
   const handleSaveEntry = async () => {
     if (!newEntry.metric_name || !newEntry.cost_usd) return;
@@ -520,13 +558,15 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-2 flex-wrap">
-          {(['overview', 'storage', 'aws', 'breakdown', 'forecast', 'entry'] as ViewMode[]).map(mode => (
+          {(['overview', 'storage', 'aws', 'breakdown', 'forecast', 'ai_usage', 'entry'] as ViewMode[]).map(mode => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 viewMode === mode
-                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+                  ? mode === 'ai_usage'
+                    ? 'bg-violet-500/15 text-violet-400 border border-violet-500/30'
+                    : 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
                   : `${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`
               }`}
             >
@@ -535,6 +575,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
               {mode === 'aws' && <><Cloud size={14} className="inline mr-1.5" />AWS</>}
               {mode === 'breakdown' && <><Building size={14} className="inline mr-1.5" />Club Costs</>}
               {mode === 'forecast' && <><TrendingUp size={14} className="inline mr-1.5" />Forecast</>}
+              {mode === 'ai_usage' && <><Bot size={14} className="inline mr-1.5" />AskAlfie AI</>}
               {mode === 'entry' && <><Plus size={14} className="inline mr-1.5" />Record Costs</>}
             </button>
           ))}
@@ -1359,6 +1400,342 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* AI USAGE VIEW */}
+      {/* ============================================================ */}
+      {viewMode === 'ai_usage' && (
+        <div className="space-y-6">
+          {/* Header controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className={`text-xl font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                <Bot size={20} className="text-violet-400" />
+                AskAlfie AI Usage & Costs
+              </h2>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Anthropic API usage from the mobile app AskAlfie feature
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {[7, 30, 90].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setAiDateRange(d)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    aiDateRange === d
+                      ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+                      : `${darkMode ? 'text-slate-400 hover:bg-slate-800/50 border border-transparent' : 'text-slate-500 hover:bg-slate-100 border border-transparent'}`
+                  }`}
+                >
+                  {d}d
+                </button>
+              ))}
+              <button
+                onClick={() => loadAiUsageData(aiDateRange)}
+                disabled={aiUsageLoading}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ml-1 ${darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'}`}
+              >
+                <RefreshCw size={12} className={aiUsageLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {aiUsageLoading ? (
+            <div className="flex items-center justify-center h-48">
+              <div className="animate-spin w-7 h-7 border-2 border-violet-500 border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <>
+              {/* Summary stat cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                {[
+                  {
+                    label: 'Total Queries',
+                    value: (aiUsageSummary?.total_queries || 0).toLocaleString(),
+                    icon: MessageSquare,
+                    color: 'violet',
+                    sub: `${aiDateRange} day period`,
+                  },
+                  {
+                    label: 'AI Cost',
+                    value: `$${parseFloat(aiUsageSummary?.total_cost_usd || 0).toFixed(4)}`,
+                    icon: DollarSign,
+                    color: 'emerald',
+                    sub: 'USD total',
+                  },
+                  {
+                    label: 'Total Tokens',
+                    value: ((aiUsageSummary?.total_tokens || 0) / 1000).toFixed(1) + 'K',
+                    icon: Cpu,
+                    color: 'sky',
+                    sub: `${((aiUsageSummary?.total_input_tokens || 0) / 1000).toFixed(1)}K in / ${((aiUsageSummary?.total_output_tokens || 0) / 1000).toFixed(1)}K out`,
+                  },
+                  {
+                    label: 'Unique Users',
+                    value: (aiUsageSummary?.unique_users || 0).toLocaleString(),
+                    icon: Users,
+                    color: 'amber',
+                    sub: 'active users',
+                  },
+                  {
+                    label: 'Unique Clubs',
+                    value: (aiUsageSummary?.unique_clubs || 0).toLocaleString(),
+                    icon: Building,
+                    color: 'teal',
+                    sub: 'clubs using AI',
+                  },
+                  {
+                    label: 'Avg Response',
+                    value: `${((aiUsageSummary?.avg_response_time_ms || 0) / 1000).toFixed(1)}s`,
+                    icon: Activity,
+                    color: 'rose',
+                    sub: 'per query',
+                  },
+                ].map(card => {
+                  const cMap: Record<string, string> = {
+                    violet: 'from-violet-500/20 to-violet-700/20 border-violet-500/30',
+                    emerald: 'from-emerald-500/20 to-emerald-700/20 border-emerald-500/30',
+                    sky: 'from-sky-500/20 to-sky-700/20 border-sky-500/30',
+                    amber: 'from-amber-500/20 to-amber-700/20 border-amber-500/30',
+                    teal: 'from-teal-500/20 to-teal-700/20 border-teal-500/30',
+                    rose: 'from-rose-500/20 to-rose-700/20 border-rose-500/30',
+                  };
+                  const iMap: Record<string, string> = {
+                    violet: 'text-violet-400', emerald: 'text-emerald-400', sky: 'text-sky-400',
+                    amber: 'text-amber-400', teal: 'text-teal-400', rose: 'text-rose-400',
+                  };
+                  const Icon = card.icon;
+                  return (
+                    <div key={card.label} className={`rounded-2xl border bg-gradient-to-br p-4 backdrop-blur-sm ${cMap[card.color]}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <Icon size={16} className={iMap[card.color]} />
+                      </div>
+                      <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{card.value}</div>
+                      <div className={`text-xs mt-0.5 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{card.label}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{card.sub}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Daily usage chart */}
+              {aiDailyData.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className={cardClass}>
+                    <h3 className={headingClass}>Daily Query Volume</h3>
+                    <div className="h-52">
+                      <Bar
+                        data={{
+                          labels: aiDailyData.map(d => {
+                            const dt = new Date(d.summary_date);
+                            return dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+                          }),
+                          datasets: [
+                            {
+                              label: 'Queries',
+                              data: aiDailyData.map(d => d.total_queries),
+                              backgroundColor: 'rgba(139, 92, 246, 0.7)',
+                              borderRadius: 4,
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              backgroundColor: chartColors.tooltipBg,
+                              titleColor: chartColors.tooltipText,
+                              bodyColor: chartColors.tooltipText,
+                              borderColor: chartColors.tooltipBorder,
+                              borderWidth: 1,
+                              padding: 10,
+                              cornerRadius: 8,
+                            },
+                          },
+                          scales: {
+                            x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 }, maxTicksLimit: 10 } },
+                            y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } }, beginAtZero: true },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={cardClass}>
+                    <h3 className={headingClass}>Daily AI Cost (USD)</h3>
+                    <div className="h-52">
+                      <Line
+                        data={{
+                          labels: aiDailyData.map(d => {
+                            const dt = new Date(d.summary_date);
+                            return dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+                          }),
+                          datasets: [
+                            {
+                              label: 'Cost USD',
+                              data: aiDailyData.map(d => parseFloat(d.total_cost_usd || 0)),
+                              borderColor: '#10b981',
+                              backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                              fill: true,
+                              tension: 0.4,
+                              pointRadius: 3,
+                              pointBackgroundColor: '#10b981',
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              backgroundColor: chartColors.tooltipBg,
+                              titleColor: chartColors.tooltipText,
+                              bodyColor: chartColors.tooltipText,
+                              borderColor: chartColors.tooltipBorder,
+                              borderWidth: 1,
+                              padding: 10,
+                              cornerRadius: 8,
+                              callbacks: { label: (ctx: any) => `$${(ctx.raw || 0).toFixed(4)} USD` },
+                            },
+                          },
+                          scales: {
+                            x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 }, maxTicksLimit: 10 } },
+                            y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 }, callback: (v: any) => `$${v.toFixed(3)}` }, beginAtZero: true },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Token usage chart */}
+              {aiDailyData.length > 0 && (
+                <div className={cardClass}>
+                  <h3 className={headingClass}>Daily Token Usage</h3>
+                  <div className="h-52">
+                    <Bar
+                      data={{
+                        labels: aiDailyData.map(d => {
+                          const dt = new Date(d.summary_date);
+                          return dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+                        }),
+                        datasets: [
+                          {
+                            label: 'Tokens',
+                            data: aiDailyData.map(d => Number(d.total_tokens)),
+                            backgroundColor: 'rgba(14, 165, 233, 0.6)',
+                            borderRadius: 4,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                            backgroundColor: chartColors.tooltipBg,
+                            titleColor: chartColors.tooltipText,
+                            bodyColor: chartColors.tooltipText,
+                            borderColor: chartColors.tooltipBorder,
+                            borderWidth: 1,
+                            padding: 10,
+                            cornerRadius: 8,
+                            callbacks: { label: (ctx: any) => `${(ctx.raw || 0).toLocaleString()} tokens` },
+                          },
+                        },
+                        scales: {
+                          x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 }, maxTicksLimit: 10 } },
+                          y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 }, callback: (v: any) => `${(v / 1000).toFixed(0)}K` }, beginAtZero: true },
+                        },
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Model pricing table */}
+              <div className={cardClass}>
+                <h3 className={headingClass}>AI Model Pricing Reference</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className={`border-b ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                        {['Model', 'Provider', 'Input / 1K tokens', 'Output / 1K tokens', 'Status'].map(h => (
+                          <th key={h} className={`pb-2 text-left text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiModelPricing.map(m => (
+                        <tr key={m.id} className={`border-b ${darkMode ? 'border-slate-800/50' : 'border-slate-100'}`}>
+                          <td className={`py-2.5 pr-4 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{m.model_name}</td>
+                          <td className="py-2.5 pr-4">
+                            <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+                              m.provider === 'anthropic' ? 'bg-violet-500/20 text-violet-400' : 'bg-emerald-500/20 text-emerald-400'
+                            }`}>
+                              {m.provider}
+                            </span>
+                          </td>
+                          <td className={`py-2.5 pr-4 font-mono text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                            ${parseFloat(m.input_cost_per_1k_tokens).toFixed(5)}
+                          </td>
+                          <td className={`py-2.5 pr-4 font-mono text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                            ${parseFloat(m.output_cost_per_1k_tokens).toFixed(5)}
+                          </td>
+                          <td className="py-2.5">
+                            <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+                              m.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
+                            }`}>
+                              {m.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {aiModelPricing.length === 0 && (
+                        <tr><td colSpan={5} className="py-8 text-center text-slate-500">No pricing data available.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <p className={`text-xs mt-3 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Pricing is approximate and based on Anthropic/OpenAI published rates. Update as pricing changes.
+                </p>
+              </div>
+
+              {/* Cost projection note */}
+              {aiUsageSummary && parseFloat(aiUsageSummary.total_cost_usd) > 0 && (
+                <div className={`rounded-2xl border p-5 ${darkMode ? 'bg-violet-500/5 border-violet-500/20' : 'bg-violet-50 border-violet-200'}`}>
+                  <div className="flex items-start gap-3">
+                    <Bot size={18} className="text-violet-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-violet-300' : 'text-violet-700'}`}>
+                        Cost Projection
+                      </p>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Based on your last {aiDateRange} days of usage, estimated monthly AI spend is{' '}
+                        <span className="font-semibold text-emerald-400">
+                          ${(parseFloat(aiUsageSummary.total_cost_usd) / aiDateRange * 30).toFixed(4)} USD/month
+                        </span>
+                        {' '}at an average of{' '}
+                        <span className="font-semibold">
+                          {Math.round(parseInt(aiUsageSummary.total_queries) / aiDateRange)} queries/day
+                        </span>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
