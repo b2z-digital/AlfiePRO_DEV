@@ -33,38 +33,37 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get access token function
+    // Get access token function - uses unified integrations table
     async function getAccessToken(organizationId: string, organizationType: string) {
-      const tableName = organizationType === 'club' ? 'club_integrations' :
-                        organizationType === 'state' ? 'state_association_integrations' :
-                        'national_association_integrations';
       const idColumn = organizationType === 'club' ? 'club_id' :
                        organizationType === 'state' ? 'state_association_id' :
                        'national_association_id';
 
       const { data: integration } = await supabase
-        .from(tableName)
-        .select('google_drive_refresh_token, google_drive_access_token, google_drive_token_expiry')
+        .from('integrations')
+        .select('id, credentials')
         .eq(idColumn, organizationId)
-        .eq('provider', 'google_drive')
+        .eq('platform', 'google_drive')
         .maybeSingle();
 
-      if (!integration?.google_drive_refresh_token) {
+      if (!integration?.credentials?.refresh_token) {
         throw new Error('Google Drive not connected');
       }
 
+      const creds = integration.credentials;
+
       // Check if token is expired
-      const isExpired = !integration.google_drive_token_expiry ||
-        new Date(integration.google_drive_token_expiry) <= new Date();
+      const isExpired = !creds.token_expires_at ||
+        new Date(creds.token_expires_at) <= new Date();
 
       if (isExpired) {
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            refresh_token: integration.google_drive_refresh_token,
+            client_id: clientId!,
+            client_secret: clientSecret!,
+            refresh_token: creds.refresh_token,
             grant_type: 'refresh_token',
           }),
         });
@@ -74,15 +73,30 @@ Deno.serve(async (req: Request) => {
         const expiresIn = tokenData.expires_in || 3600;
         const newExpiry = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-        await supabase.from(tableName).update({
-          google_drive_access_token: newAccessToken,
-          google_drive_token_expiry: newExpiry,
-        }).eq(idColumn, organizationId).eq('provider', 'google_drive');
+        await supabase.from('integrations').update({
+          credentials: { ...creds, access_token: newAccessToken, token_expires_at: newExpiry },
+        }).eq('id', integration.id);
 
         return newAccessToken;
       }
 
-      return integration.google_drive_access_token;
+      return creds.access_token;
+    }
+
+    // Get root folder id from unified integrations table
+    async function getRootFolderId(organizationId: string, organizationType: string) {
+      const idColumn = organizationType === 'club' ? 'club_id' :
+                       organizationType === 'state' ? 'state_association_id' :
+                       'national_association_id';
+
+      const { data: integration } = await supabase
+        .from('integrations')
+        .select('credentials')
+        .eq(idColumn, organizationId)
+        .eq('platform', 'google_drive')
+        .maybeSingle();
+
+      return integration?.credentials?.folder_id || integration?.credentials?.root_folder_id || null;
     }
 
     if (action === 'create_folder') {
@@ -93,22 +107,9 @@ Deno.serve(async (req: Request) => {
       }
 
       const accessToken = await getAccessToken(organizationId, organizationType);
+      const rootFolderId = await getRootFolderId(organizationId, organizationType);
 
-      const tableName = organizationType === 'club' ? 'club_integrations' :
-                        organizationType === 'state' ? 'state_association_integrations' :
-                        'national_association_integrations';
-      const idColumn = organizationType === 'club' ? 'club_id' :
-                       organizationType === 'state' ? 'state_association_id' :
-                       'national_association_id';
-
-      const { data: integration } = await supabase
-        .from(tableName)
-        .select('google_drive_folder_id')
-        .eq(idColumn, organizationId)
-        .eq('provider', 'google_drive')
-        .maybeSingle();
-
-      if (!integration?.google_drive_folder_id) {
+      if (!rootFolderId) {
         throw new Error('Google Drive folder not configured');
       }
 
@@ -123,7 +124,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder',
-            parents: [integration.google_drive_folder_id]
+            parents: [rootFolderId]
           }),
         }
       );

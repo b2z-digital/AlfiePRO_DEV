@@ -163,18 +163,18 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     if (!organizationId) return false;
 
     try {
-      const tableName = organizationType === 'club' ? 'club_integrations' :
-                       organizationType === 'state' ? 'state_association_integrations' :
-                       'national_association_integrations';
+      const idColumn = organizationType === 'club' ? 'club_id' :
+                       organizationType === 'state' ? 'state_association_id' :
+                       'national_association_id';
 
       const { data, error } = await supabase
-        .from(tableName)
-        .select('google_drive_refresh_token')
-        .eq(`${organizationType === 'club' ? 'club' : organizationType}_id`, organizationId)
-        .eq('provider', 'google_drive')
+        .from('integrations')
+        .select('id, credentials')
+        .eq(idColumn, organizationId)
+        .eq('platform', 'google_drive')
         .maybeSingle();
 
-      const hasIntegration = !error && !!data?.google_drive_refresh_token;
+      const hasIntegration = !error && !!data?.id && !!data?.credentials?.refresh_token;
       setHasGoogleDriveIntegration(hasIntegration);
       return hasIntegration;
     } catch (error) {
@@ -711,21 +711,18 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       let folderId = category?.google_drive_folder_id;
 
       if (!folderId) {
-        const tableName = organizationType === 'club' ? 'club_integrations' :
-                         organizationType === 'state' ? 'state_association_integrations' :
-                         'national_association_integrations';
         const idColumn = organizationType === 'club' ? 'club_id' :
                         organizationType === 'state' ? 'state_association_id' :
                         'national_association_id';
 
         const { data: integration } = await supabase
-          .from(tableName)
-          .select('google_drive_folder_id')
+          .from('integrations')
+          .select('credentials')
           .eq(idColumn, organizationId)
-          .eq('provider', 'google_drive')
+          .eq('platform', 'google_drive')
           .maybeSingle();
 
-        folderId = integration?.google_drive_folder_id;
+        folderId = integration?.credentials?.folder_id || integration?.credentials?.root_folder_id;
       }
 
       if (!folderId) {
