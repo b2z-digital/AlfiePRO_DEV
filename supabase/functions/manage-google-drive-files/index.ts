@@ -206,8 +206,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (action === 'sync') {
-      const { organizationId, organizationType, folderId } = body;
+    if (action === 'sync' || action === 'list_folder') {
+      const { organizationId, organizationType, folderId: bodyFolderId } = body;
+
+      let folderId = bodyFolderId;
+
+      // If no folderId provided, use the root folder from integration
+      if (!folderId) {
+        folderId = await getRootFolderId(organizationId, organizationType);
+      }
 
       if (!folderId) {
         throw new Error('folderId is required');
@@ -216,7 +223,7 @@ Deno.serve(async (req: Request) => {
       const accessToken = await getAccessToken(organizationId, organizationType);
 
       const listResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink,createdTime,modifiedTime,size)`,
+        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink,webContentLink,createdTime,modifiedTime,size,thumbnailLink,iconLink)&orderBy=folder,name`,
         {
           method: 'GET',
           headers: {
@@ -236,7 +243,8 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          files: listData.files || []
+          files: listData.files || [],
+          folderId
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
