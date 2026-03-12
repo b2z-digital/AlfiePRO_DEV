@@ -38,6 +38,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showSmsManagement, setShowSmsManagement] = useState(false);
+  const callbackProcessedRef = React.useRef(false);
 
   // Configuration states
   const [googleAnalyticsId, setGoogleAnalyticsId] = useState('');
@@ -184,6 +185,10 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
+
+    // Prevent processing the same OAuth callback twice if the effect re-runs
+    if (callbackProcessedRef.current) return;
+    if (code) callbackProcessedRef.current = true;
 
     if (urlParams.get('stripe_connected') === 'true') {
       setSuccess('Stripe account connected successfully!');
@@ -1054,7 +1059,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       console.log('Edge function response:', { status: response.status, data });
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to connect Google Drive');
+        const errMsg = data.error || 'Failed to connect Google Drive';
+        const isCredsMismatch = errMsg.includes('invalid_client') || errMsg.includes('Unauthorized');
+        throw new Error(isCredsMismatch
+          ? 'Google Drive credentials mismatch. The OAuth client ID/secret in the server configuration does not match the Google Cloud project. Please contact support.'
+          : errMsg
+        );
       }
 
       console.log('Fetching updated integration status...');
