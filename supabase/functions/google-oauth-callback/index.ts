@@ -95,49 +95,48 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const idColumn = clubId ? 'club_id' :
+      associationType === 'state' ? 'state_association_id' : 'national_association_id';
+    const orgId = clubId || associationId;
+
+    const integrationData: Record<string, unknown> = {
+      [idColumn]: orgId,
+      platform: 'google',
+      is_active: true,
+      credentials: {
+        email,
+        google_calendar_id: calendarId,
+        access_token,
+        refresh_token,
+        token_expires_at: expiresAt,
+      },
+      connected_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (idColumn !== 'club_id') integrationData['club_id'] = null;
+    if (idColumn !== 'state_association_id') integrationData['state_association_id'] = null;
+    if (idColumn !== 'national_association_id') integrationData['national_association_id'] = null;
+
+    const { data: existing } = await supabase
+      .from('integrations')
+      .select('id')
+      .eq(idColumn, orgId)
+      .eq('platform', 'google')
+      .maybeSingle();
+
     let dbError;
-
-    if (clubId) {
-      const result = await supabase
-        .from('club_integrations')
-        .upsert({
-          club_id: clubId,
-          provider: 'google',
-          google_email: email,
-          google_calendar_id: calendarId,
-          access_token: access_token,
-          refresh_token: refresh_token,
-          token_expires_at: expiresAt,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: 'club_id,provider'
-        });
-      dbError = result.error;
-    } else if (associationId && associationType) {
-      const tableName = associationType === 'state'
-        ? 'state_association_integrations'
-        : 'national_association_integrations';
-      const idColumn = associationType === 'state'
-        ? 'state_association_id'
-        : 'national_association_id';
-
-      const result = await supabase
-        .from(tableName)
-        .upsert({
-          [idColumn]: associationId,
-          provider: 'google',
-          google_email: email,
-          google_calendar_id: calendarId,
-          access_token: access_token,
-          refresh_token: refresh_token,
-          token_expires_at: expiresAt,
-          is_enabled: true,
-          connected_at: new Date().toISOString()
-        }, {
-          onConflict: `${idColumn},provider`
-        });
-      dbError = result.error;
+    if (existing) {
+      const { error } = await supabase
+        .from('integrations')
+        .update(integrationData)
+        .eq('id', existing.id);
+      dbError = error;
+    } else {
+      const { error } = await supabase
+        .from('integrations')
+        .insert(integrationData);
+      dbError = error;
     }
 
     if (dbError) {
