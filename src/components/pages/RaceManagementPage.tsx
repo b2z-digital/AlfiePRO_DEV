@@ -1187,9 +1187,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     return name.toLowerCase().includes(search) || venue.toLowerCase().includes(search);
   };
 
-  // Get unique years from all events and series rounds
+  // Get unique years from all events and series rounds, always including current year
   const availableYears = React.useMemo(() => {
     const years = new Set<number>();
+
+    // Always include current year
+    years.add(new Date().getFullYear());
 
     quickRaces.forEach(race => {
       const year = new Date(race.date).getFullYear();
@@ -2394,9 +2397,9 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {[
               { value: 'all', label: 'All Events', count: sortedQuickRaces.length + sortedSeries.length },
-              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces, ...series.flatMap(s => s.rounds)].filter(e => !isDatePast(e.date) && !e.completed).length },
-              { value: 'past', label: 'Past', count: [...quickRaces, ...series.flatMap(s => s.rounds)].filter(e => isDatePast(e.date) && !e.completed).length },
-              { value: 'completed', label: 'Completed', count: [...quickRaces, ...series.flatMap(s => s.rounds)].filter(e => e.completed).length },
+              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
+              { value: 'past', label: 'Past', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
+              { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
               { value: 'pending', label: 'Pending', count: pendingEvents.length },
             ].map((tab) => (
               <button
