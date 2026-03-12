@@ -295,7 +295,16 @@ Thank you.
         .replace(/\[Meeting Time\]/g, meetingTime)
         .replace(/\[Meeting Location\]/g, meetingLocation);
 
-      const attendanceRecords = recipientMembers.map(member => ({
+      const seenUserIds = new Set<string>();
+      const deduplicatedRecipients = recipientMembers.filter(member => {
+        if (member.user_id) {
+          if (seenUserIds.has(member.user_id)) return false;
+          seenUserIds.add(member.user_id);
+        }
+        return true;
+      });
+
+      const attendanceRecords = deduplicatedRecipients.map(member => ({
         meeting_id: meetingId,
         member_id: member.id,
         user_id: member.user_id,
@@ -319,7 +328,7 @@ Thank you.
         attendanceData?.map(a => [a.member_id, a.response_token]) || []
       );
 
-      const recipients = recipientMembers.map(member => ({
+      const recipients = deduplicatedRecipients.map(member => ({
         user_id: member.user_id,
         email: member.email,
         first_name: member.first_name,
