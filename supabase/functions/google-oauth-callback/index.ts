@@ -51,7 +51,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const tokenData = await tokenResponse.json();
-    const { access_token, refresh_token, expires_in } = tokenData;
+    const { access_token, refresh_token, expires_in, scope: grantedScopes } = tokenData;
 
     if (!access_token) {
       throw new Error('No access token received');
@@ -73,24 +73,6 @@ Deno.serve(async (req: Request) => {
 
     const userInfo = await userInfoResponse.json();
     const email = userInfo.email;
-
-    const calendarResponse = await fetch(
-      'https://www.googleapis.com/calendar/v3/users/me/calendarList',
-      {
-        headers: {
-          'Authorization': `Bearer ${access_token}`,
-        },
-      }
-    );
-
-    let calendarId = null;
-    if (calendarResponse.ok) {
-      const calendarData = await calendarResponse.json();
-      if (calendarData.items && calendarData.items.length > 0) {
-        calendarId = calendarData.items[0].id;
-      }
-    }
-
     const expiresAt = new Date(Date.now() + (expires_in * 1000)).toISOString();
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -99,56 +81,137 @@ Deno.serve(async (req: Request) => {
       associationType === 'state' ? 'state_association_id' : 'national_association_id';
     const orgId = clubId || associationId;
 
-    const integrationData: Record<string, unknown> = {
+    const baseOwner: Record<string, unknown> = {
       [idColumn]: orgId,
-      platform: 'google',
-      is_active: true,
-      credentials: {
-        email,
-        google_calendar_id: calendarId,
-        access_token,
-        refresh_token,
-        token_expires_at: expiresAt,
-      },
       connected_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
+    if (idColumn !== 'club_id') baseOwner['club_id'] = null;
+    if (idColumn !== 'state_association_id') baseOwner['state_association_id'] = null;
+    if (idColumn !== 'national_association_id') baseOwner['national_association_id'] = null;
 
-    if (idColumn !== 'club_id') integrationData['club_id'] = null;
-    if (idColumn !== 'state_association_id') integrationData['state_association_id'] = null;
-    if (idColumn !== 'national_association_id') integrationData['national_association_id'] = null;
+    const scopeStr = grantedScopes || '';
+    const hasCalendar = scopeStr.includes('calendar');
+    const hasDrive = scopeStr.includes('drive');
+    const hasYoutube = scopeStr.includes('youtube');
 
-    const { data: existing } = await supabase
-      .from('integrations')
-      .select('id')
-      .eq(idColumn, orgId)
-      .eq('platform', 'google')
-      .maybeSingle();
-
-    let dbError;
-    if (existing) {
-      const { error } = await supabase
-        .from('integrations')
-        .update(integrationData)
-        .eq('id', existing.id);
-      dbError = error;
-    } else {
-      const { error } = await supabase
-        .from('integrations')
-        .insert(integrationData);
-      dbError = error;
+    let calendarId = null;
+    if (hasCalendar) {
+      const calendarResponse = await fetch(
+        'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+        { headers: { 'Authorization': `Bearer ${access_token}` } }
+      );
+      if (calendarResponse.ok) {
+        const calendarData = await calendarResponse.json();
+        if (calendarData.items && calendarData.items.length > 0) {
+          calendarId = calendarData.items[0].id;
+        }
+      }
     }
 
-    if (dbError) {
-      throw new Error(`Database error: ${dbError.message}`);
+    let channelId = null;
+    let channelName = null;
+    if (hasYoutube) {
+      const ytResponse = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+        { headers: { 'Authorization': `Bearer ${access_token}` } }
+      );
+      if (ytResponse.ok) {
+        const ytData = await ytResponse.json();
+        if (ytData.items && ytData.items.length > 0) {
+          channelId = ytData.items[0].id;
+          channelName = ytData.items[0].snippet?.title;
+        }
+      }
+    }
+
+    const sharedCredentials = {
+      email,
+      access_token,
+      refresh_token,
+      token_expires_at: expiresAt,
+    };
+
+    const platforms = [
+      {
+        platform: 'google',
+        is_active: true,
+        credentials: {
+          ...sharedCredentials,
+          google_calendar_id: calendarId,
+        },
+      },
+    ];
+
+    if (hasDrive) {
+      platforms.push({
+        platform: 'google_drive',
+        is_active: true,
+        credentials: {
+          ...sharedCredentials,
+          google_account_email: email,
+        },
+      });
+    }
+
+    if (hasYoutube) {
+      platforms.push({
+        platform: 'youtube',
+        is_active: true,
+        credentials: {
+          ...sharedCredentials,
+          channel_id: channelId,
+          channel_name: channelName,
+        },
+      });
+    }
+
+    const results: string[] = [];
+    for (const p of platforms) {
+      const integrationData = {
+        ...baseOwner,
+        platform: p.platform,
+        is_active: p.is_active,
+        credentials: p.credentials,
+      };
+
+      const { data: existing } = await supabase
+        .from('integrations')
+        .select('id')
+        .eq(idColumn, orgId)
+        .eq('platform', p.platform)
+        .maybeSingle();
+
+      let dbError;
+      if (existing) {
+        const { error } = await supabase
+          .from('integrations')
+          .update(integrationData)
+          .eq('id', existing.id);
+        dbError = error;
+      } else {
+        const { error } = await supabase
+          .from('integrations')
+          .insert(integrationData);
+        dbError = error;
+      }
+
+      if (dbError) {
+        console.error(`Error saving ${p.platform}:`, dbError);
+      } else {
+        results.push(p.platform);
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        email: email,
-        calendarId: calendarId,
-        message: 'Google integration connected successfully'
+        email,
+        calendarId,
+        channelId,
+        channelName,
+        connectedServices: results,
+        message: `Google connected: ${results.join(', ')}`
       }),
       {
         headers: {

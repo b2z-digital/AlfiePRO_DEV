@@ -566,7 +566,15 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '230273275079-723coi1ukfg2vngapur5djnug1cer6hd.apps.googleusercontent.com';
       const redirectUri = `${window.location.origin}/settings`;
-      const scope = 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/calendar';
+      const scopes = [
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.metadata.readonly',
+        'https://www.googleapis.com/auth/youtube',
+        'https://www.googleapis.com/auth/youtube.upload',
+      ].join(' ');
 
       const stateData: any = { integration: 'google' };
       if (currentClub?.clubId) {
@@ -579,7 +587,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(clientId)}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `scope=${encodeURIComponent(scope)}&` +
+        `scope=${encodeURIComponent(scopes)}&` +
         `response_type=code&` +
         `access_type=offline&` +
         `prompt=consent&` +
@@ -736,31 +744,79 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
   };
 
   const handleGoogleSubServiceToggle = async (subServiceId: string) => {
-    const googleSuite = integrations.find(i => i.id === 'google_suite');
-    const subService = googleSuite?.subServices?.find(s => s.id === subServiceId);
-
-    if (subService?.connected) {
-      if (subServiceId === 'google_drive') {
-        await handleDisconnectGoogleDrive();
+    if (subServiceId === 'google-analytics') {
+      const googleSuite = integrations.find(i => i.id === 'google_suite');
+      const analyticsSub = googleSuite?.subServices?.find(s => s.id === 'google-analytics');
+      if (analyticsSub?.connected) {
+        await handleDisconnectIntegration('google-analytics');
       } else {
-        await handleDisconnectIntegration(subServiceId);
+        setSelectedIntegration('google-analytics');
+        setShowConfigModal(true);
       }
-    } else {
-      switch (subServiceId) {
-        case 'google':
-          handleConnectGoogle();
-          break;
-        case 'google_drive':
-          handleConnectGoogleDrive();
-          break;
-        case 'youtube':
-          handleConnectYoutube();
-          break;
-        case 'google-analytics':
-          setSelectedIntegration('google-analytics');
-          setShowConfigModal(true);
-          break;
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const orgId = currentClub?.clubId || currentOrganization?.id;
+      if (!orgId) return;
+
+      let idColumn = 'club_id';
+      if (!currentClub?.clubId && currentOrganization?.id) {
+        idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
       }
+
+      const { data: existing } = await supabase
+        .from('integrations')
+        .select('id, is_active')
+        .eq(idColumn, orgId)
+        .eq('platform', subServiceId)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('integrations')
+          .update({ is_active: !existing.is_active, updated_at: new Date().toISOString() })
+          .eq('id', existing.id);
+        if (error) throw error;
+      }
+
+      await fetchIntegrationStatus();
+    } catch (err) {
+      console.error('Error toggling Google sub-service:', err);
+      addNotification('error', 'Failed to update service');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnectAllGoogle = async () => {
+    try {
+      setSaving(true);
+      const orgId = currentClub?.clubId || currentOrganization?.id;
+      if (!orgId) return;
+
+      let idColumn = 'club_id';
+      if (!currentClub?.clubId && currentOrganization?.id) {
+        idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
+      }
+
+      const googlePlatforms = ['google', 'google_drive', 'youtube'];
+      for (const platform of googlePlatforms) {
+        await supabase
+          .from('integrations')
+          .delete()
+          .eq(idColumn, orgId)
+          .eq('platform', platform);
+      }
+
+      await fetchIntegrationStatus();
+      addNotification('success', 'Google account disconnected');
+    } catch (err) {
+      console.error('Error disconnecting Google:', err);
+      addNotification('error', 'Failed to disconnect Google');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1223,14 +1279,12 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                 </div>
 
                 {integration.id === 'google_suite' ? (
-                  <button
-                    onClick={() => handleToggleIntegration(integration.id)}
-                    disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
-                  >
-                    <Settings size={14} />
-                    Manage
-                  </button>
+                  integration.connected ? (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      <Check size={12} />
+                      Connected
+                    </div>
+                  ) : null
                 ) : (
                   <button
                     onClick={() => handleToggleIntegration(integration.id)}
@@ -1257,31 +1311,84 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
               </div>
 
               {integration.id === 'google_suite' && integration.subServices && (
-                <div className="mt-3 space-y-2">
-                  {integration.subServices.map(sub => (
-                    <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-700/30">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sub.connected ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                        <span className="text-sm text-slate-300">{sub.name}</span>
-                        {sub.connected && sub.connectedInfo && (
-                          <span className="text-xs text-slate-500 truncate">
-                            - {sub.connectedInfo.value}
+                <div className="mt-3">
+                  {!integration.connected ? (
+                    <button
+                      onClick={handleConnectGoogle}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {saving ? <RefreshCw size={16} className="animate-spin" /> : null}
+                      Connect Google Account
+                    </button>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Check size={14} className="text-emerald-400" />
+                          <span className="text-sm text-emerald-300 font-medium">
+                            {integration.subServices.find(s => s.id === 'google')?.connectedInfo?.value || 'Connected'}
                           </span>
-                        )}
+                        </div>
+                        <button
+                          onClick={handleDisconnectAllGoogle}
+                          disabled={saving}
+                          className="text-xs px-2.5 py-1 rounded-md font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          Disconnect
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleGoogleSubServiceToggle(sub.id)}
-                        disabled={saving}
-                        className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
-                          sub.connected
-                            ? 'text-red-400 hover:bg-red-500/10'
-                            : 'text-blue-400 hover:bg-blue-500/10'
-                        }`}
-                      >
-                        {sub.connected ? 'Disconnect' : 'Connect'}
-                      </button>
-                    </div>
-                  ))}
+                      <div className="space-y-1.5">
+                        {integration.subServices.map(sub => (
+                          <div key={sub.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-700/30">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-sm text-slate-300">{sub.name}</span>
+                              {sub.connected && sub.connectedInfo && sub.id !== 'google' && (
+                                <span className="text-xs text-slate-500 truncate">
+                                  {sub.connectedInfo.value}
+                                </span>
+                              )}
+                            </div>
+                            {sub.id === 'google-analytics' ? (
+                              <button
+                                onClick={() => handleGoogleSubServiceToggle(sub.id)}
+                                disabled={saving}
+                                className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
+                                  sub.connected
+                                    ? 'text-red-400 hover:bg-red-500/10'
+                                    : 'text-blue-400 hover:bg-blue-500/10'
+                                }`}
+                              >
+                                {sub.connected ? 'Remove' : 'Configure'}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleGoogleSubServiceToggle(sub.id)}
+                                disabled={saving}
+                                className={`
+                                  relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                                  transition-colors duration-200 ease-in-out
+                                  ${sub.connected ? 'bg-emerald-500' : 'bg-slate-600'}
+                                  ${saving ? 'opacity-50 cursor-not-allowed' : ''}
+                                `}
+                                role="switch"
+                                aria-checked={sub.connected}
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`
+                                    pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0
+                                    transition duration-200 ease-in-out
+                                    ${sub.connected ? 'translate-x-4' : 'translate-x-0'}
+                                  `}
+                                />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
