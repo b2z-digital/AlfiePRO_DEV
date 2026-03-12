@@ -311,7 +311,8 @@ Thank you.
         .select('member_id, response_token');
 
       if (attendanceError) {
-        throw new Error('Failed to create attendance records');
+        console.error('Attendance upsert error:', attendanceError);
+        throw new Error(`Cannot create attendance records: ${attendanceError.message}`);
       }
 
       const tokenMap = new Map(
