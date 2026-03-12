@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  User, 
-  Flag, 
-  Edit2, 
-  Trash2, 
-  CheckSquare, 
-  Paperclip, 
-  AlertTriangle, 
+  ArrowLeft,
+  Calendar,
+  Clock,
+  User,
+  Flag,
+  Edit2,
+  Trash2,
+  CheckSquare,
+  Paperclip,
+  AlertTriangle,
   Check,
   MessageSquare,
-  Eye
+  Eye,
+  X
 } from 'lucide-react';
 import { Task } from '../../types/task';
 import { completeTask, getTaskAttachments } from '../../utils/taskStorage';
@@ -198,6 +199,13 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold text-white tracking-tight">My Tasks</h2>
         <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 hover:text-white transition-all duration-200 border border-slate-600/50"
+            title="Close"
+          >
+            <X size={18} />
+          </button>
           {task.status !== 'completed' && (
             <button
               onClick={handleMarkAsComplete}
