@@ -776,22 +776,22 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             )}
 
             {categories.map(cat => (
-              <div key={cat.id} className="group relative">
+              <div key={cat.id} className="group flex items-center gap-0.5">
                 <button
                   onClick={() => setActiveSection(cat.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all pr-16 ${
+                  className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all min-w-0 ${
                     activeSection === cat.id
                       ? 'bg-slate-700/80 text-white border border-slate-600/60 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
                   }`}
                 >
-                  <FolderOpen size={14} className={activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'} />
+                  <FolderOpen size={14} className={`flex-shrink-0 ${activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'}`} />
                   <span className="flex-1 truncate text-left">{cat.name}</span>
-                  <span className="text-xs text-slate-600 group-hover:hidden">
+                  <span className="text-xs text-slate-600 group-hover:invisible">
                     {resources.filter(r => r.category_id === cat.id).length}
                   </span>
                 </button>
-                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5">
+                <div className="flex items-center flex-shrink-0 invisible group-hover:visible">
                   <button
                     onClick={e => {
                       e.stopPropagation();
@@ -800,14 +800,14 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                       setCategoryDescription(cat.description || '');
                       setShowCategoryModal(true);
                     }}
-                    className="p-1.5 hover:text-white text-slate-400 hover:bg-slate-600 rounded transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-600 rounded transition-colors"
                     title="Rename folder"
                   >
                     <Edit2 size={12} />
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); handleDeleteCategory(cat.id); }}
-                    className="p-1.5 hover:text-red-400 text-slate-400 hover:bg-slate-600 rounded transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
                     title="Delete folder"
                   >
                     <Trash2 size={12} />
