@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CheckCircle2, Clock, ChevronRight, X, Grid as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, XCircle, Send, Edit2 } from 'lucide-react';
+import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CheckCircle2, Clock, ChevronRight, X, Grid as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, XCircle, Send, Edit2, Globe } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
@@ -17,6 +17,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { boatTypeColors, defaultColorScheme } from '../constants/colors';
 import EventResultsDisplay from '../components/EventResultsDisplay';
 import SeriesResultsDisplay from '../components/SeriesResultsDisplay';
+import ExternalResultsDisplay from '../components/ExternalResultsDisplay';
 import { getStoredVenues } from '../utils/venueStorage';
 import { Venue } from '../types/venue';
 import { supabase } from '../utils/supabase';
@@ -27,8 +28,24 @@ import { PublishToMetaModal } from '../components/PublishToMetaModal';
 import { HeatRaceResultsModal } from '../components/HeatRaceResultsModal';
 import { SeriesEditModal } from '../components/SeriesEditModal';
 
-type MainTab = 'events' | 'leaderboards';
+type MainTab = 'events' | 'leaderboards' | 'national' | 'world';
 type StatusFilter = 'all' | 'completed' | 'in-progress';
+
+interface ExternalResultEvent {
+  id: string;
+  event_name: string;
+  event_date: string | null;
+  event_end_date: string | null;
+  venue: string | null;
+  boat_class_raw: string | null;
+  boat_class_mapped: string | null;
+  competitor_count: number;
+  race_count: number;
+  display_category: 'national' | 'world';
+  source_url: string;
+  results_json: any[] | null;
+  last_scraped_at: string | null;
+}
 type ViewMode = 'list' | 'grid';
 
 interface RoundResult {
@@ -71,11 +88,14 @@ export const ResultsPage: React.FC = () => {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
   const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
+  const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
+  const [externalWorldEvents, setExternalWorldEvents] = useState<ExternalResultEvent[]>([]);
 
   // Selected item for detail view
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<RaceSeries | null>(null);
   const [selectedRound, setSelectedRound] = useState<RoundResult | null>(null);
+  const [selectedExternalEvent, setSelectedExternalEvent] = useState<ExternalResultEvent | null>(null);
 
   // Export and modal state
   const [showExportDropdown, setShowExportDropdown] = useState(false);
@@ -88,6 +108,7 @@ export const ResultsPage: React.FC = () => {
   useEffect(() => {
     loadData();
     loadClubFeaturedImage();
+    loadExternalResults();
   }, [currentClub]);
 
   const loadClubFeaturedImage = async () => {
@@ -104,6 +125,22 @@ export const ResultsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Error loading club featured image:', err);
+    }
+  };
+
+  const loadExternalResults = async () => {
+    try {
+      const { data } = await supabase
+        .from('external_result_events')
+        .select('id,event_name,event_date,event_end_date,venue,boat_class_raw,boat_class_mapped,competitor_count,race_count,display_category,source_url,results_json,last_scraped_at')
+        .eq('is_visible', true)
+        .order('event_date', { ascending: false });
+      if (data) {
+        setExternalNationalEvents(data.filter((e: ExternalResultEvent) => e.display_category === 'national'));
+        setExternalWorldEvents(data.filter((e: ExternalResultEvent) => e.display_category === 'world'));
+      }
+    } catch (err) {
+      console.error('Error loading external results:', err);
     }
   };
 
@@ -1703,6 +1740,22 @@ export const ResultsPage: React.FC = () => {
       );
     }
 
+    // External event detail view
+    if (selectedExternalEvent) {
+      return (
+        <div className="space-y-4">
+          <button
+            onClick={() => setSelectedExternalEvent(null)}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <ChevronRight className="rotate-180" size={16} />
+            Back to results
+          </button>
+          <ExternalResultsDisplay event={selectedExternalEvent} darkMode={true} isExportMode={false} />
+        </div>
+      );
+    }
+
     // Main list view
     const eventsToShow = mainTab === 'events' ? filteredEvents : [];
     const seriesToShow = mainTab === 'leaderboards' ? filteredSeries : [];
@@ -1778,46 +1831,66 @@ export const ResultsPage: React.FC = () => {
         </div>
 
         {/* Main Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-700">
+        <div className="flex items-center gap-2 border-b border-slate-700 flex-wrap">
           <button
-            onClick={() => setMainTab('events')}
+            onClick={() => { setMainTab('events'); setSelectedExternalEvent(null); }}
             className={`px-4 py-3 font-medium transition-colors relative ${
-              mainTab === 'events'
-                ? 'text-green-400'
-                : 'text-slate-400 hover:text-slate-300'
+              mainTab === 'events' ? 'text-green-400' : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <div className="flex items-center gap-2">
               <Trophy size={18} />
               <span>Individual Events & Rounds</span>
-              <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">
-                {filteredEvents.length}
-              </span>
+              <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredEvents.length}</span>
             </div>
-            {mainTab === 'events' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />
-            )}
+            {mainTab === 'events' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
           </button>
 
           <button
-            onClick={() => setMainTab('leaderboards')}
+            onClick={() => { setMainTab('leaderboards'); setSelectedExternalEvent(null); }}
             className={`px-4 py-3 font-medium transition-colors relative ${
-              mainTab === 'leaderboards'
-                ? 'text-purple-400'
-                : 'text-slate-400 hover:text-slate-300'
+              mainTab === 'leaderboards' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-300'
             }`}
           >
             <div className="flex items-center gap-2">
               <TrendingUp size={18} />
               <span>Series Leaderboards</span>
-              <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">
-                {filteredSeries.length}
-              </span>
+              <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredSeries.length}</span>
             </div>
-            {mainTab === 'leaderboards' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
-            )}
+            {mainTab === 'leaderboards' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />}
           </button>
+
+          {externalNationalEvents.length > 0 && (
+            <button
+              onClick={() => { setMainTab('national'); setSelectedExternalEvent(null); }}
+              className={`px-4 py-3 font-medium transition-colors relative ${
+                mainTab === 'national' ? 'text-amber-400' : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Globe size={18} />
+                <span>National Events</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{externalNationalEvents.length}</span>
+              </div>
+              {mainTab === 'national' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
+            </button>
+          )}
+
+          {externalWorldEvents.length > 0 && (
+            <button
+              onClick={() => { setMainTab('world'); setSelectedExternalEvent(null); }}
+              className={`px-4 py-3 font-medium transition-colors relative ${
+                mainTab === 'world' ? 'text-orange-400' : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Globe size={18} />
+                <span>World Events</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{externalWorldEvents.length}</span>
+              </div>
+              {mainTab === 'world' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-400" />}
+            </button>
+          )}
         </div>
 
         {/* Filters */}
@@ -1901,7 +1974,7 @@ export const ResultsPage: React.FC = () => {
               Object.entries(groupedSeries).map(([className, seriesList]) => (
                 <div key={className}>
                   <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <TrendingUp size={18} className="text-purple-400" />
+                    <TrendingUp size={18} className="text-blue-400" />
                     {className}
                     <span className="text-sm font-normal text-slate-400">({seriesList.length})</span>
                   </h3>
@@ -1913,6 +1986,108 @@ export const ResultsPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {(mainTab === 'national' || mainTab === 'world') && (() => {
+          const extEvents = mainTab === 'national' ? externalNationalEvents : externalWorldEvents;
+          const accentColor = mainTab === 'national' ? 'amber' : 'orange';
+          return (
+            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
+              {extEvents.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-slate-400">
+                  No {mainTab === 'national' ? 'national' : 'world'} events found
+                </div>
+              ) : (
+                extEvents.map(ev => {
+                  if (viewMode === 'grid') {
+                    return (
+                      <button
+                        key={ev.id}
+                        onClick={() => setSelectedExternalEvent(ev)}
+                        className="group relative overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 hover:scale-[1.02] text-left flex flex-col"
+                      >
+                        <div className="relative h-40 flex-shrink-0 overflow-hidden bg-slate-900">
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                            <Globe className="text-slate-600" size={40} />
+                          </div>
+                          <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
+                            <Globe size={12} />
+                            {mainTab === 'national' ? 'National' : 'World'}
+                          </div>
+                          {ev.event_date && (
+                            <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
+                              <div className="text-center">
+                                <div className="text-xs font-semibold text-slate-900">
+                                  {new Date(ev.event_date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+                                </div>
+                                <div className="text-lg font-bold text-slate-900 leading-none">
+                                  {new Date(ev.event_date).getDate()}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <h4 className="text-white font-medium mb-2 line-clamp-2 text-left">{ev.event_name}</h4>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {(ev.boat_class_mapped || ev.boat_class_raw) && (
+                              <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
+                                {ev.boat_class_mapped || ev.boat_class_raw}
+                              </div>
+                            )}
+                          </div>
+                          {ev.event_date && (
+                            <div className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+                              <Calendar size={14} />
+                              <span>{formatDate(ev.event_date)}</span>
+                            </div>
+                          )}
+                          {ev.venue && (
+                            <div className="flex items-center gap-2 text-sm text-slate-400 mb-1">
+                              <MapPin size={14} />
+                              <span>{ev.venue}</span>
+                            </div>
+                          )}
+                          {ev.competitor_count > 0 && (
+                            <div className="flex items-center gap-2 text-sm text-slate-400">
+                              <Users size={14} />
+                              <span>{ev.competitor_count} competitors</span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }
+                  // List view
+                  return (
+                    <button
+                      key={ev.id}
+                      onClick={() => setSelectedExternalEvent(ev)}
+                      className="group w-full flex items-center gap-4 p-4 rounded-lg border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 transition-all duration-200"
+                    >
+                      <div className={`w-12 h-12 rounded-lg bg-${accentColor}-500/20 flex items-center justify-center flex-shrink-0`}>
+                        <Globe className={`text-${accentColor}-400`} size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <h4 className="font-medium text-white truncate">{ev.event_name}</h4>
+                        <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-slate-400">
+                          {ev.event_date && <span className="flex items-center gap-1"><Calendar size={12} />{formatDate(ev.event_date)}</span>}
+                          {ev.venue && <span className="flex items-center gap-1"><MapPin size={12} />{ev.venue}</span>}
+                          {ev.competitor_count > 0 && <span className="flex items-center gap-1"><Users size={12} />{ev.competitor_count} competitors</span>}
+                          {(ev.boat_class_mapped || ev.boat_class_raw) && (
+                            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                              {ev.boat_class_mapped || ev.boat_class_raw}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight className="text-slate-400 group-hover:text-white transition-colors flex-shrink-0" size={20} />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };

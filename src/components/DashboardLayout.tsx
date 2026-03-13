@@ -102,6 +102,7 @@ import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
 import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
 import { ImpersonationAuditTab } from './super-admin/ImpersonationAuditTab';
 import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
+import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapingTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -1053,6 +1054,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'ask-alfie-management', label: 'Ask Alfie', icon: Bot, description: 'AI knowledge management', path: '/ask-alfie-management' },
           { id: 'help-support', label: 'Help & Support', icon: LifeBuoy, description: 'FAQs, tutorials & tickets', path: '/help-support' },
           { id: 'news-scraping', label: 'News Scraping', icon: Newspaper, description: 'Automated news scrapers', path: '/news-scraping' },
+          { id: 'results-scraping', label: 'Results Scraping', icon: Trophy, description: 'External race results feeds', path: '/results-scraping' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1686,6 +1688,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/news-scraping" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <NewsScrapingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/results-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ExternalResultsScrapingTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
