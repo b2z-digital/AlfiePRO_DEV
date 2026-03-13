@@ -354,6 +354,41 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (action === 'move_file') {
+      const { organizationId, organizationType, fileId, targetFolderId, currentParentId } = body;
+
+      if (!fileId || !targetFolderId) {
+        throw new Error('fileId and targetFolderId are required');
+      }
+
+      const accessToken = await getAccessToken(organizationId, organizationType);
+
+      const removeParents = currentParentId ? `&removeParents=${currentParentId}` : '';
+      const moveResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${targetFolderId}${removeParents}&fields=id,name,parents`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!moveResponse.ok) {
+        const error = await moveResponse.text();
+        console.error('Move error:', error);
+        throw new Error('Failed to move file in Google Drive');
+      }
+
+      const moved = await moveResponse.json();
+      return new Response(
+        JSON.stringify({ success: true, file: moved }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
