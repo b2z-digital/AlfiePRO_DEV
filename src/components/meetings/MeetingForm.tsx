@@ -973,7 +973,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                         type="button"
                         onClick={createGoogleMeet}
                         disabled={creatingMeet || !formData.name || !formData.date}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-white hover:bg-gray-100 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <Video size={14} />
                         {creatingMeet ? 'Creating...' : 'Generate Google Meet'}

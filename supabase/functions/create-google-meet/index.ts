@@ -65,21 +65,29 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const idColumn = clubId ? 'club_id'
-      : associationType === 'state' ? 'state_association_id'
-      : 'national_association_id';
-    const orgId = clubId || associationId;
+    const lookups: { column: string; id: string }[] = [];
+    if (associationId) {
+      const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      lookups.push({ column: assocColumn, id: associationId });
+    }
+    if (clubId) {
+      lookups.push({ column: 'club_id', id: clubId });
+    }
 
-    const { data: integration, error: integrationError } = await supabase
-      .from('integrations')
-      .select('id, credentials')
-      .eq(idColumn, orgId)
-      .eq('platform', 'google')
-      .eq('is_active', true)
-      .maybeSingle();
+    let integration = null;
+    for (const lookup of lookups) {
+      const { data, error: integrationError } = await supabase
+        .from('integrations')
+        .select('id, credentials')
+        .eq(lookup.column, lookup.id)
+        .eq('platform', 'google')
+        .eq('is_active', true)
+        .maybeSingle();
 
-    if (integrationError) {
-      throw new Error(`Failed to fetch integration: ${integrationError.message}`);
+      if (!integrationError && data?.credentials?.refresh_token) {
+        integration = data;
+        break;
+      }
     }
 
     if (!integration || !integration.credentials) {
