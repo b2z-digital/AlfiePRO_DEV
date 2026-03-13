@@ -96,15 +96,15 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
 
   useEffect(() => {
     if (organizationId) loadAll();
-  }, [organizationId, organizationType]);
+  }, [organizationId, organizationType, currentClub?.clubId]);
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (!document.hidden && organizationId) checkGoogleDrive();
+      if (!document.hidden) checkGoogleDrive();
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [organizationId]);
+  }, [organizationId, currentClub?.clubId]);
 
   useEffect(() => {
     if (activeSection === 'drive' && hasGoogleDrive && driveItems.length === 0) {
@@ -151,24 +151,37 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   };
 
   const checkGoogleDrive = async (): Promise<boolean> => {
-    if (!organizationId) return false;
+    const effectiveOrgId = organizationId || currentClub?.clubId;
+    const effectiveType = organizationType || 'club';
+    if (!effectiveOrgId) return false;
     try {
-      const idColumn = organizationType === 'club' ? 'club_id'
-        : organizationType === 'state' ? 'state_association_id'
+      const idColumn = effectiveType === 'club' ? 'club_id'
+        : effectiveType === 'state' ? 'state_association_id'
         : 'national_association_id';
-      const { data } = await supabase
+
+      const { data: allIntegrations, error } = await supabase
         .from('integrations')
-        .select('id, credentials')
-        .eq(idColumn, organizationId)
-        .eq('platform', 'google_drive')
-        .maybeSingle();
-      const connected = !!data?.credentials?.refresh_token;
+        .select('id, platform, is_active, credentials')
+        .eq(idColumn, effectiveOrgId);
+
+      if (error) {
+        console.warn('checkGoogleDrive query error:', error.message);
+        setHasGoogleDrive(false);
+        return false;
+      }
+
+      const driveIntegration = (allIntegrations || []).find(
+        i => i.platform === 'google_drive' && i.is_active && i.credentials?.refresh_token
+      );
+
+      const connected = !!driveIntegration;
       setHasGoogleDrive(connected);
-      if (connected && data?.credentials?.folder_id) {
-        setDriveRootFolderId(data.credentials.folder_id);
+      if (connected && driveIntegration?.credentials?.folder_id) {
+        setDriveRootFolderId(driveIntegration.credentials.folder_id);
       }
       return connected;
-    } catch {
+    } catch (err) {
+      console.warn('checkGoogleDrive error:', err);
       setHasGoogleDrive(false);
       return false;
     }
