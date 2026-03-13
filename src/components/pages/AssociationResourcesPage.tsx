@@ -77,6 +77,21 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   const [driveRenameName, setDriveRenameName] = useState('');
   const [driveRenaming, setDriveRenaming] = useState(false);
 
+  // Drive new folder modal
+  const [showDriveNewFolderModal, setShowDriveNewFolderModal] = useState(false);
+  const [driveNewFolderName, setDriveNewFolderName] = useState('');
+  const [driveNewFolderCreating, setDriveNewFolderCreating] = useState(false);
+
+  // In-app confirm dialog
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const showConfirm = (message: string, onConfirm: () => void) => {
+    setConfirmDialog({ message, onConfirm });
+  };
+
   // Category modal
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ResourceStorage.ResourceCategory | null>(null);
@@ -302,20 +317,24 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     }
   };
 
-  const handleDriveDelete = async (item: DriveItem) => {
-    if (!confirm(`Delete "${item.name}" from Google Drive?`)) return;
-    try {
-      await callDriveApi({
-        action: 'delete_file',
-        organizationId: driveOrgId || organizationId,
-        organizationType: driveOrgType || organizationType,
-        fileId: item.id,
-      });
-      addNotification(`"${item.name}" deleted`, 'success');
-      if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
-    } catch (err: any) {
-      addNotification(err.message || 'Failed to delete file', 'error');
-    }
+  const handleDriveDelete = (item: DriveItem) => {
+    showConfirm(
+      `Delete "${item.name}" from Google Drive?`,
+      async () => {
+        try {
+          await callDriveApi({
+            action: 'delete_file',
+            organizationId: driveOrgId || organizationId,
+            organizationType: driveOrgType || organizationType,
+            fileId: item.id,
+          });
+          addNotification(`"${item.name}" deleted`, 'success');
+          if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
+        } catch (err: any) {
+          addNotification(err.message || 'Failed to delete file', 'error');
+        }
+      }
+    );
   };
 
   const handleDriveRename = async () => {
@@ -343,6 +362,28 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   const openDriveRename = (item: DriveItem) => {
     setDriveRenameItem(item);
     setDriveRenameName(item.name);
+  };
+
+  const handleCreateDriveFolder = async () => {
+    if (!driveNewFolderName.trim() || !currentDriveFolderId) return;
+    setDriveNewFolderCreating(true);
+    try {
+      await callDriveApi({
+        action: 'create_folder',
+        organizationId: driveOrgId || organizationId,
+        organizationType: driveOrgType || organizationType,
+        folderName: driveNewFolderName.trim(),
+        parentFolderId: currentDriveFolderId,
+      });
+      addNotification(`Folder "${driveNewFolderName.trim()}" created in Google Drive`, 'success');
+      setShowDriveNewFolderModal(false);
+      setDriveNewFolderName('');
+      browseDriveFolder(currentDriveFolderId);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to create folder', 'error');
+    } finally {
+      setDriveNewFolderCreating(false);
+    }
   };
 
   const handleOpenDrive = () => {
@@ -478,21 +519,25 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     setEditingCategory(null);
   };
 
-  const handleDeleteCategory = async (catId: string) => {
-    if (!confirm('Delete this folder and all its resources?')) return;
-    try {
-      const catResources = await ResourceStorage.fetchResources(catId);
-      for (const r of catResources) {
-        if (r.file_url) await ResourceStorage.deleteResourceFile(r.file_url);
-        await ResourceStorage.deleteResource(r.id);
+  const handleDeleteCategory = (catId: string) => {
+    showConfirm(
+      'Delete this folder and all its resources?',
+      async () => {
+        try {
+          const catResources = await ResourceStorage.fetchResources(catId);
+          for (const r of catResources) {
+            if (r.file_url) await ResourceStorage.deleteResourceFile(r.file_url);
+            await ResourceStorage.deleteResource(r.id);
+          }
+          await ResourceStorage.deleteResourceCategory(catId);
+          if (activeSection === catId) setActiveSection('all');
+          addNotification('Folder deleted', 'success');
+          loadAll();
+        } catch {
+          addNotification('Failed to delete folder', 'error');
+        }
       }
-      await ResourceStorage.deleteResourceCategory(catId);
-      if (activeSection === catId) setActiveSection('all');
-      addNotification('Folder deleted', 'success');
-      loadAll();
-    } catch {
-      addNotification('Failed to delete folder', 'error');
-    }
+    );
   };
 
   const handleSaveResource = async () => {
@@ -552,16 +597,20 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     setEditingResource(null);
   };
 
-  const handleDeleteResource = async (resource: ResourceStorage.AssociationResource) => {
-    if (!confirm(`Delete "${resource.title}"?`)) return;
-    try {
-      if (resource.file_url) await ResourceStorage.deleteResourceFile(resource.file_url);
-      await ResourceStorage.deleteResource(resource.id);
-      addNotification('Resource deleted', 'success');
-      loadAll();
-    } catch {
-      addNotification('Failed to delete resource', 'error');
-    }
+  const handleDeleteResource = (resource: ResourceStorage.AssociationResource) => {
+    showConfirm(
+      `Delete "${resource.title}"?`,
+      async () => {
+        try {
+          if (resource.file_url) await ResourceStorage.deleteResourceFile(resource.file_url);
+          await ResourceStorage.deleteResource(resource.id);
+          addNotification('Resource deleted', 'success');
+          loadAll();
+        } catch {
+          addNotification('Failed to delete resource', 'error');
+        }
+      }
+    );
   };
 
   const getFileIcon = (mimeType?: string, isFolder?: boolean) => {
@@ -684,13 +733,23 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 />
               </label>
             )}
-            <button
-              onClick={() => { resetCategoryForm(); setShowCategoryModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
-            >
-              <FolderPlus size={15} />
-              New Folder
-            </button>
+            {isDriveSection && currentDriveFolderId ? (
+              <button
+                onClick={() => { setDriveNewFolderName(''); setShowDriveNewFolderModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
+              >
+                <FolderPlus size={15} />
+                New Folder
+              </button>
+            ) : !isDriveSection && (
+              <button
+                onClick={() => { resetCategoryForm(); setShowCategoryModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
+              >
+                <FolderPlus size={15} />
+                New Folder
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -739,22 +798,22 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             )}
 
             {categories.map(cat => (
-              <div key={cat.id} className="group relative">
+              <div key={cat.id} className="group flex items-center gap-0.5">
                 <button
                   onClick={() => setActiveSection(cat.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                  className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all min-w-0 ${
                     activeSection === cat.id
                       ? 'bg-slate-700/80 text-white border border-slate-600/60 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
                   }`}
                 >
-                  <FolderOpen size={14} className={activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'} />
+                  <FolderOpen size={14} className={`flex-shrink-0 ${activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'}`} />
                   <span className="flex-1 truncate text-left">{cat.name}</span>
-                  <span className="text-xs text-slate-600">
+                  <span className="text-xs text-slate-600 group-hover:invisible">
                     {resources.filter(r => r.category_id === cat.id).length}
                   </span>
                 </button>
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-slate-800 rounded px-0.5">
+                <div className="flex items-center flex-shrink-0 invisible group-hover:visible">
                   <button
                     onClick={e => {
                       e.stopPropagation();
@@ -763,15 +822,17 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                       setCategoryDescription(cat.description || '');
                       setShowCategoryModal(true);
                     }}
-                    className="p-1 hover:text-white text-slate-400 rounded transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-600 rounded transition-colors"
+                    title="Rename folder"
                   >
-                    <Edit2 size={10} />
+                    <Edit2 size={12} />
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); handleDeleteCategory(cat.id); }}
-                    className="p-1 hover:text-red-400 text-slate-400 rounded transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                    title="Delete folder"
                   >
-                    <Trash2 size={10} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </div>
@@ -1148,6 +1209,75 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
                 {resourceSaving ? 'Saving...' : editingResource ? 'Update' : 'Add Resource'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-app Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="p-6">
+              <p className="text-white text-sm font-medium leading-relaxed">{confirmDialog.message}</p>
+            </div>
+            <div className="px-6 pb-5 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drive New Folder Modal */}
+      {showDriveNewFolderModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
+              <h3 className="text-lg font-semibold text-white">New Folder in Google Drive</h3>
+              <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5">
+              <label className="text-sm font-medium text-slate-300 block mb-1.5">Folder Name</label>
+              <input
+                type="text"
+                value={driveNewFolderName}
+                onChange={e => setDriveNewFolderName(e.target.value)}
+                placeholder="e.g. Race Documents 2026"
+                className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleCreateDriveFolder()}
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                This folder will be created inside the current Google Drive location.
+              </p>
+            </div>
+            <div className="p-5 pt-0 flex justify-end gap-3">
+              <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateDriveFolder}
+                disabled={driveNewFolderCreating || !driveNewFolderName.trim()}
+                className="px-4 py-2 text-sm bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+              >
+                {driveNewFolderCreating ? 'Creating...' : 'Create Folder'}
               </button>
             </div>
           </div>
