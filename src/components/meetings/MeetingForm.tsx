@@ -508,10 +508,69 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     return [];
   };
 
-  const fetchMembers = async (_category?: MeetingCategory) => {
+  const fetchAllMembers = async (): Promise<Member[]> => {
+    const memberFields = 'id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
+
+    if (clubId) {
+      const { data, error } = await supabase
+        .from('members')
+        .select(memberFields)
+        .eq('club_id', clubId)
+        .order('first_name', { ascending: true });
+      if (error) throw error;
+      return (data as Member[]) || [];
+    } else if (associationId && associationType) {
+      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+      const { data: userAssociations, error: assocError } = await supabase
+        .from(tableName)
+        .select('user_id')
+        .eq(idColumn, associationId);
+
+      if (assocError) throw assocError;
+      if (!userAssociations || userAssociations.length === 0) return [];
+
+      const userIds = userAssociations.map(ua => ua.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+        .order('first_name', { ascending: true });
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map((profile: any) => ({
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        club_id: '',
+        phone: '',
+        club: '',
+        street: '',
+        city: '',
+        state: '',
+        postcode: '',
+        date_joined: '',
+        membership_level: 'Full',
+        is_financial: true,
+        amount_paid: 0,
+        created_at: '',
+        updated_at: ''
+      })) as Member[];
+    }
+
+    return [];
+  };
+
+  const fetchMembers = async (category?: MeetingCategory) => {
     try {
-      const committeeMembers = await fetchCommitteeMembers();
-      setMembers(committeeMembers);
+      const cat = category ?? formData.meeting_category;
+      const memberList = cat === 'committee'
+        ? await fetchCommitteeMembers()
+        : await fetchAllMembers();
+      setMembers(memberList);
     } catch (err) {
       console.error('Error fetching members:', err);
       setError('Failed to load members');
@@ -605,6 +664,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
       if (formData.recurrence_type !== 'none' && !formData.recurrence_end_date) {
         throw new Error('Please select an end date for the recurring series');
+      }
+
+      if ((formData.meeting_type === 'hybrid' || formData.meeting_type === 'in_person') && !formData.location) {
+        throw new Error('A location is required for in-person and hybrid meetings');
       }
       
       const meetingData: any = {
@@ -839,7 +902,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Location
+                    Location {(formData.meeting_type === 'hybrid' || formData.meeting_type === 'in_person') && <span className="text-red-400">*</span>}
                   </label>
                   <div className="relative">
                     <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
