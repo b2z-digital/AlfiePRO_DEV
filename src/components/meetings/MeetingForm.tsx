@@ -364,22 +364,37 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         .map(m => m.email)
         .filter(Boolean);
 
-      const { data, error } = await supabase.functions.invoke('create-google-meet', {
-        body: {
-          clubId: effectiveClubId,
-          associationId: effectiveAssociationId,
-          associationType: effectiveAssociationType,
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-google-meet`;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
+      const fetchResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          clubId: effectiveClubId || null,
+          associationId: effectiveAssociationId || null,
+          associationType: effectiveAssociationType || null,
           meetingName: formData.name,
           meetingDescription: formData.description,
           startDateTime,
           endDateTime,
           attendeeEmails
-        }
+        }),
       });
 
-      if (error) {
-        const errorMsg = data?.error || error.message || 'Failed to create Google Meet';
-        throw new Error(errorMsg);
+      const data = await fetchResponse.json();
+
+      if (!fetchResponse.ok) {
+        throw new Error(data?.error || `Failed to create Google Meet (${fetchResponse.status})`);
       }
 
       if (data?.error) {
