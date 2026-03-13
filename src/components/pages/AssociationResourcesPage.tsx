@@ -60,6 +60,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   const [loadingDrive, setLoadingDrive] = useState(false);
   const [driveBreadcrumbs, setDriveBreadcrumbs] = useState<BreadcrumbItem[]>([]);
   const [currentDriveFolderId, setCurrentDriveFolderId] = useState<string | null>(null);
+  const [driveOrgId, setDriveOrgId] = useState<string | null>(null);
+  const [driveOrgType, setDriveOrgType] = useState<string>('club');
 
   // Drag & drop
   const [isDragging, setIsDragging] = useState(false);
@@ -151,35 +153,51 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   };
 
   const checkGoogleDrive = async (): Promise<boolean> => {
-    const effectiveOrgId = organizationId || currentClub?.clubId;
-    const effectiveType = organizationType || 'club';
-    if (!effectiveOrgId) return false;
+    const lookups: { column: string; id: string; type: string }[] = [];
+
+    if (organizationType === 'club' && organizationId) {
+      lookups.push({ column: 'club_id', id: organizationId, type: 'club' });
+    } else if (organizationId) {
+      const assocColumn = organizationType === 'state' ? 'state_association_id' : 'national_association_id';
+      lookups.push({ column: assocColumn, id: organizationId, type: organizationType });
+      if (currentClub?.clubId) {
+        lookups.push({ column: 'club_id', id: currentClub.clubId, type: 'club' });
+      }
+    } else if (currentClub?.clubId) {
+      lookups.push({ column: 'club_id', id: currentClub.clubId, type: 'club' });
+    }
+
+    if (lookups.length === 0) {
+      setHasGoogleDrive(false);
+      return false;
+    }
+
     try {
-      const idColumn = effectiveType === 'club' ? 'club_id'
-        : effectiveType === 'state' ? 'state_association_id'
-        : 'national_association_id';
+      for (const lookup of lookups) {
+        const { data: allIntegrations, error } = await supabase
+          .from('integrations')
+          .select('id, platform, is_active, credentials')
+          .eq(lookup.column, lookup.id);
 
-      const { data: allIntegrations, error } = await supabase
-        .from('integrations')
-        .select('id, platform, is_active, credentials')
-        .eq(idColumn, effectiveOrgId);
+        if (error) continue;
 
-      if (error) {
-        console.warn('checkGoogleDrive query error:', error.message);
-        setHasGoogleDrive(false);
-        return false;
+        const driveIntegration = (allIntegrations || []).find(
+          i => i.platform === 'google_drive' && i.is_active && i.credentials?.refresh_token
+        );
+
+        if (driveIntegration) {
+          setHasGoogleDrive(true);
+          setDriveOrgId(lookup.id);
+          setDriveOrgType(lookup.type);
+          if (driveIntegration.credentials?.folder_id) {
+            setDriveRootFolderId(driveIntegration.credentials.folder_id);
+          }
+          return true;
+        }
       }
 
-      const driveIntegration = (allIntegrations || []).find(
-        i => i.platform === 'google_drive' && i.is_active && i.credentials?.refresh_token
-      );
-
-      const connected = !!driveIntegration;
-      setHasGoogleDrive(connected);
-      if (connected && driveIntegration?.credentials?.folder_id) {
-        setDriveRootFolderId(driveIntegration.credentials.folder_id);
-      }
-      return connected;
+      setHasGoogleDrive(false);
+      return false;
     } catch (err) {
       console.warn('checkGoogleDrive error:', err);
       setHasGoogleDrive(false);
@@ -213,8 +231,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     try {
       const data = await callDriveApi({
         action: 'list_folder',
-        organizationId,
-        organizationType,
+        organizationId: driveOrgId || organizationId,
+        organizationType: driveOrgType || organizationType,
         folderId,
       });
       const items: DriveItem[] = (data.files || []).map((f: any) => ({
@@ -252,8 +270,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     try {
       const data = await callDriveApi({
         action: 'list_folder',
-        organizationId,
-        organizationType,
+        organizationId: driveOrgId || organizationId,
+        organizationType: driveOrgType || organizationType,
         folderId: targetId,
       });
       setDriveItems((data.files || []).map((f: any) => ({
@@ -289,8 +307,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     try {
       await callDriveApi({
         action: 'delete_file',
-        organizationId,
-        organizationType,
+        organizationId: driveOrgId || organizationId,
+        organizationType: driveOrgType || organizationType,
         fileId: item.id,
       });
       addNotification(`"${item.name}" deleted`, 'success');
@@ -306,8 +324,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     try {
       await callDriveApi({
         action: 'rename_file',
-        organizationId,
-        organizationType,
+        organizationId: driveOrgId || organizationId,
+        organizationType: driveOrgType || organizationType,
         fileId: driveRenameItem.id,
         newName: driveRenameName.trim(),
       });
@@ -370,8 +388,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         });
         await callDriveApi({
           action: 'upload_file',
-          organizationId,
-          organizationType,
+          organizationId: driveOrgId || organizationId,
+          organizationType: driveOrgType || organizationType,
           fileName: file.name,
           fileData: fileData.split(',')[1],
           mimeType: file.type || 'application/octet-stream',

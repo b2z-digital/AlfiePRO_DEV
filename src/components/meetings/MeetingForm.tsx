@@ -300,33 +300,42 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
   const checkGoogleIntegration = async () => {
     try {
-      const effectiveClubId = clubId || (!associationId ? currentClub?.clubId : undefined);
       const effectiveAssociationId = associationId || currentOrganization?.id;
       const effectiveAssociationType = associationType || currentOrganization?.type;
+      const effectiveClubId = clubId || currentClub?.clubId;
 
-      const idColumn = effectiveClubId ? 'club_id'
-        : effectiveAssociationType === 'state' ? 'state_association_id'
-        : 'national_association_id';
-      const orgId = effectiveClubId || effectiveAssociationId;
+      const lookups: { column: string; id: string }[] = [];
 
-      if (!orgId) return;
-
-      const { data: allIntegrations, error } = await supabase
-        .from('integrations')
-        .select('id, platform, is_active, credentials')
-        .eq(idColumn, orgId);
-
-      if (error) {
-        console.warn('checkGoogleIntegration error:', error.message);
-        return;
+      if (effectiveClubId && !effectiveAssociationId) {
+        lookups.push({ column: 'club_id', id: effectiveClubId });
+      } else if (effectiveAssociationId) {
+        const assocColumn = effectiveAssociationType === 'state' ? 'state_association_id' : 'national_association_id';
+        lookups.push({ column: assocColumn, id: effectiveAssociationId });
+        if (effectiveClubId) {
+          lookups.push({ column: 'club_id', id: effectiveClubId });
+        }
+      } else if (effectiveClubId) {
+        lookups.push({ column: 'club_id', id: effectiveClubId });
       }
 
-      const googleIntegration = (allIntegrations || []).find(
-        i => i.platform === 'google' && i.is_active && i.credentials?.refresh_token
-      );
+      if (lookups.length === 0) return;
 
-      if (googleIntegration) {
-        setHasGoogleIntegration(true);
+      for (const lookup of lookups) {
+        const { data: allIntegrations, error } = await supabase
+          .from('integrations')
+          .select('id, platform, is_active, credentials')
+          .eq(lookup.column, lookup.id);
+
+        if (error) continue;
+
+        const googleIntegration = (allIntegrations || []).find(
+          i => i.platform === 'google' && i.is_active && i.credentials?.refresh_token
+        );
+
+        if (googleIntegration) {
+          setHasGoogleIntegration(true);
+          return;
+        }
       }
     } catch (err) {
       console.error('Error checking Google integration:', err);
@@ -334,7 +343,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   };
 
   const createGoogleMeet = async () => {
-    const effectiveClubId = clubId || (!associationId ? currentClub?.clubId : undefined);
+    const effectiveClubId = clubId || currentClub?.clubId;
     const effectiveAssociationId = associationId || currentOrganization?.id;
     const effectiveAssociationType = associationType || currentOrganization?.type;
 
