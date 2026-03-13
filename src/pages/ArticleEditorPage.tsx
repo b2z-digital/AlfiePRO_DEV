@@ -655,7 +655,25 @@ const ArticleEditorPage: React.FC = () => {
                         {publishToCommunity && (
                           <div className="space-y-1.5">
                             {availableCommunityGroups.length > 1 && (
-                              <p className="text-xs text-slate-400 mb-2">Select groups to post to:</p>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs text-slate-400">Select groups to post to:</p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const allSelected = availableCommunityGroups.every(g => communityGroupIds.includes(g.id));
+                                    if (allSelected) {
+                                      setCommunityGroupIds([]);
+                                    } else {
+                                      setCommunityGroupIds(availableCommunityGroups.map(g => g.id));
+                                    }
+                                  }}
+                                  className="text-xs text-teal-400 hover:text-teal-300 transition-colors font-medium"
+                                >
+                                  {availableCommunityGroups.every(g => communityGroupIds.includes(g.id))
+                                    ? 'Deselect All'
+                                    : 'Select All Clubs'}
+                                </button>
+                              </div>
                             )}
                             {availableCommunityGroups.map(group => (
                               <label
