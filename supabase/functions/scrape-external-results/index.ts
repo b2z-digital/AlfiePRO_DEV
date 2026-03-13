@@ -292,6 +292,34 @@ function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null
   }
 }
 
+// ─── Extract the largest results table as raw HTML ────────────────────────────
+
+function extractBestTableHtml(html: string): string | null {
+  const tableMatches = extractAllMatches(html, /<table[^>]*>[\s\S]*?<\/table>/i);
+  if (!tableMatches.length) return null;
+
+  let bestHtml = "";
+  let bestRowCount = 0;
+  for (const tm of tableMatches) {
+    const rowCount = extractAllMatches(tm[0], /<tr[\s\S]*?<\/tr>/i).length;
+    if (rowCount > bestRowCount) {
+      bestRowCount = rowCount;
+      bestHtml = tm[0];
+    }
+  }
+  if (!bestHtml || bestRowCount < 2) return null;
+
+  // Strip inline styles, bgcolor, width, border, cellpadding attrs so our CSS controls appearance
+  return bestHtml
+    .replace(/\s+style="[^"]*"/gi, "")
+    .replace(/\s+bgcolor="[^"]*"/gi, "")
+    .replace(/\s+width="[^"]*"/gi, "")
+    .replace(/\s+border="[^"]*"/gi, "")
+    .replace(/\s+cellpadding="[^"]*"/gi, "")
+    .replace(/\s+cellspacing="[^"]*"/gi, "")
+    .replace(/\s+align="[^"]*"/gi, "");
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -341,9 +369,12 @@ Deno.serve(async (req: Request) => {
       }
 
       const html = await fetchResp.text();
+
+      // Extract the largest table as raw HTML for faithful rendering
+      const rawTableHtml = extractBestTableHtml(html);
       const parsed = parseEventPage(html, eventRow.event_name);
 
-      if (!parsed || !parsed.competitors.length) {
+      if (!rawTableHtml && (!parsed || !parsed.competitors.length)) {
         return new Response(JSON.stringify({ error: "No results found on event page", competitors: [] }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -351,37 +382,41 @@ Deno.serve(async (req: Request) => {
       }
 
       let boatClassId: string | null = null;
-      const bClass = parsed.boatClassMapped || eventRow.boat_class_mapped;
+      const bClass = (parsed?.boatClassMapped) || eventRow.boat_class_mapped;
       if (bClass) {
         const { data: bc } = await supabase
           .from("boat_classes").select("id").ilike("name", `%${bClass}%`).maybeSingle();
         boatClassId = bc?.id || null;
       }
 
-      await supabase.from("external_result_events").update({
-        results_json: parsed.competitors,
-        competitor_count: parsed.competitors.length,
-        race_count: parsed.raceCount,
-        event_date: parsed.eventDate || undefined,
-        event_end_date: parsed.eventEndDate || undefined,
-        venue: parsed.venue || undefined,
-        boat_class_raw: parsed.boatClassRaw || eventRow.boat_class_raw,
-        boat_class_mapped: parsed.boatClassMapped || eventRow.boat_class_mapped,
-        boat_class_id: boatClassId,
+      const competitors = parsed?.competitors || [];
+      const updatePayload: Record<string, unknown> = {
+        results_json: competitors,
+        competitor_count: competitors.length,
+        race_count: parsed?.raceCount ?? 0,
         last_scraped_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }).eq("id", event_row_id);
+      };
+      if (parsed?.eventDate) updatePayload.event_date = parsed.eventDate;
+      if (parsed?.eventEndDate) updatePayload.event_end_date = parsed.eventEndDate;
+      if (parsed?.venue) updatePayload.venue = parsed.venue;
+      if (parsed?.boatClassRaw || eventRow.boat_class_raw) updatePayload.boat_class_raw = parsed?.boatClassRaw || eventRow.boat_class_raw;
+      if (parsed?.boatClassMapped || eventRow.boat_class_mapped) updatePayload.boat_class_mapped = parsed?.boatClassMapped || eventRow.boat_class_mapped;
+      if (boatClassId) updatePayload.boat_class_id = boatClassId;
+
+      await supabase.from("external_result_events").update(updatePayload).eq("id", event_row_id);
 
       return new Response(JSON.stringify({
         success: true,
-        competitors: parsed.competitors,
-        race_count: parsed.raceCount,
-        competitor_count: parsed.competitors.length,
-        event_date: parsed.eventDate,
-        event_end_date: parsed.eventEndDate,
-        venue: parsed.venue,
-        boat_class_raw: parsed.boatClassRaw,
-        boat_class_mapped: parsed.boatClassMapped,
+        raw_table_html: rawTableHtml || null,
+        competitors,
+        race_count: parsed?.raceCount ?? 0,
+        competitor_count: competitors.length,
+        event_date: parsed?.eventDate,
+        event_end_date: parsed?.eventEndDate,
+        venue: parsed?.venue,
+        boat_class_raw: parsed?.boatClassRaw,
+        boat_class_mapped: parsed?.boatClassMapped,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
