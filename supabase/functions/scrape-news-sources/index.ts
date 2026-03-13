@@ -35,19 +35,38 @@ function absoluteUrl(base: string, href: string): string {
   }
 }
 
-function stripTags(html: string): string {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
+function decodeHtmlEntities(text: string): string {
+  return text
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+    .replace(/&apos;/gi, "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&ndash;/gi, "\u2013")
+    .replace(/&mdash;/gi, "\u2014")
+    .replace(/&lsquo;/gi, "\u2018")
+    .replace(/&rsquo;/gi, "\u2019")
+    .replace(/&ldquo;/gi, "\u201C")
+    .replace(/&rdquo;/gi, "\u201D")
+    .replace(/&hellip;/gi, "\u2026")
+    .replace(/&trade;/gi, "\u2122")
+    .replace(/&reg;/gi, "\u00AE")
+    .replace(/&copy;/gi, "\u00A9")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function stripTags(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim()
+  );
 }
 
 function firstMatch(pattern: RegExp, html: string, group = 1): string | null {
@@ -263,21 +282,22 @@ function extractAuthor(html: string, sourceName: string): string {
 }
 
 function extractCoverImage(html: string, baseUrl: string): string | null {
-  // og:image — most reliable and usually the best quality
+  // 1. Prefer inline article body image — more likely to actually exist on the server
+  //    than the auto-generated og:image thumbnail (which is often missing)
+  const contentHtml = extractById(html, "NewsPostDetailContent") || extractById(html, "NewsPostDetailSummary") || "";
+  if (contentHtml) {
+    const imgSrc = firstMatch(/<img[^>]*src=["']([^"']+)["'][^>]*>/i, contentHtml);
+    if (imgSrc && !imgSrc.startsWith("data:") && !/logo|icon|avatar|pixel|sprite/i.test(imgSrc)) {
+      return absoluteUrl(baseUrl, imgSrc);
+    }
+  }
+
+  // 2. og:image as secondary option
   const og = firstMatch(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i, html)
     || firstMatch(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i, html);
   if (og && !og.startsWith("data:")) return absoluteUrl(baseUrl, og);
 
-  // Article body image
-  const contentHtml = extractById(html, "NewsPostDetailContent") || extractById(html, "NewsPostDetailSummary") || "";
-  if (contentHtml) {
-    const imgSrc = firstMatch(/<img[^>]*src=["']([^"']+)["'][^>]*>/i, contentHtml);
-    if (imgSrc && !imgSrc.startsWith("data:")) {
-      if (!/logo|icon|avatar|pixel|sprite/i.test(imgSrc)) return absoluteUrl(baseUrl, imgSrc);
-    }
-  }
-
-  // Any article image fallback
+  // 3. Any qualifying image anywhere on the page
   const imgSrcs = allMatches(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, html);
   for (const src of imgSrcs) {
     if (src.startsWith("data:")) continue;
