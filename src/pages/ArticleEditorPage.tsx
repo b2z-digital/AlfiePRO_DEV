@@ -632,6 +632,65 @@ const ArticleEditorPage: React.FC = () => {
                     </p>
                   </div>
 
+                  {availableCommunityGroups.length > 0 && (
+                    <div className="pt-4 border-t border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Users size={16} className="text-teal-400" />
+                        <label className="text-sm font-medium text-slate-300">Publish to Community</label>
+                      </div>
+                      <p className="text-xs text-slate-400 mb-3 pl-6">Share as a post in club groups when published</p>
+                      <div className="pl-6">
+                        <label className="flex items-center gap-3 cursor-pointer mb-3">
+                          <div
+                            onClick={() => setPublishToCommunity(p => !p)}
+                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${publishToCommunity ? 'bg-teal-500' : 'bg-slate-600'}`}
+                          >
+                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${publishToCommunity ? 'translate-x-5' : 'translate-x-0'}`} />
+                          </div>
+                          <span className="text-sm text-slate-300">
+                            {publishToCommunity ? 'On — will post on publish' : 'Off'}
+                          </span>
+                        </label>
+
+                        {publishToCommunity && (
+                          <div className="space-y-1.5">
+                            {availableCommunityGroups.length > 1 && (
+                              <p className="text-xs text-slate-400 mb-2">Select groups to post to:</p>
+                            )}
+                            {availableCommunityGroups.map(group => (
+                              <label
+                                key={group.id}
+                                className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                                  communityGroupIds.includes(group.id)
+                                    ? 'border-teal-500/50 bg-teal-500/10'
+                                    : 'border-slate-700/50 bg-slate-700/20 hover:border-slate-600'
+                                }`}
+                                onClick={() => handleToggleCommunityGroup(group.id)}
+                              >
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                                  communityGroupIds.includes(group.id)
+                                    ? 'bg-teal-500 border-teal-500'
+                                    : 'border-slate-500'
+                                }`}>
+                                  {communityGroupIds.includes(group.id) && <Check size={10} className="text-white" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium text-white truncate">{group.name}</div>
+                                  {group.club_name && (
+                                    <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                      <Building2 size={10} />
+                                      {group.club_name}
+                                    </div>
+                                  )}
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-4 border-t border-slate-700/50">
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
                       <Tag size={16} />
@@ -841,67 +900,6 @@ const ArticleEditorPage: React.FC = () => {
                 </p>
               </div>
 
-              {availableCommunityGroups.length > 0 && (
-                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 transition-all hover:border-slate-600/50">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500/20 to-green-500/20 border border-teal-500/20">
-                      <Users size={20} className="text-teal-400" />
-                    </div>
-                    <div className="flex-1">
-                      <h2 className="text-lg font-semibold text-white">Publish to Community</h2>
-                      <p className="text-xs text-slate-400">Share this article as a post in club groups</p>
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-3 cursor-pointer mb-4">
-                    <div
-                      onClick={() => setPublishToCommunity(p => !p)}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${publishToCommunity ? 'bg-teal-500' : 'bg-slate-600'}`}
-                    >
-                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${publishToCommunity ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </div>
-                    <span className="text-sm text-slate-300">
-                      {publishToCommunity ? 'Will post to selected groups on publish' : 'Off — not posting to community'}
-                    </span>
-                  </label>
-
-                  {publishToCommunity && (
-                    <div className="space-y-2">
-                      {availableCommunityGroups.length > 1 && (
-                        <p className="text-xs text-slate-400 mb-2">Select which groups to post to:</p>
-                      )}
-                      {availableCommunityGroups.map(group => (
-                        <label
-                          key={group.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                            communityGroupIds.includes(group.id)
-                              ? 'border-teal-500/50 bg-teal-500/10'
-                              : 'border-slate-700/50 bg-slate-700/20 hover:border-slate-600'
-                          }`}
-                          onClick={() => handleToggleCommunityGroup(group.id)}
-                        >
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                            communityGroupIds.includes(group.id)
-                              ? 'bg-teal-500 border-teal-500'
-                              : 'border-slate-500'
-                          }`}>
-                            {communityGroupIds.includes(group.id) && <Check size={10} className="text-white" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-white truncate">{group.name}</div>
-                            {group.club_name && (
-                              <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                <Building2 size={10} />
-                                {group.club_name}
-                              </div>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>

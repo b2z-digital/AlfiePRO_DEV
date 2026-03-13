@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import 'react-quill/dist/quill.bubble.css';
 
 interface WysiwygEditorProps {
   value: string;
@@ -15,6 +14,8 @@ interface WysiwygEditorProps {
   onImageUpload?: (file: File) => Promise<string>;
 }
 
+let editorCounter = 0;
+
 export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   value,
   onChange,
@@ -26,6 +27,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   disabled = false,
   onImageUpload
 }) => {
+  const instanceId = useRef(`wysiwyg-${++editorCounter}`);
   const effectiveHeight = height || 300;
   const quillRef = useRef<ReactQuill>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,96 +103,20 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     'image'
   ];
 
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .ql-editor p {
-        margin-bottom: 1em;
-      }
-      .ql-editor h1, .ql-editor h2, .ql-editor h3 {
-        margin-top: 1.5em;
-        margin-bottom: 0.5em;
-      }
-      .ql-editor ul, .ql-editor ol {
-        margin-bottom: 1em;
-        padding-left: 1.5em;
-      }
-      .ql-editor li {
-        margin-bottom: 0;
-        line-height: 1.5;
-      }
-      .ql-editor li + li {
-        margin-top: 0.2em;
-      }
-      .ql-editor a {
-        color: #3b82f6;
-        text-decoration: underline;
-      }
-      .ql-editor a:hover {
-        color: #2563eb;
-      }
-      .ql-editor br {
-        display: block;
-        content: "";
-        margin-top: 0;
-      }
-      .ql-editor img {
-        max-width: 100%;
-        height: auto;
-        border-radius: 0.5rem;
-        margin: 1em 0;
-        display: block;
-      }
-
-      /* Article content styles */
-      .article-content p {
-        margin-bottom: 1em;
-        white-space: pre-wrap;
-      }
-      .article-content h1, .article-content h2, .article-content h3 {
-        margin-top: 1.5em;
-        margin-bottom: 0.5em;
-      }
-      .article-content ul, .article-content ol {
-        margin-bottom: 1em;
-        padding-left: 1.5em;
-      }
-      .article-content li {
-        margin-bottom: 0;
-        line-height: 1.5;
-      }
-      .article-content li + li {
-        margin-top: 0.2em;
-      }
-      .article-content a {
-        color: #3b82f6;
-        text-decoration: underline;
-      }
-      .article-content a:hover {
-        color: #2563eb;
-      }
-      .article-content br {
-        display: block;
-        content: "";
-        margin-top: 0;
-      }
-      .article-content img {
-        max-width: 100%;
-        height: auto;
-        border-radius: 0.5rem;
-        margin: 1em 0;
-        display: block;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
+  const id = instanceId.current;
+  const containerHeight = minHeight ? 'auto' : `${effectiveHeight}px`;
+  const editorMinHeight = minHeight ? `calc(${minHeight} - 42px)` : `${effectiveHeight - 42}px`;
+  const toolbarBg = darkMode ? 'rgba(51, 65, 85, 0.6)' : '#f9fafb';
+  const containerBg = darkMode ? 'rgba(30, 41, 59, 0.6)' : '#ffffff';
+  const borderColor = darkMode ? 'rgba(51, 65, 85, 0.5)' : '#e5e7eb';
+  const textColor = darkMode ? '#ffffff' : '#1e293b';
+  const placeholderColor = darkMode ? '#64748b' : '#9ca3af';
+  const iconColor = darkMode ? '#94a3b8' : '#64748b';
+  const pickerColor = darkMode ? '#e2e8f0' : '#1e293b';
+  const pickerOptionsBg = darkMode ? 'rgba(30, 41, 59, 0.95)' : '#ffffff';
 
   return (
-    <div className={`wysiwyg-editor ${className}`}>
+    <div className={`${id} ${className}`} style={{ minHeight: containerHeight }}>
       <input
         ref={fileInputRef}
         type="file"
@@ -198,78 +124,81 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
         className="hidden"
         onChange={handleFileChange}
       />
-      <style jsx>{`
-        .wysiwyg-editor .ql-container {
-          font-size: 14px;
-          ${minHeight ? `min-height: calc(${minHeight} - 42px);` : `height: ${effectiveHeight - 42}px;`}
-          border-bottom-left-radius: 0.375rem;
-          border-bottom-right-radius: 0.375rem;
-          background-color: ${darkMode ? 'rgba(30, 41, 59, 0.6)' : '#ffffff'};
-          color: ${darkMode ? '#ffffff' : '#1e293b'};
-          border-color: ${darkMode ? 'rgba(51, 65, 85, 0.5)' : '#e5e7eb'};
-        }
-
-        .wysiwyg-editor .ql-toolbar {
+      <style>{`
+        .${id} .ql-toolbar {
           border-top-left-radius: 0.375rem;
           border-top-right-radius: 0.375rem;
-          background-color: ${darkMode ? 'rgba(51, 65, 85, 0.6)' : '#f9fafb'};
-          color: ${darkMode ? '#e2e8f0' : '#1e293b'};
-          border-color: ${darkMode ? 'rgba(51, 65, 85, 0.5)' : '#e5e7eb'};
+          background-color: ${toolbarBg};
+          border-color: ${borderColor};
         }
-
-        .wysiwyg-editor .ql-editor {
-          ${minHeight ? `min-height: calc(${minHeight} - 42px);` : `min-height: ${effectiveHeight - 42}px;`}
-          color: ${darkMode ? 'white' : '#1e293b'};
+        .${id} .ql-container {
+          font-size: 14px;
+          border-bottom-left-radius: 0.375rem;
+          border-bottom-right-radius: 0.375rem;
+          background-color: ${containerBg};
+          color: ${textColor};
+          border-color: ${borderColor};
+        }
+        .${id} .ql-editor {
+          min-height: ${editorMinHeight};
+          color: ${textColor};
           font-size: 16px;
           line-height: 1.6;
-        }
-
-        .wysiwyg-editor .ql-editor.ql-blank::before {
-          color: ${darkMode ? '#64748b' : '#9ca3af'};
-          opacity: 1;
-          font-style: normal;
-        }
-
-        .wysiwyg-editor .ql-stroke {
-          stroke: ${darkMode ? '#94a3b8' : '#64748b'};
-        }
-
-        .wysiwyg-editor .ql-fill {
-          fill: ${darkMode ? '#94a3b8' : '#64748b'};
-        }
-
-        .wysiwyg-editor .ql-picker {
-          color: ${darkMode ? '#e2e8f0' : '#1e293b'};
-        }
-
-        .wysiwyg-editor .ql-picker-options {
-          background-color: ${darkMode ? 'rgba(30, 41, 59, 0.95)' : '#ffffff'};
-          border-color: ${darkMode ? 'rgba(51, 65, 85, 0.5)' : '#e5e7eb'};
-        }
-
-        /* Preserve whitespace in editor */
-        .wysiwyg-editor .ql-editor p {
           white-space: pre-wrap;
         }
-
-        .wysiwyg-editor .ql-editor ol li,
-        .wysiwyg-editor .ql-editor ul li {
-          margin-bottom: 0;
+        .${id} .ql-editor.ql-blank::before {
+          color: ${placeholderColor};
+          font-style: normal;
+        }
+        .${id} .ql-stroke {
+          stroke: ${iconColor};
+        }
+        .${id} .ql-fill {
+          fill: ${iconColor};
+        }
+        .${id} .ql-picker {
+          color: ${pickerColor};
+        }
+        .${id} .ql-picker-options {
+          background-color: ${pickerOptionsBg};
+          border-color: ${borderColor};
+        }
+        .${id} .ql-editor p {
+          margin-bottom: 0.75em;
+        }
+        .${id} .ql-editor h1,
+        .${id} .ql-editor h2,
+        .${id} .ql-editor h3 {
+          margin-top: 1.5em;
+          margin-bottom: 0.5em;
+        }
+        .${id} .ql-editor ul,
+        .${id} .ql-editor ol {
+          margin-bottom: 1em;
+          padding-left: 1.5em;
+        }
+        .${id} .ql-editor li {
           line-height: 1.5;
         }
-
-        .wysiwyg-editor .ql-editor ol li + li,
-        .wysiwyg-editor .ql-editor ul li + li {
-          margin-top: 0.2em;
+        .${id} .ql-editor a {
+          color: #3b82f6;
+          text-decoration: underline;
         }
-
-        .wysiwyg-editor .ql-editor img {
+        .${id} .ql-editor img {
           max-width: 100%;
           height: auto;
           border-radius: 0.5rem;
-          margin: 0.5em 0;
+          margin: 0.75em 0;
           display: block;
         }
+
+        /* Article content display styles */
+        .article-content p { margin-bottom: 1em; white-space: pre-wrap; }
+        .article-content h1, .article-content h2, .article-content h3 { margin-top: 1.5em; margin-bottom: 0.5em; }
+        .article-content ul, .article-content ol { margin-bottom: 1em; padding-left: 1.5em; }
+        .article-content li { line-height: 1.5; }
+        .article-content a { color: #3b82f6; text-decoration: underline; }
+        .article-content img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1em 0; display: block; }
       `}</style>
       <ReactQuill
         ref={quillRef}
