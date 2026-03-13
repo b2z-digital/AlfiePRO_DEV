@@ -164,11 +164,9 @@ Deno.serve(async (req: Request) => {
           }
         }
       },
-      attendees: attendeeEmails ? attendeeEmails.map((email: string) => ({ email })) : [],
       reminders: {
         useDefault: false,
         overrides: [
-          { method: 'email', minutes: 24 * 60 },
           { method: 'popup', minutes: 30 },
         ],
       },
@@ -176,7 +174,7 @@ Deno.serve(async (req: Request) => {
 
     const calendarId = creds.google_calendar_id || 'primary';
     const calendarResponse = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1&sendUpdates=none`,
       {
         method: 'POST',
         headers: {
