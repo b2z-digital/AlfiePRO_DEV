@@ -88,8 +88,28 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     onConfirm: () => void;
   } | null>(null);
 
+  // Drag & drop for resource moving
+  const [draggedResource, setDraggedResource] = useState<ResourceStorage.AssociationResource | null>(null);
+  const [draggedCategory, setDraggedCategory] = useState<ResourceStorage.ResourceCategory | null>(null);
+  const [dropTargetCatId, setDropTargetCatId] = useState<string | null>(null);
+
   const showConfirm = (message: string, onConfirm: () => void) => {
     setConfirmDialog({ message, onConfirm });
+  };
+
+  const handleDropOnCategory = async (targetCatId: string) => {
+    if (draggedResource && draggedResource.category_id !== targetCatId) {
+      try {
+        await ResourceStorage.updateResource(draggedResource.id, { category_id: targetCatId });
+        addNotification(`"${draggedResource.title}" moved`, 'success');
+        loadAll();
+      } catch {
+        addNotification('Failed to move resource', 'error');
+      }
+    }
+    setDraggedResource(null);
+    setDraggedCategory(null);
+    setDropTargetCatId(null);
   };
 
   // Category modal
@@ -798,7 +818,15 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             )}
 
             {categories.map(cat => (
-              <div key={cat.id} className="group flex items-center gap-0.5">
+              <div
+                key={cat.id}
+                className={`group flex items-center gap-0.5 rounded-lg transition-all ${
+                  dropTargetCatId === cat.id ? 'ring-2 ring-amber-400/60 bg-amber-500/10' : ''
+                }`}
+                onDragOver={e => { if (draggedResource || draggedCategory) { e.preventDefault(); setDropTargetCatId(cat.id); } }}
+                onDragLeave={() => setDropTargetCatId(null)}
+                onDrop={e => { e.preventDefault(); handleDropOnCategory(cat.id); }}
+              >
                 <button
                   onClick={() => setActiveSection(cat.id)}
                   className={`flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all min-w-0 ${
@@ -807,7 +835,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
                   }`}
                 >
-                  <FolderOpen size={14} className={`flex-shrink-0 ${activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'}`} />
+                  <FolderOpen size={14} className={`flex-shrink-0 ${dropTargetCatId === cat.id ? 'text-amber-400' : activeSection === cat.id ? 'text-amber-400' : 'text-slate-500'}`} />
                   <span className="flex-1 truncate text-left">{cat.name}</span>
                   <span className="text-xs text-slate-600 group-hover:invisible">
                     {resources.filter(r => r.category_id === cat.id).length}
@@ -1023,6 +1051,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   setShowResourceModal(true);
                 }}
                 onDeleteResource={handleDeleteResource}
+                draggedResource={draggedResource}
+                onDragStartResource={setDraggedResource}
+                onDragEndResource={() => { setDraggedResource(null); setDropTargetCatId(null); }}
+                dropTargetCatId={dropTargetCatId}
+                onDropOnCategory={handleDropOnCategory}
+                onDragOverCategory={setDropTargetCatId}
               />
             ) : (
               <FolderView
@@ -1045,6 +1079,8 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   setShowResourceModal(true);
                 }}
                 onDeleteResource={handleDeleteResource}
+                onDragStartResource={setDraggedResource}
+                onDragEndResource={() => { setDraggedResource(null); setDropTargetCatId(null); }}
               />
             )}
           </div>
@@ -1372,7 +1408,13 @@ const AllFilesView: React.FC<{
   formatDate: (iso?: string) => string;
   onEditResource: (r: ResourceStorage.AssociationResource) => void;
   onDeleteResource: (r: ResourceStorage.AssociationResource) => void;
-}> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, sharedCount, isClubContext, onSetSection, onOpenDrive, onNewFolder, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource }) => {
+  draggedResource: ResourceStorage.AssociationResource | null;
+  onDragStartResource: (r: ResourceStorage.AssociationResource) => void;
+  onDragEndResource: () => void;
+  dropTargetCatId: string | null;
+  onDropOnCategory: (catId: string) => void;
+  onDragOverCategory: (catId: string | null) => void;
+}> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, sharedCount, isClubContext, onSetSection, onOpenDrive, onNewFolder, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, draggedResource, onDragStartResource, onDragEndResource, dropTargetCatId, onDropOnCategory, onDragOverCategory }) => {
   return (
     <div className="space-y-6">
       {/* Storage sources */}
@@ -1424,14 +1466,21 @@ const AllFilesView: React.FC<{
           }>
             {categories.map(cat => {
               const count = resources.filter(r => r.category_id === cat.id).length;
+              const isTarget = dropTargetCatId === cat.id && !!draggedResource;
               if (viewMode === 'grid') {
                 return (
                   <button
                     key={cat.id}
+                    draggable={false}
+                    onDragOver={e => { if (draggedResource) { e.preventDefault(); onDragOverCategory(cat.id); } }}
+                    onDragLeave={() => onDragOverCategory(null)}
+                    onDrop={e => { e.preventDefault(); onDropOnCategory(cat.id); }}
                     onClick={() => onSetSection(cat.id)}
-                    className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-slate-800/70 to-slate-700/40 border border-slate-700/50 hover:border-amber-500/30 rounded-xl transition-all hover:shadow-lg hover:shadow-amber-500/10 group"
+                    className={`flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-slate-800/70 to-slate-700/40 border rounded-xl transition-all group ${
+                      isTarget ? 'border-amber-400/70 bg-amber-500/10 scale-105 shadow-lg shadow-amber-500/20' : 'border-slate-700/50 hover:border-amber-500/30 hover:shadow-lg hover:shadow-amber-500/10'
+                    }`}
                   >
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isTarget ? 'bg-amber-500/30' : 'bg-amber-500/15'}`}>
                       <FolderOpen size={24} className="text-amber-400" />
                     </div>
                     <p className="text-xs font-medium text-slate-300 group-hover:text-white text-center">{cat.name}</p>
@@ -1440,17 +1489,26 @@ const AllFilesView: React.FC<{
                 );
               }
               return (
-                <button
+                <div
                   key={cat.id}
-                  onClick={() => onSetSection(cat.id)}
-                  className="flex items-center gap-3 px-4 py-3 bg-slate-800/40 border border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-700/30 rounded-xl transition-all group w-full text-left"
+                  onDragOver={e => { if (draggedResource) { e.preventDefault(); onDragOverCategory(cat.id); } }}
+                  onDragLeave={() => onDragOverCategory(null)}
+                  onDrop={e => { e.preventDefault(); onDropOnCategory(cat.id); }}
+                  className={`rounded-xl transition-all ${isTarget ? 'ring-2 ring-amber-400/60' : ''}`}
                 >
-                  <FolderOpen size={18} className="text-amber-400 flex-shrink-0" />
-                  <span className="flex-1 text-sm text-slate-300 group-hover:text-white font-medium">{cat.name}</span>
-                  {cat.description && <span className="text-xs text-slate-500 hidden sm:block">{cat.description}</span>}
-                  <span className="text-xs text-slate-500">{count} item{count !== 1 ? 's' : ''}</span>
-                  <ChevronRight size={13} className="text-slate-600 group-hover:text-slate-400" />
-                </button>
+                  <button
+                    onClick={() => onSetSection(cat.id)}
+                    className={`flex items-center gap-3 px-4 py-3 border rounded-xl transition-all group w-full text-left ${
+                      isTarget ? 'bg-amber-500/10 border-amber-400/50' : 'bg-slate-800/40 border-slate-700/40 hover:border-slate-600/60 hover:bg-slate-700/30'
+                    }`}
+                  >
+                    <FolderOpen size={18} className={`flex-shrink-0 ${isTarget ? 'text-amber-300' : 'text-amber-400'}`} />
+                    <span className="flex-1 text-sm text-slate-300 group-hover:text-white font-medium">{cat.name}</span>
+                    {cat.description && <span className="text-xs text-slate-500 hidden sm:block">{cat.description}</span>}
+                    <span className="text-xs text-slate-500">{count} item{count !== 1 ? 's' : ''}</span>
+                    <ChevronRight size={13} className="text-slate-600 group-hover:text-slate-400" />
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1469,6 +1527,8 @@ const AllFilesView: React.FC<{
             formatDate={formatDate}
             onEdit={onEditResource}
             onDelete={onDeleteResource}
+            onDragStartResource={onDragStartResource}
+            onDragEndResource={onDragEndResource}
           />
         </div>
       )}
@@ -1506,7 +1566,9 @@ const FolderView: React.FC<{
   formatDate: (iso?: string) => string;
   onEditResource: (r: ResourceStorage.AssociationResource) => void;
   onDeleteResource: (r: ResourceStorage.AssociationResource) => void;
-}> = ({ resources, viewMode, onAddResource, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource }) => {
+  onDragStartResource: (r: ResourceStorage.AssociationResource) => void;
+  onDragEndResource: () => void;
+}> = ({ resources, viewMode, onAddResource, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, onDragStartResource, onDragEndResource }) => {
   if (resources.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -1534,7 +1596,12 @@ const FolderView: React.FC<{
           const iconColor = getFileIconColor(r.file_type || r.resource_type);
           const bgColor = getFileBgColor(r.file_type || r.resource_type);
           return (
-            <div key={r.id} className="group relative flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-slate-800/70 to-slate-700/40 border border-slate-700/50 hover:border-slate-600/70 hover:shadow-lg transition-all cursor-pointer"
+            <div
+              key={r.id}
+              draggable
+              onDragStart={() => onDragStartResource(r)}
+              onDragEnd={onDragEndResource}
+              className="group relative flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-slate-800/70 to-slate-700/40 border border-slate-700/50 hover:border-slate-600/70 hover:shadow-lg transition-all cursor-grab active:cursor-grabbing active:opacity-60 active:scale-95"
               onClick={() => r.external_url ? window.open(r.external_url, '_blank') : r.file_url ? window.open(r.file_url, '_blank') : undefined}
             >
               <div className={`w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center`}>
@@ -1566,6 +1633,8 @@ const FolderView: React.FC<{
       formatDate={formatDate}
       onEdit={onEditResource}
       onDelete={onDeleteResource}
+      onDragStartResource={onDragStartResource}
+      onDragEndResource={onDragEndResource}
     />
   );
 };
@@ -1580,7 +1649,9 @@ const ResourceTable: React.FC<{
   onEdit?: (r: ResourceStorage.AssociationResource) => void;
   onDelete?: (r: ResourceStorage.AssociationResource) => void;
   readOnly?: boolean;
-}> = ({ resources, getFileIcon, getFileIconColor, formatFileSize, formatDate, onEdit, onDelete, readOnly }) => (
+  onDragStartResource?: (r: ResourceStorage.AssociationResource) => void;
+  onDragEndResource?: () => void;
+}> = ({ resources, getFileIcon, getFileIconColor, formatFileSize, formatDate, onEdit, onDelete, readOnly, onDragStartResource, onDragEndResource }) => (
   <div className="bg-gradient-to-br from-slate-800/80 to-slate-800/40 rounded-xl border border-slate-700/50 overflow-hidden">
     <table className="w-full">
       <thead>
@@ -1601,7 +1672,10 @@ const ResourceTable: React.FC<{
           return (
             <tr
               key={r.id}
-              className="hover:bg-slate-700/20 group transition-colors cursor-pointer"
+              draggable={!!onDragStartResource}
+              onDragStart={() => onDragStartResource?.(r)}
+              onDragEnd={onDragEndResource}
+              className="hover:bg-slate-700/20 group transition-colors cursor-grab active:cursor-grabbing active:opacity-60"
               onClick={() => url && window.open(url, '_blank')}
             >
               <td className="px-4 py-3">
