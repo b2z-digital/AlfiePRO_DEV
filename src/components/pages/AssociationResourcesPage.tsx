@@ -88,10 +88,14 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     onConfirm: () => void;
   } | null>(null);
 
-  // Drag & drop for resource moving
+  // Drag & drop for local resource moving
   const [draggedResource, setDraggedResource] = useState<ResourceStorage.AssociationResource | null>(null);
   const [draggedCategory, setDraggedCategory] = useState<ResourceStorage.ResourceCategory | null>(null);
   const [dropTargetCatId, setDropTargetCatId] = useState<string | null>(null);
+
+  // Drag & drop for Google Drive items
+  const [draggedDriveItem, setDraggedDriveItem] = useState<DriveItem | null>(null);
+  const [dropTargetDriveFolderId, setDropTargetDriveFolderId] = useState<string | null>(null);
 
   const showConfirm = (message: string, onConfirm: () => void) => {
     setConfirmDialog({ message, onConfirm });
@@ -110,6 +114,30 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     setDraggedResource(null);
     setDraggedCategory(null);
     setDropTargetCatId(null);
+  };
+
+  const handleDriveDropOnFolder = async (targetFolderId: string) => {
+    if (!draggedDriveItem || draggedDriveItem.id === targetFolderId) {
+      setDraggedDriveItem(null);
+      setDropTargetDriveFolderId(null);
+      return;
+    }
+    try {
+      await callDriveApi({
+        action: 'move_file',
+        organizationId: driveOrgId || organizationId,
+        organizationType: driveOrgType || organizationType,
+        fileId: draggedDriveItem.id,
+        targetFolderId,
+        currentParentId: currentDriveFolderId,
+      });
+      addNotification(`"${draggedDriveItem.name}" moved`, 'success');
+      if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to move file', 'error');
+    }
+    setDraggedDriveItem(null);
+    setDropTargetDriveFolderId(null);
   };
 
   // Category modal
@@ -1012,6 +1040,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 formatDate={formatDate}
                 contextMenu={contextMenu}
                 setContextMenu={setContextMenu}
+                draggedDriveItem={draggedDriveItem}
+                onDragStartDriveItem={setDraggedDriveItem}
+                onDragEndDriveItem={() => { setDraggedDriveItem(null); setDropTargetDriveFolderId(null); }}
+                dropTargetDriveFolderId={dropTargetDriveFolderId}
+                onDropOnDriveFolder={handleDriveDropOnFolder}
+                onDragOverDriveFolder={setDropTargetDriveFolderId}
               />
             ) : isSharedSection ? (
               <SharedResourcesView
@@ -1794,7 +1828,13 @@ const DriveView: React.FC<{
   formatDate: (iso?: string) => string;
   contextMenu: { item: DriveItem; x: number; y: number } | null;
   setContextMenu: React.Dispatch<React.SetStateAction<{ item: DriveItem; x: number; y: number } | null>>;
-}> = ({ items, loading, viewMode, hasGoogleDrive, driveRootFolderId, onItemClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, contextMenu, setContextMenu }) => {
+  draggedDriveItem: DriveItem | null;
+  onDragStartDriveItem: (item: DriveItem) => void;
+  onDragEndDriveItem: () => void;
+  dropTargetDriveFolderId: string | null;
+  onDropOnDriveFolder: (folderId: string) => void;
+  onDragOverDriveFolder: (folderId: string | null) => void;
+}> = ({ items, loading, viewMode, hasGoogleDrive, driveRootFolderId, onItemClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, contextMenu, setContextMenu, draggedDriveItem, onDragStartDriveItem, onDragEndDriveItem, dropTargetDriveFolderId, onDropOnDriveFolder, onDragOverDriveFolder }) => {
   if (!hasGoogleDrive) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -1858,6 +1898,12 @@ const DriveView: React.FC<{
                   getFileIconColor={getFileIconColor}
                   getFileBgColor={getFileBgColor}
                   formatFileSize={formatFileSize}
+                  isDragTarget={dropTargetDriveFolderId === item.id && !!draggedDriveItem && draggedDriveItem.id !== item.id}
+                  onDragStart={() => onDragStartDriveItem(item)}
+                  onDragEnd={onDragEndDriveItem}
+                  onDragOver={e => { if (draggedDriveItem && draggedDriveItem.id !== item.id) { e.preventDefault(); onDragOverDriveFolder(item.id); } }}
+                  onDragLeave={() => onDragOverDriveFolder(null)}
+                  onDrop={e => { e.preventDefault(); onDropOnDriveFolder(item.id); }}
                 />
               ))}
             </div>
@@ -1880,6 +1926,12 @@ const DriveView: React.FC<{
                   getFileIconColor={getFileIconColor}
                   getFileBgColor={getFileBgColor}
                   formatFileSize={formatFileSize}
+                  isDragTarget={false}
+                  onDragStart={() => onDragStartDriveItem(item)}
+                  onDragEnd={onDragEndDriveItem}
+                  onDragOver={() => {}}
+                  onDragLeave={() => {}}
+                  onDrop={() => {}}
                 />
               ))}
             </div>
@@ -1918,18 +1970,27 @@ const DriveView: React.FC<{
             {[...folders, ...files].map(item => {
               const Icon = getFileIcon(item.mimeType, item.isFolder);
               const iconColor = getFileIconColor(item.mimeType, item.isFolder);
+              const isTarget = item.isFolder && dropTargetDriveFolderId === item.id && !!draggedDriveItem && draggedDriveItem.id !== item.id;
               return (
                 <tr
                   key={item.id}
-                  className="hover:bg-slate-700/20 group transition-colors cursor-pointer"
+                  draggable
+                  onDragStart={e => { e.stopPropagation(); onDragStartDriveItem(item); }}
+                  onDragEnd={onDragEndDriveItem}
+                  onDragOver={e => { if (item.isFolder && draggedDriveItem && draggedDriveItem.id !== item.id) { e.preventDefault(); onDragOverDriveFolder(item.id); } }}
+                  onDragLeave={() => { if (item.isFolder) onDragOverDriveFolder(null); }}
+                  onDrop={e => { e.preventDefault(); if (item.isFolder) onDropOnDriveFolder(item.id); }}
+                  className={`group transition-colors cursor-grab active:cursor-grabbing active:opacity-60 ${
+                    isTarget ? 'bg-green-500/10 border-l-2 border-green-400' : 'hover:bg-slate-700/20'
+                  }`}
                   onClick={() => onItemClick(item)}
                   onContextMenu={e => handleRightClick(e, item)}
                 >
                   <td className="px-4 py-3">
-                    <Icon size={16} className={iconColor} />
+                    <Icon size={16} className={isTarget ? 'text-green-400' : iconColor} />
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-slate-200 group-hover:text-white font-medium transition-colors">{item.name}</span>
+                    <span className={`text-sm font-medium transition-colors ${isTarget ? 'text-green-300' : 'text-slate-200 group-hover:text-white'}`}>{item.name}</span>
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-500 hidden sm:table-cell">{formatDate(item.modifiedTime)}</td>
                   <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{formatFileSize(item.size)}</td>
@@ -1984,20 +2045,36 @@ const DriveGridCard: React.FC<{
   getFileIconColor: (m?: string, f?: boolean) => string;
   getFileBgColor: (m?: string, f?: boolean) => string;
   formatFileSize: (b?: string | number) => string;
-}> = ({ item, onClick, onRightClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize }) => {
+  isDragTarget: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
+}> = ({ item, onClick, onRightClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, isDragTarget, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }) => {
   const Icon = getFileIcon(item.mimeType, item.isFolder);
   const iconColor = getFileIconColor(item.mimeType, item.isFolder);
   const bgColor = getFileBgColor(item.mimeType, item.isFolder);
   return (
     <div
-      className="group relative flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-slate-800/70 to-slate-700/40 border border-slate-700/50 hover:border-slate-600/70 hover:shadow-lg transition-all cursor-pointer"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-slate-800/70 to-slate-700/40 border transition-all cursor-grab active:cursor-grabbing active:opacity-60 active:scale-95 ${
+        isDragTarget
+          ? 'border-green-400/70 bg-green-500/10 scale-105 shadow-lg shadow-green-500/20'
+          : 'border-slate-700/50 hover:border-slate-600/70 hover:shadow-lg'
+      }`}
       onClick={() => onClick(item)}
       onContextMenu={e => onRightClick(e, item)}
     >
-      <div className={`w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center`}>
-        <Icon size={24} className={iconColor} />
+      <div className={`w-12 h-12 rounded-xl ${isDragTarget ? 'bg-green-500/30' : bgColor} flex items-center justify-center`}>
+        <Icon size={24} className={isDragTarget ? 'text-green-400' : iconColor} />
       </div>
-      <p className="text-xs font-medium text-slate-300 group-hover:text-white text-center line-clamp-2 w-full">{item.name}</p>
+      <p className={`text-xs font-medium text-center line-clamp-2 w-full ${isDragTarget ? 'text-green-300' : 'text-slate-300 group-hover:text-white'}`}>{item.name}</p>
       {!item.isFolder && item.size && <p className="text-xs text-slate-600">{formatFileSize(item.size)}</p>}
       <div className="absolute top-2 right-2 hidden group-hover:flex gap-1" onClick={e => e.stopPropagation()}>
         {!item.isFolder && (
