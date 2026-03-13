@@ -16,24 +16,23 @@ interface WysiwygEditorProps {
 
 let _counter = 0;
 
-interface ImageToolbarState {
-  visible: boolean;
+interface SelectedImage {
+  img: HTMLImageElement;
   top: number;
   left: number;
-  img: HTMLImageElement | null;
 }
 
 const SIZE_OPTIONS = [
-  { label: 'S', title: 'Small (25%)', width: '25%' },
-  { label: 'M', title: 'Medium (50%)', width: '50%' },
-  { label: 'L', title: 'Large (75%)', width: '75%' },
+  { label: 'S',    title: 'Small (25%)',      width: '25%'  },
+  { label: 'M',    title: 'Medium (50%)',     width: '50%'  },
+  { label: 'L',    title: 'Large (75%)',      width: '75%'  },
   { label: 'Full', title: 'Full width (100%)', width: '100%' },
 ];
 
 const ALIGN_OPTIONS = [
-  { label: '←', title: 'Align left', float: 'left', margin: '0 1em 0.5em 0', display: 'inline' },
-  { label: '↔', title: 'Center', float: 'none', margin: '0.75em auto', display: 'block' },
-  { label: '→', title: 'Align right', float: 'right', margin: '0 0 0.5em 1em', display: 'inline' },
+  { label: '⬅', title: 'Float left',  float: 'left',  margin: '0 1em 0.5em 0',   display: 'inline' },
+  { label: '⬛', title: 'Center',      float: 'none',  margin: '0.75em auto',      display: 'block'  },
+  { label: '➡', title: 'Float right', float: 'right', margin: '0 0 0.5em 1em',   display: 'inline' },
 ];
 
 export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
@@ -47,100 +46,143 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   disabled = false,
   onImageUpload,
 }) => {
-  const id = useRef(`wysiwyg-${_counter++}`).current;
+  const id              = useRef(`wysiwyg-${_counter++}`).current;
   const effectiveHeight = height || 300;
-  const quillRef = useRef<ReactQuill>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [toolbar, setToolbar] = useState<ImageToolbarState>({ visible: false, top: 0, left: 0, img: null });
+  const quillRef        = useRef<ReactQuill>(null);
+  const fileInputRef    = useRef<HTMLInputElement>(null);
+  const containerRef    = useRef<HTMLDivElement>(null);
+  const floatingRef     = useRef<HTMLDivElement>(null);
+
+  // Selected image state — stored in a ref so toolbar callbacks always have
+  // the current value without needing to re-create the event listeners.
+  const selectedImgRef  = useRef<HTMLImageElement | null>(null);
+  const [selected, setSelected] = useState<SelectedImage | null>(null);
 
   const onImageUploadRef = useRef(onImageUpload);
   onImageUploadRef.current = onImageUpload;
 
-  // ── Image click handler ──────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Re-position toolbar whenever selected changes ────────────────────────
+  const refreshToolbarPos = useCallback((img: HTMLImageElement) => {
     const container = containerRef.current;
     if (!container) return;
-
-    const onClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName !== 'IMG') {
-        setToolbar(t => ({ ...t, visible: false, img: null }));
-        return;
-      }
-      const img = target as HTMLImageElement;
-      const rect = img.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      setToolbar({
-        visible: true,
-        top: rect.top - containerRect.top - 44,
-        left: rect.left - containerRect.left,
-        img,
-      });
-    };
-
-    container.addEventListener('click', onClick);
-    return () => container.removeEventListener('click', onClick);
+    const imgRect       = img.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    setSelected({
+      img,
+      top:  imgRect.top  - containerRect.top  - 48,
+      left: imgRect.left - containerRect.left,
+    });
   }, []);
 
-  const applySize = useCallback((width: string) => {
-    if (!toolbar.img) return;
-    toolbar.img.style.width = width;
-    toolbar.img.style.maxWidth = '100%';
-    toolbar.img.style.height = 'auto';
-    setToolbar(t => ({ ...t, visible: true }));
-  }, [toolbar.img]);
+  // ── DOM event listeners on the Quill editor root ─────────────────────────
+  useEffect(() => {
+    // We attach to the quill editor DOM once it mounts
+    const getEditor = () => quillRef.current?.getEditor();
 
-  const applyAlign = useCallback((opt: typeof ALIGN_OPTIONS[0]) => {
-    if (!toolbar.img) return;
-    toolbar.img.style.float = opt.float;
-    toolbar.img.style.margin = opt.margin;
-    toolbar.img.style.display = opt.display;
-    setToolbar(t => ({ ...t, visible: true }));
-  }, [toolbar.img]);
+    // Poll briefly for Quill to be ready
+    let attempts = 0;
+    const tryAttach = () => {
+      const quill = getEditor();
+      if (!quill && attempts++ < 20) { setTimeout(tryAttach, 100); return; }
+      if (!quill) return;
 
-  const addCaption = useCallback(() => {
-    if (!toolbar.img) return;
-    const existing = toolbar.img.getAttribute('data-caption') || '';
-    const caption = window.prompt('Image caption (leave blank to remove):', existing);
+      const root = quill.root as HTMLElement;
+
+      const onMouseDown = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'IMG') {
+          // Select this image
+          const img = target as HTMLImageElement;
+          selectedImgRef.current = img;
+          refreshToolbarPos(img);
+          e.stopPropagation();
+        }
+      };
+
+      root.addEventListener('mousedown', onMouseDown);
+      return () => root.removeEventListener('mousedown', onMouseDown);
+    };
+
+    const cleanup = tryAttach();
+    return () => { if (cleanup) cleanup(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Click outside → deselect ─────────────────────────────────────────────
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // Don't deselect if clicking inside the floating toolbar
+      if (floatingRef.current?.contains(target)) return;
+      // Don't deselect if clicking on an image (handled by mousedown above)
+      if ((target as HTMLElement).tagName === 'IMG') return;
+      selectedImgRef.current = null;
+      setSelected(null);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  // ── Apply size ────────────────────────────────────────────────────────────
+  const applySize = (width: string) => {
+    const img = selectedImgRef.current;
+    if (!img) return;
+    img.style.width    = width;
+    img.style.maxWidth = '100%';
+    img.style.height   = 'auto';
+    refreshToolbarPos(img);
+  };
+
+  // ── Apply alignment ───────────────────────────────────────────────────────
+  const applyAlign = (opt: typeof ALIGN_OPTIONS[0]) => {
+    const img = selectedImgRef.current;
+    if (!img) return;
+    img.style.float   = opt.float;
+    img.style.margin  = opt.margin;
+    img.style.display = opt.display;
+    refreshToolbarPos(img);
+  };
+
+  // ── Caption ───────────────────────────────────────────────────────────────
+  const addCaption = () => {
+    const img = selectedImgRef.current;
+    if (!img) return;
+    const existing = img.getAttribute('data-caption') || '';
+    const caption  = window.prompt('Image caption (leave blank to remove):', existing);
     if (caption === null) return;
+
     if (caption.trim() === '') {
-      toolbar.img.removeAttribute('data-caption');
-      toolbar.img.removeAttribute('alt');
-      // Remove sibling figcaption if any
-      const fig = toolbar.img.closest('figure');
-      if (fig) {
-        const cap = fig.querySelector('figcaption');
-        if (cap) cap.remove();
-      }
+      img.removeAttribute('data-caption');
+      img.removeAttribute('alt');
+      const fig = img.closest('figure');
+      if (fig) fig.querySelector('figcaption')?.remove();
     } else {
-      toolbar.img.setAttribute('data-caption', caption);
-      toolbar.img.setAttribute('alt', caption);
-      // Insert or update figcaption
-      let fig = toolbar.img.closest('figure') as HTMLElement | null;
+      img.setAttribute('data-caption', caption);
+      img.setAttribute('alt', caption);
+      let fig = img.closest('figure') as HTMLElement | null;
       if (!fig) {
         fig = document.createElement('figure');
-        fig.style.cssText = 'margin: 1em 0; display: block;';
-        toolbar.img.parentNode?.insertBefore(fig, toolbar.img);
-        fig.appendChild(toolbar.img);
+        fig.style.cssText = 'margin:1em 0;display:block;';
+        img.parentNode?.insertBefore(fig, img);
+        fig.appendChild(img);
       }
       let cap = fig.querySelector('figcaption') as HTMLElement | null;
       if (!cap) {
         cap = document.createElement('figcaption');
-        cap.style.cssText = 'text-align: center; font-size: 0.85em; color: #94a3b8; margin-top: 0.4em; font-style: italic;';
+        cap.style.cssText = 'text-align:center;font-size:0.85em;color:#94a3b8;margin-top:0.4em;font-style:italic;';
         fig.appendChild(cap);
       }
       cap.textContent = caption;
     }
-    setToolbar(t => ({ ...t, visible: true }));
-  }, [toolbar.img]);
+    refreshToolbarPos(img);
+  };
 
-  // ── File upload ──────────────────────────────────────────────────────────
+  // ── File upload ───────────────────────────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !onImageUploadRef.current) return;
     try {
-      const url = await onImageUploadRef.current(file);
+      const url   = await onImageUploadRef.current(file);
       const quill = quillRef.current?.getEditor();
       if (quill) {
         const range = quill.getSelection(true);
@@ -154,11 +196,9 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     }
   }, []);
 
-  const handleImageInsert = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
+  const handleImageInsert = useCallback(() => { fileInputRef.current?.click(); }, []);
 
-  // ── Quill modules (stable — empty deps) ─────────────────────────────────
+  // ── Quill modules (stable — intentionally no deps) ───────────────────────
   const hasImageUpload = !!onImageUpload;
   const modules = useMemo(() => {
     const toolbarOptions = [
@@ -178,8 +218,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
       keyboard: {
         bindings: {
           linebreak: {
-            key: 13,
-            shiftKey: true,
+            key: 13, shiftKey: true,
             handler(this: any, range: any) {
               this.quill.insertText(range.index, '\n', 'user');
               this.quill.setSelection(range.index + 1, 'silent');
@@ -197,20 +236,23 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     'list', 'bullet', 'indent', 'link', 'image',
   ], []);
 
-  // ── Derived style values ─────────────────────────────────────────────────
+  // ── Styling ───────────────────────────────────────────────────────────────
   const editorMinHeight = minHeight ? `calc(${minHeight} - 42px)` : `${effectiveHeight - 42}px`;
-  const toolbarBg    = darkMode ? 'rgba(51,65,85,0.6)'  : '#f9fafb';
-  const containerBg  = darkMode ? 'rgba(30,41,59,0.6)'  : '#ffffff';
-  const borderColor  = darkMode ? 'rgba(51,65,85,0.5)'  : '#e5e7eb';
-  const textColor    = darkMode ? '#ffffff'             : '#1e293b';
-  const phColor      = darkMode ? '#64748b'             : '#9ca3af';
-  const iconColor    = darkMode ? '#94a3b8'             : '#64748b';
-  const pickerColor  = darkMode ? '#e2e8f0'             : '#1e293b';
-  const pickerOptBg  = darkMode ? 'rgba(30,41,59,0.95)' : '#ffffff';
+  const toolbarBg   = darkMode ? 'rgba(51,65,85,0.6)'  : '#f9fafb';
+  const containerBg = darkMode ? 'rgba(30,41,59,0.6)'  : '#ffffff';
+  const borderColor = darkMode ? 'rgba(51,65,85,0.5)'  : '#e5e7eb';
+  const textColor   = darkMode ? '#ffffff'             : '#1e293b';
+  const phColor     = darkMode ? '#64748b'             : '#9ca3af';
+  const iconColor   = darkMode ? '#94a3b8'             : '#64748b';
+  const pickerColor = darkMode ? '#e2e8f0'             : '#1e293b';
+  const pickerOptBg = darkMode ? 'rgba(30,41,59,0.95)' : '#ffffff';
 
-  const btnBase = 'px-2 py-0.5 rounded text-xs font-medium transition-colors border';
-  const btnStyle = 'bg-slate-700 text-white border-slate-600 hover:bg-slate-600';
+  const btnBase   = 'px-2 py-1 rounded text-xs font-semibold transition-colors border cursor-pointer';
+  const btnNormal = 'bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-500';
   const btnActive = 'bg-blue-600 text-white border-blue-500';
+
+  const currentWidth = selected?.img.style.width  ?? '';
+  const currentFloat = selected?.img.style.float  ?? '';
 
   return (
     <div ref={containerRef} className={`${id} ${className} relative`}>
@@ -222,46 +264,56 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* Floating image toolbar */}
-      {toolbar.visible && toolbar.img && (
+      {/* ── Floating image controls ── */}
+      {selected && (
         <div
-          className="absolute z-50 flex items-center gap-1 px-2 py-1.5 rounded-lg shadow-xl border"
+          ref={floatingRef}
+          className="absolute z-50 flex flex-wrap items-center gap-1 px-2 py-1.5 rounded-lg shadow-2xl border select-none"
           style={{
-            top: Math.max(4, toolbar.top),
-            left: toolbar.left,
-            background: darkMode ? 'rgba(15,23,42,0.97)' : '#ffffff',
-            borderColor: darkMode ? 'rgba(51,65,85,0.8)' : '#e5e7eb',
+            top:         Math.max(4, selected.top),
+            left:        selected.left,
+            background:  darkMode ? 'rgba(15,23,42,0.97)' : '#f8fafc',
+            borderColor: darkMode ? 'rgba(71,85,105,0.9)' : '#cbd5e1',
+            pointerEvents: 'auto',
           }}
-          onMouseDown={e => e.preventDefault()}
+          // Stop ALL mouse events from reaching the document listener that would deselect
+          onMouseDown={e => e.stopPropagation()}
         >
-          <span className="text-xs text-slate-400 mr-1 select-none">Size:</span>
+          <span className="text-xs text-slate-400 font-medium pr-0.5">Size:</span>
           {SIZE_OPTIONS.map(s => (
             <button
               key={s.width}
+              type="button"
               title={s.title}
-              className={`${btnBase} ${toolbar.img?.style.width === s.width ? btnActive : btnStyle}`}
-              onClick={() => applySize(s.width)}
+              className={`${btnBase} ${currentWidth === s.width ? btnActive : btnNormal}`}
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); applySize(s.width); }}
             >
               {s.label}
             </button>
           ))}
+
           <div className="w-px h-5 bg-slate-600 mx-1" />
-          <span className="text-xs text-slate-400 mr-1 select-none">Align:</span>
+
+          <span className="text-xs text-slate-400 font-medium pr-0.5">Align:</span>
           {ALIGN_OPTIONS.map(a => (
             <button
               key={a.float}
+              type="button"
               title={a.title}
-              className={`${btnBase} ${toolbar.img?.style.float === a.float ? btnActive : btnStyle}`}
-              onClick={() => applyAlign(a)}
+              className={`${btnBase} ${currentFloat === a.float ? btnActive : btnNormal}`}
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); applyAlign(a); }}
             >
               {a.label}
             </button>
           ))}
+
           <div className="w-px h-5 bg-slate-600 mx-1" />
+
           <button
+            type="button"
             title="Add / edit caption"
-            className={`${btnBase} ${btnStyle}`}
-            onClick={addCaption}
+            className={`${btnBase} ${btnNormal}`}
+            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); addCaption(); }}
           >
             Caption
           </button>
@@ -289,17 +341,11 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
           font-size: 16px;
           line-height: 1.6;
         }
-        .${id} .ql-editor.ql-blank::before {
-          color: ${phColor};
-          font-style: normal;
-        }
-        .${id} .ql-stroke { stroke: ${iconColor}; }
-        .${id} .ql-fill   { fill:   ${iconColor}; }
-        .${id} .ql-picker  { color: ${pickerColor}; }
-        .${id} .ql-picker-options {
-          background-color: ${pickerOptBg};
-          border-color: ${borderColor};
-        }
+        .${id} .ql-editor.ql-blank::before { color: ${phColor}; font-style: normal; }
+        .${id} .ql-stroke  { stroke: ${iconColor}; }
+        .${id} .ql-fill    { fill:   ${iconColor}; }
+        .${id} .ql-picker  { color:  ${pickerColor}; }
+        .${id} .ql-picker-options { background-color: ${pickerOptBg}; border-color: ${borderColor}; }
         .${id} .ql-editor p            { margin-bottom: 0.75em; }
         .${id} .ql-editor h1,
         .${id} .ql-editor h2,
@@ -315,7 +361,6 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
           margin: 0.75em 0;
           display: block;
           cursor: pointer;
-          transition: outline 0.15s;
         }
         .${id} .ql-editor img:hover    { outline: 2px solid #3b82f6; outline-offset: 2px; }
         .${id} .ql-editor figure       { margin: 1em 0; display: block; }
