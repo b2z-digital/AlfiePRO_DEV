@@ -1,6 +1,7 @@
-import React from 'react';
-import { Trophy, MapPin, Calendar, Users, Globe, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trophy, MapPin, Calendar, Users, Globe, Tag, Loader2, RefreshCw } from 'lucide-react';
 import { formatDate } from '../utils/date';
+import { supabase } from '../utils/supabase';
 
 interface CompetitorResult {
   position: number | null;
@@ -41,14 +42,74 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
   darkMode = true,
   isExportMode = false,
 }) => {
-  const competitors: CompetitorResult[] = Array.isArray(event.results_json) ? event.results_json : [];
+  const [competitors, setCompetitors] = useState<CompetitorResult[]>(
+    Array.isArray(event.results_json) && event.results_json.length > 0 ? event.results_json : []
+  );
+  const [raceCount, setRaceCount] = useState(event.race_count || 0);
+  const [eventDate, setEventDate] = useState(event.event_date);
+  const [eventEndDate, setEventEndDate] = useState(event.event_end_date);
+  const [venue, setVenue] = useState(event.venue);
+  const [boatClassMapped, setBoatClassMapped] = useState(event.boat_class_mapped);
+  const [boatClassRaw, setBoatClassRaw] = useState(event.boat_class_raw);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Determine race count from data
-  const raceCount = competitors.length > 0
-    ? Math.max(...competitors.map(c => c.races?.length || 0), event.race_count || 0)
-    : (event.race_count || 0);
+  const needsFetch = competitors.length === 0;
 
-  const raceLabels = Array.from({ length: raceCount }, (_, i) => `R${i + 1}`);
+  useEffect(() => {
+    if (needsFetch) {
+      fetchResults();
+    }
+  }, [event.id]);
+
+  const fetchResults = async () => {
+    setFetching(true);
+    setFetchError(null);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-external-results`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ event_row_id: event.id }),
+          signal: AbortSignal.timeout(30000),
+        }
+      );
+
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || `HTTP ${res.status}`);
+
+      if (Array.isArray(result.competitors) && result.competitors.length > 0) {
+        setCompetitors(result.competitors);
+        setRaceCount(result.race_count ?? 0);
+        if (result.event_date) setEventDate(result.event_date);
+        if (result.event_end_date) setEventEndDate(result.event_end_date);
+        if (result.venue) setVenue(result.venue);
+        if (result.boat_class_mapped) setBoatClassMapped(result.boat_class_mapped);
+        if (result.boat_class_raw) setBoatClassRaw(result.boat_class_raw);
+      } else {
+        setFetchError('No results found on the source page yet.');
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to load results';
+      setFetchError(msg.includes('timeout') ? 'Timed out loading results. Try again.' : msg);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const effectiveRaceCount = competitors.length > 0
+    ? Math.max(...competitors.map(c => c.races?.length || 0), raceCount)
+    : raceCount;
+
+  const raceLabels = Array.from({ length: effectiveRaceCount }, (_, i) => `R${i + 1}`);
 
   const bg = isExportMode ? 'bg-white' : darkMode ? 'bg-slate-800/50' : 'bg-white';
   const border = isExportMode ? 'border-gray-200' : darkMode ? 'border-slate-700/50' : 'border-gray-200';
@@ -61,15 +122,15 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
   const tableBorder = isExportMode ? 'border-gray-200' : darkMode ? 'border-slate-700/30' : 'border-gray-200';
 
   const formatEventDate = () => {
-    if (!event.event_date) return null;
-    if (event.event_end_date && event.event_end_date !== event.event_date) {
-      const start = new Date(event.event_date);
-      const end = new Date(event.event_end_date);
+    if (!eventDate) return null;
+    if (eventEndDate && eventEndDate !== eventDate) {
+      const start = new Date(eventDate);
+      const end = new Date(eventEndDate);
       const startStr = start.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
       const endStr = end.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
       return `${startStr} – ${endStr}`;
     }
-    return formatDate(event.event_date);
+    return formatDate(eventDate);
   };
 
   return (
@@ -78,7 +139,6 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
       <div className={`${isExportMode ? 'bg-gray-900' : darkMode ? 'bg-slate-900/70' : 'bg-gray-900'} px-6 py-5`}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            {/* Source badge */}
             <div className="flex items-center gap-2 mb-2">
               <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                 event.display_category === 'world'
@@ -104,31 +164,31 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
                   {formatEventDate()}
                 </div>
               )}
-              {event.venue && (
+              {venue && (
                 <div className="flex items-center gap-1.5 text-sm text-slate-300">
                   <MapPin size={14} className="text-slate-400" />
-                  {event.venue}
+                  {venue}
                 </div>
               )}
               <div className="flex items-center gap-1.5 text-sm text-slate-300">
                 <Users size={14} className="text-slate-400" />
-                {competitors.length} competitors
+                {fetching ? '...' : competitors.length} competitors
               </div>
-              {raceCount > 0 && (
+              {effectiveRaceCount > 0 && (
                 <div className="flex items-center gap-1.5 text-sm text-slate-300">
                   <Trophy size={14} className="text-slate-400" />
-                  {raceCount} races
+                  {effectiveRaceCount} races
                 </div>
               )}
             </div>
           </div>
 
-          {(event.boat_class_mapped || event.boat_class_raw) && (
+          {(boatClassMapped || boatClassRaw) && (
             <div className="flex-shrink-0 text-right">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30">
                 <Tag size={14} className="text-blue-400" />
                 <span className="text-blue-300 font-semibold text-sm">
-                  {event.boat_class_mapped || event.boat_class_raw}
+                  {boatClassMapped || boatClassRaw}
                 </span>
               </div>
             </div>
@@ -136,8 +196,13 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
         </div>
       </div>
 
-      {/* Results Table */}
-      {competitors.length > 0 ? (
+      {/* Results Table / Loading / Empty */}
+      {fetching ? (
+        <div className={`py-16 text-center ${textSecondary}`}>
+          <Loader2 size={32} className="mx-auto mb-3 animate-spin opacity-60" />
+          <p className="text-sm">Loading results from source...</p>
+        </div>
+      ) : competitors.length > 0 ? (
         <div className="overflow-x-auto">
           <table className={`w-full text-sm ${tableBg}`}>
             <thead>
@@ -178,7 +243,6 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
                     key={idx}
                     className={`${idx % 2 === 0 ? '' : tableRowAlt} ${tableRowHover} transition-colors`}
                   >
-                    {/* Position */}
                     <td className="px-3 py-3 text-center">
                       <span className={`text-sm font-bold ${posColor}`}>
                         {competitor.position ?? '—'}
@@ -190,42 +254,28 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
                         }`} />
                       )}
                     </td>
-
-                    {/* Name / Club */}
                     <td className="px-3 py-3">
                       <div className={`font-medium ${textPrimary} text-sm`}>{competitor.name || '—'}</div>
                       {competitor.club && (
                         <div className={`text-xs ${textSecondary} mt-0.5`}>{competitor.club}</div>
                       )}
                     </td>
-
-                    {/* Sail No */}
                     <td className="px-3 py-3">
                       <span className={`text-sm font-mono ${textPrimary}`}>{competitor.sailNo || '—'}</span>
                     </td>
-
-                    {/* Design */}
                     <td className={`px-3 py-3 hidden md:table-cell`}>
                       <span className={`text-sm ${textSecondary}`}>{competitor.boatDesign || '—'}</span>
                     </td>
-
-                    {/* Nett */}
                     <td className="px-3 py-3 text-center">
-                      <span className={`text-sm font-bold ${
-                        isTop3 ? posColor : textPrimary
-                      }`}>
+                      <span className={`text-sm font-bold ${isTop3 ? posColor : textPrimary}`}>
                         {competitor.nett !== null ? competitor.nett : '—'}
                       </span>
                     </td>
-
-                    {/* Total */}
                     <td className={`px-3 py-3 text-center hidden sm:table-cell`}>
                       <span className={`text-sm ${textSecondary}`}>
                         {competitor.total !== null ? competitor.total : '—'}
                       </span>
                     </td>
-
-                    {/* Race scores */}
                     {raceLabels.map((_, raceIdx) => {
                       const score = competitor.races?.[raceIdx] ?? null;
                       const isDiscard = competitor.isDiscard?.[raceIdx] ?? false;
@@ -233,9 +283,7 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
                         <td key={raceIdx} className="px-2 py-3 text-center">
                           {score !== null ? (
                             <span className={`text-xs font-mono ${
-                              isDiscard
-                                ? `${textSecondary} line-through`
-                                : textPrimary
+                              isDiscard ? `${textSecondary} line-through` : textPrimary
                             }`}>
                               {score}
                             </span>
@@ -254,7 +302,21 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
       ) : (
         <div className={`py-12 text-center ${textSecondary}`}>
           <Trophy size={36} className="mx-auto mb-3 opacity-30" />
-          <p>No results data available for this event.</p>
+          {fetchError ? (
+            <>
+              <p className="text-sm mb-4">{fetchError}</p>
+              <button
+                type="button"
+                onClick={fetchResults}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm transition-colors"
+              >
+                <RefreshCw size={14} />
+                Try again
+              </button>
+            </>
+          ) : (
+            <p>No results data available for this event.</p>
+          )}
         </div>
       )}
 

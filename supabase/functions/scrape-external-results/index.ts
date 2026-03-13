@@ -306,7 +306,86 @@ Deno.serve(async (req: Request) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { source_id, manual } = body;
+    const { source_id, manual, event_row_id } = body;
+
+    // ── On-demand single event fetch ──────────────────────────────────────────
+    // When event_row_id is provided, fetch and parse that event's page on the
+    // fly, update the DB row, and return the full parsed results immediately.
+    if (event_row_id) {
+      const { data: eventRow, error: eventErr } = await supabase
+        .from("external_result_events")
+        .select("id, source_id, source_url, event_name, display_category, boat_class_raw, boat_class_mapped, external_event_id")
+        .eq("id", event_row_id)
+        .maybeSingle();
+
+      if (eventErr || !eventRow) {
+        return new Response(JSON.stringify({ error: "Event not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const fetchResp = await fetch(eventRow.source_url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+
+      if (!fetchResp.ok) {
+        return new Response(JSON.stringify({ error: `HTTP ${fetchResp.status} fetching event page` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const html = await fetchResp.text();
+      const parsed = parseEventPage(html, eventRow.event_name);
+
+      if (!parsed || !parsed.competitors.length) {
+        return new Response(JSON.stringify({ error: "No results found on event page", competitors: [] }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      let boatClassId: string | null = null;
+      const bClass = parsed.boatClassMapped || eventRow.boat_class_mapped;
+      if (bClass) {
+        const { data: bc } = await supabase
+          .from("boat_classes").select("id").ilike("name", `%${bClass}%`).maybeSingle();
+        boatClassId = bc?.id || null;
+      }
+
+      await supabase.from("external_result_events").update({
+        results_json: parsed.competitors,
+        competitor_count: parsed.competitors.length,
+        race_count: parsed.raceCount,
+        event_date: parsed.eventDate || undefined,
+        event_end_date: parsed.eventEndDate || undefined,
+        venue: parsed.venue || undefined,
+        boat_class_raw: parsed.boatClassRaw || eventRow.boat_class_raw,
+        boat_class_mapped: parsed.boatClassMapped || eventRow.boat_class_mapped,
+        boat_class_id: boatClassId,
+        last_scraped_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", event_row_id);
+
+      return new Response(JSON.stringify({
+        success: true,
+        competitors: parsed.competitors,
+        race_count: parsed.raceCount,
+        competitor_count: parsed.competitors.length,
+        event_date: parsed.eventDate,
+        event_end_date: parsed.eventEndDate,
+        venue: parsed.venue,
+        boat_class_raw: parsed.boatClassRaw,
+        boat_class_mapped: parsed.boatClassMapped,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let sourcesQuery = supabase.from("external_result_sources").select("*").eq("is_active", true);
     if (source_id) sourcesQuery = sourcesQuery.eq("id", source_id);

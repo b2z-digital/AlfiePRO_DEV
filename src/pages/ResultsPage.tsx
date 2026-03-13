@@ -2007,7 +2007,11 @@ export const ResultsPage: React.FC = () => {
                       >
                         <div className="relative h-40 flex-shrink-0 overflow-hidden bg-slate-900">
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-                            <Globe className="text-slate-600" size={40} />
+                            <img
+                              src="/alfie_app_logo.svg"
+                              alt="AlfiePRO"
+                              className="w-16 h-16 opacity-20"
+                            />
                           </div>
                           <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
                             <Globe size={12} />
