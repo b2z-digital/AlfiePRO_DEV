@@ -204,35 +204,64 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
   async function handleRunNow(source: ResultSource) {
     setRunningId(source.id);
     setError(null);
+    setSuccess(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const sessionResult = await supabase.auth.getSession();
+      const token = sessionResult.data?.session?.access_token;
+      if (!token) {
+        setError('Not authenticated. Please refresh the page.');
+        clearTimeout(timeoutId);
+        setRunningId(null);
+        return;
+      }
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-external-results`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ source_id: source.id, manual: true }),
+          signal: controller.signal,
         }
       );
-      const result = await res.json();
-      if (result.error) throw new Error(result.error);
-      const r = result.results?.[0];
-      if (r && !r.error) {
-        setSuccess(`Scraped "${source.name}": ${r.created} new, ${r.updated} updated, ${r.skipped} skipped.`);
-        setTimeout(() => setSuccess(null), 5000);
-      } else if (r?.error) {
-        setError(r.error);
+      clearTimeout(timeoutId);
+      let result: Record<string, unknown> = {};
+      try {
+        result = await res.json();
+      } catch {
+        throw new Error(`Server returned status ${res.status} (non-JSON response)`);
       }
-      fetchAll();
+      if (!res.ok || result.error) {
+        throw new Error(String(result.error || result.message || `HTTP ${res.status}`));
+      }
+      const r = (result.results as Array<Record<string, unknown>>)?.[0];
+      if (r && !r.error) {
+        setSuccess(`Scraped "${source.name}": ${r.created ?? 0} new, ${r.updated ?? 0} updated, ${r.skipped ?? 0} skipped.`);
+        setTimeout(() => setSuccess(null), 6000);
+      } else if (r?.error) {
+        setError(`Scrape error: ${r.error}`);
+      } else {
+        setSuccess(`Scrape completed for "${source.name}".`);
+        setTimeout(() => setSuccess(null), 4000);
+      }
+      await fetchAll();
       if (expandedSource === source.id) fetchEventsForSource(source.id);
       if (expandedLogs === source.id) fetchLogsForSource(source.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Scrape failed');
+    } catch (e: unknown) {
+      clearTimeout(timeoutId);
+      const msg = e instanceof Error ? e.message : 'Scrape failed';
+      if (msg.toLowerCase().includes('abort')) {
+        setError('Scrape timed out after 2 minutes. The site may be slow — check Logs to see if it completed.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setRunningId(null);
     }
-    setRunningId(null);
   }
 
   const formatDate = (iso: string | null) => {
@@ -284,6 +313,14 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
           Add Source
         </button>
       </div>
+
+      {/* Running indicator */}
+      {runningId && (
+        <div className="flex items-center gap-2 p-3 bg-amber-900/30 border border-amber-700/50 rounded-lg text-amber-300 text-sm">
+          <RefreshCw size={16} className="animate-spin flex-shrink-0" />
+          Scraping in progress — this may take up to 2 minutes for large event lists. Please wait...
+        </div>
+      )}
 
       {/* Feedback */}
       {error && (
@@ -431,10 +468,11 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* Run Now */}
                   <button
+                    type="button"
                     onClick={() => handleRunNow(source)}
-                    disabled={runningId === source.id}
+                    disabled={runningId !== null}
                     title="Run scrape now"
-                    className="p-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 transition-colors disabled:opacity-50"
+                    className="p-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/40 text-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {runningId === source.id
                       ? <RefreshCw size={16} className="animate-spin" />
@@ -442,9 +480,11 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
                   </button>
                   {/* Toggle Active */}
                   <button
+                    type="button"
                     onClick={() => handleToggleActive(source)}
+                    disabled={runningId !== null}
                     title={source.is_active ? 'Deactivate' : 'Activate'}
-                    className={`p-2 rounded-lg transition-colors ${
+                    className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${
                       source.is_active
                         ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
                         : 'bg-slate-700 hover:bg-slate-600 text-slate-400'
@@ -454,6 +494,7 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
                   </button>
                   {/* Expand events */}
                   <button
+                    type="button"
                     onClick={() => toggleExpand(source.id)}
                     title="View scraped events"
                     className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
@@ -462,6 +503,7 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
                   </button>
                   {/* Logs */}
                   <button
+                    type="button"
                     onClick={() => toggleLogs(source.id)}
                     title="View scrape logs"
                     className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors text-xs font-medium"
@@ -470,9 +512,11 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
                   </button>
                   {/* Delete */}
                   <button
+                    type="button"
                     onClick={() => handleDelete(source.id)}
+                    disabled={runningId !== null}
                     title="Delete source"
-                    className="p-2 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-400 transition-colors"
+                    className="p-2 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-400 transition-colors disabled:opacity-50"
                   >
                     <Trash2 size={16} />
                   </button>

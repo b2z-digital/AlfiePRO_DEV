@@ -36,6 +36,12 @@ const PAGE_SECTION_MAP: Record<string, string> = {
   '/': 'dashboard',
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function toValidUuid(v: string | null | undefined): string | null {
+  if (!v) return null;
+  return UUID_RE.test(v) ? v : null;
+}
+
 function getPageSection(path: string): string {
   for (const [prefix, section] of Object.entries(PAGE_SECTION_MAP)) {
     if (prefix === '/') continue;
@@ -78,8 +84,8 @@ export function usePlatformTracking(
           .from('platform_sessions')
           .insert({
             user_id: session.user.id,
-            club_id: contextRef.current.clubId || null,
-            association_id: contextRef.current.associationId || null,
+            club_id: toValidUuid(contextRef.current.clubId),
+            association_id: toValidUuid(contextRef.current.associationId),
             association_type: contextRef.current.associationType || null,
             user_agent: navigator.userAgent.slice(0, 200),
           })
@@ -106,8 +112,8 @@ export function usePlatformTracking(
           .from('platform_sessions')
           .update({
             last_active_at: new Date().toISOString(),
-            club_id: ctx.clubId || null,
-            association_id: ctx.associationId || null,
+            club_id: toValidUuid(ctx.clubId),
+            association_id: toValidUuid(ctx.associationId),
             association_type: ctx.associationType || null,
           })
           .eq('id', sessionIdRef.current);
@@ -136,8 +142,8 @@ export function usePlatformTracking(
       await supabase.from('platform_page_views').insert({
         session_id: sessionIdRef.current || null,
         user_id: session.user.id,
-        club_id: ctx.clubId || null,
-        association_id: ctx.associationId || null,
+        club_id: toValidUuid(ctx.clubId),
+        association_id: toValidUuid(ctx.associationId),
         page_path: path,
         page_section: getPageSection(path),
       });
