@@ -6,7 +6,7 @@ import { formatDate } from '../utils/date';
 import { getArticleById, deleteArticle } from '../utils/articleStorage';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = '/alfie_app_logo.svg';
 
 const ArticleDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

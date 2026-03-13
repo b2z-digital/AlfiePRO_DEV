@@ -125,6 +125,25 @@ interface ArticleLink {
   date: string | null;
 }
 
+/**
+ * Normalise a CMS Made Simple article URL so that variant query strings
+ * (cntnt01origid vs cntnt01returnid, different returnid values, etc.)
+ * all resolve to the same canonical URL.
+ * We keep only the params that uniquely identify the article.
+ */
+function normaliseCmsUrl(rawHref: string, baseUrl: string): string {
+  const href = absoluteUrl(baseUrl, rawHref.replace(/&amp;/g, "&"));
+  try {
+    const u = new URL(href);
+    const articleId = u.searchParams.get("cntnt01articleid");
+    const returnId = u.searchParams.get("cntnt01returnid") || u.searchParams.get("cntnt01origid") || "129";
+    // Rebuild with only the essential params in a fixed order
+    return `${u.origin}${u.pathname}?mact=News,cntnt01,detail,0&cntnt01articleid=${articleId}&cntnt01returnid=${returnId}`;
+  } catch {
+    return href;
+  }
+}
+
 function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
   const links: ArticleLink[] = [];
   const seen = new Set<string>();
@@ -134,7 +153,7 @@ function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
   const cmsPattern = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/gi;
   let m: RegExpExecArray | null;
   while ((m = cmsPattern.exec(html)) !== null) {
-    const href = absoluteUrl(baseUrl, m[1].replace(/&amp;/g, "&"));
+    const href = normaliseCmsUrl(m[1], baseUrl);
     if (!seen.has(href)) {
       seen.add(href);
       links.push({ href, title: "", date: null });
@@ -187,7 +206,7 @@ function enrichCmsMakerLinks(links: ArticleLink[], html: string, baseUrl: string
   for (const block of blocks) {
     const hrefM = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/i.exec(block);
     if (!hrefM) continue;
-    const href = absoluteUrl(baseUrl, hrefM[1].replace(/&amp;/g, "&"));
+    const href = normaliseCmsUrl(hrefM[1], baseUrl);
     const link = links.find(l => l.href === href);
     if (!link) continue;
 
@@ -487,10 +506,12 @@ Deno.serve(async (req: Request) => {
           last_scraped_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }).eq("id", source.id);
-        await supabase.rpc("increment_scrape_source_count", {
-          p_source_id: source.id,
-          p_increment: articlesCreated,
-        }).catch(() => {});
+        try {
+          await supabase.rpc("increment_scrape_source_count", {
+            p_source_id: source.id,
+            p_increment: articlesCreated,
+          });
+        } catch { /* non-fatal */ }
 
         results.push({ source: source.name, created: articlesCreated, skipped: articlesSkipped });
 
