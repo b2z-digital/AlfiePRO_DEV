@@ -82,6 +82,16 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   const [driveNewFolderName, setDriveNewFolderName] = useState('');
   const [driveNewFolderCreating, setDriveNewFolderCreating] = useState(false);
 
+  // In-app confirm dialog
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const showConfirm = (message: string, onConfirm: () => void) => {
+    setConfirmDialog({ message, onConfirm });
+  };
+
   // Category modal
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ResourceStorage.ResourceCategory | null>(null);
@@ -307,20 +317,24 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     }
   };
 
-  const handleDriveDelete = async (item: DriveItem) => {
-    if (!confirm(`Delete "${item.name}" from Google Drive?`)) return;
-    try {
-      await callDriveApi({
-        action: 'delete_file',
-        organizationId: driveOrgId || organizationId,
-        organizationType: driveOrgType || organizationType,
-        fileId: item.id,
-      });
-      addNotification(`"${item.name}" deleted`, 'success');
-      if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
-    } catch (err: any) {
-      addNotification(err.message || 'Failed to delete file', 'error');
-    }
+  const handleDriveDelete = (item: DriveItem) => {
+    showConfirm(
+      `Delete "${item.name}" from Google Drive?`,
+      async () => {
+        try {
+          await callDriveApi({
+            action: 'delete_file',
+            organizationId: driveOrgId || organizationId,
+            organizationType: driveOrgType || organizationType,
+            fileId: item.id,
+          });
+          addNotification(`"${item.name}" deleted`, 'success');
+          if (currentDriveFolderId) browseDriveFolder(currentDriveFolderId);
+        } catch (err: any) {
+          addNotification(err.message || 'Failed to delete file', 'error');
+        }
+      }
+    );
   };
 
   const handleDriveRename = async () => {
@@ -505,21 +519,25 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     setEditingCategory(null);
   };
 
-  const handleDeleteCategory = async (catId: string) => {
-    if (!confirm('Delete this folder and all its resources?')) return;
-    try {
-      const catResources = await ResourceStorage.fetchResources(catId);
-      for (const r of catResources) {
-        if (r.file_url) await ResourceStorage.deleteResourceFile(r.file_url);
-        await ResourceStorage.deleteResource(r.id);
+  const handleDeleteCategory = (catId: string) => {
+    showConfirm(
+      'Delete this folder and all its resources?',
+      async () => {
+        try {
+          const catResources = await ResourceStorage.fetchResources(catId);
+          for (const r of catResources) {
+            if (r.file_url) await ResourceStorage.deleteResourceFile(r.file_url);
+            await ResourceStorage.deleteResource(r.id);
+          }
+          await ResourceStorage.deleteResourceCategory(catId);
+          if (activeSection === catId) setActiveSection('all');
+          addNotification('Folder deleted', 'success');
+          loadAll();
+        } catch {
+          addNotification('Failed to delete folder', 'error');
+        }
       }
-      await ResourceStorage.deleteResourceCategory(catId);
-      if (activeSection === catId) setActiveSection('all');
-      addNotification('Folder deleted', 'success');
-      loadAll();
-    } catch {
-      addNotification('Failed to delete folder', 'error');
-    }
+    );
   };
 
   const handleSaveResource = async () => {
@@ -579,16 +597,20 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     setEditingResource(null);
   };
 
-  const handleDeleteResource = async (resource: ResourceStorage.AssociationResource) => {
-    if (!confirm(`Delete "${resource.title}"?`)) return;
-    try {
-      if (resource.file_url) await ResourceStorage.deleteResourceFile(resource.file_url);
-      await ResourceStorage.deleteResource(resource.id);
-      addNotification('Resource deleted', 'success');
-      loadAll();
-    } catch {
-      addNotification('Failed to delete resource', 'error');
-    }
+  const handleDeleteResource = (resource: ResourceStorage.AssociationResource) => {
+    showConfirm(
+      `Delete "${resource.title}"?`,
+      async () => {
+        try {
+          if (resource.file_url) await ResourceStorage.deleteResourceFile(resource.file_url);
+          await ResourceStorage.deleteResource(resource.id);
+          addNotification('Resource deleted', 'success');
+          loadAll();
+        } catch {
+          addNotification('Failed to delete resource', 'error');
+        }
+      }
+    );
   };
 
   const getFileIcon = (mimeType?: string, isFolder?: boolean) => {
@@ -1187,6 +1209,34 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
                 {resourceSaving ? 'Saving...' : editingResource ? 'Update' : 'Add Resource'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-app Confirm Dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="p-6">
+              <p className="text-white text-sm font-medium leading-relaxed">{confirmDialog.message}</p>
+            </div>
+            <div className="px-6 pb-5 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors font-medium"
+              >
+                Delete
               </button>
             </div>
           </div>
