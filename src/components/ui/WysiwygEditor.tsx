@@ -22,17 +22,22 @@ interface SelectedImage {
   left: number;
 }
 
+interface CaptionModalState {
+  open: boolean;
+  value: string;
+}
+
 const SIZE_OPTIONS = [
-  { label: 'S',    title: 'Small (25%)',      width: '25%'  },
-  { label: 'M',    title: 'Medium (50%)',     width: '50%'  },
-  { label: 'L',    title: 'Large (75%)',      width: '75%'  },
+  { label: 'S',    title: 'Small (25%)',       width: '25%'  },
+  { label: 'M',    title: 'Medium (50%)',      width: '50%'  },
+  { label: 'L',    title: 'Large (75%)',       width: '75%'  },
   { label: 'Full', title: 'Full width (100%)', width: '100%' },
 ];
 
 const ALIGN_OPTIONS = [
-  { label: '⬅', title: 'Float left',  float: 'left',  margin: '0 1em 0.5em 0',   display: 'inline' },
-  { label: '⬛', title: 'Center',      float: 'none',  margin: '0.75em auto',      display: 'block'  },
-  { label: '➡', title: 'Float right', float: 'right', margin: '0 0 0.5em 1em',   display: 'inline' },
+  { label: '⬅', title: 'Float left',  float: 'left',  margin: '0 1em 0.5em 0', display: 'inline' },
+  { label: '⬛', title: 'Center',      float: 'none',  margin: '0.75em auto',   display: 'block'  },
+  { label: '➡', title: 'Float right', float: 'right', margin: '0 0 0.5em 1em', display: 'inline' },
 ];
 
 export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
@@ -52,16 +57,16 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   const fileInputRef    = useRef<HTMLInputElement>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
   const floatingRef     = useRef<HTMLDivElement>(null);
+  const captionInputRef = useRef<HTMLInputElement>(null);
 
-  // Selected image state — stored in a ref so toolbar callbacks always have
-  // the current value without needing to re-create the event listeners.
-  const selectedImgRef  = useRef<HTMLImageElement | null>(null);
-  const [selected, setSelected] = useState<SelectedImage | null>(null);
+  const selectedImgRef = useRef<HTMLImageElement | null>(null);
+  const [selected, setSelected]           = useState<SelectedImage | null>(null);
+  const [captionModal, setCaptionModal]   = useState<CaptionModalState>({ open: false, value: '' });
 
   const onImageUploadRef = useRef(onImageUpload);
   onImageUploadRef.current = onImageUpload;
 
-  // ── Re-position toolbar whenever selected changes ────────────────────────
+  // ── Reposition toolbar ───────────────────────────────────────────────────
   const refreshToolbarPos = useCallback((img: HTMLImageElement) => {
     const container = containerRef.current;
     if (!container) return;
@@ -74,53 +79,48 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     });
   }, []);
 
-  // ── DOM event listeners on the Quill editor root ─────────────────────────
+  // ── Attach mousedown listener to Quill root after mount ──────────────────
   useEffect(() => {
-    // We attach to the quill editor DOM once it mounts
-    const getEditor = () => quillRef.current?.getEditor();
-
-    // Poll briefly for Quill to be ready
+    let removeListener: (() => void) | undefined;
     let attempts = 0;
+
     const tryAttach = () => {
-      const quill = getEditor();
-      if (!quill && attempts++ < 20) { setTimeout(tryAttach, 100); return; }
-      if (!quill) return;
-
+      const quill = quillRef.current?.getEditor();
+      if (!quill) {
+        if (attempts++ < 30) setTimeout(tryAttach, 100);
+        return;
+      }
       const root = quill.root as HTMLElement;
-
       const onMouseDown = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.tagName === 'IMG') {
-          // Select this image
           const img = target as HTMLImageElement;
           selectedImgRef.current = img;
           refreshToolbarPos(img);
           e.stopPropagation();
         }
       };
-
       root.addEventListener('mousedown', onMouseDown);
-      return () => root.removeEventListener('mousedown', onMouseDown);
+      removeListener = () => root.removeEventListener('mousedown', onMouseDown);
     };
 
-    const cleanup = tryAttach();
-    return () => { if (cleanup) cleanup(); };
+    tryAttach();
+    return () => removeListener?.();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Click outside → deselect ─────────────────────────────────────────────
+  // ── Click outside → deselect (skip if inside toolbar or caption modal) ───
   useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
+    const onDocMouseDown = (e: MouseEvent) => {
       const target = e.target as Node;
-      // Don't deselect if clicking inside the floating toolbar
       if (floatingRef.current?.contains(target)) return;
-      // Don't deselect if clicking on an image (handled by mousedown above)
       if ((target as HTMLElement).tagName === 'IMG') return;
+      if ((target as HTMLElement).closest?.('[data-caption-modal]')) return;
       selectedImgRef.current = null;
       setSelected(null);
     };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, []);
 
   // ── Apply size ────────────────────────────────────────────────────────────
@@ -143,39 +143,65 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     refreshToolbarPos(img);
   };
 
-  // ── Caption ───────────────────────────────────────────────────────────────
-  const addCaption = () => {
+  // ── Open caption modal ────────────────────────────────────────────────────
+  const openCaption = () => {
     const img = selectedImgRef.current;
     if (!img) return;
     const existing = img.getAttribute('data-caption') || '';
-    const caption  = window.prompt('Image caption (leave blank to remove):', existing);
-    if (caption === null) return;
-
-    if (caption.trim() === '') {
-      img.removeAttribute('data-caption');
-      img.removeAttribute('alt');
-      const fig = img.closest('figure');
-      if (fig) fig.querySelector('figcaption')?.remove();
-    } else {
-      img.setAttribute('data-caption', caption);
-      img.setAttribute('alt', caption);
-      let fig = img.closest('figure') as HTMLElement | null;
-      if (!fig) {
-        fig = document.createElement('figure');
-        fig.style.cssText = 'margin:1em 0;display:block;';
-        img.parentNode?.insertBefore(fig, img);
-        fig.appendChild(img);
-      }
-      let cap = fig.querySelector('figcaption') as HTMLElement | null;
-      if (!cap) {
-        cap = document.createElement('figcaption');
-        cap.style.cssText = 'text-align:center;font-size:0.85em;color:#94a3b8;margin-top:0.4em;font-style:italic;';
-        fig.appendChild(cap);
-      }
-      cap.textContent = caption;
-    }
-    refreshToolbarPos(img);
+    setCaptionModal({ open: true, value: existing });
+    setTimeout(() => captionInputRef.current?.focus(), 50);
   };
+
+  // ── Confirm caption ───────────────────────────────────────────────────────
+  const confirmCaption = () => {
+    const img = selectedImgRef.current;
+    if (!img) { setCaptionModal({ open: false, value: '' }); return; }
+    const caption = captionModal.value.trim();
+
+    try {
+      if (caption === '') {
+        img.removeAttribute('data-caption');
+        img.removeAttribute('alt');
+        // Unwrap from figure if present
+        const fig = img.closest('figure');
+        if (fig) {
+          fig.querySelector('figcaption')?.remove();
+          fig.parentNode?.insertBefore(img, fig);
+          fig.parentNode?.removeChild(fig);
+        }
+      } else {
+        img.setAttribute('data-caption', caption);
+        img.setAttribute('alt', caption);
+
+        // Find or create wrapping figure
+        let fig = img.closest('figure') as HTMLElement | null;
+        if (!fig) {
+          fig = document.createElement('figure');
+          fig.style.cssText = 'margin:1em 0;display:block;';
+          img.parentNode?.insertBefore(fig, img);
+          fig.appendChild(img);
+        }
+
+        // Find or create figcaption
+        let cap = fig.querySelector('figcaption') as HTMLElement | null;
+        if (!cap) {
+          cap = document.createElement('figcaption');
+          cap.style.cssText =
+            'text-align:center;font-size:0.85em;color:#94a3b8;margin-top:0.4em;font-style:italic;';
+          fig.appendChild(cap);
+        }
+        cap.textContent = caption;
+      }
+
+      refreshToolbarPos(img);
+    } catch (err) {
+      console.error('Caption error:', err);
+    }
+
+    setCaptionModal({ open: false, value: '' });
+  };
+
+  const cancelCaption = () => setCaptionModal({ open: false, value: '' });
 
   // ── File upload ───────────────────────────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,7 +224,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
 
   const handleImageInsert = useCallback(() => { fileInputRef.current?.click(); }, []);
 
-  // ── Quill modules (stable — intentionally no deps) ───────────────────────
+  // ── Quill modules (stable ref) ────────────────────────────────────────────
   const hasImageUpload = !!onImageUpload;
   const modules = useMemo(() => {
     const toolbarOptions = [
@@ -236,7 +262,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     'list', 'bullet', 'indent', 'link', 'image',
   ], []);
 
-  // ── Styling ───────────────────────────────────────────────────────────────
+  // ── Styles ────────────────────────────────────────────────────────────────
   const editorMinHeight = minHeight ? `calc(${minHeight} - 42px)` : `${effectiveHeight - 42}px`;
   const toolbarBg   = darkMode ? 'rgba(51,65,85,0.6)'  : '#f9fafb';
   const containerBg = darkMode ? 'rgba(30,41,59,0.6)'  : '#ffffff';
@@ -251,8 +277,8 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   const btnNormal = 'bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-500';
   const btnActive = 'bg-blue-600 text-white border-blue-500';
 
-  const currentWidth = selected?.img.style.width  ?? '';
-  const currentFloat = selected?.img.style.float  ?? '';
+  const currentWidth = selected?.img.style.width ?? '';
+  const currentFloat = selected?.img.style.float ?? '';
 
   return (
     <div ref={containerRef} className={`${id} ${className} relative`}>
@@ -270,13 +296,12 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
           ref={floatingRef}
           className="absolute z-50 flex flex-wrap items-center gap-1 px-2 py-1.5 rounded-lg shadow-2xl border select-none"
           style={{
-            top:         Math.max(4, selected.top),
-            left:        selected.left,
-            background:  darkMode ? 'rgba(15,23,42,0.97)' : '#f8fafc',
-            borderColor: darkMode ? 'rgba(71,85,105,0.9)' : '#cbd5e1',
+            top:           Math.max(4, selected.top),
+            left:          selected.left,
+            background:    darkMode ? 'rgba(15,23,42,0.97)' : '#f8fafc',
+            borderColor:   darkMode ? 'rgba(71,85,105,0.9)' : '#cbd5e1',
             pointerEvents: 'auto',
           }}
-          // Stop ALL mouse events from reaching the document listener that would deselect
           onMouseDown={e => e.stopPropagation()}
         >
           <span className="text-xs text-slate-400 font-medium pr-0.5">Size:</span>
@@ -313,10 +338,70 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
             type="button"
             title="Add / edit caption"
             className={`${btnBase} ${btnNormal}`}
-            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); addCaption(); }}
+            onMouseDown={e => { e.preventDefault(); e.stopPropagation(); openCaption(); }}
           >
             Caption
           </button>
+        </div>
+      )}
+
+      {/* ── In-app caption modal ── */}
+      {captionModal.open && (
+        <div
+          data-caption-modal="true"
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <div
+            className="rounded-xl shadow-2xl border p-6 w-full max-w-sm"
+            style={{
+              background:   darkMode ? '#1e293b' : '#ffffff',
+              borderColor:  darkMode ? 'rgba(71,85,105,0.8)' : '#e2e8f0',
+            }}
+          >
+            <h3
+              className="text-base font-semibold mb-4"
+              style={{ color: textColor }}
+            >
+              Image Caption
+            </h3>
+            <input
+              ref={captionInputRef}
+              type="text"
+              value={captionModal.value}
+              onChange={e => setCaptionModal(m => ({ ...m, value: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') confirmCaption(); if (e.key === 'Escape') cancelCaption(); }}
+              placeholder="Enter caption (leave blank to remove)"
+              className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-2 focus:ring-blue-500 mb-5"
+              style={{
+                background:  darkMode ? 'rgba(30,41,59,0.8)' : '#f8fafc',
+                borderColor: darkMode ? 'rgba(71,85,105,0.8)' : '#cbd5e1',
+                color:       textColor,
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelCaption}
+                className="px-4 py-2 rounded-lg text-sm font-medium border transition-colors"
+                style={{
+                  background:  darkMode ? 'rgba(51,65,85,0.6)' : '#f1f5f9',
+                  borderColor: darkMode ? 'rgba(71,85,105,0.6)' : '#cbd5e1',
+                  color:       darkMode ? '#cbd5e1' : '#475569',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmCaption}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
