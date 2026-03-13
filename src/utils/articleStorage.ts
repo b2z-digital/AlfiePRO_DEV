@@ -17,6 +17,9 @@ export interface Article {
   updated_at?: string;
   status: 'draft' | 'published';
   tags?: string[];
+  is_scraped?: boolean;
+  scraped_url?: string;
+  scraped_author?: string;
   author_name?: string; // Derived field
   source_type?: 'club' | 'state' | 'national'; // Derived field
   source_name?: string; // Derived field
@@ -213,11 +216,16 @@ export const getArticles = async (
 
     // Map author names, transform tags, and add source info
     const articlesWithAuthors = articles.map(article => {
-      // Find author
-      const author = users?.find(user => user.id === article.author_id);
-      const authorName = author
-        ? `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author'
-        : 'Unknown Author';
+      // Find author — scraped articles use scraped_author field
+      let authorName: string;
+      if (article.is_scraped && article.scraped_author) {
+        authorName = article.scraped_author;
+      } else {
+        const author = users?.find(user => user.id === article.author_id);
+        authorName = author
+          ? `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author'
+          : 'Unknown Author';
+      }
 
       // Extract tags
       const tags = article.article_tags?.map(tag => tag.tag) || [];
@@ -289,15 +297,17 @@ export const getArticleById = async (id: string): Promise<Article | null> => {
     
     if (!article) return null;
     
-    // Fetch author name
+    // Fetch author name — scraped articles use scraped_author directly
     let authorName = 'Unknown Author';
-    if (article.author_id) {
+    if (article.is_scraped && article.scraped_author) {
+      authorName = article.scraped_author;
+    } else if (article.author_id) {
       const { data: author } = await supabase
         .from('profiles')
         .select('first_name, last_name')
         .eq('id', article.author_id)
         .maybeSingle();
-      
+
       if (author) {
         authorName = `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author';
       }

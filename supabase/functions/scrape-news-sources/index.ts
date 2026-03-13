@@ -21,8 +21,8 @@ interface ScrapedArticle {
   content: string;
   excerpt: string;
   cover_image: string | null;
-  original_url: string;
   published_at: string;
+  scraped_author: string;
 }
 
 // ─── HTML utility helpers ────────────────────────────────────────────────────
@@ -50,21 +50,52 @@ function stripTags(html: string): string {
     .trim();
 }
 
-// Extract value of a named capture from a regex against a string
 function firstMatch(pattern: RegExp, html: string, group = 1): string | null {
   const m = pattern.exec(html);
   return m ? m[group].trim() : null;
 }
 
-// Pull all regex matches into an array
 function allMatches(pattern: RegExp, html: string, group = 1): string[] {
   const results: string[] = [];
   let m: RegExpExecArray | null;
-  const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
+  const flags = pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g";
+  const re = new RegExp(pattern.source, flags);
   while ((m = re.exec(html)) !== null) {
     results.push(m[group].trim());
   }
   return results;
+}
+
+/**
+ * Extract the inner HTML of the FIRST element matching a given id attribute.
+ * Uses a greedy approach to capture nested HTML properly.
+ */
+function extractById(html: string, id: string): string | null {
+  // Find the opening tag for this id
+  const startTagRe = new RegExp(`<(\\w+)[^>]*\\sid=["']${id}["'][^>]*>`, "i");
+  const startTagM = startTagRe.exec(html);
+  if (!startTagM) return null;
+
+  const tagName = startTagM[1];
+  const startIdx = startTagM.index + startTagM[0].length;
+
+  // Walk forward counting open/close tags to find the matching closing tag
+  let depth = 1;
+  let pos = startIdx;
+  while (pos < html.length && depth > 0) {
+    const nextOpen = html.indexOf(`<${tagName}`, pos);
+    const nextClose = html.indexOf(`</${tagName}>`, pos);
+    if (nextClose === -1) break;
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      depth++;
+      pos = nextOpen + 1;
+    } else {
+      depth--;
+      if (depth === 0) return html.slice(startIdx, nextClose);
+      pos = nextClose + 1;
+    }
+  }
+  return null;
 }
 
 // ─── News article link detection ────────────────────────────────────────────
@@ -73,112 +104,95 @@ interface ArticleLink {
   href: string;
   title: string;
   date: string | null;
-  thumbnail: string | null;
 }
 
-/**
- * Detects which URL pattern this source uses and returns
- * a list of article page URLs with any metadata available on the index page.
- */
 function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
-  const base = new URL(baseUrl);
   const links: ArticleLink[] = [];
   const seen = new Set<string>();
 
-  // ── Strategy 1: CMS Maker / CMSMS sites (radiosailing.org.au pattern)
-  // href="index.php?mact=News,cntnt01,detail,0&cntnt01articleid=NNN..."
-  const cmsNewsPattern = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/gi;
+  // ── Strategy 1: CMS Made Simple (radiosailing.org.au)
+  // URLs contain: mact=News,cntnt01,detail,0&cntnt01articleid=NNN
+  const cmsPattern = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/gi;
   let m: RegExpExecArray | null;
-  while ((m = cmsNewsPattern.exec(html)) !== null) {
+  while ((m = cmsPattern.exec(html)) !== null) {
     const href = absoluteUrl(baseUrl, m[1].replace(/&amp;/g, "&"));
     if (!seen.has(href)) {
       seen.add(href);
-      links.push({ href, title: "", date: null, thumbnail: null });
+      links.push({ href, title: "", date: null });
     }
   }
   if (links.length > 0) {
-    // Try to enrich with surrounding h5 title & date text
-    // The page HTML has: <h5>Title</h5><p>excerpt</p><p>Posted: date</p> near the link
     enrichCmsMakerLinks(links, html, baseUrl);
     return links;
   }
 
-  // ── Strategy 2: WordPress / common blog patterns
-  // <article ...><a href="...">...</a></article>
+  // ── Strategy 2: WordPress <article> blocks
   const articleBlocks = html.match(/<article[^>]*>[\s\S]*?<\/article>/gi) || [];
+  const base = new URL(baseUrl);
   for (const block of articleBlocks) {
     const href = firstMatch(/href=["']([^"']+)["']/, block);
     if (!href) continue;
     const abs = absoluteUrl(baseUrl, href);
-    if (seen.has(abs) || new URL(abs).hostname !== base.hostname) continue;
+    try { if (new URL(abs).hostname !== base.hostname) continue; } catch { continue; }
+    if (seen.has(abs)) continue;
     seen.add(abs);
     const title = firstMatch(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i, block);
     const dateRaw = firstMatch(/datetime=["']([^"']+)["']/, block)
       || firstMatch(/<time[^>]*>([\s\S]*?)<\/time>/i, block);
-    const img = firstMatch(/<img[^>]*src=["']([^"']+)["'][^>]*>/i, block);
     links.push({
       href: abs,
       title: title ? stripTags(title) : "",
       date: dateRaw,
-      thumbnail: img ? absoluteUrl(baseUrl, img) : null,
     });
   }
   if (links.length > 0) return links;
 
-  // ── Strategy 3: Generic — find links that look like article permalinks
+  // ── Strategy 3: Generic permalink pattern
+  const base2 = new URL(baseUrl);
   const genericPattern = /href=["']([^"'#?][^"']*(?:\/\d{4}\/|\/news\/|\/article\/|\/post\/|\/blog\/)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   while ((m = genericPattern.exec(html)) !== null) {
     const href = absoluteUrl(baseUrl, m[1]);
     const linkText = stripTags(m[2]);
-    if (seen.has(href) || new URL(href).hostname !== base.hostname) continue;
-    if (linkText.length < 10) continue;
+    try { if (new URL(href).hostname !== base2.hostname) continue; } catch { continue; }
+    if (seen.has(href) || linkText.length < 10) continue;
     seen.add(href);
-    links.push({ href, title: linkText, date: null, thumbnail: null });
+    links.push({ href, title: linkText, date: null });
   }
-
   return links;
 }
 
-/**
- * For CMS Maker sites (radiosailing.org.au), the index page lists articles as:
- *   <h5><a href="...">Title</a></h5>
- *   <p>Excerpt</p>
- *   <p>Posted: DD Mon YYYY HH:MM</p>
- * We parse those blocks to enrich our link list with titles & dates.
- */
 function enrichCmsMakerLinks(links: ArticleLink[], html: string, baseUrl: string) {
-  // Split on <h5> blocks
+  // The news index page has blocks like:
+  //   <h5><a href="...">Title</a></h5><p>excerpt</p><p>Posted: Mar 8, 2026 10:09</p>
   const blocks = html.split(/<h5>/i);
   for (const block of blocks) {
-    // Extract the href inside this block
     const hrefM = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/i.exec(block);
     if (!hrefM) continue;
     const href = absoluteUrl(baseUrl, hrefM[1].replace(/&amp;/g, "&"));
     const link = links.find(l => l.href === href);
     if (!link) continue;
 
-    // Title: text inside <a>...</a> within the h5
     const titleM = /<a[^>]*>([\s\S]*?)<\/a>/i.exec(block);
     if (titleM) link.title = stripTags(titleM[1]);
 
-    // Date: "Posted: DD Mon YYYY HH:MM" pattern
-    const dateM = /Posted:\s*([A-Za-z]+ \d{1,2},?\s*\d{4}[\s\d:]*)/i.exec(block)
-      || /Posted:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4}[\s\d:]*)/i.exec(block);
+    // "Posted: Mar 8, 2026 10:09"
+    const dateM = /Posted:\s*([A-Za-z]+ +\d{1,2},?\s*\d{4}(?:\s+\d{1,2}:\d{2})?)/i.exec(block)
+      || /Posted:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4}(?:\s+\d{1,2}:\d{2})?)/i.exec(block);
     if (dateM) link.date = dateM[1].trim();
   }
 }
 
-// ─── Individual article page scraper ────────────────────────────────────────
+// ─── HTTP helper ─────────────────────────────────────────────────────────────
 
 async function fetchHtml(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; AlfieScraper/1.0; +https://alfiepro.app)",
+        "User-Agent": "Mozilla/5.0 (compatible; AlfieScraper/1.0)",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-AU,en;q=0.9",
       },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) return null;
     return await res.text();
@@ -187,136 +201,159 @@ async function fetchHtml(url: string): Promise<string | null> {
   }
 }
 
-function extractArticleTitle(html: string): string {
-  // og:title first
+// ─── Article field extractors ─────────────────────────────────────────────────
+
+function extractTitle(html: string, hintTitle: string): string {
+  // CMS Made Simple: <h3 id="NewsPostDetailTitle">...</h3>
+  const byId = extractById(html, "NewsPostDetailTitle");
+  if (byId) { const t = stripTags(byId); if (t.length > 5) return t; }
+
+  // og:title
   const og = firstMatch(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i, html)
     || firstMatch(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i, html);
   if (og && og.length > 5) return og;
 
-  // CMS Maker: article title is in <h3> inside the content div
-  const h3 = firstMatch(/<h3[^>]*>([\s\S]*?)<\/h3>/i, html);
-  if (h3) { const t = stripTags(h3); if (t.length > 5) return t; }
-
-  const h1 = firstMatch(/<h1[^>]*>([\s\S]*?)<\/h1>/i, html);
-  if (h1) { const t = stripTags(h1); if (t.length > 5) return t; }
-
-  const h2 = firstMatch(/<h2[^>]*>([\s\S]*?)<\/h2>/i, html);
-  if (h2) { const t = stripTags(h2); if (t.length > 5) return t; }
-
-  // <title> tag fallback — strip site name
-  const title = firstMatch(/<title[^>]*>([\s\S]*?)<\/title>/i, html);
-  if (title) {
-    return title.split(/[|\-–—]/)[0].trim();
+  for (const tag of ["h1", "h2", "h3"]) {
+    const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i").exec(html);
+    if (m) { const t = stripTags(m[1]); if (t.length > 5) return t; }
   }
-  return "";
+
+  const title = firstMatch(/<title[^>]*>([\s\S]*?)<\/title>/i, html);
+  if (title) return title.split(/[|\-–—]/)[0].trim();
+
+  return hintTitle;
 }
 
-function extractPublishedDate(html: string, hintDate: string | null): string {
-  // og / schema dates
-  const patterns = [
-    /<meta[^>]*property=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
-    /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']article:published_time["']/i,
-    /<time[^>]*datetime=["']([^"']+)["'][^>]*>/i,
-    /<meta[^>]*name=["']date["'][^>]*content=["']([^"']+)["']/i,
-  ];
-  for (const p of patterns) {
-    const m = p.exec(html);
-    if (m) {
-      try { return new Date(m[1]).toISOString(); } catch { /* continue */ }
+function extractDate(html: string, hintDate: string | null): string {
+  // CMS Made Simple: <div id="NewsPostDetailDate">Mar  8, 2026<br></div>
+  const byId = extractById(html, "NewsPostDetailDate");
+  if (byId) {
+    const text = stripTags(byId).trim();
+    if (text) {
+      try { const d = new Date(text); if (!isNaN(d.getTime())) return d.toISOString(); } catch { /* continue */ }
     }
   }
 
-  // CMS Maker: "Posted: Mar 11, 2026 18:52" or similar
-  const postedM = /Posted:\s*([A-Za-z]+ \d{1,2},?\s*\d{4}(?:\s+\d{1,2}:\d{2})?)/i.exec(html)
-    || /Posted:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4}(?:\s+\d{1,2}:\d{2})?)/i.exec(html);
-  if (postedM) {
-    try { return new Date(postedM[1]).toISOString(); } catch { /* continue */ }
+  // og / schema meta tags
+  for (const p of [
+    /<meta[^>]*property=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
+    /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']article:published_time["']/i,
+    /<time[^>]*datetime=["']([^"']+)["'][^>]*>/i,
+  ]) {
+    const m = p.exec(html);
+    if (m) { try { return new Date(m[1]).toISOString(); } catch { /* continue */ } }
   }
 
-  // Use hint date from index page
   if (hintDate) {
-    try { return new Date(hintDate).toISOString(); } catch { /* continue */ }
+    try { const d = new Date(hintDate); if (!isNaN(d.getTime())) return d.toISOString(); } catch { /* continue */ }
   }
 
   return new Date().toISOString();
 }
 
+function extractAuthor(html: string, sourceName: string): string {
+  // CMS Made Simple: <div id="NewsPostDetailAuthor">Posted by: ARYA Publicity</div>
+  const byId = extractById(html, "NewsPostDetailAuthor");
+  if (byId) {
+    const text = stripTags(byId).replace(/^Posted\s+by:\s*/i, "").trim();
+    if (text.length > 1) return text;
+  }
+  // Fall back to the configured source name
+  return sourceName;
+}
+
 function extractCoverImage(html: string, baseUrl: string): string | null {
-  // og:image is most reliable
+  // og:image — most reliable and usually the best quality
   const og = firstMatch(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i, html)
     || firstMatch(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i, html);
   if (og && !og.startsWith("data:")) return absoluteUrl(baseUrl, og);
 
-  const twitter = firstMatch(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i, html);
-  if (twitter && !twitter.startsWith("data:")) return absoluteUrl(baseUrl, twitter);
+  // Article body image
+  const contentHtml = extractById(html, "NewsPostDetailContent") || extractById(html, "NewsPostDetailSummary") || "";
+  if (contentHtml) {
+    const imgSrc = firstMatch(/<img[^>]*src=["']([^"']+)["'][^>]*>/i, contentHtml);
+    if (imgSrc && !imgSrc.startsWith("data:")) {
+      if (!/logo|icon|avatar|pixel|sprite/i.test(imgSrc)) return absoluteUrl(baseUrl, imgSrc);
+    }
+  }
 
-  // Article body images — skip tiny icons, logos, tracking pixels
+  // Any article image fallback
   const imgSrcs = allMatches(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, html);
   for (const src of imgSrcs) {
     if (src.startsWith("data:")) continue;
-    if (/logo|icon|avatar|banner|button|pixel|tracking|sprite|rss|social|facebook|twitter/i.test(src)) continue;
+    if (/logo|icon|avatar|button|pixel|tracking|sprite|rss|social|facebook|twitter/i.test(src)) continue;
     const abs = absoluteUrl(baseUrl, src);
-    // Prefer .jpg/.jpeg/.png/.webp
     if (/\.(jpe?g|png|webp|jfif)/i.test(abs)) return abs;
   }
-
   return null;
 }
 
-function extractMainContent(html: string): string {
-  // CMS Maker: content sits inside div with class containing "cntnt01" or "cmsmasters_post_content"
-  const cmsContent = /<div[^>]*class=["'][^"']*cntnt01[^"']*["'][^>]*>([\s\S]*?)<\/div>/i.exec(html);
-  if (cmsContent && cmsContent[1].length > 100) return cmsContent[1];
+function extractContent(html: string, baseUrl: string): string {
+  // CMS Made Simple: combine summary + full content divs
+  const summary = extractById(html, "NewsPostDetailSummary") || "";
+  const body = extractById(html, "NewsPostDetailContent") || "";
+  let combined = (summary + "\n" + body).trim();
 
-  // WordPress: .entry-content, .post-content, .article-content
-  const wpContent = /<div[^>]*class=["'][^"']*(?:entry|post|article|single)[_-]content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i.exec(html);
-  if (wpContent && wpContent[1].length > 100) return wpContent[1];
-
-  // <article> tag
-  const articleTag = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(html);
-  if (articleTag && articleTag[1].length > 100) return articleTag[1];
-
-  // <main> tag
-  const mainTag = /<main[^>]*>([\s\S]*?)<\/main>/i.exec(html);
-  if (mainTag && mainTag[1].length > 100) return mainTag[1];
-
-  // Largest <div> block heuristic
-  let best = "";
-  const divPattern = /<div[^>]*>([\s\S]*?)<\/div>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = divPattern.exec(html)) !== null) {
-    const text = stripTags(m[1]);
-    if (text.length > best.length && text.length > 200) best = m[1];
+  if (combined.length > 100) {
+    // Make relative image/link URLs absolute
+    combined = combined
+      .replace(/src=["'](?!https?:\/\/|\/\/|data:)([^"']+)["']/gi, (_, p) => `src="${absoluteUrl(baseUrl, p)}"`)
+      .replace(/href=["'](?!https?:\/\/|\/\/|#|mailto:)([^"']+)["']/gi, (_, p) => `href="${absoluteUrl(baseUrl, p)}"`)
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .trim()
+      .substring(0, 80000);
+    return combined;
   }
-  return best || html;
+
+  // WordPress / other sites — common content wrappers
+  for (const selector of [
+    /<div[^>]*class=["'][^"']*(?:entry|post|article|single)[_-]content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<article[^>]*>([\s\S]*?)<\/article>/i,
+    /<main[^>]*>([\s\S]*?)<\/main>/i,
+  ]) {
+    const m = selector.exec(html);
+    if (m && stripTags(m[1]).length > 100) {
+      return m[1]
+        .replace(/src=["'](?!https?:\/\/|\/\/|data:)([^"']+)["']/gi, (_, p) => `src="${absoluteUrl(baseUrl, p)}"`)
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .trim()
+        .substring(0, 80000);
+    }
+  }
+
+  return html.substring(0, 80000);
 }
 
-async function scrapeArticlePage(url: string, hintTitle: string, hintDate: string | null): Promise<ScrapedArticle | null> {
+// ─── Per-article scraper ──────────────────────────────────────────────────────
+
+async function scrapeArticlePage(
+  url: string,
+  hintTitle: string,
+  hintDate: string | null,
+  sourceName: string,
+): Promise<ScrapedArticle | null> {
   const html = await fetchHtml(url);
   if (!html) return null;
 
-  const title = extractArticleTitle(html) || hintTitle;
+  const title = extractTitle(html, hintTitle);
   if (!title || title.length < 5) return null;
 
-  const publishedAt = extractPublishedDate(html, hintDate);
-  const coverImage = extractCoverImage(html, url);
-  const contentRaw = extractMainContent(html);
-  const plainText = stripTags(contentRaw);
+  const published_at = extractDate(html, hintDate);
+  const scraped_author = extractAuthor(html, sourceName);
+  const cover_image = extractCoverImage(html, url);
+  const contentHtml = extractContent(html, url);
+  const plainText = stripTags(contentHtml);
   if (plainText.length < 30) return null;
 
   const excerpt = plainText.substring(0, 400).replace(/\s+/g, " ").trim();
+  const content = contentHtml;
 
-  // Clean content HTML
-  const content = contentRaw
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .trim()
-    .substring(0, 60000);
-
-  return { title, content, excerpt, cover_image: coverImage, original_url: url, published_at: publishedAt };
+  return { title, content, excerpt, cover_image, published_at, scraped_author };
 }
 
-// ─── Main handler ────────────────────────────────────────────────────────────
+// ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -349,7 +386,6 @@ Deno.serve(async (req: Request) => {
     const results: Array<{ source: string; created: number; skipped: number; error?: string }> = [];
 
     for (const source of sources as ScrapeSource[]) {
-      // Insert run log
       const { data: logRow } = await supabase
         .from("news_scrape_logs")
         .insert({ source_id: source.id, status: "running" })
@@ -361,17 +397,18 @@ Deno.serve(async (req: Request) => {
       let articlesSkipped = 0;
 
       try {
-        // ── 1. Fetch & parse index page
+        // 1. Fetch index page and discover article links
         const indexHtml = await fetchHtml(source.url);
         if (!indexHtml) throw new Error("Failed to fetch index page");
 
         const articleLinks = detectArticleLinks(indexHtml, source.url);
-        // Deduplicate and cap at 50 per run
         const unique = [...new Map(articleLinks.map(l => [l.href, l])).values()].slice(0, 50);
 
-        if (unique.length === 0) throw new Error("No article links found on index page — the scraper may need a custom selector for this site");
+        if (unique.length === 0) {
+          throw new Error("No article links found on index page");
+        }
 
-        // ── 2. Determine publish targets
+        // 2. Determine publish targets
         const targets: Array<{ state_association_id?: string; national_association_id?: string }> = [];
         if (source.target_type === "national" && source.target_national_association_id) {
           targets.push({ national_association_id: source.target_national_association_id });
@@ -385,9 +422,8 @@ Deno.serve(async (req: Request) => {
           for (const s of stateRows ?? []) targets.push({ state_association_id: s.id });
         }
 
-        // ── 3. Scrape each article
+        // 3. Scrape each article page
         for (const link of unique) {
-          // Check global dedup (same URL, any target)
           const { data: existing } = await supabase
             .from("articles")
             .select("id")
@@ -395,7 +431,7 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
           if (existing) { articlesSkipped++; continue; }
 
-          const article = await scrapeArticlePage(link.href, link.title, link.date);
+          const article = await scrapeArticlePage(link.href, link.title, link.date, source.name);
           if (!article || article.title.length < 5) { articlesSkipped++; continue; }
 
           for (const target of targets) {
@@ -404,6 +440,7 @@ Deno.serve(async (req: Request) => {
               content: article.content,
               excerpt: article.excerpt,
               cover_image: article.cover_image,
+              scraped_author: article.scraped_author,
               status: "published",
               published_at: article.published_at,
               scraped_url: link.href,
@@ -413,11 +450,10 @@ Deno.serve(async (req: Request) => {
           }
           articlesCreated++;
 
-          // Polite delay between article fetches
           await new Promise(r => setTimeout(r, 800));
         }
 
-        // ── 4. Update log & source metadata
+        // 4. Update metadata
         if (logId) {
           await supabase.from("news_scrape_logs").update({
             completed_at: new Date().toISOString(),
