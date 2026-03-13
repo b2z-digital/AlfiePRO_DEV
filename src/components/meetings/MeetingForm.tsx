@@ -174,7 +174,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   onSuccess,
   onCancel
 }) => {
-  const { user } = useAuth();
+  const { user, currentClub, currentOrganization } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -260,7 +260,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
       fetchAgendaItems();
     }
-  }, [meeting, clubId, associationId, associationType]);
+  }, [meeting, clubId, associationId, associationType, currentClub?.clubId, currentOrganization?.id]);
 
   useEffect(() => {
     loadGoogleMaps(() => setMapsLoaded(true));
@@ -300,22 +300,32 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
   const checkGoogleIntegration = async () => {
     try {
-      const idColumn = clubId ? 'club_id'
-        : associationType === 'state' ? 'state_association_id'
+      const effectiveClubId = clubId || (!associationId ? currentClub?.clubId : undefined);
+      const effectiveAssociationId = associationId || currentOrganization?.id;
+      const effectiveAssociationType = associationType || currentOrganization?.type;
+
+      const idColumn = effectiveClubId ? 'club_id'
+        : effectiveAssociationType === 'state' ? 'state_association_id'
         : 'national_association_id';
-      const orgId = clubId || associationId;
+      const orgId = effectiveClubId || effectiveAssociationId;
 
       if (!orgId) return;
 
-      const { data, error } = await supabase
+      const { data: allIntegrations, error } = await supabase
         .from('integrations')
-        .select('id, credentials')
-        .eq(idColumn, orgId)
-        .eq('platform', 'google')
-        .eq('is_active', true)
-        .maybeSingle();
+        .select('id, platform, is_active, credentials')
+        .eq(idColumn, orgId);
 
-      if (!error && data?.credentials?.refresh_token) {
+      if (error) {
+        console.warn('checkGoogleIntegration error:', error.message);
+        return;
+      }
+
+      const googleIntegration = (allIntegrations || []).find(
+        i => i.platform === 'google' && i.is_active && i.credentials?.refresh_token
+      );
+
+      if (googleIntegration) {
         setHasGoogleIntegration(true);
       }
     } catch (err) {
@@ -324,7 +334,11 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   };
 
   const createGoogleMeet = async () => {
-    if ((!clubId && !associationId) || !formData.name || !formData.date) {
+    const effectiveClubId = clubId || (!associationId ? currentClub?.clubId : undefined);
+    const effectiveAssociationId = associationId || currentOrganization?.id;
+    const effectiveAssociationType = associationType || currentOrganization?.type;
+
+    if ((!effectiveClubId && !effectiveAssociationId) || !formData.name || !formData.date) {
       setError('Please fill in meeting name and date first');
       return;
     }
@@ -333,11 +347,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     setError(null);
 
     try {
-      // Combine date and time into ISO format
       const startDateTime = new Date(`${formData.date}T${formData.start_time}`).toISOString();
       const endDateTime = new Date(`${formData.date}T${formData.end_time}`).toISOString();
 
-      // Get attendee emails
       const attendeeEmails = members
         .filter(m => m.email)
         .map(m => m.email)
@@ -345,9 +357,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
       const { data, error } = await supabase.functions.invoke('create-google-meet', {
         body: {
-          clubId,
-          associationId,
-          associationType,
+          clubId: effectiveClubId,
+          associationId: effectiveAssociationId,
+          associationType: effectiveAssociationType,
           meetingName: formData.name,
           meetingDescription: formData.description,
           startDateTime,
