@@ -130,6 +130,7 @@ const ArticleDetailPage: React.FC = () => {
               src={article.cover_image || DEFAULT_COVER_IMAGE}
               alt={article.title}
               className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-transparent"></div>
 

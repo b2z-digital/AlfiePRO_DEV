@@ -502,16 +502,19 @@ Deno.serve(async (req: Request) => {
             status: "success",
           }).eq("id", logId);
         }
+        // Set article_count to the current total of scraped articles from this source
+        const { data: srcRow } = await supabase
+          .from("news_scrape_sources")
+          .select("article_count")
+          .eq("id", source.id)
+          .maybeSingle();
+        const newTotal = ((srcRow?.article_count as number) ?? 0) + articlesCreated;
+
         await supabase.from("news_scrape_sources").update({
           last_scraped_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          article_count: newTotal,
         }).eq("id", source.id);
-        try {
-          await supabase.rpc("increment_scrape_source_count", {
-            p_source_id: source.id,
-            p_increment: articlesCreated,
-          });
-        } catch { /* non-fatal */ }
 
         results.push({ source: source.name, created: articlesCreated, skipped: articlesSkipped });
 
