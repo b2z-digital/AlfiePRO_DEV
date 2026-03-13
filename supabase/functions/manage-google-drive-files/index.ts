@@ -100,8 +100,8 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'create_folder') {
-      const { organizationId, organizationType, folderName } = body;
-      
+      const { organizationId, organizationType, folderName, parentFolderId } = body;
+
       if (!folderName) {
         throw new Error('Folder name is required');
       }
@@ -109,7 +109,9 @@ Deno.serve(async (req: Request) => {
       const accessToken = await getAccessToken(organizationId, organizationType);
       const rootFolderId = await getRootFolderId(organizationId, organizationType);
 
-      if (!rootFolderId) {
+      const targetParentId = parentFolderId || rootFolderId;
+
+      if (!targetParentId) {
         throw new Error('Google Drive folder not configured');
       }
 
@@ -124,7 +126,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder',
-            parents: [rootFolderId]
+            parents: [targetParentId]
           }),
         }
       );
