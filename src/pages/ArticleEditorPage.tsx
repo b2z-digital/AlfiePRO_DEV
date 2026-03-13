@@ -66,22 +66,13 @@ const ArticleEditorPage: React.FC = () => {
         }
 
         // Fetch community groups for publishing
-        // For club users: fetch own club group
         // For association users: fetch all clubs' groups under that association
+        // For club users: fetch own club group
+        // NOTE: check association FIRST — a state/national admin may also have a currentClub set
         const orgId = currentOrganization?.id;
         const clubId = currentClub?.clubId;
 
-        if (clubId) {
-          const { data: groups } = await supabase
-            .from('social_groups')
-            .select('id, name')
-            .eq('club_id', clubId)
-            .order('name');
-          if (groups) {
-            setAvailableCommunityGroups(groups);
-            if (groups.length > 0) setCommunityGroupIds([groups[0].id]);
-          }
-        } else if (orgId && currentOrganization?.type) {
+        if (orgId && currentOrganization?.type) {
           const assocColumn = currentOrganization.type === 'state' ? 'state_association_id' : 'national_association_id';
 
           // Get all clubs under this association
@@ -105,6 +96,16 @@ const ArticleEditorPage: React.FC = () => {
                 groups.map(g => ({ id: g.id, name: g.name, club_name: clubMap[g.club_id] }))
               );
             }
+          }
+        } else if (clubId) {
+          const { data: groups } = await supabase
+            .from('social_groups')
+            .select('id, name')
+            .eq('club_id', clubId)
+            .order('name');
+          if (groups) {
+            setAvailableCommunityGroups(groups);
+            if (groups.length > 0) setCommunityGroupIds([groups[0].id]);
           }
         }
 
