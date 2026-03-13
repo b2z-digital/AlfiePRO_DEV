@@ -58,8 +58,8 @@ Deno.serve(async (req: Request) => {
       attendeeEmails
     } = await req.json();
 
-    if ((!clubId && !associationId) || !meetingName || !startDateTime || !endDateTime) {
-      throw new Error('Missing required parameters');
+    if (!meetingName || !startDateTime || !endDateTime) {
+      throw new Error('Missing required parameters: meetingName, startDateTime, endDateTime');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -96,8 +96,24 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (!integration) {
+      const { data: fallbackData } = await supabase
+        .from('integrations')
+        .select('id, credentials')
+        .eq('platform', 'google')
+        .eq('is_active', true)
+        .not('credentials', 'is', null)
+        .limit(10);
+
+      if (fallbackData) {
+        integration = fallbackData.find(
+          (i: any) => i.credentials?.refresh_token
+        ) || null;
+      }
+    }
+
     if (!integration || !integration.credentials) {
-      throw new Error('Google integration not found. Please connect Google Calendar first.');
+      throw new Error('Google integration not found. Please connect Google Calendar in your club or association settings first.');
     }
 
     const creds = integration.credentials;
