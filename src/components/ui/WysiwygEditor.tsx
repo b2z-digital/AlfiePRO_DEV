@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import 'react-quill/dist/quill.bubble.css';
@@ -12,6 +12,7 @@ interface WysiwygEditorProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  onImageUpload?: (file: File) => Promise<string>;
 }
 
 export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
@@ -22,41 +23,84 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   minHeight,
   placeholder = 'Start typing...',
   className = '',
-  disabled = false
+  disabled = false,
+  onImageUpload
 }) => {
   const effectiveHeight = height || 300;
-  const modules = useMemo(() => ({
-    toolbar: [
+  const quillRef = useRef<ReactQuill>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageInsert = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onImageUpload) return;
+
+    try {
+      const url = await onImageUpload(file);
+      const quill = quillRef.current?.getEditor();
+      if (quill) {
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'image', url);
+        quill.setSelection(range.index + 1, 0);
+      }
+    } catch (err) {
+      console.error('Image upload failed:', err);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const modules = useMemo(() => {
+    const toolbarOptions = [
       [{ 'header': [1, 2, 3, false] }],
       ['bold', 'italic', 'underline', 'strike'],
       [{ 'list': 'ordered'}, { 'list': 'bullet' }],
       [{ 'indent': '-1'}, { 'indent': '+1' }],
       ['link'],
+      ...(onImageUpload ? [['image']] : []),
       ['clean']
-    ],
-    keyboard: {
-      bindings: {
-        linebreak: {
-          key: 13,
-          shiftKey: true,
-          handler: function(range: any) {
-            this.quill.insertText(range.index, '\n', 'user');
-            this.quill.setSelection(range.index + 1, 'silent');
-            return false;
+    ];
+
+    const mod: any = {
+      toolbar: {
+        container: toolbarOptions,
+        ...(onImageUpload ? {
+          handlers: {
+            image: handleImageInsert
+          }
+        } : {})
+      },
+      keyboard: {
+        bindings: {
+          linebreak: {
+            key: 13,
+            shiftKey: true,
+            handler: function(range: any) {
+              this.quill.insertText(range.index, '\n', 'user');
+              this.quill.setSelection(range.index + 1, 'silent');
+              return false;
+            }
           }
         }
       }
-    }
-  }), []);
+    };
+
+    return mod;
+  }, [onImageUpload]);
 
   const formats = [
     'header',
     'bold', 'italic', 'underline', 'strike',
     'list', 'bullet', 'indent',
-    'link'
+    'link',
+    'image'
   ];
 
-  // Add custom CSS to preserve whitespace and formatting
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -89,6 +133,13 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
         display: block;
         content: "";
         margin-top: 0;
+      }
+      .ql-editor img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 0.5rem;
+        margin: 1em 0;
+        display: block;
       }
 
       /* Article content styles */
@@ -123,6 +174,13 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
         content: "";
         margin-top: 0;
       }
+      .article-content img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 0.5rem;
+        margin: 1em 0;
+        display: block;
+      }
     `;
     document.head.appendChild(style);
 
@@ -133,6 +191,13 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
 
   return (
     <div className={`wysiwyg-editor ${className}`}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
       <style jsx>{`
         .wysiwyg-editor .ql-container {
           font-size: 14px;
@@ -197,8 +262,17 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
         .wysiwyg-editor .ql-editor ul li + li {
           margin-top: 0.2em;
         }
+
+        .wysiwyg-editor .ql-editor img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 0.5rem;
+          margin: 0.5em 0;
+          display: block;
+        }
       `}</style>
       <ReactQuill
+        ref={quillRef}
         theme="snow"
         value={value}
         onChange={onChange}

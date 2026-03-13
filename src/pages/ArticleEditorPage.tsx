@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, X, Tag, Plus, Calendar, AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, AlignLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft, Save, X, Tag, Plus, Calendar, AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, AlignLeft, BookOpen, Users, Globe, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { WysiwygEditor } from '../components/ui/WysiwygEditor';
 import { getArticleById, createArticle, updateArticle, Article } from '../utils/articleStorage';
@@ -42,6 +42,12 @@ const ArticleEditorPage: React.FC = () => {
   const [selectedYachtClasses, setSelectedYachtClasses] = useState<string[]>(['generic']);
   const [availableYachtClasses, setAvailableYachtClasses] = useState<Array<{ id: string; name: string }>>([]);
 
+  // Community publishing
+  const [publishToCommunity, setPublishToCommunity] = useState(false);
+  const [communityGroupIds, setCommunityGroupIds] = useState<string[]>([]);
+  const [availableCommunityGroups, setAvailableCommunityGroups] = useState<Array<{ id: string; name: string; club_name?: string }>>([]);
+  const [uploadingInlineImage, setUploadingInlineImage] = useState(false);
+
   useEffect(() => {
     const fetchArticle = async () => {
       try {
@@ -57,6 +63,49 @@ const ArticleEditorPage: React.FC = () => {
 
         if (yachtClasses) {
           setAvailableYachtClasses(yachtClasses);
+        }
+
+        // Fetch community groups for publishing
+        // For club users: fetch own club group
+        // For association users: fetch all clubs' groups under that association
+        const orgId = currentOrganization?.id;
+        const clubId = currentClub?.clubId;
+
+        if (clubId) {
+          const { data: groups } = await supabase
+            .from('social_groups')
+            .select('id, name')
+            .eq('club_id', clubId)
+            .order('name');
+          if (groups) {
+            setAvailableCommunityGroups(groups);
+            if (groups.length > 0) setCommunityGroupIds([groups[0].id]);
+          }
+        } else if (orgId && currentOrganization?.type) {
+          const assocColumn = currentOrganization.type === 'state' ? 'state_association_id' : 'national_association_id';
+
+          // Get all clubs under this association
+          const { data: clubs } = await supabase
+            .from('clubs')
+            .select('id, name')
+            .eq(assocColumn, orgId)
+            .order('name');
+
+          if (clubs && clubs.length > 0) {
+            const clubIds = clubs.map(c => c.id);
+            const { data: groups } = await supabase
+              .from('social_groups')
+              .select('id, name, club_id')
+              .in('club_id', clubIds)
+              .order('name');
+
+            if (groups) {
+              const clubMap = Object.fromEntries(clubs.map(c => [c.id, c.name]));
+              setAvailableCommunityGroups(
+                groups.map(g => ({ id: g.id, name: g.name, club_name: clubMap[g.club_id] }))
+              );
+            }
+          }
         }
 
         // Fetch event name if event context exists
@@ -109,7 +158,7 @@ const ArticleEditorPage: React.FC = () => {
     };
 
     fetchArticle();
-  }, [id, eventId]);
+  }, [id, eventId, currentClub?.clubId, currentOrganization?.id, currentOrganization?.type]);
 
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
@@ -219,6 +268,39 @@ const ArticleEditorPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  const handleInlineImageUpload = async (file: File): Promise<string> => {
+    const organizationId = currentOrganization?.id || currentClub?.clubId;
+    if (!organizationId) throw new Error('No organization selected');
+
+    setUploadingInlineImage(true);
+    try {
+      const { compressImage } = await import('../utils/imageCompression');
+      const compressed = await compressImage(file, 'cover');
+      const fileExt = compressed.name.split('.').pop();
+      const fileName = `${organizationId}/${uuidv4()}-inline-${Date.now()}.${fileExt}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('article-images')
+        .upload(fileName, compressed, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('article-images')
+        .getPublicUrl(data.path);
+
+      return publicUrl;
+    } finally {
+      setUploadingInlineImage(false);
+    }
+  };
+
+  const handleToggleCommunityGroup = (groupId: string) => {
+    setCommunityGroupIds(prev =>
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+    );
+  };
+
   const handleSave = async (publish: boolean = false) => {
     try {
       const isAssociation = !!currentOrganization && !currentClub;
@@ -292,6 +374,35 @@ const ArticleEditorPage: React.FC = () => {
           if (classError) {
             console.error('Error saving yacht class associations:', classError);
           }
+        }
+      }
+
+      // Publish to community groups if requested
+      if (publish && publishToCommunity && communityGroupIds.length > 0 && user?.id) {
+        const plainText = content.replace(/<[^>]*>/g, '').substring(0, 300);
+        const postContent = `📰 **${title.trim()}**\n\n${plainText}${plainText.length >= 300 ? '...' : ''}`;
+
+        const posts = communityGroupIds.map(groupId => ({
+          author_id: user.id,
+          club_id: currentClub?.clubId || null,
+          group_id: groupId,
+          content: postContent,
+          content_type: 'link',
+          privacy: 'group',
+          link_url: `/news`,
+          link_title: title.trim(),
+          link_description: excerpt.trim() || plainText.substring(0, 150),
+          link_image_url: coverImage || DEFAULT_COVER_IMAGE,
+          is_pinned: false,
+          is_moderated: false,
+        }));
+
+        const { error: postError } = await supabase
+          .from('social_posts')
+          .insert(posts);
+
+        if (postError) {
+          console.error('Error posting to community:', postError);
         }
       }
 
@@ -461,6 +572,12 @@ const ArticleEditorPage: React.FC = () => {
                     <p className="text-sm text-slate-400 mt-0.5">Write your article using the rich text editor</p>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-slate-400">
+                    {uploadingInlineImage && (
+                      <div className="flex items-center gap-1.5 text-blue-400">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-400" />
+                        <span>Uploading image...</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <FileText size={14} />
                       <span>{wordCount} words</span>
@@ -478,6 +595,7 @@ const ArticleEditorPage: React.FC = () => {
                     darkMode={true}
                     height={600}
                     placeholder="Start writing your article content here..."
+                    onImageUpload={handleInlineImageUpload}
                   />
                 </div>
               </div>
@@ -722,6 +840,68 @@ const ArticleEditorPage: React.FC = () => {
                   {excerpt.length > 0 ? `${excerpt.length} characters` : 'Auto-generated if left empty'}
                 </p>
               </div>
+
+              {availableCommunityGroups.length > 0 && (
+                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6 transition-all hover:border-slate-600/50">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500/20 to-green-500/20 border border-teal-500/20">
+                      <Users size={20} className="text-teal-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h2 className="text-lg font-semibold text-white">Publish to Community</h2>
+                      <p className="text-xs text-slate-400">Share this article as a post in club groups</p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-3 cursor-pointer mb-4">
+                    <div
+                      onClick={() => setPublishToCommunity(p => !p)}
+                      className={`relative w-11 h-6 rounded-full transition-colors ${publishToCommunity ? 'bg-teal-500' : 'bg-slate-600'}`}
+                    >
+                      <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${publishToCommunity ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </div>
+                    <span className="text-sm text-slate-300">
+                      {publishToCommunity ? 'Will post to selected groups on publish' : 'Off — not posting to community'}
+                    </span>
+                  </label>
+
+                  {publishToCommunity && (
+                    <div className="space-y-2">
+                      {availableCommunityGroups.length > 1 && (
+                        <p className="text-xs text-slate-400 mb-2">Select which groups to post to:</p>
+                      )}
+                      {availableCommunityGroups.map(group => (
+                        <label
+                          key={group.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                            communityGroupIds.includes(group.id)
+                              ? 'border-teal-500/50 bg-teal-500/10'
+                              : 'border-slate-700/50 bg-slate-700/20 hover:border-slate-600'
+                          }`}
+                          onClick={() => handleToggleCommunityGroup(group.id)}
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                            communityGroupIds.includes(group.id)
+                              ? 'bg-teal-500 border-teal-500'
+                              : 'border-slate-500'
+                          }`}>
+                            {communityGroupIds.includes(group.id) && <Check size={10} className="text-white" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{group.name}</div>
+                            {group.club_name && (
+                              <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Building2 size={10} />
+                                {group.club_name}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
