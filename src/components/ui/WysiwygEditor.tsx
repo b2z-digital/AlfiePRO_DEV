@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -14,7 +14,7 @@ interface WysiwygEditorProps {
   onImageUpload?: (file: File) => Promise<string>;
 }
 
-let editorCounter = 0;
+let _counter = 0;
 
 export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   value,
@@ -27,21 +27,21 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   disabled = false,
   onImageUpload
 }) => {
-  const instanceId = useRef(`wysiwyg-${++editorCounter}`);
+  // Stable ID — created once per component mount, never changes
+  const id = useRef(`wysiwyg-${_counter++}`).current;
   const effectiveHeight = height || 300;
   const quillRef = useRef<ReactQuill>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageInsert = () => {
-    fileInputRef.current?.click();
-  };
+  // Keep a ref to the latest onImageUpload so the stable handler can call it
+  const onImageUploadRef = useRef(onImageUpload);
+  onImageUploadRef.current = onImageUpload;
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !onImageUpload) return;
-
+    if (!file || !onImageUploadRef.current) return;
     try {
-      const url = await onImageUpload(file);
+      const url = await onImageUploadRef.current(file);
       const quill = quillRef.current?.getEditor();
       if (quill) {
         const range = quill.getSelection(true);
@@ -51,72 +51,72 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
     } catch (err) {
       console.error('Image upload failed:', err);
     } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  };
+  }, []);
 
+  const handleImageInsert = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  // modules must be fully stable — never recreated after mount
+  const hasImageUpload = !!onImageUpload;
   const modules = useMemo(() => {
     const toolbarOptions = [
-      [{ 'header': [1, 2, 3, false] }],
+      [{ header: [1, 2, 3, false] }],
       ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'indent': '-1'}, { 'indent': '+1' }],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      [{ indent: '-1' }, { indent: '+1' }],
       ['link'],
-      ...(onImageUpload ? [['image']] : []),
-      ['clean']
+      ...(hasImageUpload ? [['image']] : []),
+      ['clean'],
     ];
 
-    const mod: any = {
+    return {
       toolbar: {
         container: toolbarOptions,
-        ...(onImageUpload ? {
-          handlers: {
-            image: handleImageInsert
-          }
-        } : {})
+        ...(hasImageUpload ? { handlers: { image: handleImageInsert } } : {}),
       },
       keyboard: {
         bindings: {
           linebreak: {
             key: 13,
             shiftKey: true,
-            handler: function(range: any) {
+            handler(this: any, range: any) {
               this.quill.insertText(range.index, '\n', 'user');
               this.quill.setSelection(range.index + 1, 'silent');
               return false;
-            }
-          }
-        }
-      }
+            },
+          },
+        },
+      },
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — modules must never change after mount
 
-    return mod;
-  }, [onImageUpload]);
-
-  const formats = [
+  const formats = useMemo(() => [
     'header',
     'bold', 'italic', 'underline', 'strike',
     'list', 'bullet', 'indent',
     'link',
-    'image'
-  ];
+    'image',
+  ], []);
 
-  const id = instanceId.current;
-  const containerHeight = minHeight ? 'auto' : `${effectiveHeight}px`;
-  const editorMinHeight = minHeight ? `calc(${minHeight} - 42px)` : `${effectiveHeight - 42}px`;
-  const toolbarBg = darkMode ? 'rgba(51, 65, 85, 0.6)' : '#f9fafb';
-  const containerBg = darkMode ? 'rgba(30, 41, 59, 0.6)' : '#ffffff';
-  const borderColor = darkMode ? 'rgba(51, 65, 85, 0.5)' : '#e5e7eb';
-  const textColor = darkMode ? '#ffffff' : '#1e293b';
-  const placeholderColor = darkMode ? '#64748b' : '#9ca3af';
-  const iconColor = darkMode ? '#94a3b8' : '#64748b';
-  const pickerColor = darkMode ? '#e2e8f0' : '#1e293b';
-  const pickerOptionsBg = darkMode ? 'rgba(30, 41, 59, 0.95)' : '#ffffff';
+  const editorMinHeight = minHeight
+    ? `calc(${minHeight} - 42px)`
+    : `${effectiveHeight - 42}px`;
+
+  const toolbarBg     = darkMode ? 'rgba(51,65,85,0.6)'   : '#f9fafb';
+  const containerBg   = darkMode ? 'rgba(30,41,59,0.6)'   : '#ffffff';
+  const borderColor   = darkMode ? 'rgba(51,65,85,0.5)'   : '#e5e7eb';
+  const textColor     = darkMode ? '#ffffff'              : '#1e293b';
+  const phColor       = darkMode ? '#64748b'              : '#9ca3af';
+  const iconColor     = darkMode ? '#94a3b8'              : '#64748b';
+  const pickerColor   = darkMode ? '#e2e8f0'              : '#1e293b';
+  const pickerOptsBg  = darkMode ? 'rgba(30,41,59,0.95)'  : '#ffffff';
 
   return (
-    <div className={`${id} ${className}`} style={{ minHeight: containerHeight }}>
+    <div className={`${id} ${className}`}>
       <input
         ref={fileInputRef}
         type="file"
@@ -144,61 +144,37 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
           color: ${textColor};
           font-size: 16px;
           line-height: 1.6;
-          white-space: pre-wrap;
         }
         .${id} .ql-editor.ql-blank::before {
-          color: ${placeholderColor};
+          color: ${phColor};
           font-style: normal;
         }
-        .${id} .ql-stroke {
-          stroke: ${iconColor};
-        }
-        .${id} .ql-fill {
-          fill: ${iconColor};
-        }
-        .${id} .ql-picker {
-          color: ${pickerColor};
-        }
+        .${id} .ql-stroke { stroke: ${iconColor}; }
+        .${id} .ql-fill   { fill:   ${iconColor}; }
+        .${id} .ql-picker  { color: ${pickerColor}; }
         .${id} .ql-picker-options {
-          background-color: ${pickerOptionsBg};
+          background-color: ${pickerOptsBg};
           border-color: ${borderColor};
         }
-        .${id} .ql-editor p {
-          margin-bottom: 0.75em;
-        }
+        .${id} .ql-editor p            { margin-bottom: 0.75em; }
         .${id} .ql-editor h1,
         .${id} .ql-editor h2,
-        .${id} .ql-editor h3 {
-          margin-top: 1.5em;
-          margin-bottom: 0.5em;
-        }
+        .${id} .ql-editor h3           { margin-top: 1.5em; margin-bottom: 0.5em; }
         .${id} .ql-editor ul,
-        .${id} .ql-editor ol {
-          margin-bottom: 1em;
-          padding-left: 1.5em;
-        }
-        .${id} .ql-editor li {
-          line-height: 1.5;
-        }
-        .${id} .ql-editor a {
-          color: #3b82f6;
-          text-decoration: underline;
-        }
-        .${id} .ql-editor img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 0.5rem;
-          margin: 0.75em 0;
-          display: block;
-        }
+        .${id} .ql-editor ol           { margin-bottom: 1em; padding-left: 1.5em; }
+        .${id} .ql-editor li           { line-height: 1.5; }
+        .${id} .ql-editor a            { color: #3b82f6; text-decoration: underline; }
+        .${id} .ql-editor img          { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 0.75em 0; display: block; }
 
-        /* Article content display styles */
-        .article-content p { margin-bottom: 1em; white-space: pre-wrap; }
-        .article-content h1, .article-content h2, .article-content h3 { margin-top: 1.5em; margin-bottom: 0.5em; }
-        .article-content ul, .article-content ol { margin-bottom: 1em; padding-left: 1.5em; }
-        .article-content li { line-height: 1.5; }
-        .article-content a { color: #3b82f6; text-decoration: underline; }
-        .article-content img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1em 0; display: block; }
+        .article-content p             { margin-bottom: 1em; white-space: pre-wrap; }
+        .article-content h1,
+        .article-content h2,
+        .article-content h3            { margin-top: 1.5em; margin-bottom: 0.5em; }
+        .article-content ul,
+        .article-content ol            { margin-bottom: 1em; padding-left: 1.5em; }
+        .article-content li            { line-height: 1.5; }
+        .article-content a             { color: #3b82f6; text-decoration: underline; }
+        .article-content img           { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1em 0; display: block; }
       `}</style>
       <ReactQuill
         ref={quillRef}
