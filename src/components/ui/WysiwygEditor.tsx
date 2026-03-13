@@ -109,6 +109,19 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Restore data-img-caption on parent <p> after each value change ──────
+  useEffect(() => {
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
+    const imgs = quill.root.querySelectorAll<HTMLImageElement>('img[data-caption]');
+    imgs.forEach(img => {
+      const cap = img.getAttribute('data-caption');
+      if (cap && img.parentElement) {
+        img.parentElement.setAttribute('data-img-caption', cap);
+      }
+    });
+  }, [value]);
+
   // ── Click outside → deselect (skip if inside toolbar or caption modal) ───
   useEffect(() => {
     const onDocMouseDown = (e: MouseEvent) => {
@@ -153,46 +166,33 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
   };
 
   // ── Confirm caption ───────────────────────────────────────────────────────
+  // Strategy: store caption only as data-caption/alt on the img element.
+  // Never restructure the DOM — Quill will strip any unknown wrapper elements.
+  // The caption is rendered visually via a CSS ::after trick on the img wrapper.
   const confirmCaption = () => {
     const img = selectedImgRef.current;
     if (!img) { setCaptionModal({ open: false, value: '' }); return; }
     const caption = captionModal.value.trim();
 
     try {
+      const parentP = img.parentElement;
       if (caption === '') {
         img.removeAttribute('data-caption');
         img.removeAttribute('alt');
-        // Unwrap from figure if present
-        const fig = img.closest('figure');
-        if (fig) {
-          fig.querySelector('figcaption')?.remove();
-          fig.parentNode?.insertBefore(img, fig);
-          fig.parentNode?.removeChild(fig);
-        }
+        img.removeAttribute('title');
+        parentP?.removeAttribute('data-img-caption');
       } else {
         img.setAttribute('data-caption', caption);
         img.setAttribute('alt', caption);
-
-        // Find or create wrapping figure
-        let fig = img.closest('figure') as HTMLElement | null;
-        if (!fig) {
-          fig = document.createElement('figure');
-          fig.style.cssText = 'margin:1em 0;display:block;';
-          img.parentNode?.insertBefore(fig, img);
-          fig.appendChild(img);
-        }
-
-        // Find or create figcaption
-        let cap = fig.querySelector('figcaption') as HTMLElement | null;
-        if (!cap) {
-          cap = document.createElement('figcaption');
-          cap.style.cssText =
-            'text-align:center;font-size:0.85em;color:#94a3b8;margin-top:0.4em;font-style:italic;';
-          fig.appendChild(cap);
-        }
-        cap.textContent = caption;
+        img.setAttribute('title', caption);
+        // Propagate to parent <p> so CSS ::after can read it via attr()
+        if (parentP) parentP.setAttribute('data-img-caption', caption);
       }
-
+      // Sync the updated HTML back to the parent state
+      const quill = quillRef.current?.getEditor();
+      if (quill) {
+        onChange(quill.root.innerHTML);
+      }
       refreshToolbarPos(img);
     } catch (err) {
       console.error('Caption error:', err);
@@ -443,13 +443,33 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
           max-width: 100%;
           height: auto;
           border-radius: 0.5rem;
-          margin: 0.75em 0;
+          margin: 0.75em auto 0;
           display: block;
           cursor: pointer;
         }
         .${id} .ql-editor img:hover    { outline: 2px solid #3b82f6; outline-offset: 2px; }
         .${id} .ql-editor figure       { margin: 1em 0; display: block; }
         .${id} .ql-editor figcaption   { text-align: center; font-size: 0.85em; color: #94a3b8; margin-top: 0.4em; font-style: italic; }
+
+        /* Caption rendered via CSS using data-caption attribute — no DOM restructuring */
+        .${id} .ql-editor p:has(img[data-caption])::after,
+        .${id} .ql-editor p:has(img[data-caption]) ~ p:empty { display: none; }
+        .${id} .ql-editor img[data-caption] { margin-bottom: 0; }
+        .${id} .ql-editor img[data-caption] + br { display: none; }
+        .${id} .ql-editor p:has(img[data-caption]) {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .${id} .ql-editor p:has(img[data-caption])::after {
+          content: attr(data-img-caption);
+          display: block;
+          text-align: center;
+          font-size: 0.85em;
+          color: #94a3b8;
+          margin-top: 0.4em;
+          font-style: italic;
+        }
 
         .article-content p             { margin-bottom: 1em; white-space: pre-wrap; }
         .article-content h1,
@@ -459,7 +479,9 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
         .article-content ol            { margin-bottom: 1em; padding-left: 1.5em; }
         .article-content li            { line-height: 1.5; }
         .article-content a             { color: #3b82f6; text-decoration: underline; }
-        .article-content img           { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1em 0; display: block; }
+        .article-content img           { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 1em auto 0; display: block; }
+        .article-content p:has(img[data-caption]) { display: flex; flex-direction: column; align-items: center; }
+        .article-content img[data-caption]         { margin-bottom: 0; }
         .article-content figure        { margin: 1em 0; }
         .article-content figcaption    { text-align: center; font-size: 0.85em; color: #94a3b8; margin-top: 0.4em; font-style: italic; }
       `}</style>
