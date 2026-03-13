@@ -7,8 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// ─── Boat class keyword map ───────────────────────────────────────────────────
-// Maps common phrases found in source pages to normalised AlfiePRO class names
+const MAX_EVENTS_PER_RUN = 50;
+const FETCH_TIMEOUT_MS = 20000;
+
 const BOAT_CLASS_KEYWORDS: Record<string, string> = {
   "international ten rater": "10R",
   "ten rater": "10R",
@@ -43,7 +44,26 @@ function detectBoatClass(text: string): string | null {
   return null;
 }
 
-// ─── HTML Parsing helpers ─────────────────────────────────────────────────────
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#\d+;/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractAllMatches(html: string, pattern: RegExp): RegExpMatchArray[] {
+  const results: RegExpMatchArray[] = [];
+  let m: RegExpMatchArray | null;
+  const flags = pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g";
+  const re = new RegExp(pattern.source, flags);
+  while ((m = re.exec(html)) !== null) results.push(m);
+  return results;
+}
 
 function extractText(html: string, tag: string): string {
   const re = new RegExp(`<${tag}[^>]*>(.*?)</${tag}>`, "is");
@@ -51,16 +71,86 @@ function extractText(html: string, tag: string): string {
   return m ? m[1].replace(/<[^>]+>/g, "").trim() : "";
 }
 
-function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#\d+;/g, "").trim();
+// ─── Parse list page: extract event links + metadata from the list HTML ────────
+
+interface DiscoveredEvent {
+  externalEventId: string;
+  url: string;
+  name: string;
+  eventDate: string | null;
+  venue: string | null;
+  boatClassRaw: string | null;
+  boatClassMapped: string | null;
 }
 
-function extractAllMatches(html: string, pattern: RegExp): RegExpMatchArray[] {
-  const results: RegExpMatchArray[] = [];
-  let m: RegExpMatchArray | null;
-  const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
-  while ((m = re.exec(html)) !== null) results.push(m);
-  return results;
+function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
+  const events: DiscoveredEvent[] = [];
+  const seen = new Set<string>();
+  const urlObj = new URL(baseUrl);
+  const origin = urlObj.origin;
+
+  const linkMatches = extractAllMatches(html, /<a[^>]+href=["']([^"'#][^"']*?)["'][^>]*>([\s\S]*?)<\/a>/i);
+
+  for (const m of linkMatches) {
+    // Decode HTML entities in href (e.g. &amp; -> &)
+    const href = m[1].trim()
+      .replace(/&amp;/g, "&")
+      .replace(/&#38;/g, "&")
+      .replace(/&quot;/g, '"');
+    const rawText = stripTags(m[2]);
+    if (!rawText || rawText.length < 3) continue;
+
+    let fullUrl = href;
+    if (href.startsWith("//")) fullUrl = urlObj.protocol + href;
+    else if (href.startsWith("/")) fullUrl = origin + href;
+    else if (!href.startsWith("http")) fullUrl = origin + "/" + href;
+
+    // Must be on the same origin
+    try {
+      const u = new URL(fullUrl);
+      if (u.origin !== origin) continue;
+    } catch {
+      continue;
+    }
+
+    // Require a recognisable event ID in the URL
+    const eventIdMatch =
+      fullUrl.match(/[?&](?:eventid|event_id|eid|id)=(\w+)/i) ||
+      fullUrl.match(/\/event[s]?\/(\w+)/i) ||
+      fullUrl.match(/\/results?\/(\w+)/i) ||
+      fullUrl.match(/arcade=results[^&]*&.*?eventid=(\w+)/i);
+
+    if (!eventIdMatch) continue;
+
+    const externalEventId = eventIdMatch[1];
+    if (seen.has(externalEventId)) continue;
+    seen.add(externalEventId);
+
+    // Try to extract date / boat class from link text or surrounding context
+    const boatClassMapped = detectBoatClass(rawText);
+    const dateMatch = rawText.match(/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/) ||
+                      rawText.match(/\d{1,2}\s+\w{3,9}\s+\d{4}/);
+
+    let eventDate: string | null = null;
+    if (dateMatch) {
+      const d = new Date(dateMatch[0]);
+      if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
+    }
+
+    events.push({
+      externalEventId,
+      url: fullUrl,
+      name: rawText.slice(0, 200),
+      eventDate,
+      venue: null,
+      boatClassRaw: boatClassMapped || null,
+      boatClassMapped,
+    });
+
+    if (events.length >= MAX_EVENTS_PER_RUN) break;
+  }
+
+  return events;
 }
 
 // ─── Parse a single event results page ───────────────────────────────────────
@@ -88,41 +178,36 @@ interface ParsedEvent {
   competitors: ParsedResult[];
 }
 
-function parseEventPage(html: string): ParsedEvent | null {
+function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null {
   try {
-    // Extract event name from <title> or <h1>/<h2>
     let eventName =
       extractText(html, "h1") ||
       extractText(html, "h2") ||
       extractText(html, "title") ||
+      fallbackName ||
       "Unknown Event";
     eventName = eventName.replace(/\s+/g, " ").trim();
 
-    // Extract boat class from page text
     const boatClassRaw = (() => {
-      // Look for class mentions near the header area
       const headerArea = html.slice(0, 3000);
       const classMatch =
         headerArea.match(/class[:\s]+([A-Za-z0-9\s\-\/]+?)(?:\s*<|\s*\n|\s*,)/i) ||
         headerArea.match(/(international ten rater|marblehead|one metre|footy|df65|df95|a class|e class|rc laser|victoria|ec12|1 metre)/i);
       if (classMatch) return classMatch[1].trim();
-      // Fallback: detect from event name
       return detectBoatClass(eventName) ? eventName : "";
     })();
     const boatClassMapped = detectBoatClass(boatClassRaw || eventName);
 
-    // Extract venue/location - look for common patterns
-    const venueMatch = html.match(/(?:venue|location|held at|at\s+):\s*([^<\n,]+)/i) ||
-                       html.match(/<td[^>]*>\s*(?:Venue|Location)\s*<\/td>\s*<td[^>]*>\s*([^<]+)/i);
+    const venueMatch =
+      html.match(/(?:venue|location|held at|at\s+):\s*([^<\n,]+)/i) ||
+      html.match(/<td[^>]*>\s*(?:Venue|Location)\s*<\/td>\s*<td[^>]*>\s*([^<]+)/i);
     const venue = venueMatch ? stripTags(venueMatch[1]).trim() : "";
 
-    // Extract date - look for common date patterns
     const dateMatch = html.match(/(\d{1,2}[-\/\s]\w+[-\/\s]\d{4}|\d{4}-\d{2}-\d{2}|\w+\s+\d{1,2}[-,\s]+\d{4})/);
     let eventDate: string | null = null;
     let eventEndDate: string | null = null;
     if (dateMatch) {
       const raw = dateMatch[1];
-      // Try to parse a date range like "04-07 Mar 2026"
       const rangeMatch = html.match(/(\d{1,2})[-–](\d{1,2})\s+(\w+)\s+(\d{4})/);
       if (rangeMatch) {
         const [, d1, d2, mon, yr] = rangeMatch;
@@ -134,12 +219,9 @@ function parseEventPage(html: string): ParsedEvent | null {
       }
     }
 
-    // ── Parse the results table ──────────────────────────────────────────────
-    // Find the main results table (largest table or one with "Pos" header)
     const tableMatches = extractAllMatches(html, /<table[^>]*>([\s\S]*?)<\/table>/i);
     if (!tableMatches.length) return null;
 
-    // Pick the table with most rows (most likely the results table)
     let bestTable = "";
     let bestRowCount = 0;
     for (const tm of tableMatches) {
@@ -148,14 +230,12 @@ function parseEventPage(html: string): ParsedEvent | null {
     }
     if (!bestTable) return null;
 
-    // Extract headers from <th> tags
     const headerRow = bestTable.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i)?.[1] || "";
     const headers = extractAllMatches(headerRow, /<th[^>]*>([\s\S]*?)<\/th>/i)
       .map(m => stripTags(m[1]).trim().toUpperCase());
 
     if (!headers.length) return null;
 
-    // Map header positions
     const posIdx = headers.findIndex(h => h === "POS" || h === "POSITION" || h === "#");
     const nameIdx = headers.findIndex(h => h.includes("NAME") || h.includes("SKIPPER") || h.includes("COMPETITOR"));
     const clubIdx = headers.findIndex(h => h.includes("CLUB"));
@@ -163,13 +243,11 @@ function parseEventPage(html: string): ParsedEvent | null {
     const designIdx = headers.findIndex(h => h.includes("DESIGN") || h.includes("BOAT") || h.includes("CLASS"));
     const nettIdx = headers.findIndex(h => h === "NETT" || h === "NET" || h === "PTS");
     const totalIdx = headers.findIndex(h => h === "TOTAL" || h === "GROSS");
-    // Race columns: R1, R2, ... or just numeric
     const raceIndices = headers
       .map((h, i) => (/^R\d+$/.test(h) || /^\d+$/.test(h)) ? i : -1)
       .filter(i => i >= 0);
     const raceCount = raceIndices.length;
 
-    // Extract data rows
     const rowMatches = extractAllMatches(bestTable, /<tr[^>]*>([\s\S]*?)<\/tr>/i);
     const competitors: ParsedResult[] = [];
 
@@ -180,18 +258,12 @@ function parseEventPage(html: string): ParsedEvent | null {
 
       const posRaw = posIdx >= 0 ? cells[posIdx] : cells[0];
       const pos = parseInt(posRaw);
-      if (isNaN(pos)) continue; // skip header rows caught here
+      if (isNaN(pos)) continue;
 
-      // Name/Club may be combined in one cell with <br> or separate lines
       let name = nameIdx >= 0 ? cells[nameIdx] : cells[1];
       let club = clubIdx >= 0 ? cells[clubIdx] : "";
-
-      // If name contains newline-like content, split
       const nameParts = name.split(/\n+/).map(s => s.trim()).filter(Boolean);
-      if (nameParts.length >= 2 && !club) {
-        name = nameParts[0];
-        club = nameParts[1];
-      }
+      if (nameParts.length >= 2 && !club) { name = nameParts[0]; club = nameParts[1]; }
 
       const sailNo = sailIdx >= 0 ? cells[sailIdx] : "";
       const boatDesign = designIdx >= 0 ? cells[designIdx] : "";
@@ -200,113 +272,24 @@ function parseEventPage(html: string): ParsedEvent | null {
       const nett = nettRaw !== null ? parseFloat(nettRaw) || null : null;
       const total = totalRaw !== null ? parseFloat(totalRaw) || null : null;
 
-      // Parse race scores - detect discards via brackets (e.g. "(15.0)")
       const races: (string | null)[] = [];
       const isDiscard: boolean[] = [];
       for (const ri of raceIndices) {
         const raw = ri < cells.length ? cells[ri] : null;
-        if (raw === null || raw === "" || raw === "-") {
-          races.push(null);
-          isDiscard.push(false);
-        } else {
-          const discardMatch = raw.match(/^\((.+)\)$/);
-          if (discardMatch) {
-            races.push(discardMatch[1]);
-            isDiscard.push(true);
-          } else {
-            races.push(raw);
-            isDiscard.push(false);
-          }
-        }
+        if (!raw || raw === "-") { races.push(null); isDiscard.push(false); continue; }
+        const d = raw.match(/^\((.+)\)$/);
+        if (d) { races.push(d[1]); isDiscard.push(true); }
+        else { races.push(raw); isDiscard.push(false); }
       }
 
-      competitors.push({
-        position: pos,
-        name,
-        club,
-        sailNo,
-        boatDesign,
-        nett,
-        total,
-        races,
-        isDiscard,
-      });
+      competitors.push({ position: pos, name, club, sailNo, boatDesign, nett, total, races, isDiscard });
     }
 
     if (!competitors.length) return null;
-
     return { eventName, venue, eventDate, eventEndDate, boatClassRaw, boatClassMapped, raceCount, competitors };
   } catch {
     return null;
   }
-}
-
-// ─── Discover event links from a list page ────────────────────────────────────
-
-interface DiscoveredEvent {
-  externalEventId: string;
-  url: string;
-  name: string;
-}
-
-function discoverEventLinks(html: string, baseUrl: string): DiscoveredEvent[] {
-  const events: DiscoveredEvent[] = [];
-  const seen = new Set<string>();
-
-  // Extract base origin from baseUrl
-  const urlObj = new URL(baseUrl);
-  const origin = urlObj.origin;
-
-  // Strategy 1: Look for eventid= pattern in links
-  const linkMatches = extractAllMatches(html, /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
-  for (const m of linkMatches) {
-    const href = m[1];
-    const text = stripTags(m[2]).trim();
-    if (!text || text.length < 3) continue;
-
-    // Build full URL
-    let fullUrl = href;
-    if (href.startsWith("//")) fullUrl = urlObj.protocol + href;
-    else if (href.startsWith("/")) fullUrl = origin + href;
-    else if (!href.startsWith("http")) fullUrl = origin + "/" + href;
-
-    // Look for eventid= or similar identifier
-    const eventIdMatch = fullUrl.match(/[?&](?:eventid|event_id|id)=(\d+)/i) ||
-                        fullUrl.match(/\/event\/(\d+)/i) ||
-                        fullUrl.match(/\/results\/(\d+)/i);
-
-    if (eventIdMatch) {
-      const externalEventId = eventIdMatch[1];
-      if (!seen.has(externalEventId)) {
-        seen.add(externalEventId);
-        events.push({ externalEventId, url: fullUrl, name: text });
-      }
-    }
-  }
-
-  // Strategy 2: If no eventid pattern found, look for any links to results-like URLs
-  if (!events.length) {
-    for (const m of linkMatches) {
-      const href = m[1];
-      const text = stripTags(m[2]).trim();
-      if (!text || text.length < 5) continue;
-      if (!href.toLowerCase().includes("result") && !href.toLowerCase().includes("arcade")) continue;
-
-      let fullUrl = href;
-      if (href.startsWith("//")) fullUrl = urlObj.protocol + href;
-      else if (href.startsWith("/")) fullUrl = origin + href;
-      else if (!href.startsWith("http")) fullUrl = origin + "/" + href;
-
-      if (!seen.has(fullUrl)) {
-        seen.add(fullUrl);
-        // Use a hash of the URL as the external ID
-        const hash = btoa(fullUrl).replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
-        events.push({ externalEventId: hash, url: fullUrl, name: text });
-      }
-    }
-  }
-
-  return events;
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -325,7 +308,6 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const { source_id, manual } = body;
 
-    // Fetch sources to process
     let sourcesQuery = supabase.from("external_result_sources").select("*").eq("is_active", true);
     if (source_id) sourcesQuery = sourcesQuery.eq("id", source_id);
 
@@ -347,7 +329,6 @@ Deno.serve(async (req: Request) => {
       let eventsFound = 0;
 
       try {
-        // Create scrape log
         const { data: logData } = await supabase
           .from("external_result_scrape_logs")
           .insert({ source_id: source.id, status: "running" })
@@ -355,108 +336,140 @@ Deno.serve(async (req: Request) => {
           .single();
         logId = logData?.id || null;
 
-        // ── Fetch the source URL ──────────────────────────────────────────────
+        // Fetch the source page
         const fetchResponse = await fetch(source.url, {
-          headers: { "User-Agent": "AlfiePRO-Results-Scraper/1.0" },
-          signal: AbortSignal.timeout(30000),
+          headers: {
+            "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
-        if (!fetchResponse.ok) throw new Error(`HTTP ${fetchResponse.status} for ${source.url}`);
+        if (!fetchResponse.ok) throw new Error(`HTTP ${fetchResponse.status} fetching ${source.url}`);
         const html = await fetchResponse.text();
 
-        // ── Determine events to process ───────────────────────────────────────
-        let eventsToProcess: DiscoveredEvent[] = [];
-
         if (source.source_type === "single_event") {
-          // Treat the source URL itself as a single event
-          const urlId = source.id.slice(0, 8);
-          eventsToProcess = [{ externalEventId: urlId, url: source.url, name: source.name }];
-        } else {
-          // Discover links from the list page
-          eventsToProcess = discoverEventLinks(html, source.url);
-        }
+          // ── Single event: parse results directly from this page ────────────
+          const evId = source.id.slice(0, 8);
+          const existing = await supabase
+            .from("external_result_events")
+            .select("id, last_scraped_at")
+            .eq("source_id", source.id)
+            .eq("external_event_id", evId)
+            .maybeSingle();
 
-        eventsFound = eventsToProcess.length;
+          eventsFound = 1;
 
-        // ── Process each event ────────────────────────────────────────────────
-        for (const ev of eventsToProcess) {
-          try {
-            // Check if already exists
-            const { data: existing } = await supabase
-              .from("external_result_events")
-              .select("id, last_scraped_at")
-              .eq("source_id", source.id)
-              .eq("external_event_id", ev.externalEventId)
-              .maybeSingle();
+          if (existing.data && !manual) {
+            const lastScrape = existing.data.last_scraped_at ? new Date(existing.data.last_scraped_at) : null;
+            if (lastScrape && (Date.now() - lastScrape.getTime()) < 6 * 60 * 60 * 1000) {
+              eventsSkipped = 1;
+            }
+          }
 
-            // Skip if scraped in last 6 hours (unless manual)
-            if (existing && !manual) {
-              const lastScrape = existing.last_scraped_at ? new Date(existing.last_scraped_at) : null;
-              if (lastScrape && (Date.now() - lastScrape.getTime()) < 6 * 60 * 60 * 1000) {
-                eventsSkipped++;
-                continue;
+          if (eventsSkipped === 0) {
+            const parsed = parseEventPage(html, source.name);
+            if (parsed && parsed.competitors.length) {
+              let boatClassId: string | null = null;
+              if (parsed.boatClassMapped) {
+                const { data: bc } = await supabase
+                  .from("boat_classes").select("id").ilike("name", `%${parsed.boatClassMapped}%`).maybeSingle();
+                boatClassId = bc?.id || null;
               }
-            }
-
-            // Fetch event page (skip if same as source for event_list)
-            let eventHtml = html;
-            if (ev.url !== source.url) {
-              const evRes = await fetch(ev.url, {
-                headers: { "User-Agent": "AlfiePRO-Results-Scraper/1.0" },
-                signal: AbortSignal.timeout(20000),
-              });
-              if (!evRes.ok) { eventsSkipped++; continue; }
-              eventHtml = await evRes.text();
-            }
-
-            const parsed = parseEventPage(eventHtml);
-            if (!parsed || !parsed.competitors.length) { eventsSkipped++; continue; }
-
-            // Try to auto-map boat class to AlfiePRO boat_classes table
-            let boatClassId: string | null = null;
-            if (parsed.boatClassMapped) {
-              const { data: bc } = await supabase
-                .from("boat_classes")
-                .select("id")
-                .ilike("name", `%${parsed.boatClassMapped}%`)
-                .maybeSingle();
-              boatClassId = bc?.id || null;
-            }
-
-            const eventPayload = {
-              source_id: source.id,
-              external_event_id: ev.externalEventId,
-              event_name: parsed.eventName || ev.name,
-              event_date: parsed.eventDate,
-              event_end_date: parsed.eventEndDate,
-              venue: parsed.venue,
-              boat_class_raw: parsed.boatClassRaw,
-              boat_class_id: boatClassId,
-              boat_class_mapped: parsed.boatClassMapped,
-              source_url: ev.url,
-              results_json: parsed.competitors,
-              competitor_count: parsed.competitors.length,
-              race_count: parsed.raceCount,
-              display_category: source.display_category,
-              last_scraped_at: new Date().toISOString(),
-            };
-
-            if (existing) {
-              await supabase
-                .from("external_result_events")
-                .update({ ...eventPayload, updated_at: new Date().toISOString() })
-                .eq("id", existing.id);
-              eventsUpdated++;
+              const payload = {
+                source_id: source.id,
+                external_event_id: evId,
+                event_name: parsed.eventName || source.name,
+                event_date: parsed.eventDate,
+                event_end_date: parsed.eventEndDate,
+                venue: parsed.venue,
+                boat_class_raw: parsed.boatClassRaw,
+                boat_class_id: boatClassId,
+                boat_class_mapped: parsed.boatClassMapped,
+                source_url: source.url,
+                results_json: parsed.competitors,
+                competitor_count: parsed.competitors.length,
+                race_count: parsed.raceCount,
+                display_category: source.display_category,
+                last_scraped_at: new Date().toISOString(),
+              };
+              if (existing.data) {
+                await supabase.from("external_result_events")
+                  .update({ ...payload, updated_at: new Date().toISOString() })
+                  .eq("id", existing.data.id);
+                eventsUpdated = 1;
+              } else {
+                await supabase.from("external_result_events").insert(payload);
+                eventsCreated = 1;
+              }
             } else {
-              await supabase.from("external_result_events").insert(eventPayload);
-              eventsCreated++;
+              eventsSkipped = 1;
             }
-          } catch (evErr) {
-            console.error("Error processing event", ev.url, evErr);
-            eventsSkipped++;
+          }
+
+        } else {
+          // ── Event list: discover links and register them WITHOUT fetching each page ──
+          const discovered = parseListPage(html, source.url);
+          eventsFound = discovered.length;
+
+          for (const ev of discovered) {
+            try {
+              const { data: existing } = await supabase
+                .from("external_result_events")
+                .select("id, last_scraped_at")
+                .eq("source_id", source.id)
+                .eq("external_event_id", ev.externalEventId)
+                .maybeSingle();
+
+              if (existing && !manual) {
+                const lastScrape = existing.last_scraped_at ? new Date(existing.last_scraped_at) : null;
+                if (lastScrape && (Date.now() - lastScrape.getTime()) < 6 * 60 * 60 * 1000) {
+                  eventsSkipped++;
+                  continue;
+                }
+              }
+
+              let boatClassId: string | null = null;
+              if (ev.boatClassMapped) {
+                const { data: bc } = await supabase
+                  .from("boat_classes").select("id").ilike("name", `%${ev.boatClassMapped}%`).maybeSingle();
+                boatClassId = bc?.id || null;
+              }
+
+              const payload = {
+                source_id: source.id,
+                external_event_id: ev.externalEventId,
+                event_name: ev.name,
+                event_date: ev.eventDate,
+                event_end_date: null,
+                venue: ev.venue,
+                boat_class_raw: ev.boatClassRaw,
+                boat_class_id: boatClassId,
+                boat_class_mapped: ev.boatClassMapped,
+                source_url: ev.url,
+                results_json: [],
+                competitor_count: 0,
+                race_count: 0,
+                display_category: source.display_category,
+                last_scraped_at: new Date().toISOString(),
+              };
+
+              if (existing) {
+                await supabase.from("external_result_events")
+                  .update({ ...payload, updated_at: new Date().toISOString() })
+                  .eq("id", existing.id);
+                eventsUpdated++;
+              } else {
+                await supabase.from("external_result_events").insert(payload);
+                eventsCreated++;
+              }
+            } catch (evErr) {
+              console.error("Error saving event", ev.url, evErr);
+              eventsSkipped++;
+            }
           }
         }
 
-        // Update source event_count
+        // Update source counters
         const { count: totalCount } = await supabase
           .from("external_result_events")
           .select("*", { count: "exact", head: true })
@@ -479,7 +492,13 @@ Deno.serve(async (req: Request) => {
           }).eq("id", logId);
         }
 
-        results.push({ source: source.name, found: eventsFound, created: eventsCreated, updated: eventsUpdated, skipped: eventsSkipped });
+        results.push({
+          source: source.name,
+          found: eventsFound,
+          created: eventsCreated,
+          updated: eventsUpdated,
+          skipped: eventsSkipped,
+        });
 
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
