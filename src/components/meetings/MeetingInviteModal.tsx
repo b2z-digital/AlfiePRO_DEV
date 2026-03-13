@@ -288,12 +288,13 @@ Thank you.
           })
         : '[Meeting Time]';
 
-      const meetingLocation = meeting.location || '[Meeting Location]';
+      const meetingLocation = meeting.location || '';
+      const meetingConferencingUrl = meeting.conferencing_url || '';
 
       const processedMessage = message
         .replace(/\[Meeting Date\]/g, meetingDate)
         .replace(/\[Meeting Time\]/g, meetingTime)
-        .replace(/\[Meeting Location\]/g, meetingLocation);
+        .replace(/\[Meeting Location\]/g, meetingLocation || '[Meeting Location]');
 
       const seenUserIds = new Set<string>();
       const deduplicatedRecipients = recipientMembers.filter(member => {
@@ -347,7 +348,8 @@ Thank you.
           meeting_name: meeting.name,
           meeting_date: meetingDate,
           meeting_time: meetingTime,
-          meeting_location: meetingLocation
+          meeting_location: meetingLocation,
+          meeting_conferencing_url: meetingConferencingUrl || undefined
         }),
       });
 

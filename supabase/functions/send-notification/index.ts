@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
       meeting_date,
       meeting_time,
       meeting_location,
+      meeting_conferencing_url,
       attachments,
       raw_html,
       from_email,
@@ -123,6 +124,7 @@ Deno.serve(async (req) => {
                   meetingDate: meeting_date,
                   meetingTime: meeting_time,
                   meetingLocation: meeting_location,
+                  meetingConferencingUrl: meeting_conferencing_url,
                   attachments,
                   rawHtml: raw_html,
                   fromEmail: from_email,
@@ -160,6 +162,7 @@ Deno.serve(async (req) => {
               meetingDate: meeting_date,
               meetingTime: meeting_time,
               meetingLocation: meeting_location,
+              meetingConferencingUrl: meeting_conferencing_url,
               attachments,
               rawHtml: raw_html,
               fromEmail: from_email,
@@ -216,6 +219,7 @@ interface SendEmailOptions {
   meetingDate?: string;
   meetingTime?: string;
   meetingLocation?: string;
+  meetingConferencingUrl?: string;
   attachments?: Attachment[];
   rawHtml?: boolean;
   fromEmail?: string;
@@ -324,6 +328,14 @@ async function sendEmail(opts: SendEmailOptions) {
                         </td>
                         <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
                           <span style="color:#0f172a;font-size:13px;font-weight:500;">${opts.meetingLocation}</span>
+                        </td>
+                      </tr>` : ''}
+                      ${opts.meetingConferencingUrl ? `<tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#64748b;font-size:13px;">Online Link</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <a href="${opts.meetingConferencingUrl}" target="_blank" style="color:#0ea5e9;font-size:13px;font-weight:500;text-decoration:none;">${opts.meetingConferencingUrl}</a>
                         </td>
                       </tr>` : ''}
                       <tr>
