@@ -9,8 +9,8 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { usePermissions } from '../hooks/usePermissions';
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
-const FALLBACK_COVER_IMAGE = 'https://images.pexels.com/photos/273886/pexels-photo-273886.jpeg?auto=compress&cs=tinysrgb&w=800';
+const DEFAULT_COVER_IMAGE = '/alfie_app_logo.svg';
+const FALLBACK_COVER_IMAGE = '/alfie_app_logo.svg';
 
 const getArticleImageUrl = (coverImage?: string): string => {
   if (!coverImage) return DEFAULT_COVER_IMAGE;
