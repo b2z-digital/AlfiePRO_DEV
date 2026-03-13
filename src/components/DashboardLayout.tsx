@@ -101,6 +101,7 @@ import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
 import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
 import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
 import { ImpersonationAuditTab } from './super-admin/ImpersonationAuditTab';
+import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -1051,6 +1052,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'impersonation-log', label: 'Impersonation Log', icon: Eye, description: 'Admin audit trail', path: '/impersonation-log' },
           { id: 'ask-alfie-management', label: 'Ask Alfie', icon: Bot, description: 'AI knowledge management', path: '/ask-alfie-management' },
           { id: 'help-support', label: 'Help & Support', icon: LifeBuoy, description: 'FAQs, tutorials & tickets', path: '/help-support' },
+          { id: 'news-scraping', label: 'News Scraping', icon: Newspaper, description: 'Automated news scrapers', path: '/news-scraping' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1681,6 +1683,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={true} />} />
               <Route path="/help-support" element={<HelpSupportPage darkMode={true} />} />
+              <Route path="/news-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <NewsScrapingTab darkMode={true} />
+                </div></div>
+              } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
