@@ -11,24 +11,30 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
+  if (!clientId || !clientSecret) {
+    throw new Error('Google OAuth credentials not configured on server');
+  }
+
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
-      client_id: clientId!,
-      client_secret: clientSecret!,
+      client_id: clientId,
+      client_secret: clientSecret,
       refresh_token: refreshToken,
       grant_type: 'refresh_token',
     }),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    throw new Error('Failed to refresh access token');
+    console.error('Token refresh failed:', JSON.stringify(data));
+    throw new Error(`Failed to refresh Google access token: ${data.error_description || data.error || 'Unknown error'}`);
   }
 
-  const data = await response.json();
   return data.access_token;
 }
 
@@ -95,11 +101,17 @@ Deno.serve(async (req: Request) => {
     }
 
     const creds = integration.credentials;
-    let accessToken = creds.access_token;
-    const expiresAt = new Date(creds.token_expires_at);
-    const now = new Date();
 
-    if (now >= expiresAt && creds.refresh_token) {
+    if (!creds.refresh_token) {
+      throw new Error('Google refresh token not available. Please reconnect Google Calendar.');
+    }
+
+    let accessToken: string;
+    const expiresAt = creds.token_expires_at ? new Date(creds.token_expires_at) : null;
+    const now = new Date();
+    const needsRefresh = !expiresAt || !creds.access_token || now >= expiresAt;
+
+    if (needsRefresh) {
       accessToken = await refreshAccessToken(creds.refresh_token);
 
       const newExpiresAt = new Date(Date.now() + (3600 * 1000)).toISOString();
@@ -113,6 +125,8 @@ Deno.serve(async (req: Request) => {
         .from('integrations')
         .update({ credentials: updatedCredentials })
         .eq('id', integration.id);
+    } else {
+      accessToken = creds.access_token;
     }
 
     const eventData = {
@@ -158,8 +172,9 @@ Deno.serve(async (req: Request) => {
     );
 
     if (!calendarResponse.ok) {
-      const errorText = await calendarResponse.text();
-      throw new Error(`Failed to create calendar event: ${errorText}`);
+      const errorData = await calendarResponse.json().catch(() => null);
+      const errorMsg = errorData?.error?.message || await calendarResponse.text().catch(() => 'Unknown error');
+      throw new Error(`Google Calendar API error: ${errorMsg}`);
     }
 
     const eventResult = await calendarResponse.json();
@@ -169,7 +184,7 @@ Deno.serve(async (req: Request) => {
     )?.uri;
 
     if (!meetLink) {
-      throw new Error('Failed to generate Google Meet link');
+      throw new Error('Calendar event created but no Meet link was generated. The Google Workspace account may not have Meet enabled.');
     }
 
     return new Response(

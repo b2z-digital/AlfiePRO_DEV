@@ -377,9 +377,16 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMsg = data?.error || error.message || 'Failed to create Google Meet';
+        throw new Error(errorMsg);
+      }
 
-      if (data.meetingUrl) {
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.meetingUrl) {
         setFormData(prev => ({
           ...prev,
           conferencing_url: data.meetingUrl
