@@ -2006,11 +2006,17 @@ export const ResultsPage: React.FC = () => {
                         className="group relative overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 hover:scale-[1.02] text-left flex flex-col"
                       >
                         <div className="relative h-40 flex-shrink-0 overflow-hidden bg-slate-900">
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
+                          <img
+                            src="/results_tile.jpg"
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/50 to-slate-900/30" />
+                          <div className="absolute inset-0 flex items-center justify-center">
                             <img
                               src="/alfie_app_logo.svg"
                               alt="AlfiePRO"
-                              className="w-16 h-16 opacity-20"
+                              className="w-12 h-12 opacity-70 drop-shadow-lg"
                             />
                           </div>
                           <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
