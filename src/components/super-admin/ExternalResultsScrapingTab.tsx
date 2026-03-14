@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Globe, Plus, Trash2, Play, CheckCircle, XCircle, Clock,
   ChevronDown, ChevronUp, AlertCircle, Eye, EyeOff, RefreshCw,
-  Trophy, List, Tag
+  Trophy, List, Tag, Wrench
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
@@ -81,6 +81,7 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
   const [expandedLogs, setExpandedLogs] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [fixingNames, setFixingNames] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -201,6 +202,35 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
     }));
   }
 
+  async function handleFixBadNames() {
+    setFixingNames(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const sessionResult = await supabase.auth.getSession();
+      const token = sessionResult.data?.session?.access_token;
+      if (!token) { setError('Not authenticated.'); return; }
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-external-results`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ fix_bad_names: true }),
+        }
+      );
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      setSuccess(`Fixed ${result.fixed} of ${result.total} records. Run again if more remain.`);
+      setTimeout(() => setSuccess(null), 8000);
+      await fetchAll();
+      if (expandedSource) fetchEventsForSource(expandedSource);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Fix failed');
+    } finally {
+      setFixingNames(false);
+    }
+  }
+
   async function handleRunNow(source: ResultSource) {
     setRunningId(source.id);
     setError(null);
@@ -305,13 +335,24 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          Add Source
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleFixBadNames}
+            disabled={fixingNames || runningId !== null}
+            title="Re-fetch individual event pages to fix events showing only 'Results' as name"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {fixingNames ? <RefreshCw size={16} className="animate-spin" /> : <Wrench size={16} />}
+            {fixingNames ? 'Fixing...' : 'Fix Event Names'}
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Add Source
+          </button>
+        </div>
       </div>
 
       {/* Running indicator */}

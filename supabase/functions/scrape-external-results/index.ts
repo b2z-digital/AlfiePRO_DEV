@@ -337,7 +337,72 @@ Deno.serve(async (req: Request) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const { source_id, manual, event_row_id } = body;
+    const { source_id, manual, event_row_id, fix_bad_names } = body;
+
+    // ── Fix bad names: re-fetch individual pages for records with generic names ──
+    if (fix_bad_names) {
+      const { data: badRows } = await supabase
+        .from("external_result_events")
+        .select("id, source_url, event_name, boat_class_raw, boat_class_mapped")
+        .or("event_name.eq.Results,event_name.eq.,boat_class_raw.eq.")
+        .limit(30);
+
+      if (!badRows?.length) {
+        return new Response(JSON.stringify({ success: true, fixed: 0, message: "No bad records found" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      let fixed = 0;
+      for (const row of badRows) {
+        try {
+          const resp = await fetch(row.source_url, {
+            headers: { "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0" },
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          });
+          if (!resp.ok) continue;
+          const html = await resp.text();
+          const parsed = parseEventPage(html, row.event_name);
+          if (!parsed) continue;
+
+          const isStillGeneric = !parsed.eventName || parsed.eventName === "Results" || parsed.eventName.length < 4;
+          const newName = isStillGeneric ? row.event_name : parsed.eventName;
+
+          let boatClassId: string | null = null;
+          const bClass = parsed.boatClassMapped || row.boat_class_mapped;
+          if (bClass) {
+            const { data: bc } = await supabase
+              .from("boat_classes").select("id").ilike("name", `%${bClass}%`).maybeSingle();
+            boatClassId = bc?.id || null;
+          }
+
+          const update: Record<string, unknown> = {
+            event_name: newName,
+            results_json: parsed.competitors.length ? parsed.competitors : undefined,
+            competitor_count: parsed.competitors.length || undefined,
+            race_count: parsed.raceCount || undefined,
+            last_scraped_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          if (parsed.eventDate) update.event_date = parsed.eventDate;
+          if (parsed.eventEndDate) update.event_end_date = parsed.eventEndDate;
+          if (parsed.venue) update.venue = parsed.venue;
+          if (parsed.boatClassRaw) update.boat_class_raw = parsed.boatClassRaw;
+          if (parsed.boatClassMapped) update.boat_class_mapped = parsed.boatClassMapped;
+          if (boatClassId) update.boat_class_id = boatClassId;
+
+          const cleanUpdate = Object.fromEntries(Object.entries(update).filter(([, v]) => v !== undefined));
+          await supabase.from("external_result_events").update(cleanUpdate).eq("id", row.id);
+          fixed++;
+        } catch {
+          continue;
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, fixed, total: badRows.length }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ── On-demand single event fetch ──────────────────────────────────────────
     // When event_row_id is provided, fetch and parse that event's page on the
