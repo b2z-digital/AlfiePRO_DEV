@@ -245,7 +245,13 @@ export const ResultsPage: React.FC = () => {
         if (round) {
           setSelectedRound(round);
           setSelectedEvent(null);
-          setSelectedSeries(null);
+          setSelectedSeries(null)
+        }
+      }
+    }
+  }
+  )
+};
           return;
         }
       }
