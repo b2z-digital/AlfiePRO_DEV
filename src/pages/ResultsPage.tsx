@@ -593,7 +593,7 @@ export const ResultsPage: React.FC = () => {
     });
   };
 
-  // Get unique years from all events, rounds, and series rounds
+  // Get unique years from all events, rounds, series rounds, and external events
   const availableYears = Array.from(
     new Set([
       // Years from events and extracted round results
@@ -605,12 +605,29 @@ export const ResultsPage: React.FC = () => {
         (series.rounds || [])
           .map(round => new Date(round.date || '').getFullYear())
           .filter(year => !isNaN(year))
-      )
+      ),
+      // Years from external national/world events
+      ...[...externalNationalEvents, ...externalWorldEvents]
+        .map(ev => new Date(ev.event_date || '').getFullYear())
+        .filter(year => !isNaN(year))
     ])
   ).sort((a, b) => b - a); // Sort descending (newest first)
 
   const filteredEvents = sortByDateDesc(filterItems([...allEvents, ...roundResults], searchTerm, statusFilter, selectedYear));
   const filteredSeries = filterItems(allSeries, searchTerm, statusFilter, selectedYear);
+
+  const filteredNationalEvents = externalNationalEvents.filter(ev => {
+    if (!ev.event_date) return false;
+    if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
+    if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+  const filteredWorldEvents = externalWorldEvents.filter(ev => {
+    if (!ev.event_date) return false;
+    if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
+    if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
 
   // Group series by class
   const groupedSeries = filteredSeries.reduce((acc, series) => {
@@ -1771,7 +1788,7 @@ export const ResultsPage: React.FC = () => {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white">Results</h1>
               <p className="text-sm text-slate-400">
-                {mainTab === 'events' ? eventsToShow.length : seriesToShow.length} {mainTab === 'events' ? 'events' : 'leaderboards'}
+                {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'national' ? filteredNationalEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
               </p>
             </div>
           </div>
@@ -1870,7 +1887,7 @@ export const ResultsPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Globe size={18} />
                 <span>National Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{externalNationalEvents.length}</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredNationalEvents.length}</span>
               </div>
               {mainTab === 'national' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
             </button>
@@ -1886,7 +1903,7 @@ export const ResultsPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Globe size={18} />
                 <span>World Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{externalWorldEvents.length}</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredWorldEvents.length}</span>
               </div>
               {mainTab === 'world' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-400" />}
             </button>
@@ -1988,7 +2005,7 @@ export const ResultsPage: React.FC = () => {
         )}
 
         {(mainTab === 'national' || mainTab === 'world') && (() => {
-          const extEvents = mainTab === 'national' ? externalNationalEvents : externalWorldEvents;
+          const extEvents = mainTab === 'national' ? filteredNationalEvents : filteredWorldEvents;
           const accentColor = mainTab === 'national' ? 'amber' : 'orange';
           return (
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
