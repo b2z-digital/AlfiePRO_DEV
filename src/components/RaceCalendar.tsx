@@ -12,6 +12,7 @@ import { boatTypeColors, defaultColorScheme, getBoatClassBadge, getRaceFormatBad
 import { SeriesLeaderboard } from './SeriesLeaderboard';
 import { EventDetails } from './EventDetails';
 import html2canvas from 'html2canvas';
+import { getBoatClassImage } from '../utils/boatClassImages';
 import '../styles/yacht-race.css';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { supabase } from '../utils/supabase';
@@ -538,13 +539,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   };
 
   const getVenueImage = (venueName: string, event?: RaceEvent): string | null => {
-    // First check if event has venueImage (for public events with venue data)
     if (event?.venueImage) {
       return event.venueImage;
     }
-    // Fall back to finding venue by name
     const venue = venues.find(v => v.name === venueName);
-    return venue?.image || null;
+    if (venue?.image) return venue.image;
+    if (event?.isExternalEvent) {
+      return getBoatClassImage(event.raceClass as string) || null;
+    }
+    return null;
   };
 
   const isDatePast = (dateStr: string) => {
