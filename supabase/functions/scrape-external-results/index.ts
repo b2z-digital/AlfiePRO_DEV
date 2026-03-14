@@ -220,20 +220,22 @@ function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null
       html.match(/([A-Z][a-zA-Z\s]+,\s*(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ))/);
     const venue = venueMatch ? stripTags(venueMatch[1]).trim() : "";
 
-    // Date parsing — handles multiple formats from radiosailing.org.au and similar sites
+    // Date parsing — priority: extract from tilde line "~ DD Mon YYYY" used by radiosailing.org.au
     let eventDate: string | null = null;
     let eventEndDate: string | null = null;
 
-    // Try year from event name first as anchor (e.g. "2026 International ...")
-    const nameYearMatch = eventName.match(/\b(20\d{2})\b/);
-    const nameYear = nameYearMatch ? nameYearMatch[1] : null;
+    // Extract just the date portion after the tilde to avoid matching race numbers elsewhere
+    const tildeMatch = html.match(/~\s*([\d]{1,2}[^<\n]{0,30}20\d{2})/);
+    const dateSource = tildeMatch ? tildeMatch[1].trim() : "";
 
-    // Cross-month range: "28 Feb - 03 Mar 2026" or "28 Feb – 03 Mar 2026"
-    const crossMonthRange = html.match(/(\d{1,2})\s+(\w{3,9})\s*[-–~]\s*(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/);
-    // Same-month range: "09-10 Aug 2025"
-    const sameMonthRange = html.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/);
-    // Single date: "10 Aug 2025" or "2025-08-10"
-    const singleDate = html.match(/(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/) ||
+    // Cross-month range: "28 Feb - 03 Mar 2026"
+    const crossMonthRange = dateSource.match(/^(\d{1,2})\s+(\w{3,9})\s*[-–]\s*(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/);
+    // Same-month range: "09 Aug - 10 Aug 2025"
+    const sameMonthRange = dateSource.match(/^(\d{1,2})\s+(\w{3,9})\s*[-–]\s*(\d{1,2})\s+\w{3,9}\s+(20\d{2})/);
+    // Same-month short: "09-10 Aug 2025"
+    const sameMonthShort = dateSource.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/);
+    // Single date: "01 Feb 2026"
+    const singleDate = dateSource.match(/^(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/) ||
                        html.match(/(20\d{2}-\d{2}-\d{2})/);
 
     if (crossMonthRange) {
@@ -243,25 +245,20 @@ function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null
       if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
       if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
     } else if (sameMonthRange) {
-      const [, d1, d2, mon, yr] = sameMonthRange;
+      const [, d1, mon1, d2, , yr] = sameMonthRange;
+      const start = new Date(`${d1} ${mon1} ${yr}`);
+      const end = new Date(`${d2} ${mon1} ${yr}`);
+      if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
+      if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
+    } else if (sameMonthShort) {
+      const [, d1, d2, mon, yr] = sameMonthShort;
       const start = new Date(`${d1} ${mon} ${yr}`);
       const end = new Date(`${d2} ${mon} ${yr}`);
       if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
       if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
     } else if (singleDate) {
-      const raw = singleDate[1];
-      const d = new Date(raw);
+      const d = new Date(singleDate[1]);
       if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
-    }
-
-    // If date year doesn't match event name year, trust the event name year
-    if (eventDate && nameYear && !eventDate.startsWith(nameYear)) {
-      const parts = eventDate.split("-");
-      eventDate = `${nameYear}-${parts[1]}-${parts[2]}`;
-      if (eventEndDate) {
-        const ep = eventEndDate.split("-");
-        eventEndDate = `${nameYear}-${ep[1]}-${ep[2]}`;
-      }
     }
 
     const tableMatches = extractAllMatches(html, /<table[^>]*>([\s\S]*?)<\/table>/i);
