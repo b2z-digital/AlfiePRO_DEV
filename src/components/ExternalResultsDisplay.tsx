@@ -188,7 +188,7 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
                 background: rgba(30,41,59,0.4);
               }
               .external-results-table tr:hover td {
-                background: rgba(51,65,85,0.5);
+                background: inherit;
               }
               .external-results-table td:first-child,
               .external-results-table th:first-child {
