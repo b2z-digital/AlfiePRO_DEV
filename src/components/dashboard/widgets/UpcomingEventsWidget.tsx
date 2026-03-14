@@ -263,7 +263,12 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           registrationOpen: true
         }));
       } else {
-        const raceEvents = await getStoredRaceEvents();
+        const [raceEvents, raceSeries, publicEvents] = await Promise.all([
+          getStoredRaceEvents(),
+          getStoredRaceSeries(),
+          getPublicEvents(),
+        ]);
+
         const upcomingQuickRaces = raceEvents.filter(event => {
           const eventDate = new Date(event.date);
           eventDate.setHours(0, 0, 0, 0);
@@ -279,7 +284,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           skippers: event.skippers || []
         }));
 
-        const raceSeries = await getStoredRaceSeries();
         const upcomingSeriesEvents: RaceEvent[] = [];
         raceSeries.forEach(series => {
           series.rounds.forEach((round: any, roundIndex: number) => {
@@ -307,7 +311,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           });
         });
 
-        const publicEvents = await getPublicEvents();
         const upcomingPublicEvents = publicEvents
           .filter(event => {
             const eventDate = new Date(event.date);
@@ -327,7 +330,46 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             registrationOpen: true
           }));
 
-        allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents];
+        let clubStateAssociationId: string | null = null;
+        if (currentClub?.clubId) {
+          const { data: clubData } = await supabase
+            .from('clubs')
+            .select('state_association_id')
+            .eq('id', currentClub.clubId)
+            .maybeSingle();
+          clubStateAssociationId = clubData?.state_association_id || null;
+        }
+
+        const { data: externalData } = await supabase
+          .from('external_events')
+          .select('*, external_event_sources!inner(name)')
+          .eq('is_visible', true)
+          .eq('event_status', 'active')
+          .gte('event_date', todayStr)
+          .order('event_date', { ascending: true })
+          .limit(20);
+
+        const externalEvents: RaceEvent[] = (externalData || [])
+          .filter((ext: any) => {
+            const isNational = ext.display_category === 'national' || ext.event_type === 'national';
+            const isMyState = clubStateAssociationId && ext.display_category?.startsWith('state_') &&
+              ext.display_category.replace('state_', '') === clubStateAssociationId;
+            return isNational || isMyState;
+          })
+          .map((ext: any) => ({
+            id: `external-${ext.id}`,
+            eventName: ext.event_name,
+            clubName: (ext.external_event_sources as any)?.name || ext.venue || '',
+            date: ext.event_date || '',
+            venue: ext.location || ext.venue || '',
+            raceClass: ext.boat_class_mapped || ext.boat_class_raw || '',
+            raceFormat: 'scratch',
+            isPublicEvent: true,
+            eventLevel: ext.event_type === 'state' ? 'state' as const : 'national' as const,
+            registrationOpen: !!ext.registration_url,
+          }));
+
+        allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents, ...externalEvents];
       }
 
       const meetingEvents = await meetingsPromise;
