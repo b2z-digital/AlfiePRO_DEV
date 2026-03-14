@@ -32,6 +32,8 @@ interface RaceEvent {
   eventLevel?: 'state' | 'national';
   isPublicEvent?: boolean;
   isExternalEvent?: boolean;
+  sourceUrl?: string;
+  registrationUrl?: string;
   isMeeting?: boolean;
   isClubMeeting?: boolean;
   meetingCategory?: 'general' | 'committee';
@@ -369,6 +371,8 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             isExternalEvent: true,
             eventLevel: (ext.event_type === 'national' || ext.event_type === 'world') ? 'national' as const : 'state' as const,
             registrationOpen: !!ext.registration_url,
+            sourceUrl: ext.source_url || ext.registration_url || null,
+            registrationUrl: ext.registration_url || null,
           }));
 
         allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents, ...externalEvents];
@@ -668,6 +672,11 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       key={event.id}
       onClick={() => {
         if (isEditMode) return;
+        if (event.isExternalEvent) {
+          const url = event.sourceUrl || event.registrationUrl;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          return;
+        }
         if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
           navigate('/calendar');
         } else {
