@@ -1712,14 +1712,16 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 Race Format
               </p>
               <div className="flex flex-wrap gap-2">
-                <div className={`
-                  px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm
-                  ${event.raceFormat === 'handicap'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-blue-600 text-white'}
-                `}>
-                  {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                </div>
+                {!event.isExternalEvent && (
+                  <div className={`
+                    px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm
+                    ${event.raceFormat === 'handicap'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-blue-600 text-white'}
+                  `}>
+                    {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                  </div>
+                )}
                 <div className="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-600 text-white shadow-sm">
                   {event.raceClass}
                 </div>

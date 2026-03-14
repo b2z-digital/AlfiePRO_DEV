@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   Globe, Plus, Trash2, Play, CheckCircle, XCircle, Clock,
   ChevronDown, ChevronUp, AlertCircle, Eye, EyeOff, RefreshCw,
-  CalendarDays, List, Tag, FileText, ExternalLink, MapPin, Download
+  CalendarDays, List, Tag, FileText, ExternalLink, MapPin, Download,
+  Pencil, X, Save
 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
@@ -40,6 +41,7 @@ interface ScrapedEvent {
   ranking_event: boolean;
   source_url: string;
   documents_json: Array<{ name: string; url: string }> | null;
+  registration_url: string | null;
   is_visible: boolean;
   display_category: string;
   last_scraped_at: string | null;
@@ -106,6 +108,20 @@ export function EventsScrapingTab({ darkMode }: EventsScrapingTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [fetchingDetails, setFetchingDetails] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ScrapedEvent | null>(null);
+  const [editForm, setEditForm] = useState({
+    event_name: '',
+    venue: '',
+    location: '',
+    state_code: '',
+    event_date: '',
+    event_end_date: '',
+    boat_class_mapped: '',
+    event_type: 'club',
+    event_status: 'scheduled',
+    registration_url: '',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -286,6 +302,59 @@ export function EventsScrapingTab({ darkMode }: EventsScrapingTabProps) {
       if (expandedSource) fetchEventsForSource(expandedSource);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to fetch event details');
+    }
+  }
+
+  function handleEditEvent(ev: ScrapedEvent) {
+    setEditingEvent(ev);
+    setEditForm({
+      event_name: ev.event_name || '',
+      venue: ev.venue || '',
+      location: ev.location || '',
+      state_code: ev.state_code || '',
+      event_date: ev.event_date ? ev.event_date.split('T')[0] : '',
+      event_end_date: ev.event_end_date ? ev.event_end_date.split('T')[0] : '',
+      boat_class_mapped: ev.boat_class_mapped || '',
+      event_type: ev.event_type || 'club',
+      event_status: ev.event_status || 'scheduled',
+      registration_url: ev.registration_url || '',
+    });
+  }
+
+  async function handleSaveEventEdit() {
+    if (!editingEvent) return;
+    setSavingEdit(true);
+    const updates: Record<string, unknown> = {
+      event_name: editForm.event_name.trim(),
+      venue: editForm.venue.trim() || null,
+      location: editForm.location.trim() || null,
+      state_code: editForm.state_code.trim() || null,
+      event_date: editForm.event_date || null,
+      event_end_date: editForm.event_end_date || null,
+      boat_class_mapped: editForm.boat_class_mapped.trim() || null,
+      event_type: editForm.event_type,
+      event_status: editForm.event_status,
+      registration_url: editForm.registration_url.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: updateError } = await supabase
+      .from('external_events')
+      .update(updates)
+      .eq('id', editingEvent.id);
+    setSavingEdit(false);
+    if (updateError) {
+      setError(`Failed to save: ${updateError.message}`);
+      setTimeout(() => setError(null), 5000);
+    } else {
+      setSourceEvents(prev => ({
+        ...prev,
+        [editingEvent.source_id]: (prev[editingEvent.source_id] || []).map(e =>
+          e.id === editingEvent.id ? { ...e, ...updates } as ScrapedEvent : e
+        ),
+      }));
+      setEditingEvent(null);
+      setSuccess('Event updated successfully.');
+      setTimeout(() => setSuccess(null), 3000);
     }
   }
 
@@ -695,6 +764,13 @@ export function EventsScrapingTab({ darkMode }: EventsScrapingTabProps) {
                             )}
                           </div>
                           <button
+                            onClick={() => handleEditEvent(ev)}
+                            title="Edit event"
+                            className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:text-amber-400 hover:bg-slate-600 transition-colors"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
                             onClick={() => handleFetchSingleDetail(ev.id)}
                             title="Re-fetch event details"
                             className="p-1.5 rounded-lg bg-slate-700 text-slate-400 hover:text-teal-400 hover:bg-slate-600 transition-colors"
@@ -770,6 +846,150 @@ export function EventsScrapingTab({ darkMode }: EventsScrapingTabProps) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {editingEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-700">
+              <h3 className="text-lg font-semibold text-white">Edit Event</h3>
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Event Name</label>
+                <input
+                  type="text"
+                  value={editForm.event_name}
+                  onChange={e => setEditForm(f => ({ ...f, event_name: e.target.value }))}
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Venue (Club Name)</label>
+                  <input
+                    type="text"
+                    value={editForm.venue}
+                    onChange={e => setEditForm(f => ({ ...f, venue: e.target.value }))}
+                    placeholder="e.g. Lake Macquarie Radio Yacht Club"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={editForm.location}
+                    onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}
+                    placeholder="e.g. Grahamstown Dam, NSW"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={editForm.event_date}
+                    onChange={e => setEditForm(f => ({ ...f, event_date: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={editForm.event_end_date}
+                    onChange={e => setEditForm(f => ({ ...f, event_end_date: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">State Code</label>
+                  <input
+                    type="text"
+                    value={editForm.state_code}
+                    onChange={e => setEditForm(f => ({ ...f, state_code: e.target.value }))}
+                    placeholder="e.g. NSW"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Boat Class</label>
+                  <input
+                    type="text"
+                    value={editForm.boat_class_mapped}
+                    onChange={e => setEditForm(f => ({ ...f, boat_class_mapped: e.target.value }))}
+                    placeholder="e.g. DF65"
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Event Type</label>
+                  <select
+                    value={editForm.event_type}
+                    onChange={e => setEditForm(f => ({ ...f, event_type: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="club">Club</option>
+                    <option value="state">State</option>
+                    <option value="national">National</option>
+                    <option value="world">World</option>
+                    <option value="invitational">Invitational</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
+                  <select
+                    value={editForm.event_status}
+                    onChange={e => setEditForm(f => ({ ...f, event_status: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="postponed">Postponed</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Registration URL</label>
+                <input
+                  type="url"
+                  value={editForm.registration_url}
+                  onChange={e => setEditForm(f => ({ ...f, registration_url: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-700">
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEventEdit}
+                disabled={savingEdit || !editForm.event_name.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <Save size={14} />
+                {savingEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
