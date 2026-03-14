@@ -145,6 +145,7 @@ export const ResultsPage: React.FC = () => {
   const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
   const [externalStateEvents, setExternalStateEvents] = useState<ExternalResultEvent[]>([]);
   const [externalWorldEvents, setExternalWorldEvents] = useState<ExternalResultEvent[]>([]);
+  const [stateAssociationNames, setStateAssociationNames] = useState<Record<string, string>>({});
 
   // Selected item for detail view
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
@@ -194,6 +195,17 @@ export const ResultsPage: React.FC = () => {
         setExternalNationalEvents(data.filter((e: ExternalResultEvent) => e.display_category === 'national'));
         setExternalStateEvents(data.filter((e: ExternalResultEvent) => e.display_category?.startsWith('state_')));
         setExternalWorldEvents(data.filter((e: ExternalResultEvent) => e.display_category === 'world'));
+      }
+
+      const { data: stateAssocs } = await supabase
+        .from('state_associations')
+        .select('id, name, abbreviation');
+      if (stateAssocs) {
+        const nameMap: Record<string, string> = {};
+        stateAssocs.forEach((sa: any) => {
+          nameMap[sa.id] = sa.abbreviation || sa.name;
+        });
+        setStateAssociationNames(nameMap);
       }
     } catch (err) {
       console.error('Error loading external results:', err);
@@ -692,6 +704,12 @@ export const ResultsPage: React.FC = () => {
     const yearMatch = ev.event_name?.match(/\b(20\d{2})\b/);
     if (yearMatch) return parseInt(yearMatch[1]);
     return null;
+  };
+
+  const getStateAssociationLabel = (ev: ExternalResultEvent): string | null => {
+    if (!ev.display_category?.startsWith('state_')) return null;
+    const assocId = ev.display_category.replace('state_', '');
+    return stateAssociationNames[assocId] || null;
   };
 
   const filterExternalEvents = (events: ExternalResultEvent[]) => events.filter(ev => {
@@ -1954,22 +1972,6 @@ export const ResultsPage: React.FC = () => {
             {mainTab === 'leaderboards' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />}
           </button>
 
-          {externalNationalEvents.length > 0 && (
-            <button
-              onClick={() => { setMainTab('national'); setSelectedExternalEvent(null); }}
-              className={`px-4 py-3 font-medium transition-colors relative ${
-                mainTab === 'national' ? 'text-amber-400' : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Globe size={18} />
-                <span>National Events</span>
-                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredNationalEvents.length}</span>
-              </div>
-              {mainTab === 'national' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
-            </button>
-          )}
-
           {externalStateEvents.length > 0 && (
             <button
               onClick={() => { setMainTab('state'); setSelectedExternalEvent(null); }}
@@ -1983,6 +1985,22 @@ export const ResultsPage: React.FC = () => {
                 <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredStateEvents.length}</span>
               </div>
               {mainTab === 'state' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
+            </button>
+          )}
+
+          {externalNationalEvents.length > 0 && (
+            <button
+              onClick={() => { setMainTab('national'); setSelectedExternalEvent(null); }}
+              className={`px-4 py-3 font-medium transition-colors relative ${
+                mainTab === 'national' ? 'text-amber-400' : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Globe size={18} />
+                <span>National Events</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredNationalEvents.length}</span>
+              </div>
+              {mainTab === 'national' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
             </button>
           )}
 
@@ -2130,9 +2148,16 @@ export const ResultsPage: React.FC = () => {
                               className="w-20 h-20 opacity-60 drop-shadow-lg"
                             />
                           </div>
-                          <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
-                            {mainTab === 'state' ? <Map size={12} /> : <Globe size={12} />}
-                            {mainTab === 'national' ? 'National' : mainTab === 'state' ? 'State' : 'World'}
+                          <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                            {mainTab === 'state' && getStateAssociationLabel(ev) && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-green-300 backdrop-blur-sm border border-green-500/30">
+                                {getStateAssociationLabel(ev)}
+                              </div>
+                            )}
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
+                              {mainTab === 'state' ? <Map size={12} /> : <Globe size={12} />}
+                              {mainTab === 'national' ? 'National' : mainTab === 'state' ? 'State' : 'World'}
+                            </div>
                           </div>
                           {ev.event_date && (
                             <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
@@ -2204,6 +2229,11 @@ export const ResultsPage: React.FC = () => {
                           {(ev.boat_class_mapped || ev.boat_class_raw) && (
                             <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
                               {ev.boat_class_mapped || ev.boat_class_raw}
+                            </span>
+                          )}
+                          {mainTab === 'state' && getStateAssociationLabel(ev) && (
+                            <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">
+                              {getStateAssociationLabel(ev)}
                             </span>
                           )}
                         </div>

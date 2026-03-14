@@ -42,6 +42,7 @@ interface RaceResult {
   isSeriesEvent?: boolean;
   isNationalEvent?: boolean;
   isStateEvent?: boolean;
+  stateAssociationName?: string;
   externalEventId?: string;
   seriesId?: string;
   roundIndex?: number;
@@ -169,14 +170,19 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
       // Fetch national + state events and merge them in
       try {
         let stateAssociationId: string | null = null;
+        let stateAssocName: string | null = null;
         if (currentClub?.clubId) {
           const { data: saLink } = await supabase
             .from('state_association_clubs')
-            .select('state_association_id')
+            .select('state_association_id, state_associations(name, abbreviation)')
             .eq('club_id', currentClub.clubId)
             .eq('is_active', true)
             .maybeSingle();
-          if (saLink) stateAssociationId = saLink.state_association_id;
+          if (saLink) {
+            stateAssociationId = saLink.state_association_id;
+            const sa = saLink.state_associations as any;
+            if (sa) stateAssocName = sa.abbreviation || sa.name;
+          }
         }
 
         const categoriesToFetch = ['national'];
@@ -217,6 +223,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
               completed: true,
               isNationalEvent: !isState,
               isStateEvent: isState,
+              stateAssociationName: isState ? (stateAssocName || undefined) : undefined,
               boatClassImage: getBoatClassImage(boatClass),
               topThree,
             };
@@ -475,9 +482,16 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                         </span>
                       )}
                       {race.isStateEvent && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
-                          State
-                        </span>
+                        <>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+                            State
+                          </span>
+                          {race.stateAssociationName && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/50 text-green-300 border border-green-500/20">
+                              {race.stateAssociationName}
+                            </span>
+                          )}
+                        </>
                       )}
                       {!race.isNationalEvent && !race.isStateEvent && race.raceFormat && (
                         <span className={getRaceFormatBadge(race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
