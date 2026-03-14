@@ -1281,10 +1281,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mb-2">
                             <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <MapPin size={13} />
                               <span className="font-medium truncate">{event.venue}</span>
                             </div>
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
                             <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
                               {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                             </span>
@@ -2523,20 +2521,13 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             darkMode ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-100 border border-slate-200'
           }`}>
             {([
-              { key: 'all' as EventScope, label: 'All Events', icon: Calendar, desc: 'Club + My State + National' },
-              { key: 'club' as EventScope, label: 'Club', icon: Building2, desc: 'Club events only' },
-              { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', icon: MapPin, desc: 'Your state events' },
-              { key: 'national' as EventScope, label: 'National', icon: Flag, desc: 'National events' },
-              { key: 'all_states' as EventScope, label: 'All States', icon: Globe, desc: 'All state events' },
+              { key: 'all' as EventScope, label: 'All Events', desc: 'Club + My State + National' },
+              { key: 'club' as EventScope, label: 'Club Events', desc: 'Club events only' },
+              { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', desc: 'Your state events' },
+              { key: 'national' as EventScope, label: 'National Events', desc: 'National events' },
+              { key: 'all_states' as EventScope, label: 'All Events', desc: 'All events across all states' },
             ]).map(tab => {
               const isActive = eventScope === tab.key;
-              const Icon = tab.icon;
-              const count = tab.key === 'all' ? undefined :
-                tab.key === 'club' ? Object.values(uniqueEvents).filter(e => !e.isExternalEvent && !e.isPublicEvent).length :
-                tab.key === 'my_state' ? Object.values(uniqueEvents).filter(e => isEventInMyState(e)).length :
-                tab.key === 'national' ? Object.values(uniqueEvents).filter(e => e.isExternalEvent && (e.displayCategory === 'national' || e.eventLevel === 'national')).length :
-                tab.key === 'all_states' ? Object.values(uniqueEvents).filter(e => isEventInAnyState(e)).length :
-                undefined;
 
               return (
                 <button
@@ -2544,34 +2535,16 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                   onClick={() => handleEventScopeChange(tab.key)}
                   title={tab.desc}
                   className={`
-                    flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none justify-center
+                    px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none text-center whitespace-nowrap
                     ${isActive
-                      ? tab.key === 'national'
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/20'
-                        : tab.key === 'my_state'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20'
-                        : tab.key === 'club'
-                        ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/20'
-                        : tab.key === 'all_states'
-                        ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-lg shadow-sky-500/20'
-                        : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20'
                       : darkMode
                         ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                         : 'text-slate-600 hover:text-slate-800 hover:bg-white'
                     }
                   `}
                 >
-                  <Icon size={15} />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  {count !== undefined && count > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
-                      isActive
-                        ? 'bg-white/25 text-white'
-                        : darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {count}
-                    </span>
-                  )}
+                  {tab.label}
                 </button>
               );
             })}
