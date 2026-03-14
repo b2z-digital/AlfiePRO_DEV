@@ -459,6 +459,8 @@ Deno.serve(async (req: Request) => {
 
         const currentExternalIds = new Set(listingLinks.map((l) => l.id));
 
+        listingLinks.reverse();
+
         for (const link of listingLinks) {
           const externalSourceId = `arya_${link.id}`;
 

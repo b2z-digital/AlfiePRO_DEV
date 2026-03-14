@@ -40,6 +40,15 @@ export interface Classified {
     name: string;
     logo?: string;
   };
+  matched_member?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string;
+    user_id?: string;
+    club_name?: string;
+  };
   is_favorited?: boolean;
   favorites_count?: number;
 }

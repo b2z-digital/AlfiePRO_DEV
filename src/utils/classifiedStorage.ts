@@ -37,12 +37,90 @@ export async function getClassifieds(clubId?: string, includePublic = true) {
     const usersMap = new Map((usersData.data || []).map(u => [u.id, u]));
     const clubsMap = new Map((clubsData.data || []).map(c => [c.id, c]));
 
-    // Join the data
-    const result = classifieds.map(classified => ({
-      ...classified,
-      user: classified.user_id ? usersMap.get(classified.user_id) : null,
-      club: classified.club_id ? clubsMap.get(classified.club_id) : null
-    }));
+    const externalClassifieds = classifieds.filter(c => c.is_external || c.is_scraped);
+    const externalEmails = [...new Set(externalClassifieds.map(c => c.external_contact_email).filter(Boolean))] as string[];
+    const externalNames = [...new Set(externalClassifieds.map(c => c.external_contact_name).filter(Boolean))] as string[];
+
+    let membersMap = new Map<string, any>();
+    if (externalEmails.length > 0 || externalNames.length > 0) {
+      const emailConditions = externalEmails.map(e => `email.ilike.${e}`);
+      const orConditions = emailConditions.join(',');
+
+      let memberMatches: any[] = [];
+      if (externalEmails.length > 0) {
+        const { data: emailMatches } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, avatar_url, user_id, club_id')
+          .in('email', externalEmails.map(e => e.toLowerCase()));
+        if (emailMatches) memberMatches.push(...emailMatches);
+      }
+
+      if (memberMatches.length < externalClassifieds.length && externalNames.length > 0) {
+        for (const fullName of externalNames) {
+          const parts = fullName.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            const firstName = parts[0];
+            const lastName = parts.slice(1).join(' ');
+            const { data: nameMatches } = await supabase
+              .from('members')
+              .select('id, first_name, last_name, email, avatar_url, user_id, club_id')
+              .ilike('first_name', firstName)
+              .ilike('last_name', lastName)
+              .limit(1);
+            if (nameMatches) memberMatches.push(...nameMatches);
+          }
+        }
+      }
+
+      const memberClubIds = [...new Set(memberMatches.map(m => m.club_id).filter(Boolean))];
+      let memberClubsMap = new Map<string, string>();
+      if (memberClubIds.length > 0) {
+        const { data: memberClubs } = await supabase
+          .from('clubs')
+          .select('id, name')
+          .in('id', memberClubIds);
+        if (memberClubs) {
+          memberClubsMap = new Map(memberClubs.map(c => [c.id, c.name]));
+        }
+      }
+
+      for (const m of memberMatches) {
+        const key = m.email?.toLowerCase();
+        if (key && !membersMap.has(key)) {
+          membersMap.set(key, { ...m, club_name: m.club_id ? memberClubsMap.get(m.club_id) : undefined });
+        }
+        const nameKey = `${m.first_name} ${m.last_name}`.toLowerCase();
+        if (!membersMap.has(nameKey)) {
+          membersMap.set(nameKey, { ...m, club_name: m.club_id ? memberClubsMap.get(m.club_id) : undefined });
+        }
+      }
+    }
+
+    const result = classifieds.map(classified => {
+      let matched_member = null;
+      if (classified.is_external || classified.is_scraped) {
+        if (classified.external_contact_email) {
+          matched_member = membersMap.get(classified.external_contact_email.toLowerCase()) || null;
+        }
+        if (!matched_member && classified.external_contact_name) {
+          matched_member = membersMap.get(classified.external_contact_name.toLowerCase()) || null;
+        }
+      }
+      return {
+        ...classified,
+        user: classified.user_id ? usersMap.get(classified.user_id) : null,
+        club: classified.club_id ? clubsMap.get(classified.club_id) : null,
+        matched_member: matched_member ? {
+          id: matched_member.id,
+          first_name: matched_member.first_name,
+          last_name: matched_member.last_name,
+          email: matched_member.email,
+          avatar_url: matched_member.avatar_url,
+          user_id: matched_member.user_id,
+          club_name: matched_member.club_name,
+        } : null,
+      };
+    });
 
     return result as unknown as Classified[];
   } catch (error) {
