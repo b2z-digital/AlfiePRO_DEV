@@ -31,6 +31,60 @@ import { SeriesEditModal } from '../components/SeriesEditModal';
 type MainTab = 'events' | 'leaderboards' | 'national' | 'world';
 type StatusFilter = 'all' | 'completed' | 'in-progress';
 
+const BOAT_CLASS_IMAGES: { keywords: string[]; image: string }[] = [
+  {
+    keywords: ['ten rater', '10 rater', '10r', '10-r'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761693386070-10r31_orig.jpg'
+  },
+  {
+    keywords: ['international one metre', 'iom', 'one metre'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761693863856-IOM-Europeans-Spain-2023-Torrevieja-starting-upwind-1.jpg'
+  },
+  {
+    keywords: ['dragonflite 95', 'dragon force 95', 'df95', 'df-95'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761694881094-P1060377.jpg'
+  },
+  {
+    keywords: ['dragon force 65', 'dragonflite 65', 'df65', 'df-65'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761694758064-DF65.jpeg'
+  },
+  {
+    keywords: ['marblehead', 'm class'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761693804892-M%20Page%20Image.jpg'
+  },
+  {
+    keywords: ['a class', 'a-class'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761693570342-A%20Class%20Start%202.jpg'
+  },
+  {
+    keywords: ['rc laser', 'rclaser'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761694396750-Dobroyd-RC-lasers-close-racing.jpg'
+  },
+  {
+    keywords: ['ec12', 'east coast 12', 'east coast twelve'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761695045578-EC12-Nats.jpg'
+  },
+  {
+    keywords: ['soling', 's1m', 'soling one meter'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761694977244-Soling-Nationals-start.jpg'
+  },
+  {
+    keywords: ['wind warrior'],
+    image: 'https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/boat-classes/65e9acf7-acff-4071-83a1-487dd130d318/1761695142975-Large_IMG_673320110902%20at%20162351.jpg'
+  },
+];
+
+function getBoatClassImage(boatClass: string | null | undefined): string | null {
+  if (!boatClass) return null;
+  const lower = boatClass.toLowerCase();
+  for (const entry of BOAT_CLASS_IMAGES) {
+    if (entry.keywords.some(kw => lower.includes(kw))) {
+      return entry.image;
+    }
+  }
+  return null;
+}
+
 interface ExternalResultEvent {
   id: string;
   event_name: string;
@@ -2016,6 +2070,7 @@ export const ResultsPage: React.FC = () => {
               ) : (
                 extEvents.map(ev => {
                   if (viewMode === 'grid') {
+                    const classImg = getBoatClassImage(ev.boat_class_mapped || ev.boat_class_raw);
                     return (
                       <button
                         key={ev.id}
@@ -2024,18 +2079,20 @@ export const ResultsPage: React.FC = () => {
                       >
                         <div className="relative h-40 flex-shrink-0 overflow-hidden bg-slate-900">
                           <img
-                            src="/results_tile.jpg"
+                            src={classImg || '/results_tile.jpg'}
                             alt=""
                             className="absolute inset-0 w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/65" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <img
-                              src="/alfie_app_logo.svg"
-                              alt="AlfiePRO"
-                              className="w-24 h-24 opacity-70 drop-shadow-lg"
-                            />
-                          </div>
+                          {!classImg && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <img
+                                src="/alfie_app_logo.svg"
+                                alt="AlfiePRO"
+                                className="w-24 h-24 opacity-70 drop-shadow-lg"
+                              />
+                            </div>
+                          )}
                           <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
                             <Globe size={12} />
                             {mainTab === 'national' ? 'National' : 'World'}
@@ -2085,14 +2142,21 @@ export const ResultsPage: React.FC = () => {
                     );
                   }
                   // List view
+                  const listClassImg = getBoatClassImage(ev.boat_class_mapped || ev.boat_class_raw);
                   return (
                     <button
                       key={ev.id}
                       onClick={() => setSelectedExternalEvent(ev)}
                       className="group w-full flex items-center gap-4 p-4 rounded-lg border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/60 transition-all duration-200"
                     >
-                      <div className={`w-12 h-12 rounded-lg bg-${accentColor}-500/20 flex items-center justify-center flex-shrink-0`}>
-                        <Globe className={`text-${accentColor}-400`} size={20} />
+                      <div className={`w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 ${!listClassImg ? `bg-${accentColor}-500/20` : ''}`}>
+                        {listClassImg ? (
+                          <img src={listClassImg} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Globe className={`text-${accentColor}-400`} size={20} />
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0 text-left">
                         <h4 className="font-medium text-white truncate">{ev.event_name}</h4>
