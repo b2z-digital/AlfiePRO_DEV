@@ -257,7 +257,7 @@ function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null
       if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
       if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
     } else if (singleDate) {
-      const d = new Date(singleDate[1]);
+      const d = new Date(singleDate[0]);
       if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
     }
 
