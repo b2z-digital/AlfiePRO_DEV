@@ -9,6 +9,7 @@ import { useWidgetTheme } from './ThemedWidgetWrapper';
 interface Article {
   id: string;
   title: string;
+  published_at: string | null;
   created_at: string;
   status: 'draft' | 'published';
   cover_image: string | null;
@@ -39,20 +40,20 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       if (orgType === 'state') {
         const { data, error } = await supabase
           .from('articles')
-          .select('id, title, created_at, status, cover_image')
+          .select('id, title, published_at, created_at, status, cover_image')
           .eq('status', 'published')
           .eq('state_association_id', orgId)
-          .order('created_at', { ascending: false })
+          .order('published_at', { ascending: false })
           .limit(3);
         if (error) throw error;
         setArticles(data || []);
       } else if (orgType === 'national') {
         const { data, error } = await supabase
           .from('articles')
-          .select('id, title, created_at, status, cover_image')
+          .select('id, title, published_at, created_at, status, cover_image')
           .eq('status', 'published')
           .eq('national_association_id', orgId)
-          .order('created_at', { ascending: false })
+          .order('published_at', { ascending: false })
           .limit(3);
         if (error) throw error;
         setArticles(data || []);
@@ -84,14 +85,20 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
 
         const { data, error } = await supabase
           .from('articles')
-          .select('id, title, created_at, status, cover_image')
+          .select('id, title, published_at, created_at, status, cover_image')
           .eq('status', 'published')
           .or(orFilter)
-          .order('created_at', { ascending: false })
+          .order('published_at', { ascending: false })
           .limit(5);
 
         if (error) throw error;
-        setArticles((data || []).slice(0, 3));
+
+        const sorted = (data || []).sort((a, b) => {
+          const dateA = a.published_at ? new Date(a.published_at).getTime() : 0;
+          const dateB = b.published_at ? new Date(b.published_at).getTime() : 0;
+          return dateB - dateA;
+        });
+        setArticles(sorted.slice(0, 3));
       }
     } catch (error) {
       console.error('Error loading articles:', error);
@@ -198,7 +205,7 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
                   <div className="text-xs text-slate-400 flex items-center gap-3 mt-1">
                     <span className="flex items-center gap-1">
                       <Clock size={11} />
-                      {formatDate(article.created_at)}
+                      {formatDate(article.published_at || article.created_at)}
                     </span>
                     {article.status === 'published' ? (
                       <span className="text-green-400">Published</span>
