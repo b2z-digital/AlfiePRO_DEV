@@ -213,15 +213,6 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
         )}
       </div>
 
-      {articles.length > 0 && (
-        <button
-          onClick={handleCreateArticle}
-          disabled={isEditMode}
-          className={`mt-4 w-full py-2 text-sm text-amber-400 hover:text-amber-300 transition-colors ${isEditMode ? 'pointer-events-none' : ''}`}
-        >
-          View All News →
-        </button>
-      )}
     </div>
   );
 };
