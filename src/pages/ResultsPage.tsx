@@ -2087,14 +2087,7 @@ export const ResultsPage: React.FC = () => {
                             alt=""
                             className="absolute inset-0 w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/65" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <img
-                              src="/alfie_app_logo.svg"
-                              alt="AlfiePRO"
-                              className="w-20 h-20 opacity-60 drop-shadow-lg"
-                            />
-                          </div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-slate-900/10" />
                           <div className="absolute top-2 right-2 flex items-center gap-1.5">
                             {mainTab === 'state' && getStateAssociationLabel(ev) && (
                               <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-800/90 text-green-300 backdrop-blur-sm border border-green-500/30">
