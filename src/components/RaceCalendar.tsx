@@ -769,6 +769,11 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     if (timeFilter === 'upcoming' && md < today) return false;
     if (timeFilter === 'past' && md >= today) return false;
 
+    if (eventScope === 'club' && meeting.organizationLevel !== 'club') return false;
+    if (eventScope === 'my_state' && meeting.organizationLevel !== 'state_association') return false;
+    if (eventScope === 'national' && meeting.organizationLevel !== 'national_association') return false;
+    if (eventScope === 'all_states' && meeting.organizationLevel !== 'state_association') return false;
+
     return true;
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
