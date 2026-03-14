@@ -86,6 +86,31 @@ interface DiscoveredEvent {
   boatClassMapped: string | null;
 }
 
+function findNearbyDate(html: string, linkIndex: number): string | null {
+  const searchWindow = html.slice(Math.max(0, linkIndex - 500), linkIndex);
+  const datePatterns = [
+    /(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(20\d{2})/gi,
+    /(\d{1,2})[-\/](\d{1,2})[-\/](20\d{2})/g,
+  ];
+  for (const pattern of datePatterns) {
+    const matches = [...searchWindow.matchAll(pattern)];
+    if (matches.length > 0) {
+      const last = matches[matches.length - 1];
+      const d = new Date(last[0]);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+  }
+  return null;
+}
+
+function findNearbyVenue(html: string, linkIndex: number): string | null {
+  const searchWindow = html.slice(linkIndex, linkIndex + 500);
+  const venueMatch =
+    searchWindow.match(/([A-Z][a-zA-Z\s']+,\s*(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)(?:\s+AUS)?)/);
+  if (venueMatch) return venueMatch[1].replace(/\s+AUS$/, "").trim();
+  return null;
+}
+
 function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
   const events: DiscoveredEvent[] = [];
   const seen = new Set<string>();
@@ -95,7 +120,6 @@ function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
   const linkMatches = extractAllMatches(html, /<a[^>]+href=["']([^"'#][^"']*?)["'][^>]*>([\s\S]*?)<\/a>/i);
 
   for (const m of linkMatches) {
-    // Decode HTML entities in href (e.g. &amp; -> &)
     const href = m[1].trim()
       .replace(/&amp;/g, "&")
       .replace(/&#38;/g, "&")
@@ -108,7 +132,6 @@ function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
     else if (href.startsWith("/")) fullUrl = origin + href;
     else if (!href.startsWith("http")) fullUrl = origin + "/" + href;
 
-    // Must be on the same origin
     try {
       const u = new URL(fullUrl);
       if (u.origin !== origin) continue;
@@ -116,7 +139,6 @@ function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
       continue;
     }
 
-    // Require a recognisable event ID in the URL
     const eventIdMatch =
       fullUrl.match(/[?&](?:eventid|event_id|eid|id)=(\w+)/i) ||
       fullUrl.match(/\/event[s]?\/(\w+)/i) ||
@@ -129,23 +151,30 @@ function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
     if (seen.has(externalEventId)) continue;
     seen.add(externalEventId);
 
-    // Try to extract date / boat class from link text or surrounding context
     const boatClassMapped = detectBoatClass(rawText);
-    const dateMatch = rawText.match(/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/) ||
-                      rawText.match(/\d{1,2}\s+\w{3,9}\s+\d{4}/);
 
+    const linkStartIndex = m.index ?? 0;
     let eventDate: string | null = null;
-    if (dateMatch) {
-      const d = new Date(dateMatch[0]);
+
+    const inlineDate = rawText.match(/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/) ||
+                       rawText.match(/\d{1,2}\s+\w{3,9}\s+\d{4}/);
+    if (inlineDate) {
+      const d = new Date(inlineDate[0]);
       if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
     }
+
+    if (!eventDate) {
+      eventDate = findNearbyDate(html, linkStartIndex);
+    }
+
+    const venue = findNearbyVenue(html, linkStartIndex + (m[0]?.length || 0));
 
     events.push({
       externalEventId,
       url: fullUrl,
       name: rawText.slice(0, 200),
       eventDate,
-      venue: null,
+      venue,
       boatClassRaw: boatClassMapped || null,
       boatClassMapped,
     });
