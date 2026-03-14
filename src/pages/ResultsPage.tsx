@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CheckCircle2, Clock, ChevronRight, X, Grid as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, XCircle, Send, Edit2, Globe } from 'lucide-react';
+import { Trophy, TrendingUp, Search, Calendar, MapPin, Users, CheckCircle2, Clock, ChevronRight, X, Grid as GridIcon, List as ListIcon, Download, ChevronDown, FileImage, FileText, Table, XCircle, Send, Edit2, Globe, Map } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Papa from 'papaparse';
@@ -28,7 +28,7 @@ import { PublishToMetaModal } from '../components/PublishToMetaModal';
 import { HeatRaceResultsModal } from '../components/HeatRaceResultsModal';
 import { SeriesEditModal } from '../components/SeriesEditModal';
 
-type MainTab = 'events' | 'leaderboards' | 'national' | 'world';
+type MainTab = 'events' | 'leaderboards' | 'national' | 'state' | 'world';
 type StatusFilter = 'all' | 'completed' | 'in-progress';
 
 const BOAT_CLASS_IMAGES: { keywords: string[]; image: string }[] = [
@@ -95,7 +95,7 @@ interface ExternalResultEvent {
   boat_class_mapped: string | null;
   competitor_count: number;
   race_count: number;
-  display_category: 'national' | 'world';
+  display_category: string;
   source_url: string;
   results_json: any[] | null;
   last_scraped_at: string | null;
@@ -143,6 +143,7 @@ export const ResultsPage: React.FC = () => {
   const [clubFeaturedImage, setClubFeaturedImage] = useState<string | null>(null);
   const [previousSidebarState, setPreviousSidebarState] = useState<string | null>(null);
   const [externalNationalEvents, setExternalNationalEvents] = useState<ExternalResultEvent[]>([]);
+  const [externalStateEvents, setExternalStateEvents] = useState<ExternalResultEvent[]>([]);
   const [externalWorldEvents, setExternalWorldEvents] = useState<ExternalResultEvent[]>([]);
 
   // Selected item for detail view
@@ -191,6 +192,7 @@ export const ResultsPage: React.FC = () => {
         .order('event_date', { ascending: false });
       if (data) {
         setExternalNationalEvents(data.filter((e: ExternalResultEvent) => e.display_category === 'national'));
+        setExternalStateEvents(data.filter((e: ExternalResultEvent) => e.display_category?.startsWith('state_')));
         setExternalWorldEvents(data.filter((e: ExternalResultEvent) => e.display_category === 'world'));
       }
     } catch (err) {
@@ -660,8 +662,7 @@ export const ResultsPage: React.FC = () => {
           .map(round => new Date(round.date || '').getFullYear())
           .filter(year => !isNaN(year))
       ),
-      // Years from external national/world events
-      ...[...externalNationalEvents, ...externalWorldEvents]
+      ...[...externalNationalEvents, ...externalStateEvents, ...externalWorldEvents]
         .map(ev => new Date(ev.event_date || '').getFullYear())
         .filter(year => !isNaN(year))
     ])
@@ -671,6 +672,12 @@ export const ResultsPage: React.FC = () => {
   const filteredSeries = filterItems(allSeries, searchTerm, statusFilter, selectedYear);
 
   const filteredNationalEvents = externalNationalEvents.filter(ev => {
+    if (!ev.event_date) return false;
+    if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
+    if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+  const filteredStateEvents = externalStateEvents.filter(ev => {
     if (!ev.event_date) return false;
     if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
     if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -1842,7 +1849,7 @@ export const ResultsPage: React.FC = () => {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-white">Results</h1>
               <p className="text-sm text-slate-400">
-                {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'national' ? filteredNationalEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
+                {mainTab === 'events' ? eventsToShow.length : mainTab === 'leaderboards' ? seriesToShow.length : mainTab === 'national' ? filteredNationalEvents.length : mainTab === 'state' ? filteredStateEvents.length : filteredWorldEvents.length} {mainTab === 'leaderboards' ? 'leaderboards' : 'events'}
               </p>
             </div>
           </div>
@@ -1944,6 +1951,22 @@ export const ResultsPage: React.FC = () => {
                 <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredNationalEvents.length}</span>
               </div>
               {mainTab === 'national' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400" />}
+            </button>
+          )}
+
+          {externalStateEvents.length > 0 && (
+            <button
+              onClick={() => { setMainTab('state'); setSelectedExternalEvent(null); }}
+              className={`px-4 py-3 font-medium transition-colors relative ${
+                mainTab === 'state' ? 'text-green-400' : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Map size={18} />
+                <span>State Events</span>
+                <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredStateEvents.length}</span>
+              </div>
+              {mainTab === 'state' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
             </button>
           )}
 
@@ -2058,14 +2081,14 @@ export const ResultsPage: React.FC = () => {
           </div>
         )}
 
-        {(mainTab === 'national' || mainTab === 'world') && (() => {
-          const extEvents = mainTab === 'national' ? filteredNationalEvents : filteredWorldEvents;
-          const accentColor = mainTab === 'national' ? 'amber' : 'orange';
+        {(mainTab === 'national' || mainTab === 'state' || mainTab === 'world') && (() => {
+          const extEvents = mainTab === 'national' ? filteredNationalEvents : mainTab === 'state' ? filteredStateEvents : filteredWorldEvents;
+          const accentColor = mainTab === 'national' ? 'amber' : mainTab === 'state' ? 'green' : 'orange';
           return (
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-3'}>
               {extEvents.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-400">
-                  No {mainTab === 'national' ? 'national' : 'world'} events found
+                  No {mainTab === 'national' ? 'national' : mainTab === 'state' ? 'state' : 'world'} events found
                 </div>
               ) : (
                 extEvents.map(ev => {
@@ -2092,8 +2115,8 @@ export const ResultsPage: React.FC = () => {
                             />
                           </div>
                           <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
-                            <Globe size={12} />
-                            {mainTab === 'national' ? 'National' : 'World'}
+                            {mainTab === 'state' ? <Map size={12} /> : <Globe size={12} />}
+                            {mainTab === 'national' ? 'National' : mainTab === 'state' ? 'State' : 'World'}
                           </div>
                           {ev.event_date && (
                             <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
@@ -2152,7 +2175,7 @@ export const ResultsPage: React.FC = () => {
                           <img src={listClassImg} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Globe className={`text-${accentColor}-400`} size={20} />
+                            {mainTab === 'state' ? <Map className={`text-${accentColor}-400`} size={20} /> : <Globe className={`text-${accentColor}-400`} size={20} />}
                           </div>
                         )}
                       </div>

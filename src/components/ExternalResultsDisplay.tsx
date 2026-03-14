@@ -13,7 +13,7 @@ interface ExternalResultEvent {
   boat_class_mapped: string | null;
   competitor_count: number;
   race_count: number;
-  display_category: 'national' | 'world';
+  display_category: string;
   source_url: string;
   results_json: any[] | null;
   last_scraped_at: string | null;
@@ -102,8 +102,10 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
     return formatDate(eventDate);
   };
 
-  const accentColor = event.display_category === 'world' ? 'text-amber-400' : 'text-blue-400';
-  const accentBg = event.display_category === 'world' ? 'bg-amber-500/20 border-amber-500/30 text-amber-300' : 'bg-blue-500/20 border-blue-500/30 text-blue-300';
+  const isState = event.display_category?.startsWith('state_');
+  const accentColor = event.display_category === 'world' ? 'text-amber-400' : isState ? 'text-green-400' : 'text-blue-400';
+  const accentBg = event.display_category === 'world' ? 'bg-amber-500/20 border-amber-500/30 text-amber-300' : isState ? 'bg-green-500/20 border-green-500/30 text-green-300' : 'bg-blue-500/20 border-blue-500/30 text-blue-300';
+  const categoryLabel = event.display_category === 'world' ? 'World Event' : isState ? 'State Event' : 'National Event';
 
   return (
     <div className="space-y-0 rounded-xl overflow-hidden border border-slate-700/50">
@@ -112,7 +114,7 @@ const ExternalResultsDisplay: React.FC<ExternalResultsDisplayProps> = ({
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${accentBg}`}>
             <Globe size={10} />
-            {event.display_category === 'world' ? 'World Event' : 'National Event'}
+            {categoryLabel}
           </span>
           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/60 text-slate-400 border border-slate-600/30">
             External Results

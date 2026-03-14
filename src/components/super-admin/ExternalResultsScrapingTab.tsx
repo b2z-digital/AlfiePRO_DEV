@@ -15,7 +15,7 @@ interface ResultSource {
   name: string;
   url: string;
   source_type: 'event_list' | 'single_event';
-  display_category: 'national' | 'world';
+  display_category: string;
   target_national_association_id: string | null;
   is_active: boolean;
   last_scraped_at: string | null;
@@ -35,7 +35,7 @@ interface ResultEvent {
   competitor_count: number;
   race_count: number;
   is_visible: boolean;
-  display_category: 'national' | 'world';
+  display_category: string;
   last_scraped_at: string | null;
   source_url: string;
 }
@@ -58,6 +58,35 @@ interface NationalAssoc {
   name: string;
 }
 
+interface StateAssoc {
+  id: string;
+  name: string;
+  abbreviation: string | null;
+}
+
+const STATE_ABBREV_MAP: Record<string, string> = {
+  'NSW': 'NSW',
+  'VIC': 'VIC',
+  'QLD': 'QLD',
+  'SA': 'SA',
+  'WA': 'WA',
+  'TAS': 'TAS',
+  'ACT': 'ACT',
+  'NT': 'NT',
+};
+
+function getStateLabel(category: string, stateAssociations: StateAssoc[]): string {
+  if (category === 'national') return 'National Events';
+  if (category === 'world') return 'World Events';
+  if (category.startsWith('state_')) {
+    const stateId = category.replace('state_', '');
+    const sa = stateAssociations.find(s => s.id === stateId);
+    if (sa) return sa.abbreviation || sa.name;
+    return 'State Event';
+  }
+  return category;
+}
+
 const EMPTY_FORM = {
   name: '',
   url: '',
@@ -70,6 +99,7 @@ const EMPTY_FORM = {
 export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScrapingTabProps) {
   const [sources, setSources] = useState<ResultSource[]>([]);
   const [nationals, setNationals] = useState<NationalAssoc[]>([]);
+  const [stateAssociations, setStateAssociations] = useState<StateAssoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -87,12 +117,14 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
 
   async function fetchAll() {
     setLoading(true);
-    const [sourcesRes, nationalsRes] = await Promise.all([
+    const [sourcesRes, nationalsRes, statesRes] = await Promise.all([
       supabase.from('external_result_sources').select('*').order('created_at', { ascending: false }),
       supabase.from('national_associations').select('id, name').order('name'),
+      supabase.from('state_associations').select('id, name, abbreviation').order('name'),
     ]);
     if (sourcesRes.data) setSources(sourcesRes.data);
     if (nationalsRes.data) setNationals(nationalsRes.data);
+    if (statesRes.data) setStateAssociations(statesRes.data);
     setLoading(false);
   }
 
@@ -189,7 +221,7 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
     }));
   }
 
-  async function handleUpdateEventCategory(event: ResultEvent, category: 'national' | 'world') {
+  async function handleUpdateEventCategory(event: ResultEvent, category: string) {
     await supabase
       .from('external_result_events')
       .update({ display_category: category, updated_at: new Date().toISOString() })
@@ -304,13 +336,19 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
     return new Date(iso).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const categoryBadge = (cat: 'national' | 'world') => (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-      cat === 'world' ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/20 text-blue-300'
-    }`}>
-      {cat === 'world' ? 'World Events' : 'National Events'}
-    </span>
-  );
+  const categoryBadge = (cat: string) => {
+    const isState = cat.startsWith('state_');
+    const colorClass = cat === 'world'
+      ? 'bg-amber-500/20 text-amber-300'
+      : isState
+        ? 'bg-green-500/20 text-green-300'
+        : 'bg-blue-500/20 text-blue-300';
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+        {getStateLabel(cat, stateAssociations)}
+      </span>
+    );
+  };
 
   if (loading) {
     return (
@@ -427,6 +465,15 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
               >
                 <option value="national">National Events</option>
                 <option value="world">World Events</option>
+                {stateAssociations.length > 0 && (
+                  <optgroup label="State Events">
+                    {stateAssociations.map(sa => (
+                      <option key={sa.id} value={`state_${sa.id}`}>
+                        {sa.abbreviation || sa.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div>
@@ -600,11 +647,16 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
                           {/* Per-event category override */}
                           <select
                             value={ev.display_category}
-                            onChange={e => handleUpdateEventCategory(ev, e.target.value as 'national' | 'world')}
+                            onChange={e => handleUpdateEventCategory(ev, e.target.value)}
                             className="text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-300 focus:outline-none"
                           >
                             <option value="national">National</option>
                             <option value="world">World</option>
+                            {stateAssociations.map(sa => (
+                              <option key={sa.id} value={`state_${sa.id}`}>
+                                {sa.abbreviation || sa.name}
+                              </option>
+                            ))}
                           </select>
                           {/* Visibility toggle */}
                           <button
