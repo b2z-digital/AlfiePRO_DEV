@@ -663,7 +663,11 @@ export const ResultsPage: React.FC = () => {
           .filter(year => !isNaN(year))
       ),
       ...[...externalNationalEvents, ...externalStateEvents, ...externalWorldEvents]
-        .map(ev => new Date(ev.event_date || '').getFullYear())
+        .map(ev => {
+          if (ev.event_date) return new Date(ev.event_date).getFullYear();
+          const m = ev.event_name?.match(/\b(20\d{2})\b/);
+          return m ? parseInt(m[1]) : NaN;
+        })
         .filter(year => !isNaN(year))
     ])
   ).sort((a, b) => b - a); // Sort descending (newest first)
@@ -671,24 +675,24 @@ export const ResultsPage: React.FC = () => {
   const filteredEvents = sortByDateDesc(filterItems([...allEvents, ...roundResults], searchTerm, statusFilter, selectedYear));
   const filteredSeries = filterItems(allSeries, searchTerm, statusFilter, selectedYear);
 
-  const filteredNationalEvents = externalNationalEvents.filter(ev => {
-    if (!ev.event_date) return false;
-    if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
+  const getExternalEventYear = (ev: ExternalResultEvent): number | null => {
+    if (ev.event_date) return new Date(ev.event_date).getFullYear();
+    const yearMatch = ev.event_name?.match(/\b(20\d{2})\b/);
+    if (yearMatch) return parseInt(yearMatch[1]);
+    return null;
+  };
+
+  const filterExternalEvents = (events: ExternalResultEvent[]) => events.filter(ev => {
+    const year = getExternalEventYear(ev);
+    if (year !== null && year !== selectedYear) return false;
+    if (year === null) return false;
     if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
-  const filteredStateEvents = externalStateEvents.filter(ev => {
-    if (!ev.event_date) return false;
-    if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
-    if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
-  const filteredWorldEvents = externalWorldEvents.filter(ev => {
-    if (!ev.event_date) return false;
-    if (new Date(ev.event_date).getFullYear() !== selectedYear) return false;
-    if (searchTerm && !ev.event_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+
+  const filteredNationalEvents = filterExternalEvents(externalNationalEvents);
+  const filteredStateEvents = filterExternalEvents(externalStateEvents);
+  const filteredWorldEvents = filterExternalEvents(externalWorldEvents);
 
   // Group series by class
   const groupedSeries = filteredSeries.reduce((acc, series) => {
