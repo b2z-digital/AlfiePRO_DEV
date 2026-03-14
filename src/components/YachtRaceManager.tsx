@@ -2847,7 +2847,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]' : 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50'}`}>
-      <div className={`w-full ${isFullscreenScoring ? 'px-4 py-2' : 'px-20 py-12'}`}>
+      <div className={`w-full ${isFullscreenScoring ? 'px-0 py-0' : 'px-20 py-12'}`}>
         <div className={`flex-1 flex flex-col justify-center ${isFullscreenScoring ? '' : 'min-h-[calc(100vh-24rem)]'}`}>
           {getCurrentEvent() && !isFullscreenScoring && (
             <div className="mb-4">
@@ -2916,7 +2916,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
             )}
 
             {(scoringMode === 'touch' || heatManagement?.configuration.enabled) && (
-              <div className={`fixed ${isFullscreenScoring ? 'top-2 right-4' : 'top-4 right-[5.9375rem]'} z-30 flex items-center gap-2`}>
+              <div className={`fixed ${isFullscreenScoring ? 'top-2 right-4' : 'top-4 right-[5.9375rem]'} z-40 flex items-center gap-2`}>
                 <button
                   type="button"
                   onClick={() => setShowExitConfirm(true)}
