@@ -41,6 +41,7 @@ interface RaceResult {
   completed: boolean;
   isSeriesEvent?: boolean;
   isNationalEvent?: boolean;
+  externalEventId?: string;
   seriesId?: string;
   roundIndex?: number;
   venueImage?: string;
@@ -190,6 +191,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
             }
             return {
               id: `national-${ev.id}`,
+              externalEventId: ev.id,
               eventName: ev.event_name,
               date: ev.event_date!,
               venue: ev.venue || '',
@@ -369,7 +371,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
               onClick={() => {
                 if (isEditMode) return;
                 if (race.isNationalEvent) {
-                  navigate('/results', { state: { mainTab: 'national' } });
+                  navigate('/results', { state: { mainTab: 'national', externalEventId: race.externalEventId } });
                 } else {
                   navigate('/results', { state: { eventId: race.id, isSeriesEvent: race.isSeriesEvent, seriesId: race.seriesId, roundIndex: race.roundIndex } });
                 }

@@ -229,8 +229,24 @@ export const ResultsPage: React.FC = () => {
   }, [id, selectedSeries, selectedEvent, selectedRound]);
 
   useEffect(() => {
-    // Check if navigation state includes event details
     const navState = location.state as any;
+
+    if (navState?.mainTab) {
+      setMainTab(navState.mainTab);
+    }
+
+    if (navState?.externalEventId) {
+      const allExternal = [...externalNationalEvents, ...externalStateEvents, ...externalWorldEvents];
+      const extEvent = allExternal.find(e => e.id === navState.externalEventId);
+      if (extEvent) {
+        setSelectedExternalEvent(extEvent);
+        setSelectedEvent(null);
+        setSelectedSeries(null);
+        setSelectedRound(null);
+        return;
+      }
+    }
+
     let targetId = id;
 
     if (navState?.eventId) {
@@ -238,7 +254,6 @@ export const ResultsPage: React.FC = () => {
     }
 
     if (targetId) {
-      // Check if it's a round result (format: seriesId-round-roundIndex)
       if (targetId.includes('-round-')) {
         const parts = targetId.split('-round-');
         const seriesId = parts[0];
@@ -252,7 +267,6 @@ export const ResultsPage: React.FC = () => {
         }
       }
 
-      // Check if navigation state indicates it's a series event
       if (navState?.isSeriesEvent && navState?.seriesId) {
         const series = allSeries.find(s => s.id === navState.seriesId);
         if (series) {
@@ -263,7 +277,6 @@ export const ResultsPage: React.FC = () => {
         }
       }
 
-      // Check if it's a series
       const series = allSeries.find(s => s.id === targetId);
       if (series) {
         setSelectedSeries(series);
@@ -272,19 +285,18 @@ export const ResultsPage: React.FC = () => {
         return;
       }
 
-      // Otherwise it's an event
       const event = allEvents.find(e => e.id === targetId);
       if (event) {
         setSelectedEvent(event);
         setSelectedSeries(null);
         setSelectedRound(null);
       }
-    } else {
+    } else if (!navState?.externalEventId) {
       setSelectedEvent(null);
       setSelectedSeries(null);
       setSelectedRound(null);
     }
-  }, [id, location.state, allEvents, allSeries, roundResults]);
+  }, [id, location.state, allEvents, allSeries, roundResults, externalNationalEvents, externalStateEvents, externalWorldEvents]);
 
   const enrichSeriesWithRoundData = async (series: RaceSeries[]): Promise<RaceSeries[]> => {
     try {
