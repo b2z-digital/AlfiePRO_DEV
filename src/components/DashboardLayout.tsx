@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye, Bot, LifeBuoy } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye, Bot, LifeBuoy } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -104,6 +104,7 @@ import { ImpersonationAuditTab } from './super-admin/ImpersonationAuditTab';
 import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
 import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapingTab';
 import { ClassifiedsScrapingTab } from './super-admin/ClassifiedsScrapingTab';
+import { EventsScrapingTab } from './super-admin/EventsScrapingTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -1057,6 +1058,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'news-scraping', label: 'News Scraping', icon: Newspaper, description: 'Automated news scrapers', path: '/news-scraping' },
           { id: 'results-scraping', label: 'Results Scraping', icon: Trophy, description: 'External race results feeds', path: '/results-scraping' },
           { id: 'classifieds-scraping', label: 'Classifieds Scraping', icon: Tag, description: 'External classifieds feeds', path: '/classifieds-scraping' },
+          { id: 'events-scraping', label: 'Events Scraping', icon: CalendarDays, description: 'External events feeds', path: '/events-scraping' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1700,6 +1702,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/classifieds-scraping" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <ClassifiedsScrapingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/events-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <EventsScrapingTab darkMode={true} />
                 </div></div>
               } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />

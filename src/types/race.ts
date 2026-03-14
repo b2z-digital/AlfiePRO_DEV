@@ -148,6 +148,10 @@ export interface RaceEvent {
   public_event_id?: string; // Reference to public_events table ID (snake_case for backwards compatibility)
   // Event level (club/state/national)
   eventLevel?: 'club' | 'state' | 'national';
+  // External scraped event
+  isExternalEvent?: boolean;
+  sourceUrl?: string;
+  registrationUrl?: string;
   // Live features
   enableLiveTracking?: boolean; // Enable fleet board & skipper tracking
   enableLiveStream?: boolean; // Enable YouTube livestreaming
