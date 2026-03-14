@@ -2084,15 +2084,13 @@ export const ResultsPage: React.FC = () => {
                             className="absolute inset-0 w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/65" />
-                          {!classImg && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <img
-                                src="/alfie_app_logo.svg"
-                                alt="AlfiePRO"
-                                className="w-24 h-24 opacity-70 drop-shadow-lg"
-                              />
-                            </div>
-                          )}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <img
+                              src="/alfie_app_logo.svg"
+                              alt="AlfiePRO"
+                              className="w-20 h-20 opacity-60 drop-shadow-lg"
+                            />
+                          </div>
                           <div className={`absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-${accentColor}-500/90 text-white backdrop-blur-sm`}>
                             <Globe size={12} />
                             {mainTab === 'national' ? 'National' : 'World'}
