@@ -11,6 +11,7 @@ interface Article {
   title: string;
   created_at: string;
   status: 'draft' | 'published';
+  cover_image: string | null;
 }
 
 export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
@@ -18,7 +19,6 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
   const { currentClub, currentOrganization } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const darkMode = true;
   const themeColors = useWidgetTheme(colorTheme);
 
   useEffect(() => {
@@ -36,38 +36,63 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
     }
 
     try {
-      let query = supabase
-        .from('articles')
-        .select('id, title, created_at, status')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
       if (orgType === 'state') {
-        query = query.eq('state_association_id', orgId);
+        const { data, error } = await supabase
+          .from('articles')
+          .select('id, title, created_at, status, cover_image')
+          .eq('status', 'published')
+          .eq('state_association_id', orgId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        if (error) throw error;
+        setArticles(data || []);
       } else if (orgType === 'national') {
-        query = query.eq('national_association_id', orgId);
+        const { data, error } = await supabase
+          .from('articles')
+          .select('id, title, created_at, status, cover_image')
+          .eq('status', 'published')
+          .eq('national_association_id', orgId)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        if (error) throw error;
+        setArticles(data || []);
       } else {
         const effectiveClubId = orgId || clubId;
-        if (effectiveClubId) {
-          const { data: clubData } = await supabase
-            .from('clubs')
-            .select('state_association_id')
-            .eq('id', effectiveClubId)
+        if (!effectiveClubId) { setLoading(false); return; }
+
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', effectiveClubId)
+          .maybeSingle();
+
+        const stateAssocId = clubData?.state_association_id;
+
+        let nationalAssocId: string | null = null;
+        if (stateAssocId) {
+          const { data: stateData } = await supabase
+            .from('state_associations')
+            .select('national_association_id')
+            .eq('id', stateAssocId)
             .maybeSingle();
-
-          if (clubData?.state_association_id) {
-            query = query.or(`club_id.eq.${effectiveClubId},state_association_id.eq.${clubData.state_association_id}`);
-          } else {
-            query = query.eq('club_id', effectiveClubId);
-          }
+          nationalAssocId = stateData?.national_association_id ?? null;
         }
+
+        let orFilter = `club_id.eq.${effectiveClubId}`;
+        if (stateAssocId) orFilter += `,state_association_id.eq.${stateAssocId}`;
+        if (nationalAssocId) orFilter += `,national_association_id.eq.${nationalAssocId}`;
+
+        const { data, error } = await supabase
+          .from('articles')
+          .select('id, title, created_at, status, cover_image')
+          .eq('status', 'published')
+          .or(orFilter)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+        setArticles((data || []).slice(0, 3));
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setArticles((data || []).slice(0, 3));
     } catch (error) {
       console.error('Error loading articles:', error);
     } finally {
@@ -117,7 +142,9 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Newspaper className="text-amber-400" size={20} />
-          <h2 className="text-lg font-semibold text-white">{currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? 'Association News' : 'Latest News'}</h2>
+          <h2 className="text-lg font-semibold text-white">
+            {currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? 'Association News' : 'Latest News'}
+          </h2>
         </div>
         <button
           onClick={handleCreateArticle}
@@ -150,14 +177,27 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
               onClick={() => handleViewArticle(article.id)}
               className={`p-3 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-700/50 rounded-xl transition-all group ${isEditMode ? 'pointer-events-none' : 'cursor-pointer'}`}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {article.cover_image && (
+                  <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-slate-700">
+                    <img
+                      src={article.cover_image}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-white truncate group-hover:text-amber-400 transition-colors">
-                    {article.title}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-medium text-white text-sm leading-snug line-clamp-2 group-hover:text-amber-400 transition-colors">
+                      {article.title}
+                    </div>
+                    <ExternalLink size={14} className="text-slate-400 group-hover:text-amber-400 transition-colors flex-shrink-0 mt-0.5" />
                   </div>
                   <div className="text-xs text-slate-400 flex items-center gap-3 mt-1">
                     <span className="flex items-center gap-1">
-                      <Clock size={12} />
+                      <Clock size={11} />
                       {formatDate(article.created_at)}
                     </span>
                     {article.status === 'published' ? (
@@ -167,7 +207,6 @@ export const LatestNewsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
                     )}
                   </div>
                 </div>
-                <ExternalLink size={16} className="text-slate-400 group-hover:text-amber-400 transition-colors flex-shrink-0" />
               </div>
             </div>
           ))
