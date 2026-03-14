@@ -404,6 +404,32 @@ Deno.serve(async (req: Request) => {
 
     const { source_id, manual, event_row_id } = body;
 
+    const STATE_CODE_TO_FULL: Record<string, string[]> = {
+      "NSW": ["NSW", "New South Wales"],
+      "VIC": ["Victoria"],
+      "QLD": ["Queensland"],
+      "SA": ["South Australia"],
+      "WA": ["Western Australia"],
+      "TAS": ["Tasmania"],
+      "NT": ["Northern Territory"],
+      "ACT": ["Canberra", "ACT", "Australian Capital Territory"],
+    };
+
+    const { data: stateAssocs } = await supabase
+      .from("state_associations")
+      .select("id, state, abbreviation");
+
+    const stateCodeToAssocId: Record<string, string> = {};
+    if (stateAssocs) {
+      for (const sa of stateAssocs) {
+        for (const [code, names] of Object.entries(STATE_CODE_TO_FULL)) {
+          if (names.some(n => n.toLowerCase() === sa.state?.toLowerCase())) {
+            stateCodeToAssocId[code] = sa.id;
+          }
+        }
+      }
+    }
+
     if (event_row_id) {
       const { data: eventRow, error: eventErr } = await supabase
         .from("external_events")
@@ -434,6 +460,12 @@ Deno.serve(async (req: Request) => {
       updates.ranking_event = detail.rankingEvent;
       if (detail.documents.length > 0) updates.documents_json = detail.documents;
       if (detail.registrationUrl) updates.registration_url = detail.registrationUrl;
+
+      const resolvedState = detail.stateCode || eventRow.state_code;
+      const resolvedType = detail.eventType || eventRow.event_type;
+      if (resolvedType === 'state' && resolvedState && stateCodeToAssocId[resolvedState]) {
+        updates.display_category = `state_${stateCodeToAssocId[resolvedState]}`;
+      }
 
       await supabase.from("external_events").update(updates).eq("id", event_row_id);
 
@@ -509,9 +541,18 @@ Deno.serve(async (req: Request) => {
             if (evt.boatClassMapped) updates.boat_class_mapped = evt.boatClassMapped;
             updates.event_type = evt.eventType;
 
+            if (evt.eventType === 'state' && evt.stateCode && stateCodeToAssocId[evt.stateCode]) {
+              updates.display_category = `state_${stateCodeToAssocId[evt.stateCode]}`;
+            }
+
             await supabase.from("external_events").update(updates).eq("id", existing.data.id);
             updated++;
           } else {
+            let eventDisplayCategory = source.display_category;
+            if (evt.eventType === 'state' && evt.stateCode && stateCodeToAssocId[evt.stateCode]) {
+              eventDisplayCategory = `state_${stateCodeToAssocId[evt.stateCode]}`;
+            }
+
             const { error: insertErr } = await supabase.from("external_events").insert({
               source_id: source.id,
               external_event_id: evt.externalEventId,
@@ -527,7 +568,7 @@ Deno.serve(async (req: Request) => {
               event_type: evt.eventType,
               event_status: evt.eventStatus,
               source_url: evt.url,
-              display_category: source.display_category,
+              display_category: eventDisplayCategory,
               is_visible: true,
             });
             if (insertErr) { skipped++; } else { created++; }
@@ -600,7 +641,7 @@ Deno.serve(async (req: Request) => {
     if (body.fetch_details) {
       const { data: eventsToFetch } = await supabase
         .from("external_events")
-        .select("id, source_url")
+        .select("id, source_url, state_code, event_type")
         .is("venue", null)
         .eq("is_visible", true)
         .limit(20);
@@ -626,6 +667,12 @@ Deno.serve(async (req: Request) => {
             updates.ranking_event = detail.rankingEvent;
             if (detail.documents.length > 0) updates.documents_json = detail.documents;
             if (detail.registrationUrl) updates.registration_url = detail.registrationUrl;
+
+            const resolvedState = detail.stateCode || evt.state_code;
+            const resolvedType = detail.eventType || evt.event_type;
+            if (resolvedType === 'state' && resolvedState && stateCodeToAssocId[resolvedState]) {
+              updates.display_category = `state_${stateCodeToAssocId[resolvedState]}`;
+            }
 
             await supabase.from("external_events").update(updates).eq("id", evt.id);
           } catch {
