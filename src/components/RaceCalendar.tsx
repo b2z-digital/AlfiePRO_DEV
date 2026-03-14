@@ -433,7 +433,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         const externalRaceEvents: RaceEvent[] = (externalEventsResult.data || []).map((ext: any) => ({
           id: `external-${ext.id}`,
           eventName: ext.event_name,
-          clubName: ext.venue || (ext.external_event_sources as any)?.name || 'External Event',
+          clubName: (ext.external_event_sources as any)?.name || ext.venue || 'External Event',
           date: ext.event_date || '',
           endDate: ext.event_end_date || undefined,
           venue: ext.venue || ext.location || '',
