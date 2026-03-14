@@ -169,6 +169,7 @@ export async function getUserClassifieds(userId: string) {
       .select('*')
       .or(`user_id.eq.${userId},created_by_user_id.eq.${userId}`)
       .eq('status', 'active')
+      .neq('is_scraped', true)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
