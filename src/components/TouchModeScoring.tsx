@@ -565,7 +565,6 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     setDragOverIndex(null);
   };
 
-  // Touch event handlers for drag and drop
   const handleTouchStart = (e: React.TouchEvent, index: number) => {
     const entry = finishOrder[index];
     if (entry.letterScore) return;
@@ -918,7 +917,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
   };
 
   return (
-    <div className={`${isFullscreen ? 'h-[calc(100vh-3rem)]' : 'h-[75vh]'} flex flex-col overflow-hidden rounded-lg no-select ${darkMode ? 'bg-slate-900/95 text-white' : 'bg-slate-100 text-slate-900'}`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-20 h-screen' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-lg'} no-select ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-900'}`}>
       {/* Header - Race Navigation with StartBox + Race Timer */}
       <div className={`border-b px-4 py-3 flex items-center justify-between flex-shrink-0 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-2">
@@ -1121,17 +1120,24 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                               handleRemoveFromFinish(entry.skipperIndex);
                             }
                           }}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                          }}
                           onTouchEnd={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
+                            if (!isPreviousRace()) {
+                              handleRemoveFromFinish(entry.skipperIndex);
+                            }
                           }}
                           disabled={isPreviousRace()}
-                          className={`p-2.5 rounded-lg transition-colors ${isPreviousRace() ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'} ${darkMode ? 'text-slate-500 hover:text-red-400 hover:bg-slate-700 active:bg-slate-600' : 'text-slate-400 hover:text-red-500 hover:bg-slate-200 active:bg-slate-300'} ${isPreviousRace() ? 'pointer-events-none' : ''}`}
+                          className={`p-3.5 rounded-lg transition-colors ${isPreviousRace() ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'} ${darkMode ? 'text-slate-500 hover:text-red-400 hover:bg-slate-700 active:bg-slate-600' : 'text-slate-400 hover:text-red-500 hover:bg-slate-200 active:bg-slate-300'} ${isPreviousRace() ? 'pointer-events-none' : ''}`}
                           title={isPreviousRace() ? "Previous races cannot be edited" : "Remove"}
                         >
-                          <X size={20} />
+                          <X size={22} />
                         </button>
 
                         <button
@@ -1143,17 +1149,25 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                               setShowLetterScoreModal(true);
                             }
                           }}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                          }}
                           onTouchEnd={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
+                            if (!isPreviousRace()) {
+                              setSelectedSkipperForScore(entry.skipperIndex);
+                              setShowLetterScoreModal(true);
+                            }
                           }}
                           disabled={isPreviousRace()}
-                          className={`p-2.5 rounded-lg transition-colors ${isPreviousRace() ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'} ${darkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700 active:bg-slate-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 active:bg-slate-300'} ${isPreviousRace() ? 'pointer-events-none' : ''}`}
+                          className={`p-3.5 rounded-lg transition-colors ${isPreviousRace() ? 'opacity-30 cursor-not-allowed' : 'active:scale-95'} ${darkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-700 active:bg-slate-600' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 active:bg-slate-300'} ${isPreviousRace() ? 'pointer-events-none' : ''}`}
                           title={isPreviousRace() ? "Previous races cannot be edited" : "Score Options"}
                         >
-                          <MoreHorizontal size={20} />
+                          <MoreHorizontal size={22} />
                         </button>
                       </div>
                     </div>
