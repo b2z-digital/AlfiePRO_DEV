@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const MAX_EVENTS_PER_RUN = 50;
+const MAX_EVENTS_PER_RUN = 500;
 const FETCH_TIMEOUT_MS = 20000;
 
 const BOAT_CLASS_KEYWORDS: Record<string, string> = {
