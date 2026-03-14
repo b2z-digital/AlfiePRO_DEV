@@ -9,6 +9,7 @@ import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { getStoredRaceEvents, getStoredRaceSeries } from '../../../utils/raceStorage';
 import { getPublicEvents } from '../../../utils/publicEventStorage';
 import { getBoatClassBadge, getRaceFormatBadge } from '../../../constants/colors';
+import { getBoatClassImage } from '../../../utils/boatClassImages';
 import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 import { CalendarMeetingDetailsModal } from '../../meetings/CalendarMeetingDetailsModal';
 import { CalendarMeeting } from '../../../utils/calendarMeetingStorage';
@@ -351,10 +352,10 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
 
         const externalEvents: RaceEvent[] = (externalData || [])
           .filter((ext: any) => {
-            const isNational = ext.display_category === 'national' || ext.event_type === 'national';
+            const isTrulyNational = ext.event_type === 'national' || ext.event_type === 'world';
             const isMyState = clubStateAssociationId && ext.display_category?.startsWith('state_') &&
               ext.display_category.replace('state_', '') === clubStateAssociationId;
-            return isNational || isMyState;
+            return isTrulyNational || isMyState;
           })
           .map((ext: any) => ({
             id: `external-${ext.id}`,
@@ -378,7 +379,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         .slice(0, 4);
 
       const nonMeetingEvents = allUpcoming.filter(e => !e.isMeeting);
-
       const venueNames = [...new Set(nonMeetingEvents.map(e => e.venue).filter(Boolean))];
       const venueImages: Record<string, string> = {};
 
@@ -388,19 +388,22 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             .from('venues')
             .select('name, image')
             .in('name', venueNames);
-
           (venues || []).forEach(v => {
             if (v.image) venueImages[v.name] = v.image;
           });
-
-          allUpcoming = allUpcoming.map(event => ({
-            ...event,
-            venueImage: !event.isMeeting && event.venue ? venueImages[event.venue] : undefined
-          }));
         } catch (error) {
           console.error('Error fetching venue images:', error);
         }
       }
+
+      allUpcoming = allUpcoming.map(event => {
+        if (event.isMeeting) return event;
+        const venueImg = event.venue ? venueImages[event.venue] : undefined;
+        return {
+          ...event,
+          venueImage: venueImg || getBoatClassImage(event.raceClass) || undefined
+        };
+      });
 
       const eventsToEnrich = allUpcoming.filter(e => !e.isMeeting);
       if (eventsToEnrich.length > 0) {
