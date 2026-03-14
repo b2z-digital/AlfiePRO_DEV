@@ -15,10 +15,9 @@ import {
   Bookmark,
   Star,
   Navigation2,
-  Filter,
-  ChevronDown,
-  Trash2,
-  Grid
+  Grid,
+  Globe,
+  Flag
 } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { Venue } from '../types/venue';
@@ -32,9 +31,12 @@ import {
   filterEventsByDateRange,
   getCurrentLocation,
   reverseGeocode,
+  geocodeAddress,
   EventWithDistance,
   formatDistance,
-  groupEventsByVenue
+  groupEventsByVenue,
+  calculateDistance,
+  estimateTravelTime
 } from '../utils/locationUtils';
 import {
   getLocationPreferences,
@@ -56,6 +58,8 @@ interface LocationExplorerProps {
   onClose: () => void;
   onEventClick: (event: RaceEvent) => void;
 }
+
+const geocodeCache = new Map<string, LocationCoordinates | null>();
 
 export const LocationExplorer: React.FC<LocationExplorerProps> = ({
   events,
@@ -83,6 +87,9 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
   const [showSaveLocationModal, setShowSaveLocationModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [clubsMap, setClubsMap] = useState<Map<string, any>>(new Map());
+  const [externalEvents, setExternalEvents] = useState<RaceEvent[]>([]);
+  const [stateAssociationNames, setStateAssociationNames] = useState<Record<string, string>>({});
+  const [isLoadingExternal, setIsLoadingExternal] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
@@ -100,6 +107,9 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
       loadSavedLocations();
       loadDefaultClubLocation();
     }
+
+    loadExternalEvents();
+    loadStateAssociationNames();
   }, [user]);
 
   useEffect(() => {
@@ -121,6 +131,57 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
 
     fetchClubs();
   }, [events]);
+
+  const loadStateAssociationNames = async () => {
+    const { data } = await supabase
+      .from('state_associations')
+      .select('id, name, abbreviation');
+    if (data) {
+      const nameMap: Record<string, string> = {};
+      data.forEach((sa: any) => {
+        nameMap[sa.id] = sa.abbreviation || sa.name;
+      });
+      setStateAssociationNames(nameMap);
+    }
+  };
+
+  const loadExternalEvents = async () => {
+    setIsLoadingExternal(true);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('external_events')
+        .select('*, external_event_sources(name)')
+        .eq('is_visible', true)
+        .eq('event_status', 'active')
+        .gte('event_date', todayStr)
+        .order('event_date', { ascending: true });
+
+      if (data) {
+        const mapped: RaceEvent[] = data.map((ext: any) => ({
+          id: `external-${ext.id}`,
+          eventName: ext.event_name,
+          clubName: ext.external_event_sources?.name || ext.venue || 'External Event',
+          date: ext.event_date || '',
+          endDate: ext.event_end_date || undefined,
+          venue: ext.location || ext.venue || '',
+          raceClass: (ext.boat_class_mapped || ext.boat_class_raw || 'Unknown') as any,
+          raceFormat: 'scratch' as any,
+          isPublicEvent: true,
+          isExternalEvent: true,
+          externalEventType: ext.event_type || 'national',
+          eventLevel: (ext.event_type === 'national' || ext.event_type === 'world') ? 'national' as const : 'state' as const,
+          displayCategory: ext.display_category || 'national',
+          stateCode: ext.state_code || undefined,
+          sourceUrl: ext.source_url,
+          registrationUrl: ext.registration_url,
+        }));
+        setExternalEvents(mapped);
+      }
+    } finally {
+      setIsLoadingExternal(false);
+    }
+  };
 
   const loadUserPreferences = async () => {
     if (!user) return;
@@ -185,25 +246,64 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
     }
   }, [mapLoaded, view]);
 
-  useEffect(() => {
-    if (searchLocation) {
-      const eventsWithDistance = enrichEventsWithDistance(
-        events,
-        venues,
-        searchLocation,
-        'km'
-      );
+  const geocodeExternalEvents = useCallback(async (
+    extEvents: RaceEvent[],
+    origin: LocationCoordinates
+  ): Promise<EventWithDistance[]> => {
+    const results: EventWithDistance[] = [];
 
-      let filtered = filterEventsByRadius(eventsWithDistance, searchRadius);
+    for (const event of extEvents) {
+      const locationStr = event.venue;
+      if (!locationStr) continue;
+
+      let coords: LocationCoordinates | null = null;
+
+      if (geocodeCache.has(locationStr)) {
+        coords = geocodeCache.get(locationStr) ?? null;
+      } else {
+        coords = await geocodeAddress(locationStr);
+        geocodeCache.set(locationStr, coords);
+      }
+
+      if (!coords) continue;
+
+      const distance = calculateDistance(origin.lat, origin.lng, coords.lat, coords.lng, 'km');
+
+      results.push({
+        ...event,
+        distance,
+        distanceFormatted: formatDistance(distance, 'km'),
+        travelTime: estimateTravelTime(distance),
+        venueCoordinates: coords,
+      });
+    }
+
+    return results;
+  }, []);
+
+  useEffect(() => {
+    if (!searchLocation) return;
+
+    const run = async () => {
+      const clubEventsWithDistance = enrichEventsWithDistance(events, venues, searchLocation, 'km');
+      const clubFiltered = filterEventsByRadius(clubEventsWithDistance, searchRadius);
+
+      const externalWithDistance = await geocodeExternalEvents(externalEvents, searchLocation);
+      const externalFiltered = externalWithDistance.filter(e => (e.distance ?? Infinity) <= searchRadius);
+
+      let combined = [...clubFiltered, ...externalFiltered];
+      combined.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
 
       const start = startDate ? new Date(startDate) : null;
       const end = endDate ? new Date(endDate) : null;
-      filtered = filterEventsByDateRange(filtered, start, end);
+      combined = filterEventsByDateRange(combined, start, end);
 
-      setFilteredEvents(filtered);
-      updateMapMarkers(filtered);
-    }
-  }, [searchLocation, searchRadius, startDate, endDate, events, venues]);
+      setFilteredEvents(combined);
+      updateMapMarkers(combined);
+    };
+
+    run();
+  }, [searchLocation, searchRadius, startDate, endDate, events, venues, externalEvents, geocodeExternalEvents]);
 
   useEffect(() => {
     if (searchLocation && favorites.length > 0) {
@@ -371,8 +471,12 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
           const button = document.querySelector(`[data-event-id="${event.id}"]`);
           if (button) {
             button.addEventListener('click', () => {
-              onEventClick(event);
-              onClose();
+              if (!event.isExternalEvent) {
+                onEventClick(event);
+                onClose();
+              } else if (event.sourceUrl) {
+                window.open(event.sourceUrl, '_blank');
+              }
             });
           }
         });
@@ -399,13 +503,20 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
     }
   };
 
+  const getExternalEventLevelLabel = (event: EventWithDistance | RaceEvent): string => {
+    if (event.displayCategory?.startsWith('state_')) {
+      const assocId = event.displayCategory.replace('state_', '');
+      return stateAssociationNames[assocId] || 'State Event';
+    }
+    return 'National Event';
+  };
+
   const createMarkerInfoWindow = (events: EventWithDistance[], clubsMap: Map<string, any>): string => {
     const venueName = events[0].venue;
     const venueImage = events[0].venueImage;
     const distance = events[0].distanceFormatted || '';
     const travelTime = events[0].travelTime || '';
 
-    // Helper to format date parts
     const getDateParts = (dateString: string) => {
       const date = new Date(dateString);
       const month = date.toLocaleDateString('en-US', { month: 'short' });
@@ -413,10 +524,15 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
       return { month, day };
     };
 
-    const eventsList = events.map((e, idx) => {
+    const eventsList = events.map((e) => {
       const club = clubsMap.get(e.clubId);
       const { month, day } = getDateParts(e.date);
       const clubLogo = club?.logo_url || '';
+      const isExternal = e.isExternalEvent;
+      const levelLabel = isExternal ? getExternalEventLevelLabel(e) : null;
+      const isNational = isExternal && e.eventLevel === 'national';
+      const levelColor = isNational ? '#2563eb' : '#d97706';
+      const levelBg = isNational ? '#dbeafe' : '#fef3c7';
 
       return `
       <button
@@ -440,7 +556,7 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
           flex-shrink: 0;
           width: 50px;
           height: 50px;
-          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          background: ${isExternal ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'};
           border-radius: 8px;
           display: flex;
           flex-direction: column;
@@ -455,20 +571,31 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
         <div style="flex: 1; min-width: 0;">
           <div style="font-weight: 600; color: #111827; margin-bottom: 4px; font-size: 14px;">${e.eventName || 'Unnamed Event'}</div>
           <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            ${clubLogo ? `
+            ${clubLogo && !isExternal ? `
               <img src="${clubLogo}" style="width: 20px; height: 20px; border-radius: 4px; object-fit: cover;" />
             ` : ''}
             <span style="font-size: 12px; color: #6b7280; font-weight: 500;">${e.clubName}</span>
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 4px;">
-            <span style="
-              font-size: 10px;
-              padding: 2px 8px;
-              border-radius: 12px;
-              background: ${e.raceFormat === 'handicap' ? '#ede9fe' : '#dbeafe'};
-              color: ${e.raceFormat === 'handicap' ? '#7c3aed' : '#2563eb'};
-              font-weight: 500;
-            ">${e.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>
+            ${isExternal && levelLabel ? `
+              <span style="
+                font-size: 10px;
+                padding: 2px 8px;
+                border-radius: 12px;
+                background: ${levelBg};
+                color: ${levelColor};
+                font-weight: 500;
+              ">${levelLabel}</span>
+            ` : `
+              <span style="
+                font-size: 10px;
+                padding: 2px 8px;
+                border-radius: 12px;
+                background: ${e.raceFormat === 'handicap' ? '#ede9fe' : '#dbeafe'};
+                color: ${e.raceFormat === 'handicap' ? '#7c3aed' : '#2563eb'};
+                font-weight: 500;
+              ">${e.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}</span>
+            `}
             ${e.raceClass ? `
               <span style="
                 font-size: 10px;
@@ -480,6 +607,9 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
               ">${e.raceClass}</span>
             ` : ''}
           </div>
+          ${isExternal && e.sourceUrl ? `
+            <div style="margin-top: 4px; font-size: 10px; color: #6b7280;">Tap to view on source site</div>
+          ` : ''}
         </div>
       </button>
     `;
@@ -544,9 +674,11 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
   };
 
   const getEventColor = (event: EventWithDistance): string => {
+    if (event.isExternalEvent) {
+      return event.eventLevel === 'national' ? '#3b82f6' : '#f59e0b';
+    }
     if (event.raceFormat === 'handicap') return '#a855f7';
-    if (event.raceFormat === 'scratch') return '#3b82f6';
-    return '#6b7280';
+    return '#3b82f6';
   };
 
   const handleToggleFavorite = async () => {
@@ -646,6 +778,10 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
       stylers: [{ color: darkMode ? '#6b7280' : '#9ca3af' }]
     }
   ];
+
+  const clubCount = filteredEvents.filter(e => !e.isExternalEvent).length;
+  const stateCount = filteredEvents.filter(e => e.isExternalEvent && e.eventLevel === 'state').length;
+  const nationalCount = filteredEvents.filter(e => e.isExternalEvent && e.eventLevel === 'national').length;
 
   return createPortal(
     <div
@@ -898,18 +1034,36 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
             )}
           </div>
 
-          {/* View Toggle */}
+          {/* View Toggle & Event Count */}
           <div className={`
             flex items-center justify-between px-4 py-2 border-b
             ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}
           `}>
             <div className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              {searchLocation && (
-                <span>
-                  {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} near {searchLocationName}
-                </span>
-              )}
-              {!searchLocation && (
+              {searchLocation ? (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span>{filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} near {searchLocationName}</span>
+                  {filteredEvents.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      {clubCount > 0 && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`}>
+                          {clubCount} club
+                        </span>
+                      )}
+                      {stateCount > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                          {stateCount} state
+                        </span>
+                      )}
+                      {nationalCount > 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                          {nationalCount} national
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <span>Search for a location to discover events</span>
               )}
             </div>
@@ -983,63 +1137,104 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
               <div className={`${view === 'split' ? 'w-full lg:w-3/5' : 'w-full'} h-full overflow-y-auto ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
                 {searchLocation && filteredEvents.length > 0 ? (
                   <div className="p-4 space-y-3">
-                    {filteredEvents.map((event, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          onEventClick(event);
-                          onClose();
-                        }}
-                        onMouseEnter={() => setSelectedEvent(event)}
-                        className={`
-                          w-full text-left p-4 rounded-xl transition-all
-                          ${darkMode
-                            ? 'bg-slate-800 hover:bg-slate-700 hover:ring-2 hover:ring-blue-500'
-                            : 'bg-white hover:bg-slate-50 border border-slate-200 hover:ring-2 hover:ring-blue-500'}
-                          ${selectedEvent?.id === event.id ? 'ring-2 ring-blue-500' : ''}
-                        `}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            {event.eventName}
-                          </h3>
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className={`flex items-center gap-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'} font-medium`}>
-                              <Navigation2 size={14} />
-                              {event.distanceFormatted}
+                    {filteredEvents.map((event, idx) => {
+                      const isExternal = event.isExternalEvent;
+                      const levelLabel = isExternal ? getExternalEventLevelLabel(event) : null;
+                      const isNational = isExternal && event.eventLevel === 'national';
+
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            if (isExternal) {
+                              if (event.sourceUrl) window.open(event.sourceUrl, '_blank');
+                            } else {
+                              onEventClick(event);
+                              onClose();
+                            }
+                          }}
+                          onMouseEnter={() => setSelectedEvent(event)}
+                          className={`
+                            w-full text-left p-4 rounded-xl transition-all
+                            ${darkMode
+                              ? 'bg-slate-800 hover:bg-slate-700 hover:ring-2 hover:ring-blue-500'
+                              : 'bg-white hover:bg-slate-50 border border-slate-200 hover:ring-2 hover:ring-blue-500'}
+                            ${selectedEvent?.id === event.id ? 'ring-2 ring-blue-500' : ''}
+                          `}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-start gap-2 flex-1 min-w-0">
+                              {isExternal && (
+                                <div className={`flex-shrink-0 mt-0.5 p-1 rounded ${isNational ? 'bg-blue-500/20' : 'bg-amber-500/20'}`}>
+                                  {isNational
+                                    ? <Globe size={14} className="text-blue-400" />
+                                    : <Flag size={14} className="text-amber-400" />
+                                  }
+                                </div>
+                              )}
+                              <h3 className={`font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                {event.eventName}
+                              </h3>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm flex-shrink-0 ml-2">
+                              <span className={`flex items-center gap-1 ${darkMode ? 'text-blue-400' : 'text-blue-600'} font-medium`}>
+                                <Navigation2 size={14} />
+                                {event.distanceFormatted}
+                              </span>
+                              {event.travelTime && (
+                                <span className={`${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                  • {event.travelTime}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 mb-1">
+                            <MapPin size={14} className="text-slate-400 flex-shrink-0" />
+                            <span className={`text-sm truncate ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                              {event.venue}
                             </span>
-                            {event.travelTime && (
-                              <span className={`${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                                • {event.travelTime}
+                          </div>
+
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>{event.clubName}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 mb-3">
+                            <Calendar size={14} className="text-slate-400" />
+                            <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                              {formatDate(event.date)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {isExternal && levelLabel ? (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                                isNational
+                                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                                  : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                              }`}>
+                                {levelLabel}
+                              </span>
+                            ) : (
+                              <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
+                                {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                              </span>
+                            )}
+                            {event.raceClass && (
+                              <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
+                                {event.raceClass}
+                              </span>
+                            )}
+                            {isExternal && event.registrationUrl && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${darkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                                Registration open
                               </span>
                             )}
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-2">
-                          <MapPin size={14} className="text-slate-400" />
-                          <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {event.venue}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-3">
-                          <Calendar size={14} className="text-slate-400" />
-                          <span className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {formatDate(event.date)}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                            {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                          </span>
-                          <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
-                            {event.raceClass}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : searchLocation && filteredEvents.length === 0 ? (
                   <div className={`
@@ -1060,12 +1255,13 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
                         Start Your Search
                       </h3>
                       <p className="text-sm leading-relaxed">
-                        Enter a location or use "Near Me" to discover racing events near you or while traveling
+                        Enter a location or use "Near Me" to discover club, state, and national racing events near you or while traveling
                       </p>
                       <div className={`mt-6 p-4 rounded-lg ${darkMode ? 'bg-slate-800/50' : 'bg-white/50'} border ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                         <p className="text-xs font-medium mb-2">Quick Tips:</p>
                         <ul className="text-xs space-y-1 text-left">
                           <li>• Search for any city or venue</li>
+                          <li>• Shows club, state and national events</li>
                           <li>• Adjust the radius to expand your search</li>
                           <li>• Set date ranges for trip planning</li>
                         </ul>
