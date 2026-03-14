@@ -183,41 +183,57 @@ interface ParsedEvent {
 
 function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null {
   try {
-    let eventName =
-      extractText(html, "h1") ||
-      extractText(html, "h2") ||
-      extractText(html, "title") ||
-      fallbackName ||
-      "Unknown Event";
+    // Try headings in order; skip generic "Results" text
+    const isGeneric = (s: string) => !s || /^results?$/i.test(s.trim()) || s.trim().length < 4;
+
+    const h1 = extractText(html, "h1");
+    const h2 = extractText(html, "h2");
+    const h3 = extractText(html, "h3");
+    const title = extractText(html, "title").replace(/\s*\|.*$/, "").trim(); // strip " | Site Name"
+
+    let eventName = "";
+    for (const candidate of [h3, h2, h1, title, fallbackName || ""]) {
+      if (!isGeneric(candidate)) { eventName = candidate; break; }
+    }
+    if (!eventName) eventName = fallbackName || "Unknown Event";
     eventName = eventName.replace(/\s+/g, " ").trim();
 
+    // Scan wider area for boat class detection (h3 often has it)
+    const headerArea = html.slice(0, 5000);
     const boatClassRaw = (() => {
-      const headerArea = html.slice(0, 3000);
+      // Direct keyword match in h3/event name first
+      const fromName = detectBoatClass(eventName);
+      if (fromName) return eventName;
       const classMatch =
         headerArea.match(/class[:\s]+([A-Za-z0-9\s\-\/]+?)(?:\s*<|\s*\n|\s*,)/i) ||
-        headerArea.match(/(international ten rater|marblehead|one metre|footy|df65|df95|a class|e class|rc laser|victoria|ec12|1 metre)/i);
+        headerArea.match(/(international ten rater|marblehead|one metre|footy|df65|df95|dragonflite|dragon force|a class|e class|rc laser|victoria|ec12|1 metre|soling|wind warrior)/i);
       if (classMatch) return classMatch[1].trim();
-      return detectBoatClass(eventName) ? eventName : "";
+      return "";
     })();
     const boatClassMapped = detectBoatClass(boatClassRaw || eventName);
 
+    // Venue: radiosailing.org.au puts it as plain text near the date line
     const venueMatch =
       html.match(/(?:venue|location|held at|at\s+):\s*([^<\n,]+)/i) ||
-      html.match(/<td[^>]*>\s*(?:Venue|Location)\s*<\/td>\s*<td[^>]*>\s*([^<]+)/i);
+      html.match(/<td[^>]*>\s*(?:Venue|Location)\s*<\/td>\s*<td[^>]*>\s*([^<]+)/i) ||
+      // "Eagleby, QLD" style — city/suburb + state code
+      html.match(/([A-Z][a-zA-Z\s]+,\s*(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ))/);
     const venue = venueMatch ? stripTags(venueMatch[1]).trim() : "";
 
-    const dateMatch = html.match(/(\d{1,2}[-\/\s]\w+[-\/\s]\d{4}|\d{4}-\d{2}-\d{2}|\w+\s+\d{1,2}[-,\s]+\d{4})/);
+    // Date range "09 Aug - 10 Aug 2025" or "09 Aug – 10 Aug 2025"
     let eventDate: string | null = null;
     let eventEndDate: string | null = null;
-    if (dateMatch) {
-      const raw = dateMatch[1];
-      const rangeMatch = html.match(/(\d{1,2})[-–](\d{1,2})\s+(\w+)\s+(\d{4})/);
-      if (rangeMatch) {
-        const [, d1, d2, mon, yr] = rangeMatch;
-        eventDate = new Date(`${d1} ${mon} ${yr}`).toISOString().slice(0, 10);
-        eventEndDate = new Date(`${d2} ${mon} ${yr}`).toISOString().slice(0, 10);
-      } else {
-        const d = new Date(raw);
+    const rangeMatch = html.match(/(\d{1,2})\s+(\w{3,9})\s*[-–]\s*(\d{1,2})\s+(\w{3,9})\s+(\d{4})/);
+    if (rangeMatch) {
+      const [, d1, mon1, d2, mon2, yr] = rangeMatch;
+      const start = new Date(`${d1} ${mon1} ${yr}`);
+      const end = new Date(`${d2} ${mon2} ${yr}`);
+      if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
+      if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
+    } else {
+      const dateMatch = html.match(/(\d{1,2}[-\/\s]\w+[-\/\s]\d{4}|\d{4}-\d{2}-\d{2}|\w+\s+\d{1,2}[-,\s]+\d{4})/);
+      if (dateMatch) {
+        const d = new Date(dateMatch[1]);
         if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
       }
     }
