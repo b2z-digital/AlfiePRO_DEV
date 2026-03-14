@@ -214,6 +214,18 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                     )}
                   </div>
 
+                  {classified.is_scraped && classified.source_url && (
+                    <a
+                      href={classified.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors mb-2"
+                    >
+                      <ExternalLink size={14} />
+                      View Original Listing
+                    </a>
+                  )}
+
                   <div className="space-y-3 text-blue-100 mb-6">
                     <div className="flex items-center gap-2">
                       <MapPin size={18} className="text-blue-400" />
@@ -239,42 +251,97 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                   <div className="bg-slate-800/50 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <h3 className="text-lg font-semibold text-white">Seller Information</h3>
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full flex items-center gap-1">
-                        <ExternalLink size={12} />
-                        External
-                      </span>
+                      {classified.matched_member ? (
+                        <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs font-medium rounded-full flex items-center gap-1">
+                          <Users size={12} />
+                          Member
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full flex items-center gap-1">
+                          <ExternalLink size={12} />
+                          External
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 font-bold text-lg">
-                        {classified.external_contact_name?.[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white">
-                          {classified.external_contact_name}
+                    {classified.matched_member ? (
+                      <>
+                        <div className="flex items-center gap-3 mb-3">
+                          {classified.matched_member.avatar_url ? (
+                            <img
+                              src={classified.matched_member.avatar_url}
+                              alt={`${classified.matched_member.first_name} ${classified.matched_member.last_name}`}
+                              className="w-12 h-12 rounded-full object-cover bg-slate-700"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-lg">
+                              {classified.matched_member.first_name?.[0]?.toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-semibold text-white">
+                              {classified.matched_member.first_name} {classified.matched_member.last_name}
+                            </div>
+                            {classified.matched_member.club_name && (
+                              <div className="text-xs text-green-300">{classified.matched_member.club_name}</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-400">Non-member seller</div>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      {classified.external_contact_email && (
-                        <a
-                          href={`mailto:${classified.external_contact_email}`}
-                          className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
-                        >
-                          <Mail size={16} />
-                          {classified.external_contact_email}
-                        </a>
-                      )}
-                      {classified.external_contact_phone && (
-                        <a
-                          href={`tel:${classified.external_contact_phone}`}
-                          className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
-                        >
-                          <Phone size={16} />
-                          {classified.external_contact_phone}
-                        </a>
-                      )}
-                    </div>
+                        <div className="space-y-2 text-sm">
+                          {classified.matched_member.email && (
+                            <a
+                              href={`mailto:${classified.matched_member.email}`}
+                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
+                            >
+                              <Mail size={16} />
+                              {classified.matched_member.email}
+                            </a>
+                          )}
+                          {classified.external_contact_phone && (
+                            <a
+                              href={`tel:${classified.external_contact_phone}`}
+                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
+                            >
+                              <Phone size={16} />
+                              {classified.external_contact_phone}
+                            </a>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300 font-bold text-lg">
+                            {classified.external_contact_name?.[0]?.toUpperCase() || '?'}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white">
+                              {classified.external_contact_name || 'Unknown seller'}
+                            </div>
+                            <div className="text-xs text-slate-400">Non-member seller</div>
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          {classified.external_contact_email && (
+                            <a
+                              href={`mailto:${classified.external_contact_email}`}
+                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
+                            >
+                              <Mail size={16} />
+                              {classified.external_contact_email}
+                            </a>
+                          )}
+                          {classified.external_contact_phone && (
+                            <a
+                              href={`tel:${classified.external_contact_phone}`}
+                              className="flex items-center gap-2 text-blue-300 hover:text-blue-200 transition-colors"
+                            >
+                              <Phone size={16} />
+                              {classified.external_contact_phone}
+                            </a>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="bg-slate-800/50 rounded-xl p-4">

@@ -24,6 +24,9 @@ export interface Classified {
   external_contact_email?: string;
   external_contact_phone?: string;
   created_by_user_id?: string;
+  source_url?: string;
+  external_source_id?: string;
+  is_scraped?: boolean;
 
   // Joined data
   user?: {
@@ -36,6 +39,15 @@ export interface Classified {
     id: string;
     name: string;
     logo?: string;
+  };
+  matched_member?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string;
+    user_id?: string;
+    club_name?: string;
   };
   is_favorited?: boolean;
   favorites_count?: number;

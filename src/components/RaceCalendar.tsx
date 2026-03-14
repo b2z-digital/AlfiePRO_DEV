@@ -12,6 +12,7 @@ import { boatTypeColors, defaultColorScheme, getBoatClassBadge, getRaceFormatBad
 import { SeriesLeaderboard } from './SeriesLeaderboard';
 import { EventDetails } from './EventDetails';
 import html2canvas from 'html2canvas';
+import { getBoatClassImage } from '../utils/boatClassImages';
 import '../styles/yacht-race.css';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { supabase } from '../utils/supabase';
@@ -20,9 +21,10 @@ import { generateICalFile, downloadICalFile } from '../utils/calendarSync';
 import { LocationExplorer } from './LocationExplorer';
 import { getCalendarMeetings, CalendarMeeting } from '../utils/calendarMeetingStorage';
 import { CalendarMeetingDetailsModal } from './meetings/CalendarMeetingDetailsModal';
-import { Users, Shield, Building2, Globe2 } from 'lucide-react';
+import { Users, Shield, Building2, Globe2, Flag } from 'lucide-react';
 
 type CalendarView = 'list' | 'grid' | 'month' | 'year';
+type EventScope = 'all' | 'club' | 'my_state' | 'national' | 'all_states';
 
 interface RaceCalendarProps {
   events?: RaceEvent[];
@@ -48,7 +50,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const [activeFilters, setActiveFilters] = useState<{
     raceFormat?: 'handicap' | 'scratch';
     raceClass?: string;
-    eventType?: 'all' | 'club' | 'public';
+    eventType?: 'all' | 'club' | 'public' | 'state' | 'national';
   }>({
     eventType: 'all'
   });
@@ -71,6 +73,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const [calendarMeetings, setCalendarMeetings] = useState<CalendarMeeting[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<CalendarMeeting | null>(null);
   const [calendarTypeFilter, setCalendarTypeFilter] = useState<'all' | 'events' | 'meetings'>('all');
+  const [eventScope, setEventScope] = useState<EventScope>(() => {
+    const saved = localStorage.getItem('raceCalendarEventScope');
+    return (saved as EventScope) || 'all';
+  });
+  const [clubStateAssociationId, setClubStateAssociationId] = useState<string | null>(null);
+  const [stateAssociationNames, setStateAssociationNames] = useState<Record<string, string>>({});
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const subscribeMenuRef = useRef<HTMLDivElement>(null);
@@ -349,7 +357,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           return;
         }
         
-        const [storedVenues, storedSeries, raceEvents, publicEvents, meetings] = await Promise.all([
+        const [storedVenues, storedSeries, raceEvents, publicEvents, meetings, externalEventsResult] = await Promise.all([
           getStoredVenues(),
           getStoredRaceSeries(),
           getStoredRaceEvents(),
@@ -358,7 +366,13 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             currentClub?.clubId,
             currentOrganization?.type === 'state' ? currentOrganization.id : null,
             currentOrganization?.type === 'national' ? currentOrganization.id : null
-          )
+          ),
+          supabase
+            .from('external_events')
+            .select('*, external_event_sources!inner(name)')
+            .eq('is_visible', true)
+            .eq('event_status', 'active')
+            .order('event_date', { ascending: true })
         ]);
 
         setCalendarMeetings(meetings);
@@ -416,6 +430,32 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           convertToRaceEvent(publicEvent)
         );
 
+        const externalRaceEvents: RaceEvent[] = (externalEventsResult.data || []).map((ext: any) => {
+          return {
+            id: `external-${ext.id}`,
+            eventName: ext.event_name,
+            clubName: (ext.external_event_sources as any)?.name || ext.venue || 'External Event',
+            date: ext.event_date || '',
+            endDate: ext.event_end_date || undefined,
+            venue: ext.location || ext.venue || '',
+            raceClass: (ext.boat_class_mapped || ext.boat_class_raw || 'Unknown') as any,
+            raceFormat: 'scratch' as any,
+            isPublicEvent: true,
+            isExternalEvent: true,
+            externalEventType: ext.event_type || 'national',
+            eventLevel: ext.event_type === 'national' ? 'national' as const : ext.event_type === 'state' ? 'state' as const : 'national' as const,
+            noticeOfRaceUrl: ext.documents_json?.find((d: any) => d.type === 'nor' || d.name?.toLowerCase().includes('notice'))?.url,
+            sailingInstructionsUrl: ext.documents_json?.find((d: any) => d.type === 'si' || d.name?.toLowerCase().includes('sailing instruction'))?.url,
+            sourceUrl: ext.source_url,
+            registrationUrl: ext.registration_url,
+            multiDay: ext.event_end_date ? true : false,
+            numberOfDays: ext.event_end_date ? Math.ceil((new Date(ext.event_end_date).getTime() - new Date(ext.event_date).getTime()) / 86400000) + 1 : undefined,
+            displayCategory: ext.display_category || 'national',
+            stateCode: ext.state_code || undefined,
+            externalDocuments: ext.documents_json || [],
+          };
+        });
+
         // Filter out public events that have local copies in raceEvents
         // Local copies now have a public_event_id field tracking the original event
         const localCopyPublicEventIds = new Set(
@@ -432,8 +472,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         // For associations, only show public events (state/national level events)
         // For clubs, show all events including club-specific events
         const allEvents = currentOrganization?.type === 'state' || currentOrganization?.type === 'national'
-          ? [...filteredPublicEvents]  // Associations: only public state/national events
-          : [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents];  // Clubs: all events
+          ? [...filteredPublicEvents, ...externalRaceEvents]  // Associations: public + external events
+          : [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents, ...externalRaceEvents];  // Clubs: all events
 
         const enrichedEvents = await enrichEventsWithAttendance(allEvents);
         setEvents(enrichedEvents);
@@ -447,6 +487,41 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
     loadData();
   }, [propEvents, currentClub, currentOrganization]); // Reload when club/organization changes or component remounts
+
+  useEffect(() => {
+    const loadClubStateAssociation = async () => {
+      if (!currentClub?.clubId) return;
+      try {
+        const { data } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', currentClub.clubId)
+          .maybeSingle();
+        if (data?.state_association_id) {
+          setClubStateAssociationId(data.state_association_id);
+        }
+
+        const { data: stateAssocs } = await supabase
+          .from('state_associations')
+          .select('id, name, abbreviation');
+        if (stateAssocs) {
+          const nameMap: Record<string, string> = {};
+          stateAssocs.forEach((sa: any) => {
+            nameMap[sa.id] = sa.abbreviation || sa.name;
+          });
+          setStateAssociationNames(nameMap);
+        }
+      } catch (err) {
+        console.error('Error loading club state association:', err);
+      }
+    };
+    loadClubStateAssociation();
+  }, [currentClub?.clubId]);
+
+  const handleEventScopeChange = (scope: EventScope) => {
+    setEventScope(scope);
+    localStorage.setItem('raceCalendarEventScope', scope);
+  };
 
   // Load sailing days for the club
   useEffect(() => {
@@ -512,13 +587,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   };
 
   const getVenueImage = (venueName: string, event?: RaceEvent): string | null => {
-    // First check if event has venueImage (for public events with venue data)
     if (event?.venueImage) {
       return event.venueImage;
     }
-    // Fall back to finding venue by name
     const venue = venues.find(v => v.name === venueName);
-    return venue?.image || null;
+    if (venue?.image) return venue.image;
+    if (event?.isExternalEvent) {
+      return getBoatClassImage(event.raceClass as string) || null;
+    }
+    return null;
   };
 
   const isDatePast = (dateStr: string) => {
@@ -587,15 +664,26 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     )
   ).sort((a, b) => b - a); // Sort descending (newest first)
 
+  const isEventInMyState = (event: RaceEvent): boolean => {
+    if (!clubStateAssociationId) return false;
+    if (event.displayCategory?.startsWith('state_')) {
+      const assocId = event.displayCategory.replace('state_', '');
+      return assocId === clubStateAssociationId;
+    }
+    return false;
+  };
+
+  const isEventInAnyState = (event: RaceEvent): boolean => {
+    return event.displayCategory?.startsWith('state_') || event.eventLevel === 'state';
+  };
+
   const filteredEvents = Object.values(uniqueEvents)
     .filter(event => {
-      // Year filter
       const eventDate = new Date(event.date);
       if (eventDate.getFullYear() !== selectedYear) {
         return false;
       }
 
-      // Time filter
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       eventDate.setHours(0, 0, 0, 0);
@@ -619,6 +707,54 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
       if (activeFilters.eventType === 'public' && !event.isPublicEvent) {
         return false;
       }
+      if (activeFilters.eventType === 'state' && event.eventLevel !== 'state') {
+        return false;
+      }
+      if (activeFilters.eventType === 'national' && event.eventLevel !== 'national') {
+        return false;
+      }
+
+      if (eventScope === 'club') {
+        if (event.isExternalEvent || event.isPublicEvent) return false;
+      } else if (eventScope === 'my_state') {
+        if (event.isExternalEvent) {
+          if (!isEventInMyState(event)) return false;
+        } else if (event.isPublicEvent && event.eventLevel === 'state') {
+          // keep
+        } else if (!event.isExternalEvent && !event.isPublicEvent) {
+          return false;
+        } else {
+          return false;
+        }
+      } else if (eventScope === 'national') {
+        if (event.isExternalEvent) {
+          if (event.displayCategory !== 'national' && event.eventLevel !== 'national') return false;
+        } else if (event.isPublicEvent && event.eventLevel === 'national') {
+          // keep
+        } else if (!event.isExternalEvent && !event.isPublicEvent) {
+          return false;
+        } else {
+          return false;
+        }
+      } else if (eventScope === 'all_states') {
+        if (event.isExternalEvent) {
+          if (!isEventInAnyState(event)) return false;
+        } else if (event.isPublicEvent && event.eventLevel === 'state') {
+          // keep
+        } else if (!event.isExternalEvent && !event.isPublicEvent) {
+          return false;
+        } else {
+          return false;
+        }
+      }
+      else if (eventScope === 'all') {
+        if (event.isExternalEvent) {
+          const isTrulyNational = event.externalEventType === 'national' || event.externalEventType === 'world';
+          const isMyState = isEventInMyState(event);
+          if (!isTrulyNational && !isMyState) return false;
+        }
+      }
+
       return true;
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -634,6 +770,11 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
     if (timeFilter === 'upcoming' && md < today) return false;
     if (timeFilter === 'past' && md >= today) return false;
+
+    if (eventScope === 'club' && meeting.organizationLevel !== 'club') return false;
+    if (eventScope === 'my_state' && meeting.organizationLevel !== 'state_association') return false;
+    if (eventScope === 'national' && meeting.organizationLevel !== 'national_association') return false;
+    if (eventScope === 'all_states' && meeting.organizationLevel !== 'state_association') return false;
 
     return true;
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -1147,13 +1288,23 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mb-2">
                             <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <MapPin size={13} />
                               <span className="font-medium truncate">{event.venue}</span>
                             </div>
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                            <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                              {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                            </span>
+                            {event.isExternalEvent ? (
+                              event.displayCategory?.startsWith('state_') ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                  {stateAssociationNames[event.displayCategory.replace('state_', '')] || 'State Event'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                  National Event
+                                </span>
+                              )
+                            ) : (
+                              <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
+                                {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                              </span>
+                            )}
                             <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
                               {event.raceClass}
                             </span>
@@ -2184,7 +2335,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                         className={`
                           flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
                           ${activeFilters.eventType === 'public'
-                            ? 'bg-indigo-600 text-white'
+                            ? 'bg-blue-600 text-white'
                             : darkMode
                               ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                               : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -2193,6 +2344,36 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                       >
                         <Globe size={14} />
                         Public
+                      </button>
+                      <button
+                        onClick={() => toggleFilter('eventType', 'state')}
+                        className={`
+                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                          ${activeFilters.eventType === 'state'
+                            ? 'bg-amber-600 text-white'
+                            : darkMode
+                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }
+                        `}
+                      >
+                        <MapPin size={14} />
+                        State
+                      </button>
+                      <button
+                        onClick={() => toggleFilter('eventType', 'national')}
+                        className={`
+                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                          ${activeFilters.eventType === 'national'
+                            ? 'bg-teal-600 text-white'
+                            : darkMode
+                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }
+                        `}
+                      >
+                        <Flag size={14} />
+                        National
                       </button>
                     </div>
                   </div>
@@ -2352,6 +2533,42 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             )}
           </div>
         </div>
+
+        {/* Event Scope Tabs */}
+        {currentOrganization?.type !== 'state' && currentOrganization?.type !== 'national' && (
+          <div className={`flex items-center gap-1 p-1 rounded-xl mt-4 ${
+            darkMode ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-100 border border-slate-200'
+          }`}>
+            {([
+              { key: 'all' as EventScope, label: 'My Events', desc: 'Club + My State + National' },
+              { key: 'club' as EventScope, label: 'Club Events', desc: 'Club events only' },
+              { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', desc: 'Your state events' },
+              { key: 'national' as EventScope, label: 'National Events', desc: 'National events' },
+              { key: 'all_states' as EventScope, label: 'All Events', desc: 'All events across all states' },
+            ]).map(tab => {
+              const isActive = eventScope === tab.key;
+
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => handleEventScopeChange(tab.key)}
+                  title={tab.desc}
+                  className={`
+                    px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none text-center whitespace-nowrap
+                    ${isActive
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20'
+                      : darkMode
+                        ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        : 'text-slate-600 hover:text-slate-800 hover:bg-white'
+                    }
+                  `}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-6">
           {loading ? (

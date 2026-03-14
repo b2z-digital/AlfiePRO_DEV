@@ -13,6 +13,7 @@ import { MediaUploadGallery } from './MediaUploadGallery';
 import { updateEventMedia } from '../utils/raceStorage';
 import { EventMedia, YouTubeVideo } from '../types/media';
 import { UploadVideoModal } from './UploadVideoModal';
+import { getBoatClassImage } from '../utils/boatClassImages';
 import { usePermissions } from '../hooks/usePermissions';
 import { WindyWeatherWidget } from './WindyWeatherWidget';
 import { EventRegistrationModal } from './events/EventRegistrationModal';
@@ -463,10 +464,16 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
   }, [event?.id]);
 
   const fetchVenueImage = async () => {
+    const defaultImage = 'https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1';
     try {
+      if (event.isExternalEvent) {
+        const classImage = getBoatClassImage(event.raceClass as string);
+        setVenueImage(classImage || defaultImage);
+        return;
+      }
+
       if (!event.venue) return;
 
-      // First try to get venue from the venues table (works for all contexts)
       try {
         const { data: venueData, error: venueError } = await supabase
           .from('venues')
@@ -485,7 +492,6 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         console.warn('Could not fetch venue from database, trying local storage:', venueErr);
       }
 
-      // Fallback to local storage for club venues
       const venues = await getStoredVenues();
       const venue = venues.find(v => v.name === event.venue);
 
@@ -494,17 +500,14 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         if (venue.image) {
           setVenueImage(venue.image);
         } else {
-          // Default image if venue has no image
-          setVenueImage('https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1');
+          setVenueImage(defaultImage);
         }
       } else {
-        // Fallback to default image
-        setVenueImage('https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1');
+        setVenueImage(defaultImage);
       }
     } catch (err) {
       console.error('Error fetching venue image:', err);
-      // Fallback to default image
-      setVenueImage('https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1');
+      setVenueImage(defaultImage);
     }
   };
 
@@ -1709,14 +1712,16 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 Race Format
               </p>
               <div className="flex flex-wrap gap-2">
-                <div className={`
-                  px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm
-                  ${event.raceFormat === 'handicap'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-blue-600 text-white'}
-                `}>
-                  {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                </div>
+                {!event.isExternalEvent && (
+                  <div className={`
+                    px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm
+                    ${event.raceFormat === 'handicap'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-blue-600 text-white'}
+                  `}>
+                    {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                  </div>
+                )}
                 <div className="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-600 text-white shadow-sm">
                   {event.raceClass}
                 </div>
@@ -1765,8 +1770,31 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         </div>
       </div>
 
+      {/* External Event Registration Link */}
+      {event.isExternalEvent && event.registrationUrl && (
+        <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            Event Registration
+          </h3>
+          <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <p className={`text-sm mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              This event is managed externally. Click below to register on the event organiser's website.
+            </p>
+            <a
+              href={event.registrationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+            >
+              <ExternalLink size={16} />
+              Register for Event
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Event Registration Section (before skippers are added) */}
-      {!skippersAdded && (
+      {!skippersAdded && !event.isExternalEvent && (
         <div className={`
           p-4 rounded-lg
           ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
@@ -2421,104 +2449,143 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     </div>
   );
 
-  const renderDocumentsTab = () => (
-    <div className="space-y-6">
-      <div className={`
-        p-4 rounded-lg
-        ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-      `}>
-        <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-          Event Documents
-        </h3>
-        
-        <div className="space-y-4">
-          {event.noticeOfRaceUrl ? (
-            <div className={`
-              p-4 rounded-lg border
-              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-            `}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-                  <div>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Notice of Race
-                    </p>
-                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      PDF Document
-                    </p>
-                  </div>
-                </div>
-                
+  const renderDocumentsTab = () => {
+    const extDocs = event.externalDocuments || [];
+    const hasExternalDocs = extDocs.length > 0;
+    const hasNor = event.noticeOfRaceUrl || extDocs.some((d: any) => d.type === 'nor');
+    const hasSi = event.sailingInstructionsUrl || extDocs.some((d: any) => d.type === 'si');
+
+    const getDocIcon = (doc: any) => {
+      const lower = (doc.name || '').toLowerCase();
+      if (lower.includes('.pdf') || doc.url?.includes('.pdf')) return 'PDF';
+      if (lower.includes('.doc')) return 'DOC';
+      if (lower.includes('.xls')) return 'XLS';
+      return 'DOC';
+    };
+
+    const getDocColor = (doc: any) => {
+      const type = doc.type || '';
+      if (type === 'nor') return darkMode ? 'text-red-400' : 'text-red-600';
+      if (type === 'si') return darkMode ? 'text-blue-400' : 'text-blue-600';
+      if (type === 'amendment') return darkMode ? 'text-amber-400' : 'text-amber-600';
+      return darkMode ? 'text-slate-400' : 'text-slate-600';
+    };
+
+    if (hasExternalDocs) {
+      return (
+        <div className="space-y-6">
+          <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+            <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+              Event Documents
+            </h3>
+            <div className="space-y-3">
+              {extDocs.map((doc: any, idx: number) => (
                 <a
-                  href={event.noticeOfRaceUrl}
+                  key={idx}
+                  href={doc.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`
-                    px-3 py-1 rounded-lg text-sm font-medium transition-colors
-                    ${darkMode 
-                      ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' 
-                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}
+                    flex items-center justify-between p-4 rounded-lg border transition-all group
+                    ${darkMode
+                      ? 'bg-slate-800 border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/80'
+                      : 'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'}
                   `}
                 >
-                  View
-                </a>
-              </div>
-            </div>
-          ) : (
-            <div className={`
-              p-4 rounded-lg border text-center
-              ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}
-            `}>
-              No Notice of Race document available
-            </div>
-          )}
-          
-          {event.sailingInstructionsUrl ? (
-            <div className={`
-              p-4 rounded-lg border
-              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-            `}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-                  <div>
-                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      Sailing Instructions
-                    </p>
-                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      PDF Document
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <div className={`
+                      w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold
+                      ${doc.type === 'nor'
+                        ? darkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-50 text-red-600'
+                        : doc.type === 'si'
+                        ? darkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'
+                        : doc.type === 'amendment'
+                        ? darkMode ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-600'
+                        : darkMode ? 'bg-slate-600 text-slate-300' : 'bg-slate-100 text-slate-600'
+                      }
+                    `}>
+                      {getDocIcon(doc)}
+                    </div>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {doc.name}
+                      </p>
+                      <p className={`text-xs ${getDocColor(doc)}`}>
+                        {doc.type === 'nor' ? 'Notice of Race' : doc.type === 'si' ? 'Sailing Instructions' : doc.type === 'amendment' ? 'Amendment' : 'Document'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                
-                <a
-                  href={event.sailingInstructionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`
-                    px-3 py-1 rounded-lg text-sm font-medium transition-colors
-                    ${darkMode 
-                      ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' 
-                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}
-                  `}
-                >
-                  View
+                  <div className={`
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                    ${darkMode
+                      ? 'bg-blue-600/20 text-blue-400 group-hover:bg-blue-600/30'
+                      : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100'}
+                  `}>
+                    <ExternalLink size={14} />
+                    View
+                  </div>
                 </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            Event Documents
+          </h3>
+          <div className="space-y-4">
+            {event.noticeOfRaceUrl ? (
+              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>Notice of Race</p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>PDF Document</p>
+                    </div>
+                  </div>
+                  <a href={event.noticeOfRaceUrl} target="_blank" rel="noopener noreferrer"
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                    View
+                  </a>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className={`
-              p-4 rounded-lg border text-center
-              ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}
-            `}>
-              No Sailing Instructions document available
-            </div>
-          )}
+            ) : (
+              <div className={`p-4 rounded-lg border text-center ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+                No Notice of Race document available
+              </div>
+            )}
+            {event.sailingInstructionsUrl ? (
+              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>Sailing Instructions</p>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>PDF Document</p>
+                    </div>
+                  </div>
+                  <a href={event.sailingInstructionsUrl} target="_blank" rel="noopener noreferrer"
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                    View
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className={`p-4 rounded-lg border text-center ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+                No Sailing Instructions document available
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderRegistrationsTab = () => {
     const handleMarkAsPaid = async (registrationId: string) => {
@@ -2987,6 +3054,40 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
 
   const renderRegistrationTab = () => (
     <div className="space-y-6">
+      {event.isExternalEvent ? (
+        <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
+          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+            Event Registration
+          </h3>
+          <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <p className={`text-sm mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              This event is managed externally.{event.registrationUrl ? ' Click below to register on the event organiser\'s website.' : ''}
+            </p>
+            {event.registrationUrl && (
+              <a
+                href={event.registrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              >
+                <ExternalLink size={16} />
+                Register for Event
+              </a>
+            )}
+            {event.sourceUrl && (
+              <a
+                href={event.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors ${event.registrationUrl ? 'ml-3' : ''} ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+              >
+                <Globe size={16} />
+                View Event Source
+              </a>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className={`
         p-4 rounded-lg
         ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
@@ -2994,7 +3095,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
         <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
           Event Registration
         </h3>
-        
+
         <div className="space-y-4">
           <div className={`
             p-4 rounded-lg border
@@ -3059,7 +3160,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               </div>
             </div>
           </div>
-          
+
           <div className={`
             p-4 rounded-lg border
             ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
@@ -3269,6 +3370,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 

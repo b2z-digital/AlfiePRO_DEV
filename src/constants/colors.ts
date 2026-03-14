@@ -5,74 +5,95 @@ export const defaultColorScheme = {
   darkText: 'dark:text-gray-200'
 };
 
-// Boat class colors - consistent pill/badge styling
+// Boat class colors - consistent pill/badge styling (matches mobile app)
 export const boatTypeColors: Record<string, { bg: string; text: string; darkBg: string; darkText: string; gradient?: string }> = {
-  'DF65': {
-    bg: 'bg-emerald-500',
-    text: 'text-white',
-    darkBg: 'bg-emerald-600',
-    darkText: 'text-white',
-    gradient: 'from-emerald-500 to-emerald-600'
-  },
-  'DF95': {
-    bg: 'bg-amber-500',
-    text: 'text-white',
-    darkBg: 'bg-amber-600',
-    darkText: 'text-white',
-    gradient: 'from-amber-500 to-amber-600'
-  },
-  '10R': {
-    bg: 'bg-rose-500',
-    text: 'text-white',
-    darkBg: 'bg-rose-600',
-    darkText: 'text-white',
-    gradient: 'from-rose-500 to-pink-500'
-  },
   'IOM': {
     bg: 'bg-sky-500',
     text: 'text-white',
-    darkBg: 'bg-sky-600',
+    darkBg: 'bg-sky-500',
     darkText: 'text-white',
-    gradient: 'from-sky-500 to-blue-500'
+    gradient: 'from-sky-500 to-sky-600'
   },
-  'Marblehead': {
-    bg: 'bg-indigo-500',
+  '10R': {
+    bg: 'bg-purple-500',
     text: 'text-white',
-    darkBg: 'bg-indigo-600',
+    darkBg: 'bg-purple-500',
     darkText: 'text-white',
-    gradient: 'from-indigo-500 to-indigo-600'
+    gradient: 'from-purple-500 to-purple-600'
   },
-  'A Class': {
-    bg: 'bg-pink-500',
+  'DF95': {
+    bg: 'bg-red-500',
     text: 'text-white',
-    darkBg: 'bg-pink-600',
+    darkBg: 'bg-red-500',
     darkText: 'text-white',
-    gradient: 'from-pink-500 to-pink-600'
+    gradient: 'from-red-500 to-red-600'
   },
-  'RC Laser': {
+  'DF65': {
     bg: 'bg-orange-500',
     text: 'text-white',
-    darkBg: 'bg-orange-600',
+    darkBg: 'bg-orange-500',
     darkText: 'text-white',
     gradient: 'from-orange-500 to-orange-600'
+  },
+  'Marblehead': {
+    bg: 'bg-teal-500',
+    text: 'text-white',
+    darkBg: 'bg-teal-500',
+    darkText: 'text-white',
+    gradient: 'from-teal-500 to-teal-600'
+  },
+  'Footy': {
+    bg: 'bg-yellow-600',
+    text: 'text-white',
+    darkBg: 'bg-yellow-600',
+    darkText: 'text-white',
+    gradient: 'from-yellow-600 to-yellow-700'
+  },
+  'RG65': {
+    bg: 'bg-lime-600',
+    text: 'text-white',
+    darkBg: 'bg-lime-600',
+    darkText: 'text-white',
+    gradient: 'from-lime-600 to-lime-700'
+  },
+  '36R': {
+    bg: 'bg-rose-500',
+    text: 'text-white',
+    darkBg: 'bg-rose-500',
+    darkText: 'text-white',
+    gradient: 'from-rose-500 to-rose-600'
+  },
+  'A Class': {
+    bg: 'bg-slate-500',
+    text: 'text-white',
+    darkBg: 'bg-slate-500',
+    darkText: 'text-white',
+    gradient: 'from-slate-500 to-slate-600'
+  },
+  'RC Laser': {
+    bg: 'bg-slate-500',
+    text: 'text-white',
+    darkBg: 'bg-slate-500',
+    darkText: 'text-white',
+    gradient: 'from-slate-500 to-slate-600'
   }
 };
 
-// Race format colors - consistent throughout app
+// Race format colors - consistent throughout app (matches mobile app)
 export const raceFormatColors = {
   'Scratch': {
-    bg: 'bg-blue-500',
+    bg: 'bg-green-600',
     text: 'text-white',
-    darkBg: 'bg-blue-600',
+    darkBg: 'bg-green-600',
     darkText: 'text-white',
-    gradient: 'from-blue-500 to-blue-600'
+    gradient: 'from-green-600 to-green-700'
   },
   'Handicap': {
-    bg: 'bg-purple-500',
+    bg: 'bg-amber-600',
     text: 'text-white',
-    darkBg: 'bg-purple-600',
+    darkBg: 'bg-amber-600',
     darkText: 'text-white',
-    gradient: 'from-purple-500 to-purple-600'
+    gradient: 'from-amber-600 to-amber-700'
   }
 };
 

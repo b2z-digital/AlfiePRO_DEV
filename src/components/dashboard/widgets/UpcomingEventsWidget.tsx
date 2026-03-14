@@ -9,6 +9,7 @@ import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { getStoredRaceEvents, getStoredRaceSeries } from '../../../utils/raceStorage';
 import { getPublicEvents } from '../../../utils/publicEventStorage';
 import { getBoatClassBadge, getRaceFormatBadge } from '../../../constants/colors';
+import { getBoatClassImage } from '../../../utils/boatClassImages';
 import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
 import { CalendarMeetingDetailsModal } from '../../meetings/CalendarMeetingDetailsModal';
 import { CalendarMeeting } from '../../../utils/calendarMeetingStorage';
@@ -30,6 +31,7 @@ interface RaceEvent {
   registrationCount?: number;
   eventLevel?: 'state' | 'national';
   isPublicEvent?: boolean;
+  isExternalEvent?: boolean;
   isMeeting?: boolean;
   isClubMeeting?: boolean;
   meetingCategory?: 'general' | 'committee';
@@ -263,7 +265,12 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           registrationOpen: true
         }));
       } else {
-        const raceEvents = await getStoredRaceEvents();
+        const [raceEvents, raceSeries, publicEvents] = await Promise.all([
+          getStoredRaceEvents(),
+          getStoredRaceSeries(),
+          getPublicEvents(),
+        ]);
+
         const upcomingQuickRaces = raceEvents.filter(event => {
           const eventDate = new Date(event.date);
           eventDate.setHours(0, 0, 0, 0);
@@ -279,7 +286,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           skippers: event.skippers || []
         }));
 
-        const raceSeries = await getStoredRaceSeries();
         const upcomingSeriesEvents: RaceEvent[] = [];
         raceSeries.forEach(series => {
           series.rounds.forEach((round: any, roundIndex: number) => {
@@ -307,7 +313,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           });
         });
 
-        const publicEvents = await getPublicEvents();
         const upcomingPublicEvents = publicEvents
           .filter(event => {
             const eventDate = new Date(event.date);
@@ -327,7 +332,46 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             registrationOpen: true
           }));
 
-        allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents];
+        let clubStateAssociationId: string | null = null;
+        if (currentClub?.clubId) {
+          const { data: clubData } = await supabase
+            .from('clubs')
+            .select('state_association_id')
+            .eq('id', currentClub.clubId)
+            .maybeSingle();
+          clubStateAssociationId = clubData?.state_association_id || null;
+        }
+
+        const { data: externalData } = await supabase
+          .from('external_events')
+          .select('*, external_event_sources!inner(name)')
+          .eq('is_visible', true)
+          .eq('event_status', 'active')
+          .gte('event_date', todayStr)
+          .order('event_date', { ascending: true })
+          .limit(20);
+
+        const externalEvents: RaceEvent[] = (externalData || [])
+          .filter((ext: any) => {
+            const isTrulyNational = ext.event_type === 'national' || ext.event_type === 'world';
+            const isMyState = clubStateAssociationId && ext.display_category?.startsWith('state_') &&
+              ext.display_category.replace('state_', '') === clubStateAssociationId;
+            return isTrulyNational || isMyState;
+          })
+          .map((ext: any) => ({
+            id: `external-${ext.id}`,
+            eventName: ext.event_name,
+            clubName: (ext.external_event_sources as any)?.name || ext.venue || '',
+            date: ext.event_date || '',
+            venue: ext.location || ext.venue || '',
+            raceClass: ext.boat_class_mapped || ext.boat_class_raw || '',
+            isPublicEvent: true,
+            isExternalEvent: true,
+            eventLevel: (ext.event_type === 'national' || ext.event_type === 'world') ? 'national' as const : 'state' as const,
+            registrationOpen: !!ext.registration_url,
+          }));
+
+        allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents, ...externalEvents];
       }
 
       const meetingEvents = await meetingsPromise;
@@ -336,7 +380,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         .slice(0, 4);
 
       const nonMeetingEvents = allUpcoming.filter(e => !e.isMeeting);
-
       const venueNames = [...new Set(nonMeetingEvents.map(e => e.venue).filter(Boolean))];
       const venueImages: Record<string, string> = {};
 
@@ -346,19 +389,22 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             .from('venues')
             .select('name, image')
             .in('name', venueNames);
-
           (venues || []).forEach(v => {
             if (v.image) venueImages[v.name] = v.image;
           });
-
-          allUpcoming = allUpcoming.map(event => ({
-            ...event,
-            venueImage: !event.isMeeting && event.venue ? venueImages[event.venue] : undefined
-          }));
         } catch (error) {
           console.error('Error fetching venue images:', error);
         }
       }
+
+      allUpcoming = allUpcoming.map(event => {
+        if (event.isMeeting) return event;
+        const venueImg = event.venue ? venueImages[event.venue] : undefined;
+        return {
+          ...event,
+          venueImage: venueImg || getBoatClassImage(event.raceClass) || undefined
+        };
+      });
 
       const eventsToEnrich = allUpcoming.filter(e => !e.isMeeting);
       if (eventsToEnrich.length > 0) {
@@ -666,7 +712,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
-              {event.raceFormat && (
+              {!event.isExternalEvent && event.raceFormat && (
                 <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
                   {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                 </span>
