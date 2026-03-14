@@ -41,6 +41,7 @@ interface RaceResult {
   completed: boolean;
   isSeriesEvent?: boolean;
   isNationalEvent?: boolean;
+  isStateEvent?: boolean;
   externalEventId?: string;
   seriesId?: string;
   roundIndex?: number;
@@ -165,20 +166,37 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       }
 
-      // Fetch national events that have dates and merge them in
+      // Fetch national + state events and merge them in
       try {
-        const { data: nationalEvents } = await supabase
+        let stateAssociationId: string | null = null;
+        if (currentClub?.clubId) {
+          const { data: saLink } = await supabase
+            .from('state_association_clubs')
+            .select('state_association_id')
+            .eq('club_id', currentClub.clubId)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (saLink) stateAssociationId = saLink.state_association_id;
+        }
+
+        const categoriesToFetch = ['national'];
+        if (stateAssociationId) {
+          categoriesToFetch.push(`state_${stateAssociationId}`);
+        }
+
+        const { data: externalEvents } = await supabase
           .from('external_result_events')
           .select('id, event_name, event_date, venue, boat_class_raw, boat_class_mapped, results_json, competitor_count, display_category')
           .eq('is_visible', true)
-          .eq('display_category', 'national')
+          .in('display_category', categoriesToFetch)
           .not('event_date', 'is', null)
           .order('event_date', { ascending: false })
           .limit(8);
 
-        if (nationalEvents && nationalEvents.length > 0) {
-          const nationalResults = nationalEvents.map(ev => {
+        if (externalEvents && externalEvents.length > 0) {
+          const externalResults = externalEvents.map(ev => {
             const boatClass = ev.boat_class_mapped || ev.boat_class_raw || '';
+            const isState = ev.display_category !== 'national';
             const topThree: Array<{ name: string; avatarUrl?: string; position: number }> = [];
             if (ev.results_json && Array.isArray(ev.results_json) && ev.results_json.length > 0) {
               ev.results_json
@@ -190,24 +208,25 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                 });
             }
             return {
-              id: `national-${ev.id}`,
+              id: `${isState ? 'state' : 'national'}-${ev.id}`,
               externalEventId: ev.id,
               eventName: ev.event_name,
               date: ev.event_date!,
               venue: ev.venue || '',
               raceClass: boatClass,
               completed: true,
-              isNationalEvent: true,
+              isNationalEvent: !isState,
+              isStateEvent: isState,
               boatClassImage: getBoatClassImage(boatClass),
               topThree,
             };
           });
 
-          allRecent = [...allRecent, ...nationalResults]
+          allRecent = [...allRecent, ...externalResults]
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         }
       } catch (err) {
-        console.error('Error fetching national events for recent results:', err);
+        console.error('Error fetching external events for recent results:', err);
       }
 
       allRecent = allRecent.slice(0, 4);
@@ -370,8 +389,8 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
               key={race.id}
               onClick={() => {
                 if (isEditMode) return;
-                if (race.isNationalEvent) {
-                  navigate('/results', { state: { mainTab: 'national', externalEventId: race.externalEventId } });
+                if (race.isNationalEvent || race.isStateEvent) {
+                  navigate('/results', { state: { mainTab: race.isStateEvent ? 'state' : 'national', externalEventId: race.externalEventId } });
                 } else {
                   navigate('/results', { state: { eventId: race.id, isSeriesEvent: race.isSeriesEvent, seriesId: race.seriesId, roundIndex: race.roundIndex } });
                 }
@@ -384,7 +403,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
             >
               <div className="flex h-32">
                 <div className="relative w-32 h-32 flex-shrink-0 overflow-hidden">
-                  {race.isNationalEvent ? (
+                  {(race.isNationalEvent || race.isStateEvent) ? (
                     <div
                       className="absolute inset-0"
                       style={{
@@ -405,7 +424,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                     </div>
                   )}
-                  <div className={`absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b ${race.isNationalEvent ? 'from-amber-400 via-amber-500 to-amber-400' : 'from-green-400 via-green-500 to-green-400'}`} />
+                  <div className={`absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b ${race.isNationalEvent ? 'from-amber-400 via-amber-500 to-amber-400' : race.isStateEvent ? 'from-green-400 via-green-500 to-green-400' : 'from-green-400 via-green-500 to-green-400'}`} />
                   {race.date && (
                     <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
                       <div className="text-center">
@@ -417,6 +436,8 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                   <div className="absolute top-2 left-2">
                     {race.isNationalEvent ? (
                       <Globe size={20} className="text-amber-400 drop-shadow-lg" />
+                    ) : race.isStateEvent ? (
+                      <Globe size={20} className="text-green-400 drop-shadow-lg" />
                     ) : (
                       <Trophy size={20} className="text-yellow-400 drop-shadow-lg" />
                     )}
@@ -433,6 +454,11 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                           <Globe size={14} className="mr-1 text-amber-400" />
                           <span className="truncate text-amber-400/80">{race.venue || 'National Event'}</span>
                         </>
+                      ) : race.isStateEvent ? (
+                        <>
+                          <Globe size={14} className="mr-1 text-green-400" />
+                          <span className="truncate text-green-400/80">{race.venue || 'State Event'}</span>
+                        </>
                       ) : (
                         <>
                           <MapPin size={14} className="mr-1" />
@@ -448,7 +474,12 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                           National
                         </span>
                       )}
-                      {!race.isNationalEvent && race.raceFormat && (
+                      {race.isStateEvent && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+                          State
+                        </span>
+                      )}
+                      {!race.isNationalEvent && !race.isStateEvent && race.raceFormat && (
                         <span className={getRaceFormatBadge(race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
                           {race.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                         </span>
