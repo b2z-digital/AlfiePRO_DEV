@@ -31,6 +31,7 @@ interface RaceEvent {
   registrationCount?: number;
   eventLevel?: 'state' | 'national';
   isPublicEvent?: boolean;
+  isExternalEvent?: boolean;
   isMeeting?: boolean;
   isClubMeeting?: boolean;
   meetingCategory?: 'general' | 'committee';
@@ -364,9 +365,9 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             date: ext.event_date || '',
             venue: ext.location || ext.venue || '',
             raceClass: ext.boat_class_mapped || ext.boat_class_raw || '',
-            raceFormat: 'scratch',
             isPublicEvent: true,
-            eventLevel: ext.event_type === 'state' ? 'state' as const : 'national' as const,
+            isExternalEvent: true,
+            eventLevel: (ext.event_type === 'national' || ext.event_type === 'world') ? 'national' as const : 'state' as const,
             registrationOpen: !!ext.registration_url,
           }));
 
@@ -711,7 +712,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
-              {event.raceFormat && (
+              {!event.isExternalEvent && event.raceFormat && (
                 <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
                   {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
                 </span>

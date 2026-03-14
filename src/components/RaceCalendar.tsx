@@ -430,28 +430,31 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           convertToRaceEvent(publicEvent)
         );
 
-        const externalRaceEvents: RaceEvent[] = (externalEventsResult.data || []).map((ext: any) => ({
-          id: `external-${ext.id}`,
-          eventName: ext.event_name,
-          clubName: (ext.external_event_sources as any)?.name || ext.venue || 'External Event',
-          date: ext.event_date || '',
-          endDate: ext.event_end_date || undefined,
-          venue: ext.location || ext.venue || '',
-          raceClass: (ext.boat_class_mapped || ext.boat_class_raw || 'Unknown') as any,
-          raceFormat: 'scratch' as any,
-          isPublicEvent: true,
-          isExternalEvent: true,
-          eventLevel: ext.event_type === 'national' ? 'national' as const : ext.event_type === 'state' ? 'state' as const : 'national' as const,
-          noticeOfRaceUrl: ext.documents_json?.find((d: any) => d.type === 'nor' || d.name?.toLowerCase().includes('notice'))?.url,
-          sailingInstructionsUrl: ext.documents_json?.find((d: any) => d.type === 'si' || d.name?.toLowerCase().includes('sailing instruction'))?.url,
-          sourceUrl: ext.source_url,
-          registrationUrl: ext.registration_url,
-          multiDay: ext.event_end_date ? true : false,
-          numberOfDays: ext.event_end_date ? Math.ceil((new Date(ext.event_end_date).getTime() - new Date(ext.event_date).getTime()) / 86400000) + 1 : undefined,
-          displayCategory: ext.display_category || 'national',
-          stateCode: ext.state_code || undefined,
-          externalDocuments: ext.documents_json || [],
-        }));
+        const externalRaceEvents: RaceEvent[] = (externalEventsResult.data || []).map((ext: any) => {
+          return {
+            id: `external-${ext.id}`,
+            eventName: ext.event_name,
+            clubName: (ext.external_event_sources as any)?.name || ext.venue || 'External Event',
+            date: ext.event_date || '',
+            endDate: ext.event_end_date || undefined,
+            venue: ext.location || ext.venue || '',
+            raceClass: (ext.boat_class_mapped || ext.boat_class_raw || 'Unknown') as any,
+            raceFormat: 'scratch' as any,
+            isPublicEvent: true,
+            isExternalEvent: true,
+            externalEventType: ext.event_type || 'national',
+            eventLevel: ext.event_type === 'national' ? 'national' as const : ext.event_type === 'state' ? 'state' as const : 'national' as const,
+            noticeOfRaceUrl: ext.documents_json?.find((d: any) => d.type === 'nor' || d.name?.toLowerCase().includes('notice'))?.url,
+            sailingInstructionsUrl: ext.documents_json?.find((d: any) => d.type === 'si' || d.name?.toLowerCase().includes('sailing instruction'))?.url,
+            sourceUrl: ext.source_url,
+            registrationUrl: ext.registration_url,
+            multiDay: ext.event_end_date ? true : false,
+            numberOfDays: ext.event_end_date ? Math.ceil((new Date(ext.event_end_date).getTime() - new Date(ext.event_date).getTime()) / 86400000) + 1 : undefined,
+            displayCategory: ext.display_category || 'national',
+            stateCode: ext.state_code || undefined,
+            externalDocuments: ext.documents_json || [],
+          };
+        });
 
         // Filter out public events that have local copies in raceEvents
         // Local copies now have a public_event_id field tracking the original event
@@ -744,12 +747,11 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           return false;
         }
       }
-      // 'all' scope: club events + my state external events + national external events (default)
       else if (eventScope === 'all') {
         if (event.isExternalEvent) {
-          const isNational = event.displayCategory === 'national' || event.eventLevel === 'national';
+          const isTrulyNational = event.externalEventType === 'national' || event.externalEventType === 'world';
           const isMyState = isEventInMyState(event);
-          if (!isNational && !isMyState) return false;
+          if (!isTrulyNational && !isMyState) return false;
         }
       }
 
@@ -1288,9 +1290,21 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                               <span className="font-medium truncate">{event.venue}</span>
                             </div>
-                            <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                              {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                            </span>
+                            {event.isExternalEvent ? (
+                              event.displayCategory?.startsWith('state_') ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                  {stateAssociationNames[event.displayCategory.replace('state_', '')] || 'State Event'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                  National Event
+                                </span>
+                              )
+                            ) : (
+                              <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
+                                {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                              </span>
+                            )}
                             <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
                               {event.raceClass}
                             </span>
@@ -2526,7 +2540,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             darkMode ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-100 border border-slate-200'
           }`}>
             {([
-              { key: 'all' as EventScope, label: 'All Events', desc: 'Club + My State + National' },
+              { key: 'all' as EventScope, label: 'My Events', desc: 'Club + My State + National' },
               { key: 'club' as EventScope, label: 'Club Events', desc: 'Club events only' },
               { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', desc: 'Your state events' },
               { key: 'national' as EventScope, label: 'National Events', desc: 'National events' },

@@ -150,6 +150,8 @@ export interface RaceEvent {
   eventLevel?: 'club' | 'state' | 'national';
   // External scraped event
   isExternalEvent?: boolean;
+  externalEventType?: string;
+  externalStateName?: string;
   sourceUrl?: string;
   registrationUrl?: string;
   displayCategory?: string;
