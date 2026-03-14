@@ -214,6 +214,18 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                     )}
                   </div>
 
+                  {classified.is_scraped && classified.source_url && (
+                    <a
+                      href={classified.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors mb-2"
+                    >
+                      <ExternalLink size={14} />
+                      View Original Listing
+                    </a>
+                  )}
+
                   <div className="space-y-3 text-blue-100 mb-6">
                     <div className="flex items-center gap-2">
                       <MapPin size={18} className="text-blue-400" />

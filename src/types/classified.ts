@@ -24,6 +24,9 @@ export interface Classified {
   external_contact_email?: string;
   external_contact_phone?: string;
   created_by_user_id?: string;
+  source_url?: string;
+  external_source_id?: string;
+  is_scraped?: boolean;
 
   // Joined data
   user?: {
