@@ -220,21 +220,47 @@ function parseEventPage(html: string, fallbackName?: string): ParsedEvent | null
       html.match(/([A-Z][a-zA-Z\s]+,\s*(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ))/);
     const venue = venueMatch ? stripTags(venueMatch[1]).trim() : "";
 
-    // Date range "09 Aug - 10 Aug 2025" or "09 Aug – 10 Aug 2025"
+    // Date parsing — handles multiple formats from radiosailing.org.au and similar sites
     let eventDate: string | null = null;
     let eventEndDate: string | null = null;
-    const rangeMatch = html.match(/(\d{1,2})\s+(\w{3,9})\s*[-–]\s*(\d{1,2})\s+(\w{3,9})\s+(\d{4})/);
-    if (rangeMatch) {
-      const [, d1, mon1, d2, mon2, yr] = rangeMatch;
+
+    // Try year from event name first as anchor (e.g. "2026 International ...")
+    const nameYearMatch = eventName.match(/\b(20\d{2})\b/);
+    const nameYear = nameYearMatch ? nameYearMatch[1] : null;
+
+    // Cross-month range: "28 Feb - 03 Mar 2026" or "28 Feb – 03 Mar 2026"
+    const crossMonthRange = html.match(/(\d{1,2})\s+(\w{3,9})\s*[-–~]\s*(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/);
+    // Same-month range: "09-10 Aug 2025"
+    const sameMonthRange = html.match(/(\d{1,2})\s*[-–]\s*(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/);
+    // Single date: "10 Aug 2025" or "2025-08-10"
+    const singleDate = html.match(/(\d{1,2})\s+(\w{3,9})\s+(20\d{2})/) ||
+                       html.match(/(20\d{2}-\d{2}-\d{2})/);
+
+    if (crossMonthRange) {
+      const [, d1, mon1, d2, mon2, yr] = crossMonthRange;
       const start = new Date(`${d1} ${mon1} ${yr}`);
       const end = new Date(`${d2} ${mon2} ${yr}`);
       if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
       if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
-    } else {
-      const dateMatch = html.match(/(\d{1,2}[-\/\s]\w+[-\/\s]\d{4}|\d{4}-\d{2}-\d{2}|\w+\s+\d{1,2}[-,\s]+\d{4})/);
-      if (dateMatch) {
-        const d = new Date(dateMatch[1]);
-        if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
+    } else if (sameMonthRange) {
+      const [, d1, d2, mon, yr] = sameMonthRange;
+      const start = new Date(`${d1} ${mon} ${yr}`);
+      const end = new Date(`${d2} ${mon} ${yr}`);
+      if (!isNaN(start.getTime())) eventDate = start.toISOString().slice(0, 10);
+      if (!isNaN(end.getTime())) eventEndDate = end.toISOString().slice(0, 10);
+    } else if (singleDate) {
+      const raw = singleDate[1];
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
+    }
+
+    // If date year doesn't match event name year, trust the event name year
+    if (eventDate && nameYear && !eventDate.startsWith(nameYear)) {
+      const parts = eventDate.split("-");
+      eventDate = `${nameYear}-${parts[1]}-${parts[2]}`;
+      if (eventEndDate) {
+        const ep = eventEndDate.split("-");
+        eventEndDate = `${nameYear}-${ep[1]}-${ep[2]}`;
       }
     }
 
@@ -360,7 +386,7 @@ Deno.serve(async (req: Request) => {
       const { data: badRows } = await supabase
         .from("external_result_events")
         .select("id, source_url, event_name, boat_class_raw, boat_class_mapped")
-        .or("event_name.eq.Results,event_name.eq.,boat_class_raw.eq.")
+        .or("event_name.eq.Results,event_name.eq.,event_date.is.null")
         .limit(30);
 
       if (!badRows?.length) {
