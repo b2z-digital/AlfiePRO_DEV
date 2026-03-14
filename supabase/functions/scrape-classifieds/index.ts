@@ -155,6 +155,66 @@ interface ParsedListing {
   category: string;
 }
 
+function extractTextAfterH5(html: string, label: string): string {
+  const patterns = [
+    new RegExp(
+      `<h5[^>]*>\\s*${label}\\s*<\\/h5>\\s*([\\s\\S]*?)(?=<h5|<hr|<div|<table|<form|$)`,
+      "i"
+    ),
+    new RegExp(
+      `<strong>\\s*${label}\\s*<\\/strong>\\s*(?:<br\\s*\\/?>)?\\s*([^<\\n]+)`,
+      "i"
+    ),
+    new RegExp(
+      `<td[^>]*>\\s*<[^>]*>\\s*${label}\\s*<\\/[^>]*>\\s*<\\/td>\\s*<td[^>]*>\\s*([\\s\\S]*?)\\s*<\\/td>`,
+      "i"
+    ),
+  ];
+  for (const pat of patterns) {
+    const match = html.match(pat);
+    if (match) {
+      const text = stripTags(match[1]).trim();
+      if (text.length > 0) return text;
+    }
+  }
+  return "";
+}
+
+function extractDescriptionBetweenSections(html: string, title: string): string {
+  const locationEndPattern = /<h5[^>]*>[^<]*\((?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ)\)[^<]*<\/h5>/i;
+  const locationMatch = locationEndPattern.exec(html);
+  const startIdx = locationMatch
+    ? locationMatch.index + locationMatch[0].length
+    : 0;
+
+  const pricePattern = /<h5[^>]*>\s*Price[\s\S]*?<\/h5>/i;
+  const afterLocation = html.substring(startIdx);
+  const priceMatch = pricePattern.exec(afterLocation);
+  const endIdx = priceMatch ? priceMatch.index : afterLocation.length;
+
+  const descBlock = afterLocation.substring(0, endIdx);
+
+  const hrSplit = descBlock.split(/<hr[^>]*>/i);
+  const descHtml = hrSplit.length > 1 ? hrSplit.slice(1).join(" ") : descBlock;
+
+  const cleaned = descHtml
+    .replace(/<img[^>]*>/gi, "")
+    .replace(/<a[^>]*>[\s\S]*?<\/a>/gi, "")
+    .replace(/<select[\s\S]*?<\/select>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "");
+
+  const text = stripTags(cleaned).trim();
+
+  const lines = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .filter((l) => !/^select category/i.test(l))
+    .filter((l) => !/^show all/i.test(l));
+
+  return lines.join("\n").trim();
+}
+
 function parseDetailPage(html: string, fallbackTitle: string): ParsedListing | null {
   try {
     let title = fallbackTitle;
@@ -172,53 +232,77 @@ function parseDetailPage(html: string, fallbackTitle: string): ParsedListing | n
     }
 
     let price = 0;
-    const priceMatch =
-      html.match(/\$\s*([\d,]+(?:\.\d{2})?)/i) ||
-      html.match(/Price[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/i);
-    if (priceMatch) {
-      price = parseFloat(priceMatch[1].replace(/,/g, "")) || 0;
+    for (const h5 of h5Matches) {
+      const h5Price = h5.match(/Price[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/i);
+      if (h5Price) {
+        price = parseFloat(h5Price[1].replace(/,/g, "")) || 0;
+        break;
+      }
+    }
+    if (price === 0) {
+      const priceMatch =
+        html.match(/\$\s*([\d,]+(?:\.\d{2})?)/i) ||
+        html.match(/Price[:\s]*\$?\s*([\d,]+(?:\.\d{2})?)/i);
+      if (priceMatch) {
+        price = parseFloat(priceMatch[1].replace(/,/g, "")) || 0;
+      }
     }
 
     let location = "";
     for (const h5 of h5Matches) {
       if (
-        h5.match(
-          /\((?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ)?\)/i
-        ) ||
+        h5.match(/\((?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ)\)/i) ||
         h5.match(/[A-Za-z\s]+\(/) ||
-        h5.match(
-          /(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ)/i
-        )
+        h5.match(/(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT|NZ)/i)
       ) {
-        location = h5.trim();
-        break;
+        if (!/Price/i.test(h5) && !/Contact/i.test(h5) && !/Email/i.test(h5)) {
+          location = h5.trim();
+          break;
+        }
       }
     }
 
-    let contactName = "";
+    let contactName = extractTextAfterH5(html, "Contact");
     let contactEmail = "";
-    let contactPhone = "";
+    let contactPhone = extractTextAfterH5(html, "Phone");
 
-    const contactMatch = html.match(
-      /<strong>\s*Contact\s*<\/strong>\s*(?:<br\s*\/?>)?\s*([^<\n]+)/i
-    );
-    if (contactMatch) contactName = stripTags(contactMatch[1]).trim();
-
-    const emailMatch = html.match(
-      /mailto:([^"'\s<>]+)/i
-    );
-    if (emailMatch) contactEmail = emailMatch[1].trim();
-    if (!contactEmail) {
-      const emailMatch2 = html.match(
-        /<strong>\s*Email\s*<\/strong>\s*(?:<br\s*\/?>)?\s*([^<\n]+)/i
-      );
-      if (emailMatch2) contactEmail = stripTags(emailMatch2[1]).trim();
+    const emailSectionText = extractTextAfterH5(html, "Email");
+    if (emailSectionText) {
+      const inlineEmail = emailSectionText.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+      if (inlineEmail) contactEmail = inlineEmail[0];
     }
 
-    const phoneMatch = html.match(
-      /<strong>\s*Phone\s*<\/strong>\s*(?:<br\s*\/?>)?\s*([^<\n]+)/i
-    );
-    if (phoneMatch) contactPhone = stripTags(phoneMatch[1]).trim();
+    if (!contactEmail) {
+      const contactSection = html.match(
+        /<h5[^>]*>\s*Contact\s*<\/h5>([\s\S]*?)(?=<h5|<hr|<div class|$)/i
+      );
+      const emailSection = html.match(
+        /<h5[^>]*>\s*Email\s*<\/h5>([\s\S]*?)(?=<h5|<hr|<div class|$)/i
+      );
+      const searchArea = (contactSection?.[1] || "") + (emailSection?.[1] || "");
+      const mailtoMatch = searchArea.match(/mailto:([^"'\s<>?]+)/i);
+      if (mailtoMatch) {
+        contactEmail = mailtoMatch[1].trim();
+      }
+    }
+
+    if (!contactEmail) {
+      const globalMailto = html.match(/mailto:([^"'\s<>?]+)/i);
+      if (globalMailto) contactEmail = globalMailto[1].trim();
+    }
+
+    if (!contactName) {
+      const contactMatch = html.match(
+        /<strong>\s*Contact\s*<\/strong>\s*(?:<br\s*\/?>)?\s*([^<\n]+)/i
+      );
+      if (contactMatch) contactName = stripTags(contactMatch[1]).trim();
+    }
+    if (!contactPhone) {
+      const phoneMatch = html.match(
+        /<strong>\s*Phone\s*<\/strong>\s*(?:<br\s*\/?>)?\s*([^<\n]+)/i
+      );
+      if (phoneMatch) contactPhone = stripTags(phoneMatch[1]).trim();
+    }
 
     const images: string[] = [];
     const imgPattern =
@@ -232,20 +316,24 @@ function parseDetailPage(html: string, fallbackTitle: string): ParsedListing | n
       images.push(absoluteUrl("classifieds/uploaded_images/" + filename));
     }
 
-    const descCandidates: string[] = [];
-    const pPattern = /<p[^>]*>([\s\S]*?)<\/p>/gi;
-    let pM: RegExpExecArray | null;
-    while ((pM = pPattern.exec(html)) !== null) {
-      const text = stripTags(pM[1]).trim();
-      if (text.length < 20) continue;
-      if (/^Price:/i.test(text)) continue;
-      if (/^Contact\b/i.test(text)) continue;
-      if (/^Email\b/i.test(text)) continue;
-      if (/^Phone\b/i.test(text)) continue;
-      if (/select category/i.test(text)) continue;
-      descCandidates.push(text);
+    let description = extractDescriptionBetweenSections(html, title);
+
+    if (!description || description.length < 10) {
+      const descCandidates: string[] = [];
+      const pPattern = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+      let pM: RegExpExecArray | null;
+      while ((pM = pPattern.exec(html)) !== null) {
+        const text = stripTags(pM[1]).trim();
+        if (text.length < 20) continue;
+        if (/^Price:/i.test(text)) continue;
+        if (/^Contact\b/i.test(text)) continue;
+        if (/^Email\b/i.test(text)) continue;
+        if (/^Phone\b/i.test(text)) continue;
+        if (/select category/i.test(text)) continue;
+        descCandidates.push(text);
+      }
+      description = descCandidates.join("\n\n").trim();
     }
-    let description = descCandidates.join("\n\n").trim();
     if (!description) description = title;
 
     const selectMatch = html.match(
