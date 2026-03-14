@@ -133,7 +133,7 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
       .from('external_result_events')
       .select('id,source_id,external_event_id,event_name,event_date,venue,boat_class_raw,boat_class_mapped,competitor_count,race_count,is_visible,display_category,last_scraped_at,source_url')
       .eq('source_id', sourceId)
-      .order('event_date', { ascending: false });
+      .order('event_date', { ascending: false, nullsFirst: false });
     if (data) setSourceEvents(prev => ({ ...prev, [sourceId]: data }));
   }
 
@@ -222,16 +222,26 @@ export function ExternalResultsScrapingTab({ darkMode }: ExternalResultsScraping
   }
 
   async function handleUpdateEventCategory(event: ResultEvent, category: string) {
-    await supabase
-      .from('external_result_events')
-      .update({ display_category: category, updated_at: new Date().toISOString() })
-      .eq('id', event.id);
     setSourceEvents(prev => ({
       ...prev,
       [event.source_id]: (prev[event.source_id] || []).map(e =>
         e.id === event.id ? { ...e, display_category: category } : e
       ),
     }));
+    const { error: updateError } = await supabase
+      .from('external_result_events')
+      .update({ display_category: category, updated_at: new Date().toISOString() })
+      .eq('id', event.id);
+    if (updateError) {
+      setError(`Failed to save category: ${updateError.message}`);
+      setTimeout(() => setError(null), 5000);
+      setSourceEvents(prev => ({
+        ...prev,
+        [event.source_id]: (prev[event.source_id] || []).map(e =>
+          e.id === event.id ? { ...e, display_category: event.display_category } : e
+        ),
+      }));
+    }
   }
 
   async function handleFixBadNames() {
