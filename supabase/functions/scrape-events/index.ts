@@ -241,8 +241,9 @@ interface EventDetail {
   eventType: string | null;
   eventStatus: string;
   rankingEvent: boolean;
-  documents: Array<{ name: string; url: string }>;
+  documents: Array<{ name: string; url: string; type?: string }>;
   registrationUrl: string | null;
+  websiteUrl: string | null;
 }
 
 function parseEventDetailPage(html: string, baseUrl: string): EventDetail {
@@ -327,35 +328,116 @@ function parseEventDetailPage(html: string, baseUrl: string): EventDetail {
   if (/cancel/i.test(html.slice(0, 2000))) eventStatus = "cancelled";
   if (/postpone/i.test(html.slice(0, 2000)) && eventStatus === "active") eventStatus = "postponed";
 
-  const documents: Array<{ name: string; url: string }> = [];
-  const docTabMatch = html.match(/(?:document|download)[\s\S]{0,5000}/i);
-  if (docTabMatch) {
+  const documents: Array<{ name: string; url: string; type?: string }> = [];
+  const origin = new URL(baseUrl).origin;
+
+  const docSectionMatches = extractAllMatches(
+    html,
+    /(?:document|download|DOCUMENTS)[\s\S]{0,8000}/gi
+  );
+  for (const dsm of docSectionMatches) {
     const docLinks = extractAllMatches(
-      docTabMatch[0],
+      dsm[0],
       /<a[^>]+href=["']([^"']+(?:\.pdf|\.doc|\.docx|\.xls|\.xlsx)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi
     );
     for (const dl of docLinks) {
-      let docUrl = dl[1].replace(/&amp;/g, "&");
-      if (docUrl.startsWith("/")) docUrl = new URL(baseUrl).origin + docUrl;
+      let docUrl = dl[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+      if (docUrl.startsWith("/")) docUrl = origin + docUrl;
+      else if (!docUrl.startsWith("http")) docUrl = origin + "/" + docUrl;
       const docName = stripTags(dl[2]) || "Document";
       if (!documents.find(d => d.url === docUrl)) {
-        documents.push({ name: docName, url: docUrl });
+        let type = "document";
+        const lower = docName.toLowerCase();
+        if (lower.includes("notice of race") || lower.includes("nor")) type = "nor";
+        else if (lower.includes("sailing instruction") || lower.includes("si ") || lower === "si") type = "si";
+        else if (lower.includes("amendment")) type = "amendment";
+        documents.push({ name: docName, url: docUrl, type });
       }
     }
   }
 
-  const docTextLinks = extractAllMatches(html, /<a[^>]+href=["']([^"']*(?:Notice|Sailing|document|Document)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi);
-  for (const dl of docTextLinks) {
-    let docUrl = dl[1].replace(/&amp;/g, "&");
-    if (docUrl.startsWith("/")) docUrl = new URL(baseUrl).origin + docUrl;
+  const allDocLinks = extractAllMatches(
+    html,
+    /<a[^>]+href=["']([^"']+(?:\.pdf|\.doc|\.docx|\.xls|\.xlsx)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi
+  );
+  for (const dl of allDocLinks) {
+    let docUrl = dl[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+    if (docUrl.startsWith("/")) docUrl = origin + docUrl;
+    else if (!docUrl.startsWith("http")) docUrl = origin + "/" + docUrl;
     const docName = stripTags(dl[2]) || "Document";
     if (!documents.find(d => d.url === docUrl)) {
-      documents.push({ name: docName, url: docUrl });
+      let type = "document";
+      const lower = docName.toLowerCase();
+      if (lower.includes("notice of race") || lower.includes("nor")) type = "nor";
+      else if (lower.includes("sailing instruction") || lower.includes("si ") || lower === "si") type = "si";
+      else if (lower.includes("amendment")) type = "amendment";
+      documents.push({ name: docName, url: docUrl, type });
     }
   }
 
-  const regMatch = html.match(/<a[^>]+href=["']([^"']*(?:registration|register|entry|enter)[^"']*)["']/i);
-  const registrationUrl = regMatch ? regMatch[1].replace(/&amp;/g, "&") : null;
+  const namedDocLinks = extractAllMatches(
+    html,
+    /<a[^>]+href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi
+  );
+  for (const dl of namedDocLinks) {
+    const linkText = stripTags(dl[2]).toLowerCase();
+    if (
+      linkText.includes("notice of race") ||
+      linkText.includes("sailing instruction") ||
+      linkText.includes("amendment to notice") ||
+      linkText.includes("amendment to sailing") ||
+      linkText.includes("supplementary")
+    ) {
+      let docUrl = dl[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+      if (docUrl.startsWith("/")) docUrl = origin + docUrl;
+      else if (!docUrl.startsWith("http")) docUrl = origin + "/" + docUrl;
+      const docName = stripTags(dl[2]) || "Document";
+      if (!documents.find(d => d.url === docUrl)) {
+        let type = "document";
+        if (linkText.includes("notice of race")) type = "nor";
+        else if (linkText.includes("sailing instruction")) type = "si";
+        else if (linkText.includes("amendment")) type = "amendment";
+        documents.push({ name: docName, url: docUrl, type });
+      }
+    }
+  }
+
+  let registrationUrl: string | null = null;
+
+  const enterBtnMatch = html.match(/<a[^>]+href=["']([^"']*)["'][^>]*>[\s\S]*?(?:Enter\s*Online|Enter\s*Now|Register\s*Now|Register\s*Online|Enter\s*Event|ENTER)[\s\S]*?<\/a>/i);
+  if (enterBtnMatch) {
+    registrationUrl = enterBtnMatch[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+  }
+
+  if (!registrationUrl) {
+    const regTabMatch = html.match(/(?:registration|REGISTRATION)[\s\S]{0,5000}/i);
+    if (regTabMatch) {
+      const regLink = regTabMatch[0].match(/<a[^>]+href=["']([^"']*)["'][^>]*>/i);
+      if (regLink) {
+        registrationUrl = regLink[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+      }
+    }
+  }
+
+  if (!registrationUrl) {
+    const regMatch = html.match(/<a[^>]+href=["']([^"']*(?:registration|register|entry|enter|entr)[^"']*)["']/i);
+    if (regMatch) {
+      registrationUrl = regMatch[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+    }
+  }
+
+  if (registrationUrl) {
+    if (registrationUrl.startsWith("/")) registrationUrl = origin + registrationUrl;
+    else if (!registrationUrl.startsWith("http")) registrationUrl = origin + "/" + registrationUrl;
+  }
+
+  let websiteUrl: string | null = null;
+  const websiteMatch = html.match(/<a[^>]+href=["']([^"']*)["'][^>]*>[\s\S]*?(?:Event\s*Website|Official\s*Website|Website|Visit\s*Website)[\s\S]*?<\/a>/i);
+  if (websiteMatch) {
+    websiteUrl = websiteMatch[1].replace(/&amp;/g, "&").replace(/&#38;/g, "&");
+    if (websiteUrl.startsWith("/")) websiteUrl = origin + websiteUrl;
+    else if (!websiteUrl.startsWith("http")) websiteUrl = origin + "/" + websiteUrl;
+  }
 
   return {
     eventName,
@@ -371,6 +453,7 @@ function parseEventDetailPage(html: string, baseUrl: string): EventDetail {
     rankingEvent,
     documents,
     registrationUrl,
+    websiteUrl,
   };
 }
 
@@ -459,7 +542,7 @@ Deno.serve(async (req: Request) => {
       updates.event_status = detail.eventStatus;
       updates.ranking_event = detail.rankingEvent;
       if (detail.documents.length > 0) updates.documents_json = detail.documents;
-      if (detail.registrationUrl) updates.registration_url = detail.registrationUrl;
+      if (detail.registrationUrl || detail.websiteUrl) updates.registration_url = detail.registrationUrl || detail.websiteUrl;
 
       const resolvedState = detail.stateCode || eventRow.state_code;
       const resolvedType = detail.eventType || eventRow.event_type;
@@ -641,10 +724,10 @@ Deno.serve(async (req: Request) => {
     if (body.fetch_details) {
       const { data: eventsToFetch } = await supabase
         .from("external_events")
-        .select("id, source_url, state_code, event_type")
-        .is("venue", null)
+        .select("id, source_url, state_code, event_type, documents_json, registration_url")
+        .or("venue.is.null,documents_json.eq.[]::jsonb,registration_url.is.null")
         .eq("is_visible", true)
-        .limit(20);
+        .limit(30);
 
       if (eventsToFetch) {
         for (const evt of eventsToFetch) {
@@ -666,7 +749,7 @@ Deno.serve(async (req: Request) => {
             updates.event_status = detail.eventStatus;
             updates.ranking_event = detail.rankingEvent;
             if (detail.documents.length > 0) updates.documents_json = detail.documents;
-            if (detail.registrationUrl) updates.registration_url = detail.registrationUrl;
+            if (detail.registrationUrl || detail.websiteUrl) updates.registration_url = detail.registrationUrl || detail.websiteUrl;
 
             const resolvedState = detail.stateCode || evt.state_code;
             const resolvedType = detail.eventType || evt.event_type;

@@ -450,6 +450,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           numberOfDays: ext.event_end_date ? Math.ceil((new Date(ext.event_end_date).getTime() - new Date(ext.event_date).getTime()) / 86400000) + 1 : undefined,
           displayCategory: ext.display_category || 'national',
           stateCode: ext.state_code || undefined,
+          externalDocuments: ext.documents_json || [],
         }));
 
         // Filter out public events that have local copies in raceEvents

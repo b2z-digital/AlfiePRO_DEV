@@ -154,6 +154,7 @@ export interface RaceEvent {
   registrationUrl?: string;
   displayCategory?: string;
   stateCode?: string;
+  externalDocuments?: Array<{ name: string; url: string; type?: string }>;
   // Live features
   enableLiveTracking?: boolean; // Enable fleet board & skipper tracking
   enableLiveStream?: boolean; // Enable YouTube livestreaming
