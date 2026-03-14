@@ -495,10 +495,26 @@ export default function ClassifiedsPage() {
                       src={classified.images[0]}
                       alt={classified.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.classList.add('bg-gradient-to-br', 'from-slate-700', 'to-slate-800');
+                          const placeholder = parent.querySelector('.no-img-placeholder') as HTMLElement | null;
+                          if (placeholder) placeholder.style.display = 'flex';
+                        }
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Tag size={48} className="text-slate-600" />
+                  ) : null}
+                  {(!classified.images || classified.images.length === 0) && (
+                    <div className="no-img-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                      <img src="/alfie_app_logo.svg" alt="Alfie" className="w-16 h-16 opacity-40" />
+                    </div>
+                  )}
+                  {classified.images && classified.images.length > 0 && (
+                    <div className="no-img-placeholder w-full h-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 absolute inset-0" style={{ display: 'none' }}>
+                      <img src="/alfie_app_logo.svg" alt="Alfie" className="w-16 h-16 opacity-40" />
                     </div>
                   )}
 
@@ -611,10 +627,26 @@ export default function ClassifiedsPage() {
                         src={classified.images[0]}
                         alt={classified.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.classList.add('bg-gradient-to-br', 'from-slate-700', 'to-slate-800');
+                            const placeholder = parent.querySelector('.no-img-placeholder') as HTMLElement | null;
+                            if (placeholder) placeholder.style.display = 'flex';
+                          }
+                        }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Tag size={32} className="text-slate-600" />
+                    ) : null}
+                    {(!classified.images || classified.images.length === 0) && (
+                      <div className="no-img-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                        <img src="/alfie_app_logo.svg" alt="Alfie" className="w-12 h-12 opacity-40" />
+                      </div>
+                    )}
+                    {classified.images && classified.images.length > 0 && (
+                      <div className="no-img-placeholder w-full h-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 absolute inset-0" style={{ display: 'none' }}>
+                        <img src="/alfie_app_logo.svg" alt="Alfie" className="w-12 h-12 opacity-40" />
                       </div>
                     )}
                   </div>
