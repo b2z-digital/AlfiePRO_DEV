@@ -104,6 +104,68 @@ async function fetchHtml(url: string): Promise<string | null> {
   }
 }
 
+function getMimeType(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".png")) return "image/png";
+  if (lower.includes(".gif")) return "image/gif";
+  if (lower.includes(".webp")) return "image/webp";
+  return "image/jpeg";
+}
+
+function getExtension(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".png")) return "png";
+  if (lower.includes(".gif")) return "gif";
+  if (lower.includes(".webp")) return "webp";
+  return "jpg";
+}
+
+async function downloadAndStoreImage(
+  supabaseClient: ReturnType<typeof createClient>,
+  imageUrl: string,
+  listingExternalId: string,
+  imageIndex: number
+): Promise<string | null> {
+  try {
+    const res = await fetch(imageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; AlfieScraper/1.0)",
+        Accept: "image/*",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+
+    const arrayBuffer = await res.arrayBuffer();
+    if (arrayBuffer.byteLength < 500) return null;
+
+    const ext = getExtension(imageUrl);
+    const mimeType = getMimeType(imageUrl);
+    const storagePath = `scraped/classifieds/${listingExternalId}_${imageIndex}.${ext}`;
+
+    const { error: uploadError } = await supabaseClient.storage
+      .from("media")
+      .upload(storagePath, arrayBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error(`Upload error for ${imageUrl}:`, uploadError.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from("media")
+      .getPublicUrl(storagePath);
+
+    return publicUrlData?.publicUrl || null;
+  } catch (err) {
+    console.error(`Failed to download/store image ${imageUrl}:`, err);
+    return null;
+  }
+}
+
 interface ListingLink {
   id: string;
   url: string;
@@ -481,13 +543,28 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
+          const storedImages: string[] = [];
+          for (let i = 0; i < parsed.images.length; i++) {
+            const storedUrl = await downloadAndStoreImage(
+              supabase,
+              parsed.images[i],
+              externalSourceId,
+              i
+            );
+            if (storedUrl) {
+              storedImages.push(storedUrl);
+            }
+          }
+
+          const finalImages = storedImages.length > 0 ? storedImages : parsed.images;
+
           if (existing) {
             const hasChanges =
               existing.title !== parsed.title ||
               existing.price !== parsed.price ||
               existing.description !== parsed.description;
 
-            if (hasChanges) {
+            if (hasChanges || storedImages.length > 0) {
               await supabase
                 .from("classifieds")
                 .update({
@@ -495,7 +572,7 @@ Deno.serve(async (req: Request) => {
                   description: parsed.description,
                   price: parsed.price,
                   location: parsed.location || existing.title,
-                  images: parsed.images.length > 0 ? parsed.images : existing.images,
+                  images: finalImages.length > 0 ? finalImages : existing.images,
                   external_contact_name: parsed.contactName || undefined,
                   external_contact_email: parsed.contactEmail || undefined,
                   external_contact_phone: parsed.contactPhone || undefined,
@@ -515,7 +592,7 @@ Deno.serve(async (req: Request) => {
               location: parsed.location || "Australia",
               category: parsed.category,
               condition: "used",
-              images: parsed.images,
+              images: finalImages,
               contact_email: parsed.contactEmail || "scraped@alfiepro.com",
               contact_phone: parsed.contactPhone || null,
               user_id: systemUserId,
@@ -539,7 +616,7 @@ Deno.serve(async (req: Request) => {
 
         const { data: allScraped } = await supabase
           .from("classifieds")
-          .select("id, external_source_id")
+          .select("id, external_source_id, images")
           .eq("is_scraped", true)
           .like("external_source_id", "arya_%");
 
@@ -547,6 +624,17 @@ Deno.serve(async (req: Request) => {
           for (const scraped of allScraped) {
             const aryaId = scraped.external_source_id?.replace("arya_", "");
             if (aryaId && !currentExternalIds.has(aryaId)) {
+              const scrapedImages = (scraped.images as string[]) || [];
+              for (const imgUrl of scrapedImages) {
+                if (imgUrl.includes("/media/scraped/classifieds/")) {
+                  try {
+                    const pathMatch = imgUrl.match(/\/media\/(.+)$/);
+                    if (pathMatch) {
+                      await supabase.storage.from("media").remove([pathMatch[1]]);
+                    }
+                  } catch { /* best effort cleanup */ }
+                }
+              }
               await supabase
                 .from("classifieds")
                 .delete()

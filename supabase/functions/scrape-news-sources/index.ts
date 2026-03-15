@@ -85,12 +85,7 @@ function allMatches(pattern: RegExp, html: string, group = 1): string[] {
   return results;
 }
 
-/**
- * Extract the inner HTML of the FIRST element matching a given id attribute.
- * Uses a greedy approach to capture nested HTML properly.
- */
 function extractById(html: string, id: string): string | null {
-  // Find the opening tag for this id
   const startTagRe = new RegExp(`<(\\w+)[^>]*\\sid=["']${id}["'][^>]*>`, "i");
   const startTagM = startTagRe.exec(html);
   if (!startTagM) return null;
@@ -98,7 +93,6 @@ function extractById(html: string, id: string): string | null {
   const tagName = startTagM[1];
   const startIdx = startTagM.index + startTagM[0].length;
 
-  // Walk forward counting open/close tags to find the matching closing tag
   let depth = 1;
   let pos = startIdx;
   while (pos < html.length && depth > 0) {
@@ -117,6 +111,79 @@ function extractById(html: string, id: string): string | null {
   return null;
 }
 
+// ─── Image storage helpers ───────────────────────────────────────────────────
+
+function getMimeType(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".png")) return "image/png";
+  if (lower.includes(".gif")) return "image/gif";
+  if (lower.includes(".webp")) return "image/webp";
+  return "image/jpeg";
+}
+
+function getExtension(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".png")) return "png";
+  if (lower.includes(".gif")) return "gif";
+  if (lower.includes(".webp")) return "webp";
+  return "jpg";
+}
+
+async function downloadAndStoreImage(
+  supabaseClient: ReturnType<typeof createClient>,
+  imageUrl: string,
+  articleIdentifier: string
+): Promise<string | null> {
+  try {
+    const res = await fetch(imageUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; AlfieScraper/1.0)",
+        Accept: "image/*",
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+
+    const arrayBuffer = await res.arrayBuffer();
+    if (arrayBuffer.byteLength < 500) return null;
+
+    const ext = getExtension(imageUrl);
+    const mimeType = getMimeType(imageUrl);
+    const storagePath = `scraped/news/${articleIdentifier}.${ext}`;
+
+    const { error: uploadError } = await supabaseClient.storage
+      .from("media")
+      .upload(storagePath, arrayBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error(`Upload error for ${imageUrl}:`, uploadError.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from("media")
+      .getPublicUrl(storagePath);
+
+    return publicUrlData?.publicUrl || null;
+  } catch (err) {
+    console.error(`Failed to download/store image ${imageUrl}:`, err);
+    return null;
+  }
+}
+
+function generateArticleSlug(title: string, date: string): string {
+  const datePrefix = date.substring(0, 10).replace(/-/g, "");
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .substring(0, 60);
+  return `${datePrefix}_${slug}`;
+}
+
 // ─── News article link detection ────────────────────────────────────────────
 
 interface ArticleLink {
@@ -125,19 +192,12 @@ interface ArticleLink {
   date: string | null;
 }
 
-/**
- * Normalise a CMS Made Simple article URL so that variant query strings
- * (cntnt01origid vs cntnt01returnid, different returnid values, etc.)
- * all resolve to the same canonical URL.
- * We keep only the params that uniquely identify the article.
- */
 function normaliseCmsUrl(rawHref: string, baseUrl: string): string {
   const href = absoluteUrl(baseUrl, rawHref.replace(/&amp;/g, "&"));
   try {
     const u = new URL(href);
     const articleId = u.searchParams.get("cntnt01articleid");
     const returnId = u.searchParams.get("cntnt01returnid") || u.searchParams.get("cntnt01origid") || "129";
-    // Rebuild with only the essential params in a fixed order
     return `${u.origin}${u.pathname}?mact=News,cntnt01,detail,0&cntnt01articleid=${articleId}&cntnt01returnid=${returnId}`;
   } catch {
     return href;
@@ -148,8 +208,6 @@ function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
   const links: ArticleLink[] = [];
   const seen = new Set<string>();
 
-  // ── Strategy 1: CMS Made Simple (radiosailing.org.au)
-  // URLs contain: mact=News,cntnt01,detail,0&cntnt01articleid=NNN
   const cmsPattern = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/gi;
   let m: RegExpExecArray | null;
   while ((m = cmsPattern.exec(html)) !== null) {
@@ -164,7 +222,6 @@ function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
     return links;
   }
 
-  // ── Strategy 2: WordPress <article> blocks
   const articleBlocks = html.match(/<article[^>]*>[\s\S]*?<\/article>/gi) || [];
   const base = new URL(baseUrl);
   for (const block of articleBlocks) {
@@ -185,7 +242,6 @@ function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
   }
   if (links.length > 0) return links;
 
-  // ── Strategy 3: Generic permalink pattern
   const base2 = new URL(baseUrl);
   const genericPattern = /href=["']([^"'#?][^"']*(?:\/\d{4}\/|\/news\/|\/article\/|\/post\/|\/blog\/)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
   while ((m = genericPattern.exec(html)) !== null) {
@@ -200,8 +256,6 @@ function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
 }
 
 function enrichCmsMakerLinks(links: ArticleLink[], html: string, baseUrl: string) {
-  // The news index page has blocks like:
-  //   <h5><a href="...">Title</a></h5><p>excerpt</p><p>Posted: Mar 8, 2026 10:09</p>
   const blocks = html.split(/<h5>/i);
   for (const block of blocks) {
     const hrefM = /href=["']([^"']*mact=News[^"']*detail[^"']*cntnt01articleid=\d+[^"']*)["']/i.exec(block);
@@ -213,7 +267,6 @@ function enrichCmsMakerLinks(links: ArticleLink[], html: string, baseUrl: string
     const titleM = /<a[^>]*>([\s\S]*?)<\/a>/i.exec(block);
     if (titleM) link.title = stripTags(titleM[1]);
 
-    // "Posted: Mar 8, 2026 10:09"
     const dateM = /Posted:\s*([A-Za-z]+ +\d{1,2},?\s*\d{4}(?:\s+\d{1,2}:\d{2})?)/i.exec(block)
       || /Posted:\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4}(?:\s+\d{1,2}:\d{2})?)/i.exec(block);
     if (dateM) link.date = dateM[1].trim();
@@ -242,11 +295,9 @@ async function fetchHtml(url: string): Promise<string | null> {
 // ─── Article field extractors ─────────────────────────────────────────────────
 
 function extractTitle(html: string, hintTitle: string): string {
-  // CMS Made Simple: <h3 id="NewsPostDetailTitle">...</h3>
   const byId = extractById(html, "NewsPostDetailTitle");
   if (byId) { const t = stripTags(byId); if (t.length > 5) return t; }
 
-  // og:title
   const og = firstMatch(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i, html)
     || firstMatch(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i, html);
   if (og && og.length > 5) return og;
@@ -263,7 +314,6 @@ function extractTitle(html: string, hintTitle: string): string {
 }
 
 function extractDate(html: string, hintDate: string | null): string {
-  // CMS Made Simple: <div id="NewsPostDetailDate">Mar  8, 2026<br></div>
   const byId = extractById(html, "NewsPostDetailDate");
   if (byId) {
     const text = stripTags(byId).trim();
@@ -272,7 +322,6 @@ function extractDate(html: string, hintDate: string | null): string {
     }
   }
 
-  // og / schema meta tags
   for (const p of [
     /<meta[^>]*property=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
     /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']article:published_time["']/i,
@@ -290,19 +339,15 @@ function extractDate(html: string, hintDate: string | null): string {
 }
 
 function extractAuthor(html: string, sourceName: string): string {
-  // CMS Made Simple: <div id="NewsPostDetailAuthor">Posted by: ARYA Publicity</div>
   const byId = extractById(html, "NewsPostDetailAuthor");
   if (byId) {
     const text = stripTags(byId).replace(/^Posted\s+by:\s*/i, "").trim();
     if (text.length > 1) return text;
   }
-  // Fall back to the configured source name
   return sourceName;
 }
 
 function extractCoverImage(html: string, baseUrl: string): string | null {
-  // 1. Prefer inline article body image — more likely to actually exist on the server
-  //    than the auto-generated og:image thumbnail (which is often missing)
   const contentHtml = extractById(html, "NewsPostDetailContent") || extractById(html, "NewsPostDetailSummary") || "";
   if (contentHtml) {
     const imgSrc = firstMatch(/<img[^>]*src=["']([^"']+)["'][^>]*>/i, contentHtml);
@@ -311,12 +356,10 @@ function extractCoverImage(html: string, baseUrl: string): string | null {
     }
   }
 
-  // 2. og:image as secondary option
   const og = firstMatch(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i, html)
     || firstMatch(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i, html);
   if (og && !og.startsWith("data:")) return absoluteUrl(baseUrl, og);
 
-  // 3. Any qualifying image anywhere on the page
   const imgSrcs = allMatches(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, html);
   for (const src of imgSrcs) {
     if (src.startsWith("data:")) continue;
@@ -328,13 +371,11 @@ function extractCoverImage(html: string, baseUrl: string): string | null {
 }
 
 function extractContent(html: string, baseUrl: string): string {
-  // CMS Made Simple: combine summary + full content divs
   const summary = extractById(html, "NewsPostDetailSummary") || "";
   const body = extractById(html, "NewsPostDetailContent") || "";
   let combined = (summary + "\n" + body).trim();
 
   if (combined.length > 100) {
-    // Make relative image/link URLs absolute
     combined = combined
       .replace(/src=["'](?!https?:\/\/|\/\/|data:)([^"']+)["']/gi, (_, p) => `src="${absoluteUrl(baseUrl, p)}"`)
       .replace(/href=["'](?!https?:\/\/|\/\/|#|mailto:)([^"']+)["']/gi, (_, p) => `href="${absoluteUrl(baseUrl, p)}"`)
@@ -345,7 +386,6 @@ function extractContent(html: string, baseUrl: string): string {
     return combined;
   }
 
-  // WordPress / other sites — common content wrappers
   for (const selector of [
     /<div[^>]*class=["'][^"']*(?:entry|post|article|single)[_-]content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
     /<article[^>]*>([\s\S]*?)<\/article>/i,
@@ -436,7 +476,6 @@ Deno.serve(async (req: Request) => {
       let articlesSkipped = 0;
 
       try {
-        // 1. Fetch index page and discover article links
         const indexHtml = await fetchHtml(source.url);
         if (!indexHtml) throw new Error("Failed to fetch index page");
 
@@ -447,7 +486,6 @@ Deno.serve(async (req: Request) => {
           throw new Error("No article links found on index page");
         }
 
-        // 2. Determine publish targets
         const targets: Array<{ state_association_id?: string; national_association_id?: string }> = [];
         if (source.target_type === "national" && source.target_national_association_id) {
           targets.push({ national_association_id: source.target_national_association_id });
@@ -461,7 +499,6 @@ Deno.serve(async (req: Request) => {
           for (const s of stateRows ?? []) targets.push({ state_association_id: s.id });
         }
 
-        // 3. Scrape each article page
         for (const link of unique) {
           const { data: existing } = await supabase
             .from("articles")
@@ -473,12 +510,21 @@ Deno.serve(async (req: Request) => {
           const article = await scrapeArticlePage(link.href, link.title, link.date, source.name);
           if (!article || article.title.length < 5) { articlesSkipped++; continue; }
 
+          let storedCoverImage = article.cover_image;
+          if (article.cover_image) {
+            const slug = generateArticleSlug(article.title, article.published_at);
+            const stored = await downloadAndStoreImage(supabase, article.cover_image, slug);
+            if (stored) {
+              storedCoverImage = stored;
+            }
+          }
+
           for (const target of targets) {
             await supabase.from("articles").insert({
               title: article.title,
               content: article.content,
               excerpt: article.excerpt,
-              cover_image: article.cover_image,
+              cover_image: storedCoverImage,
               scraped_author: article.scraped_author,
               status: "published",
               published_at: article.published_at,
@@ -492,7 +538,6 @@ Deno.serve(async (req: Request) => {
           await new Promise(r => setTimeout(r, 800));
         }
 
-        // 4. Update metadata
         if (logId) {
           await supabase.from("news_scrape_logs").update({
             completed_at: new Date().toISOString(),
@@ -502,7 +547,6 @@ Deno.serve(async (req: Request) => {
             status: "success",
           }).eq("id", logId);
         }
-        // Set article_count to the current total of scraped articles from this source
         const { data: srcRow } = await supabase
           .from("news_scrape_sources")
           .select("article_count")
