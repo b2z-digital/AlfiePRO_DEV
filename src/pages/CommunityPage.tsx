@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
-import { Users, UserPlus, Settings, Clock, ArrowLeft, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, UserPlus, Settings, Clock, ArrowLeft, Star, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import PostCreationModal from '../components/social/PostCreationModal';
 import ActivityFeed from '../components/social/ActivityFeed';
 import ConnectionsModal from '../components/social/ConnectionsModal';
@@ -16,6 +17,7 @@ interface CommunityPageProps {
 export default function CommunityPage({ darkMode = false }: CommunityPageProps) {
   const { user, currentClub } = useAuth();
   const { isImpersonating, effectiveProfile: impersonatedProfile, effectiveUserId } = useImpersonation();
+  const navigate = useNavigate();
   const lightMode = !darkMode;
   const [profile, setProfile] = useState<any>(null);
   const [coverImage, setCoverImage] = useState<string>('');
@@ -441,6 +443,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                   {connections.slice(0, 8).map(connection => {
                     const connUser = connection.connected_user;
                     const isOnline = connUser?.last_seen && (Date.now() - new Date(connUser.last_seen).getTime()) < 15 * 60 * 1000;
+                    const connUserId = connUser?.id || (connection as any).connected_user_id;
                     return (
                       <div
                         key={connection.id}
@@ -467,6 +470,18 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                             {isOnline ? 'Online' : 'Offline'}
                           </div>
                         </div>
+                        {connUserId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/comms?compose=true&recipientId=${connUserId}`);
+                            }}
+                            className={`flex-shrink-0 p-2 rounded-lg transition-colors ${lightMode ? 'text-blue-600 hover:bg-blue-50' : 'text-blue-400 hover:bg-slate-700/50'}`}
+                            title={`Chat with ${connUser?.full_name || 'User'}`}
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     );
                   })}

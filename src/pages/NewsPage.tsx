@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, Search, Filter, Plus, Calendar, User, ChevronRight, Edit2, Trash2, AlertTriangle, X, ArrowUpDown, LayoutGrid, List } from 'lucide-react';
+import { Newspaper, Search, ListFilter as Filter, Plus, Calendar, User, ChevronRight, CreditCard as Edit2, Trash2, TriangleAlert as AlertTriangle, X, ArrowUpDown, LayoutGrid, List } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { formatDate } from '../utils/date';
@@ -274,7 +274,8 @@ const NewsPage: React.FC = () => {
               <select
                 value={filterYachtClass || ''}
                 onChange={(e) => setFilterYachtClass(e.target.value || null)}
-                className="pl-9 pr-8 py-2 bg-slate-800 text-slate-200 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none transition-all appearance-none cursor-pointer"
+                className="pl-9 pr-2 py-2 bg-slate-800 text-slate-200 rounded-lg border border-slate-700 focus:border-blue-500 focus:outline-none transition-all appearance-none cursor-pointer w-10 xl:w-auto xl:pr-8"
+                title="Filter by class"
               >
                 <option value="">All Classes</option>
                 <option value="generic">Generic</option>
@@ -332,10 +333,11 @@ const NewsPage: React.FC = () => {
             {can('articles.create') && (
               <button
                 onClick={handleNewArticle}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 animate-pulse"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 animate-pulse whitespace-nowrap"
               >
                 <Plus size={18} />
-                New Article
+                <span className="xl:hidden">New</span>
+                <span className="hidden xl:inline">New Article</span>
               </button>
             )}
           </div>
