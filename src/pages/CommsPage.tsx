@@ -9,11 +9,13 @@ interface CommsPageProps {
 export const CommsPage: React.FC<CommsPageProps> = ({ darkMode = true }) => {
   const [searchParams] = useSearchParams();
   const shouldCompose = searchParams.get('compose') === 'true';
+  const recipientId = searchParams.get('recipientId') || undefined;
 
   return (
     <Conversations
       darkMode={darkMode}
       initialShowCompose={shouldCompose}
+      initialRecipientId={recipientId}
     />
   );
 };

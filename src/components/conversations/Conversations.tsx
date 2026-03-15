@@ -63,9 +63,10 @@ interface Attachment {
 interface ConversationsProps {
   darkMode: boolean;
   initialShowCompose?: boolean;
+  initialRecipientId?: string;
 }
 
-export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialShowCompose = false }) => {
+export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialShowCompose = false, initialRecipientId }) => {
   const { user, currentClub, currentOrganization } = useAuth();
   const { isImpersonating, effectiveUserId, effectiveProfile: impersonatedProfile } = useImpersonation();
   const contextId = currentOrganization?.id || currentClub?.clubId;
@@ -120,6 +121,15 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
       fetchMarketingLists();
     }
   }, [contextId, viewingUserId]);
+
+  useEffect(() => {
+    if (initialRecipientId && initialShowCompose) {
+      setComposeForm(prev => ({
+        ...prev,
+        recipients: prev.recipients.includes(initialRecipientId) ? prev.recipients : [...prev.recipients, initialRecipientId],
+      }));
+    }
+  }, [initialRecipientId, initialShowCompose]);
 
   useEffect(() => {
     const fetchNonMemberRecipients = async () => {
