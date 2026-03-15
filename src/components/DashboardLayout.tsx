@@ -180,6 +180,21 @@ interface DashboardLayoutProps {
   onClearSelectedEvent: () => void;
 }
 
+const ShipWheel: React.FC<{ size?: number; className?: string }> = ({ size = 24, className = '' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="3"/>
+    <circle cx="12" cy="12" r="8"/>
+    <line x1="12" y1="2" x2="12" y2="5"/>
+    <line x1="12" y1="19" x2="12" y2="22"/>
+    <line x1="2" y1="12" x2="5" y2="12"/>
+    <line x1="19" y1="12" x2="22" y2="12"/>
+    <line x1="4.93" y1="4.93" x2="7.05" y2="7.05"/>
+    <line x1="16.95" y1="16.95" x2="19.07" y2="19.07"/>
+    <line x1="4.93" y1="19.07" x2="7.05" y2="16.95"/>
+    <line x1="16.95" y1="7.05" x2="19.07" y2="4.93"/>
+  </svg>
+);
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   darkMode,
   selectedEvent,
@@ -841,6 +856,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/finances',
           permission: 'finance.manage',
           featureKey: 'finance'
+        },
+        {
+          id: 'resources',
+          label: 'Documents',
+          icon: FolderOpen,
+          description: 'Manage documents, files, and links',
+          path: '/resources',
+          featureKey: 'resources'
         }
       ]
     }] : []),
@@ -850,16 +873,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       collapsible: true,
       icon: FolderOpen,
       items: [
-        {
-          id: 'resources',
-          label: 'Resources',
-          icon: FolderOpen,
-          description: currentOrganization
-            ? 'Manage documents, files, and links for clubs'
-            : 'Manage documents, files, and links',
-          path: '/resources',
-          featureKey: 'resources'
-        },
         {
           id: 'my-garage',
           label: 'Boat Shed',
@@ -939,7 +952,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       id: 'racing',
       label: 'Sailing',
       collapsible: true,
-      icon: Ship,
+      icon: ShipWheel,
       items: [
         {
           id: 'race-management',
