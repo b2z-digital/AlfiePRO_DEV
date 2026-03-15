@@ -850,7 +850,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           description: 'Manage documents, files, and links',
           path: '/resources',
           featureKey: 'resources'
-        }
+        },
+        ...(!isAssociationViewer ? [{
+          id: 'website',
+          label: 'Website Manager',
+          icon: Monitor,
+          description: 'Manage club website',
+          path: '/website',
+          permission: 'website.manage',
+          featureKey: 'website_management'
+        }] : [])
       ]
     }] : []),
     {
@@ -883,15 +892,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/classifieds',
           featureKey: 'classifieds'
         },
-        ...(!isAssociationViewer ? [{
-          id: 'website',
-          label: 'Website Manager',
-          icon: Monitor,
-          description: 'Manage club website',
-          path: '/website',
-          permission: 'website.manage',
-          featureKey: 'website_management'
-        }] : [])
       ]
     },
     {
