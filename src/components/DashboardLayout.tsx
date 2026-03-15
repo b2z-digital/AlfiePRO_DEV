@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -995,13 +995,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       id: 'communications',
       label: 'Communications',
       collapsible: true,
-      icon: Mail,
+      icon: MessageCircle,
       items: [
         {
           id: 'comms',
-          label: 'Inbox & Notifications',
-          icon: Mail,
-          description: 'Send and manage member communications',
+          label: 'Conversations',
+          icon: MessageCircle,
+          description: 'Messages, notifications, and conversations',
           path: '/comms',
           featureKey: 'notifications'
         },
