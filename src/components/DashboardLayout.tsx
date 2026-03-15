@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, UserCircle, Eye, Bot, LifeBuoy } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -179,6 +179,7 @@ interface DashboardLayoutProps {
   onStartScoring: () => void;
   onClearSelectedEvent: () => void;
 }
+
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   darkMode,
@@ -696,7 +697,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           id: 'home',
           label: 'Dashboard',
-          icon: Home,
+          icon: LayoutDashboard,
           description: 'Overview',
           path: '/'
         }
@@ -717,103 +718,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         }
       ]
     }] : []),
-    {
-      id: 'racing',
-      label: 'Racing',
-      collapsible: true,
-      icon: Flag,
-      items: [
-        {
-          id: 'race-management',
-          label: 'Race Management',
-          icon: Flag,
-          description: 'Manage races and series',
-          path: '/race-management',
-          permission: 'races.manage',
-          featureKey: 'race_management'
-        },
-        {
-          id: 'race-calendar',
-          label: 'Race Calendar',
-          icon: Calendar,
-          description: 'View upcoming races',
-          path: '/calendar',
-          featureKey: 'race_calendar'
-        },
-        {
-          id: 'results',
-          label: 'Results',
-          icon: Trophy,
-          description: 'View race results',
-          path: '/results',
-          featureKey: 'results_display'
-        },
-        ...(isSuperAdmin ? [{
-          id: 'hms-validator',
-          label: 'HMS Validator',
-          icon: FileCheck,
-          description: 'Validate AlfiePRO results against HMS scoring',
-          path: '/hms-validator',
-          featureKey: 'hms_validator'
-        }] : []),
-        {
-          id: 'yacht-classes',
-          label: 'Yacht Classes',
-          icon: Sailboat,
-          description: 'View yacht classes sailed at the club',
-          path: '/yacht-classes',
-          featureKey: 'yacht_classes'
-        },
-        {
-          id: 'venues',
-          label: 'Venues',
-          icon: MapPin,
-          description: 'Manage racing venues',
-          path: '/venues',
-          featureKey: 'venues'
-        }
-      ]
-    },
-    {
-      id: 'content-media',
-      label: 'Content & Media',
-      collapsible: true,
-      icon: Camera,
-      items: [
-        {
-          id: 'news',
-          label: 'News',
-          icon: Newspaper,
-          description: 'Club news and announcements',
-          path: '/news',
-          featureKey: 'news'
-        },
-        {
-          id: 'media',
-          label: 'Media',
-          icon: Camera,
-          description: 'Manage club media',
-          path: '/media',
-          featureKey: 'media'
-        },
-        {
-          id: 'alfie-tv',
-          label: 'AlfieTV',
-          icon: Tv,
-          description: 'Watch RC yachting videos',
-          path: '/alfie-tv',
-          featureKey: 'alfie_tv'
-        },
-        ...(!isMember ? [{
-          id: 'livestream',
-          label: 'Livestream',
-          icon: Video,
-          description: 'Broadcast races to YouTube',
-          path: '/livestream',
-          featureKey: 'livestream'
-        }] : [])
-      ]
-    },
     ...(currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? [{
       id: 'membership-assoc',
       label: 'Membership',
@@ -894,7 +798,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }] : []),
     ...(!currentOrganization ? [{
       id: 'club-operations',
-      label: 'Club Operations',
+      label: 'Club Stuff',
       collapsible: true,
       icon: Users,
       items: [
@@ -938,9 +842,155 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/finances',
           permission: 'finance.manage',
           featureKey: 'finance'
-        }
+        },
+        {
+          id: 'resources',
+          label: 'Documents',
+          icon: FolderOpen,
+          description: 'Manage documents, files, and links',
+          path: '/resources',
+          featureKey: 'resources'
+        },
+        ...(!isAssociationViewer ? [{
+          id: 'website',
+          label: 'Website Manager',
+          icon: Monitor,
+          description: 'Manage club website',
+          path: '/website',
+          permission: 'website.manage',
+          featureKey: 'website_management'
+        }] : [])
       ]
     }] : []),
+    {
+      id: 'resources-tools',
+      label: 'My Stuff',
+      collapsible: true,
+      icon: FolderOpen,
+      items: [
+        {
+          id: 'my-garage',
+          label: 'Boat Shed',
+          icon: Wrench,
+          description: 'Manage your boats, maintenance, and rig tuning',
+          path: '/my-garage',
+          featureKey: 'boat_shed'
+        },
+        {
+          id: 'weather',
+          label: 'Weather',
+          icon: Wind,
+          description: 'Live marine weather forecast',
+          path: '/weather',
+          featureKey: 'weather'
+        },
+        {
+          id: 'classifieds',
+          label: 'Classifieds',
+          icon: Tag,
+          description: 'Buy, sell, and trade sailing gear',
+          path: '/classifieds',
+          featureKey: 'classifieds'
+        },
+      ]
+    },
+    {
+      id: 'content-media',
+      label: 'News & Media',
+      collapsible: true,
+      icon: TvMinimalPlay,
+      items: [
+        {
+          id: 'news',
+          label: 'News',
+          icon: Newspaper,
+          description: 'Club news and announcements',
+          path: '/news',
+          featureKey: 'news'
+        },
+        {
+          id: 'media',
+          label: 'Media',
+          icon: Camera,
+          description: 'Manage club media',
+          path: '/media',
+          featureKey: 'media'
+        },
+        {
+          id: 'alfie-tv',
+          label: 'AlfieTV',
+          icon: Tv,
+          description: 'Watch RC yachting videos',
+          path: '/alfie-tv',
+          featureKey: 'alfie_tv'
+        },
+        ...(!isMember ? [{
+          id: 'livestream',
+          label: 'Livestream',
+          icon: Video,
+          description: 'Broadcast races to YouTube',
+          path: '/livestream',
+          featureKey: 'livestream'
+        }] : [])
+      ]
+    },
+    {
+      id: 'racing',
+      label: 'Sailing',
+      collapsible: true,
+      icon: ShipWheel,
+      items: [
+        {
+          id: 'race-management',
+          label: 'Race Management',
+          icon: Flag,
+          description: 'Manage races and series',
+          path: '/race-management',
+          permission: 'races.manage',
+          featureKey: 'race_management'
+        },
+        {
+          id: 'race-calendar',
+          label: 'Race Calendar',
+          icon: Calendar,
+          description: 'View upcoming races',
+          path: '/calendar',
+          featureKey: 'race_calendar'
+        },
+        {
+          id: 'results',
+          label: 'Results',
+          icon: Trophy,
+          description: 'View race results',
+          path: '/results',
+          featureKey: 'results_display'
+        },
+        ...(isSuperAdmin ? [{
+          id: 'hms-validator',
+          label: 'HMS Validator',
+          icon: FileCheck,
+          description: 'Validate AlfiePRO results against HMS scoring',
+          path: '/hms-validator',
+          featureKey: 'hms_validator'
+        }] : []),
+        {
+          id: 'yacht-classes',
+          label: 'Yacht Classes',
+          icon: Sailboat,
+          description: 'View yacht classes sailed at the club',
+          path: '/yacht-classes',
+          featureKey: 'yacht_classes'
+        },
+        {
+          id: 'venues',
+          label: 'Venues',
+          icon: MapPin,
+          description: 'Manage racing venues',
+          path: '/venues',
+          featureKey: 'venues'
+        }
+      ]
+    },
     {
       id: 'communications',
       label: 'Communications',
@@ -973,66 +1023,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           featureKey: 'community'
         }
       ]
-    },
-    {
-      id: 'resources-tools',
-      label: 'Resources & Tools',
-      collapsible: true,
-      icon: FolderOpen,
-      items: [
-        {
-          id: 'resources',
-          label: 'Resources',
-          icon: FolderOpen,
-          description: currentOrganization
-            ? 'Manage documents, files, and links for clubs'
-            : 'Manage documents, files, and links',
-          path: '/resources',
-          featureKey: 'resources'
-        },
-        {
-          id: 'my-garage',
-          label: 'Boat Shed',
-          icon: Wrench,
-          description: 'Manage your boats, maintenance, and rig tuning',
-          path: '/my-garage',
-          featureKey: 'boat_shed'
-        },
-        {
-          id: 'weather',
-          label: 'Weather',
-          icon: Wind,
-          description: 'Live marine weather forecast',
-          path: '/weather',
-          featureKey: 'weather'
-        },
-        {
-          id: 'classifieds',
-          label: 'Classifieds',
-          icon: Tag,
-          description: 'Buy, sell, and trade sailing gear',
-          path: '/classifieds',
-          featureKey: 'classifieds'
-        }
-      ]
-    },
-    ...(!isAssociationViewer ? [{
-      id: 'website',
-      label: 'Website',
-      collapsible: true,
-      icon: Monitor,
-      items: [
-        {
-          id: 'website',
-          label: 'Website Manager',
-          icon: Monitor,
-          description: 'Manage club website',
-          path: '/website',
-          permission: 'website.manage',
-          featureKey: 'website_management'
-        }
-      ]
-    }] : [])
+    }
   ];
 
   const isPlatformMode = (currentOrganization as any)?.type === 'platform';
