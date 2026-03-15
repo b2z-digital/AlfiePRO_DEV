@@ -240,6 +240,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [unreadTasksCount, setUnreadTasksCount] = useState(0);
   const [membershipActionCount, setMembershipActionCount] = useState(0);
+  const [unreadConversationsCount, setUnreadConversationsCount] = useState(0);
+  const [unreadCommunityCount, setUnreadCommunityCount] = useState(0);
   const [showImportMembersModal, setShowImportMembersModal] = useState(false);
   const [isHoveringNav, setIsHoveringNav] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
@@ -333,6 +335,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     fetchUnreadNotificationsCount();
     fetchUnreadTasksCount();
     fetchMembershipActionCount();
+    fetchUnreadConversationsCount();
+    fetchUnreadCommunityCount();
   }, [currentClub]);
 
   // Subscribe to realtime changes on members table
@@ -366,6 +370,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     // Refresh counts when navigating between pages
     fetchUnreadNotificationsCount();
     fetchUnreadTasksCount();
+    fetchUnreadConversationsCount();
+    fetchUnreadCommunityCount();
   }, [location.pathname]);
 
   useEffect(() => {
@@ -428,6 +434,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           table: 'membership_remittances',
           filter: `club_id=eq.${clubId}`
         }, () => fetchMembershipActionCount()).subscribe()
+      },
+      {
+        name: `conversation-messages-${userId}`,
+        setup: (ch: any) => ch.on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversation_messages'
+        }, () => fetchUnreadConversationsCount()).subscribe()
+      },
+      {
+        name: `social-notifications-${userId}`,
+        setup: (ch: any) => ch.on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'social_notifications',
+          filter: `user_id=eq.${userId}`
+        }, () => fetchUnreadCommunityCount()).subscribe()
       }
     ];
 
@@ -545,6 +568,51 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     } catch (err) {
       console.error('Error fetching active tasks count:', err);
       setUnreadTasksCount(0);
+    }
+  };
+
+  const fetchUnreadConversationsCount = async () => {
+    if (!user) return;
+    if (!navigator.onLine) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, last_read_at, conversations!inner(last_message_at)')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const unread = (data || []).filter((p: any) => {
+        const lastMsg = p.conversations?.last_message_at;
+        if (!lastMsg) return false;
+        if (!p.last_read_at) return true;
+        return new Date(lastMsg) > new Date(p.last_read_at);
+      }).length;
+
+      setUnreadConversationsCount(unread);
+    } catch (err) {
+      console.error('Error fetching unread conversations count:', err);
+      setUnreadConversationsCount(0);
+    }
+  };
+
+  const fetchUnreadCommunityCount = async () => {
+    if (!user) return;
+    if (!navigator.onLine) return;
+
+    try {
+      const { count, error } = await supabase
+        .from('social_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      setUnreadCommunityCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching unread community count:', err);
+      setUnreadCommunityCount(0);
     }
   };
 
@@ -1129,6 +1197,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   location.pathname === item.path ||
                   (item.path !== '/' && location.pathname.startsWith(item.path))
                 );
+                const commsSectionTotal = section.id === 'communications'
+                  ? (unreadNotificationsCount + unreadConversationsCount + unreadCommunityCount)
+                  : 0;
 
                 return (
                 <div key={sectionId}>
@@ -1153,7 +1224,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           title={section.label}
                         >
                           {SectionIcon && <SectionIcon size={18} className="opacity-70" />}
-                          {hasActiveItem && !isExpanded && (
+                          {section.id === 'communications' && commsSectionTotal > 0 && (
+                            <div className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                              {commsSectionTotal}
+                            </div>
+                          )}
+                          {hasActiveItem && !isExpanded && section.id !== 'communications' && (
                             <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500"></div>
                           )}
                         </button>
@@ -1179,7 +1255,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           <span className="text-xs font-semibold uppercase tracking-wider">
                             {section.label}
                           </span>
-                          {hasActiveItem && !isExpanded && (
+                          {section.id === 'communications' && !isExpanded && commsSectionTotal > 0 && (
+                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                              {commsSectionTotal}
+                            </div>
+                          )}
+                          {hasActiveItem && !isExpanded && !(section.id === 'communications' && commsSectionTotal > 0) && (
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                           )}
                         </div>
@@ -1240,9 +1321,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           {(!collapsed || isHoveringNav) && (
                             <div className="text-left flex-1 flex items-center gap-2">
                               <div className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</div>
-                              {item.id === 'comms' && unreadNotificationsCount > 0 && (
+                              {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
                                 <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
-                                  {unreadNotificationsCount}
+                                  {unreadNotificationsCount + unreadConversationsCount}
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
@@ -1253,6 +1334,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
                                 <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
+                                </div>
+                              )}
+                              {item.id === 'community' && unreadCommunityCount > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                  {unreadCommunityCount}
                                 </div>
                               )}
                             </div>
@@ -1491,6 +1577,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     location.pathname === item.path ||
                     (item.path !== '/' && location.pathname.startsWith(item.path))
                   );
+                  const commsSectionTotal = section.id === 'communications'
+                    ? (unreadNotificationsCount + unreadConversationsCount + unreadCommunityCount)
+                    : 0;
 
                   return (
                   <div key={sectionId}>
@@ -1515,7 +1604,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           <span className="text-xs font-semibold uppercase tracking-wider">
                             {section.label}
                           </span>
-                          {hasActiveItem && !isExpanded && (
+                          {section.id === 'communications' && !isExpanded && commsSectionTotal > 0 && (
+                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                              {commsSectionTotal}
+                            </div>
+                          )}
+                          {hasActiveItem && !isExpanded && !(section.id === 'communications' && commsSectionTotal > 0) && (
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                           )}
                         </div>
@@ -1569,9 +1663,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             <Icon size={18} className={`flex-shrink-0 ${isActive ? '!text-white' : ''}`} />
                             <div className="ml-3 flex-1 flex items-center gap-2">
                               <span className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</span>
-                              {item.id === 'comms' && unreadNotificationsCount > 0 && (
+                              {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
                                 <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
-                                  {unreadNotificationsCount}
+                                  {unreadNotificationsCount + unreadConversationsCount}
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
@@ -1582,6 +1676,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
                                 <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
+                                </div>
+                              )}
+                              {item.id === 'community' && unreadCommunityCount > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                  {unreadCommunityCount}
                                 </div>
                               )}
                             </div>

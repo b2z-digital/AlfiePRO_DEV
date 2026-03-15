@@ -1,11 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  FolderOpen, Plus, Edit2, Trash2, FileText,
-  Search, Grid, List, HardDrive,
-  RefreshCw, ChevronRight, Home, Upload, File, Image as ImageIcon,
-  Music, Film, Archive, FolderPlus, UploadCloud, Eye,
-  Download, ExternalLink, MoreVertical, X, Building2, Users
-} from 'lucide-react';
+import { FolderOpen, Plus, CreditCard as Edit2, Trash2, FileText, Search, Grid2x2 as Grid, List, HardDrive, RefreshCw, ChevronRight, Hop as Home, Upload, File, Image as ImageIcon, Music, Film, Archive, FolderPlus, CloudUpload as UploadCloud, Eye, Download, ExternalLink, MoveVertical as MoreVertical, X, Building2, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import * as ResourceStorage from '../../utils/associationResourceStorage';
@@ -747,9 +741,9 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               <FolderOpen size={22} className="text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Resources</h1>
+              <h1 className="text-2xl font-bold text-white">Documents</h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                {isClubContext ? 'Club & shared association resources' : 'Manage and share resources with your members'}
+                {isClubContext ? 'Manage Club Documents & Access Shared Association Resources' : 'Manage and share resources with your members'}
               </p>
             </div>
           </div>
