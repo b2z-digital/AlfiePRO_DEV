@@ -569,7 +569,7 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center bg-slate-950">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
           <p className="text-sm text-slate-500">Loading conversations...</p>
@@ -579,8 +579,8 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
   }
 
   return (
-    <div className="h-full flex bg-slate-950">
-      <div className="w-80 xl:w-96 flex-shrink-0">
+    <div className="h-screen flex bg-slate-950 overflow-hidden">
+      <div className="w-[320px] xl:w-[360px] flex-shrink-0 h-full overflow-hidden">
         <ConversationsSidebar
           activeTab={activeTab}
           onTabChange={(tab) => { setActiveTab(tab); setSelectedNotification(null); }}
@@ -598,7 +598,7 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
         />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 h-full overflow-hidden">
         {selectedNotification ? (
           <ConversationThread
             notification={selectedNotification}

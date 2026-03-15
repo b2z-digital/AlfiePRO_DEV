@@ -120,7 +120,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/40">
+    <div className="flex flex-col h-full bg-slate-900/40 overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/40 bg-slate-900/60">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex -space-x-2">

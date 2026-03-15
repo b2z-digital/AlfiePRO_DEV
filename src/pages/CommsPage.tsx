@@ -11,12 +11,10 @@ export const CommsPage: React.FC<CommsPageProps> = ({ darkMode = true }) => {
   const shouldCompose = searchParams.get('compose') === 'true';
 
   return (
-    <div className="h-full -m-4 sm:-m-6 lg:-m-8">
-      <Conversations
-        darkMode={darkMode}
-        initialShowCompose={shouldCompose}
-      />
-    </div>
+    <Conversations
+      darkMode={darkMode}
+      initialShowCompose={shouldCompose}
+    />
   );
 };
 

@@ -133,8 +133,8 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/60 border-r border-slate-700/40">
-      <div className="p-4 space-y-4">
+    <div className="flex flex-col h-full bg-slate-900/60 border-r border-slate-700/40 overflow-hidden">
+      <div className="flex-shrink-0 p-4 pt-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
@@ -306,7 +306,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-700/40">
+      <div className="flex-shrink-0 p-3 border-t border-slate-700/40">
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>{notifications.length} conversations</span>
           {unreadCount > 0 && (
