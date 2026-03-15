@@ -171,15 +171,15 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-      <div className="bg-white/8 backdrop-blur-2xl rounded-2xl border border-white/15 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/40">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 backdrop-blur-sm rounded-2xl border border-slate-700/50 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/40">
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10">
           <div className="flex items-center gap-3">
             {step === 'compose' && !replyMode && (
               <button
                 onClick={() => setStep('people-picker')}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700/40 rounded-lg transition-all"
               >
                 <ArrowLeft size={16} />
               </button>
@@ -193,7 +193,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/40 rounded-lg transition-all"
           >
             <X size={18} />
           </button>
@@ -210,7 +210,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                 value={memberSearchTerm}
                 onChange={(e) => setMemberSearchTerm(e.target.value)}
                 placeholder="Search members..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 autoFocus
               />
             </div>
@@ -233,13 +233,13 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                         className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                           isSelected
                             ? 'bg-blue-600/20 border-blue-500/40 ring-1 ring-blue-500/30'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                            : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-700/40 hover:border-slate-600/50'
                         }`}
                       >
                         <div className="relative flex-shrink-0">
                           <UserAvatar name={fullName} avatarUrl={member.avatar_url} size={38} />
                           {isSelected && (
-                            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-slate-900 flex items-center justify-center">
+                            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-[#131c31] flex items-center justify-center">
                               <svg width="8" height="8" viewBox="0 0 12 12" fill="none">
                                 <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
@@ -266,7 +266,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               <div>
                 <button
                   onClick={() => setShowMarketingLists(!showMarketingLists)}
-                  className="flex items-center justify-between w-full px-4 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-all border border-white/10"
+                  className="flex items-center justify-between w-full px-4 py-3 bg-slate-800/40 hover:bg-slate-700/40 text-white rounded-xl transition-all border border-slate-700/50"
                 >
                   <div className="flex items-center gap-2">
                     <ListChecks size={16} className="text-slate-400" />
@@ -279,11 +279,11 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                 </button>
 
                 {showMarketingLists && (
-                  <div className="mt-2 border border-white/10 rounded-xl bg-white/5 max-h-40 overflow-y-auto p-2 space-y-0.5">
+                  <div className="mt-2 border border-slate-700/50 rounded-xl bg-slate-800/40 max-h-40 overflow-y-auto p-2 space-y-0.5">
                     {marketingLists.map(list => (
                       <label
                         key={list.id}
-                        className="flex items-center gap-2.5 p-2 hover:bg-white/10 cursor-pointer transition-colors rounded-lg"
+                        className="flex items-center gap-2.5 p-2 hover:bg-slate-700/40 cursor-pointer transition-colors rounded-lg"
                       >
                         <input
                           type="checkbox"
@@ -321,7 +321,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                     }
                   }}
                   placeholder="Enter email address..."
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 />
                 <button
                   onClick={addExternalEmail}
@@ -333,7 +333,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               {composeForm.externalEmails.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {composeForm.externalEmails.map((email, index) => (
-                    <div key={index} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/8 border border-white/15 rounded-lg">
+                    <div key={index} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 border border-slate-700/50 rounded-lg">
                       <Mail size={12} className="text-slate-400" />
                       <span className="text-white text-xs">{email}</span>
                       <button
@@ -356,7 +356,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {selectedCount > 0 && (
-              <div className="flex flex-wrap gap-2 p-3 bg-white/5 rounded-xl border border-white/10">
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-800/40 rounded-xl border border-slate-700/50">
                 {composeForm.recipients.map(recipientKey => {
                   const member = members.find(m => (m.user_id ? m.user_id : `email:${m.id}`) === recipientKey);
                   const nonMember = nonMemberRecipients.get(recipientKey);
@@ -377,7 +377,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                   );
                 })}
                 {composeForm.externalEmails.map((email, index) => (
-                  <div key={index} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white/8 border border-white/15 rounded-lg">
+                  <div key={index} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/80 border border-slate-700/50 rounded-lg">
                     <Mail size={12} className="text-slate-400" />
                     <span className="text-white text-xs">{email}</span>
                     <button
@@ -397,7 +397,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                 type="text"
                 value={composeForm.subject}
                 onChange={(e) => onComposeFormChange({ ...composeForm, subject: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 placeholder="What is this about?"
               />
             </div>
@@ -429,7 +429,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
                   value={composeForm.body}
                   onChange={(e) => onComposeFormChange({ ...composeForm, body: e.target.value })}
                   rows={6}
-                  className="w-full px-4 py-3 rounded-xl bg-white/8 border border-white/15 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
                   placeholder="Type your message..."
                 />
               )}
@@ -467,7 +467,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingAttachment}
-                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/10 disabled:opacity-50"
+                className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:text-white bg-slate-800/40 hover:bg-slate-700/40 rounded-lg transition-all border border-slate-700/50 disabled:opacity-50"
               >
                 <Paperclip size={14} />
                 {uploadingAttachment ? 'Uploading...' : 'Attach Files'}
@@ -476,7 +476,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
               {attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {attachments.map((att, idx) => (
-                    <div key={idx} className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/8 border border-white/15 rounded-lg">
+                    <div key={idx} className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/80 border border-slate-700/50 rounded-lg">
                       <FileText size={12} className="text-slate-400" />
                       <span className="text-xs text-white truncate max-w-[120px]">{att.name}</span>
                       <span className="text-[10px] text-slate-500">{formatFileSize(att.size)}</span>
@@ -490,13 +490,13 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
             </div>
 
             {composeForm.recipients.length > 0 && (
-              <div className="space-y-3 pt-2 border-t border-white/10">
+              <div className="space-y-3 pt-2 border-t border-slate-700/50">
                 <div>
                   <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Type</label>
                   <select
                     value={composeForm.notification_type}
                     onChange={(e) => onComposeFormChange({ ...composeForm, notification_type: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/8 border border-white/15 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                   >
                     <option value="message">General Message</option>
                     <option value="club_news">Club News</option>
@@ -520,7 +520,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700/50">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
             Cancel
           </button>

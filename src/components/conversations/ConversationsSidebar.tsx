@@ -69,7 +69,7 @@ const UserAvatar = ({ name, avatarUrl, size = 48, isOnline }: { name: string; av
         </div>
       )}
       {isOnline && (
-        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-slate-900" />
+        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#131c31]" />
       )}
     </div>
   );
@@ -133,7 +133,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/60 border-r border-slate-700/40 overflow-hidden">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm border-r border-slate-700/50 overflow-hidden">
       <div className="flex-shrink-0 p-4 pt-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -169,7 +169,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
           )}
         </div>
 
-        <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl">
+        <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl border border-slate-700/30">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -204,7 +204,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                 <button
                   key={draft.id}
                   onClick={() => onLoadDraft(draft)}
-                  className="w-full text-left p-3 rounded-xl hover:bg-slate-800/60 transition-all group"
+                  className="w-full text-left p-3 rounded-xl hover:bg-slate-700/40 transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-700/80 flex items-center justify-center flex-shrink-0">
@@ -255,8 +255,8 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                     isSelected
                       ? 'bg-blue-600/15 border border-blue-500/30'
                       : isUnread
-                        ? 'bg-slate-800/40 hover:bg-slate-800/60 border border-transparent'
-                        : 'hover:bg-slate-800/40 border border-transparent'
+                        ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
+                        : 'hover:bg-slate-700/30 border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -267,7 +267,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                         size={44}
                       />
                       {isUnread && (
-                        <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-slate-900" />
+                        <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -306,7 +306,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         )}
       </div>
 
-      <div className="flex-shrink-0 p-3 border-t border-slate-700/40">
+      <div className="flex-shrink-0 p-3 border-t border-slate-700/50">
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>{notifications.length} conversations</span>
           {unreadCount > 0 && (
@@ -320,7 +320,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
 
 const EmptyState = ({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle?: string }) => (
   <div className="flex flex-col items-center justify-center py-16 px-4">
-    <div className="w-16 h-16 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-4 text-slate-600">
+    <div className="w-16 h-16 rounded-2xl bg-slate-700/40 flex items-center justify-center mb-4 text-slate-600">
       {icon}
     </div>
     <p className="text-slate-400 font-medium text-sm">{title}</p>

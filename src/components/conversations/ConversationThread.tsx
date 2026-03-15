@@ -120,8 +120,8 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/40 overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/40 bg-slate-900/60">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex -space-x-2">
             <UserAvatar
@@ -153,7 +153,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
             className={`p-2 rounded-lg transition-all ${
               notification.is_starred
                 ? 'text-amber-400 hover:bg-amber-400/10'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/40'
             }`}
             title={notification.is_starred ? 'Remove star' : 'Star'}
           >
@@ -161,7 +161,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
           </button>
           <button
             onClick={() => onArchive(notification)}
-            className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 rounded-lg transition-all"
+            className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-700/40 rounded-lg transition-all"
             title="Archive"
           >
             <Archive size={16} />
@@ -176,7 +176,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
           <div className="w-px h-5 bg-slate-700/50 mx-1" />
           <button
             onClick={onClose}
-            className="p-2 text-slate-500 hover:text-white hover:bg-slate-800/60 rounded-lg transition-all"
+            className="p-2 text-slate-500 hover:text-white hover:bg-slate-700/40 rounded-lg transition-all"
           >
             <X size={16} />
           </button>
@@ -212,7 +212,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
           </div>
 
           <div className="ml-16">
-            <div className="bg-slate-800/40 rounded-2xl rounded-tl-md p-5 border border-slate-700/30">
+            <div className="bg-gradient-to-br from-slate-700/40 to-slate-800/40 rounded-2xl rounded-tl-md p-5 border border-slate-600/50">
               <h3 className="text-lg font-semibold text-white mb-4">{notification.subject}</h3>
               <div
                 className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed [&_p]:mb-3 [&_a]:text-blue-400 [&_a]:no-underline hover:[&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
@@ -220,7 +220,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
               />
 
               {notification.link_url && (
-                <div className="mt-5 pt-4 border-t border-slate-700/30">
+                <div className="mt-5 pt-4 border-t border-slate-700/50">
                   <a
                     href={notification.link_url}
                     target={notification.link_url.startsWith('http') ? '_blank' : undefined}
@@ -238,7 +238,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
       </div>
 
       {activeTab === 'inbox' && (
-        <div className="px-6 py-4 border-t border-slate-700/40 bg-slate-900/60">
+        <div className="px-6 py-4 border-t border-slate-700/50 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10">
           <div className="flex items-center gap-2">
             {notification.sender_id && (
               <button

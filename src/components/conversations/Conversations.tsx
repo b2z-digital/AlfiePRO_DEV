@@ -569,7 +569,7 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-950">
+      <div className="h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
           <p className="text-sm text-slate-500">Loading conversations...</p>
@@ -579,7 +579,7 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
   }
 
   return (
-    <div className="h-screen flex bg-slate-950 overflow-hidden">
+    <div className="h-screen flex overflow-hidden">
       <div className="w-[320px] xl:w-[360px] flex-shrink-0 h-full overflow-hidden">
         <ConversationsSidebar
           activeTab={activeTab}
@@ -598,7 +598,7 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
         />
       </div>
 
-      <div className="flex-1 min-w-0 h-full overflow-hidden bg-slate-100/95">
+      <div className="flex-1 min-w-0 h-full overflow-hidden">
         {selectedNotification ? (
           <ConversationThread
             notification={selectedNotification}
@@ -612,14 +612,14 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
             darkMode={darkMode}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-slate-100/95">
-            <div className="w-20 h-20 rounded-3xl bg-white shadow-sm border border-slate-200 flex items-center justify-center mb-6">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-gradient-to-br from-slate-800/40 via-slate-800/20 to-slate-900/40">
+            <div className="w-20 h-20 rounded-3xl bg-slate-700/40 border border-slate-600/50 flex items-center justify-center mb-6">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-slate-600 mb-2">Select a conversation</h3>
-            <p className="text-sm text-slate-400 max-w-sm">
+            <h3 className="text-lg font-semibold text-slate-300 mb-2">Select a conversation</h3>
+            <p className="text-sm text-slate-500 max-w-sm">
               Choose a message from the sidebar, or start a new conversation.
             </p>
             <button
