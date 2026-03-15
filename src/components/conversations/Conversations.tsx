@@ -598,7 +598,7 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
         />
       </div>
 
-      <div className="flex-1 min-w-0 h-full overflow-hidden">
+      <div className="flex-1 min-w-0 h-full overflow-hidden bg-slate-100/95">
         {selectedNotification ? (
           <ConversationThread
             notification={selectedNotification}
@@ -612,14 +612,14 @@ export const Conversations: React.FC<ConversationsProps> = ({ darkMode, initialS
             darkMode={darkMode}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8">
-            <div className="w-20 h-20 rounded-3xl bg-slate-800/60 flex items-center justify-center mb-6">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
+          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-slate-100/95">
+            <div className="w-20 h-20 rounded-3xl bg-white shadow-sm border border-slate-200 flex items-center justify-center mb-6">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-slate-400 mb-2">Select a conversation</h3>
-            <p className="text-sm text-slate-600 max-w-sm">
+            <h3 className="text-lg font-semibold text-slate-600 mb-2">Select a conversation</h3>
+            <p className="text-sm text-slate-400 max-w-sm">
               Choose a message from the sidebar, or start a new conversation.
             </p>
             <button
