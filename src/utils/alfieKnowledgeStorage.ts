@@ -448,6 +448,88 @@ export async function triggerDocumentProcessing(documentId: string): Promise<voi
   }
 }
 
+export interface AlfieAiInstruction {
+  id: string;
+  title: string;
+  category: string;
+  instruction_text: string;
+  priority: number;
+  is_active: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const AI_INSTRUCTION_CATEGORIES = [
+  'tone_of_voice',
+  'response_style',
+  'context_rules',
+  'persona',
+  'boundaries',
+  'formatting',
+  'general'
+] as const;
+
+export const AI_INSTRUCTION_CATEGORY_LABELS: Record<string, string> = {
+  tone_of_voice: 'Tone of Voice',
+  response_style: 'Response Style',
+  context_rules: 'Context & Usage',
+  persona: 'Persona & Identity',
+  boundaries: 'Boundaries & Limits',
+  formatting: 'Formatting Rules',
+  general: 'General'
+};
+
+export async function getAiInstructions(): Promise<AlfieAiInstruction[]> {
+  const { data, error } = await supabase
+    .from('alfie_ai_instructions')
+    .select('*')
+    .order('priority', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createAiInstruction(
+  instruction: Pick<AlfieAiInstruction, 'title' | 'category' | 'instruction_text' | 'priority'>,
+  userId: string
+): Promise<AlfieAiInstruction> {
+  const { data, error } = await supabase
+    .from('alfie_ai_instructions')
+    .insert({
+      ...instruction,
+      created_by: userId
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateAiInstruction(
+  id: string,
+  updates: Partial<Pick<AlfieAiInstruction, 'title' | 'category' | 'instruction_text' | 'priority' | 'is_active'>>,
+  userId?: string
+): Promise<AlfieAiInstruction> {
+  const { data, error } = await supabase
+    .from('alfie_ai_instructions')
+    .update({ ...updates, ...(userId ? { updated_by: userId } : {}) })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAiInstruction(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('alfie_ai_instructions')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+}
+
 export async function getKnowledgeStats(): Promise<{
   totalGuides: number;
   activeGuides: number;
@@ -457,18 +539,22 @@ export async function getKnowledgeStats(): Promise<{
   activeDocuments: number;
   totalChunks: number;
   totalImages: number;
+  totalInstructions: number;
+  activeInstructions: number;
 }> {
-  const [guides, corrections, documents, chunks, images] = await Promise.all([
+  const [guides, corrections, documents, chunks, images, instructions] = await Promise.all([
     supabase.from('alfie_tuning_guides').select('id, is_active'),
     supabase.from('alfie_knowledge_corrections').select('id, status'),
     supabase.from('alfie_knowledge_documents').select('id, is_active'),
     supabase.from('alfie_knowledge_chunks').select('id', { count: 'exact', head: true }),
-    supabase.from('alfie_knowledge_images').select('id', { count: 'exact', head: true })
+    supabase.from('alfie_knowledge_images').select('id', { count: 'exact', head: true }),
+    supabase.from('alfie_ai_instructions').select('id, is_active')
   ]);
 
   const guideData = guides.data || [];
   const correctionData = corrections.data || [];
   const documentData = documents.data || [];
+  const instructionData = instructions.data || [];
 
   return {
     totalGuides: guideData.length,
@@ -478,6 +564,8 @@ export async function getKnowledgeStats(): Promise<{
     totalDocuments: documentData.length,
     activeDocuments: documentData.filter(d => d.is_active).length,
     totalChunks: chunks.count || 0,
-    totalImages: images.count || 0
+    totalImages: images.count || 0,
+    totalInstructions: instructionData.length,
+    activeInstructions: instructionData.filter(i => i.is_active).length
   };
 }
