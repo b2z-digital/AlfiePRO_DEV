@@ -339,23 +339,25 @@ export const createArticle = async (
     // Generate a new ID
     const id = uuidv4();
 
-    // Insert article
+    // Insert article — only include defined fields to avoid nulling association columns
+    const insertData: any = {
+      id,
+      title: article.title,
+      content: article.content,
+      excerpt: article.excerpt,
+      author_id: article.author_id,
+      published_at: article.status === 'published' ? new Date().toISOString() : null,
+      cover_image: article.cover_image,
+      status: article.status
+    };
+    if (article.club_id !== undefined) insertData.club_id = article.club_id;
+    if (article.state_association_id !== undefined) insertData.state_association_id = article.state_association_id;
+    if (article.national_association_id !== undefined) insertData.national_association_id = article.national_association_id;
+    if (article.event_website_id !== undefined) insertData.event_website_id = article.event_website_id;
+
     const { data: newArticle, error } = await supabase
       .from('articles')
-      .insert({
-        id,
-        title: article.title,
-        content: article.content,
-        excerpt: article.excerpt,
-        author_id: article.author_id,
-        club_id: article.club_id,
-        state_association_id: article.state_association_id,
-        national_association_id: article.national_association_id,
-        event_website_id: article.event_website_id,
-        published_at: article.status === 'published' ? new Date().toISOString() : null,
-        cover_image: article.cover_image,
-        status: article.status
-      })
+      .insert(insertData)
       .select()
       .single();
     
@@ -392,9 +394,11 @@ export const updateArticle = async (
   tags?: string[]
 ): Promise<Article> => {
   try {
-    // Update article
-    const updateData: any = { ...article };
-    
+    // Update article — strip undefined values to avoid nulling out existing columns
+    const updateData: any = Object.fromEntries(
+      Object.entries({ ...article }).filter(([, v]) => v !== undefined)
+    );
+
     // If publishing, set published_at
     if (article.status === 'published' && !article.published_at) {
       updateData.published_at = new Date().toISOString();
