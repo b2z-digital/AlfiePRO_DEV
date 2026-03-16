@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare, Trash2, UserPlus } from 'lucide-react';
 
 export type SidebarTab = 'inbox' | 'sent' | 'starred' | 'drafts';
 export type TopLevelTab = 'inbox' | 'chats';
@@ -49,6 +49,8 @@ interface ConversationsSidebarProps {
   onSelect: (notification: Notification) => void;
   onLoadDraft: (draft: any) => void;
   onCompose: () => void;
+  onNewChat: () => void;
+  onDeleteChat: (chatId: string) => void;
   unreadCount: number;
   darkMode: boolean;
   chatConversations: ChatConversation[];
@@ -122,6 +124,8 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   onSelect,
   onLoadDraft,
   onCompose,
+  onNewChat,
+  onDeleteChat,
   unreadCount,
   darkMode,
   chatConversations,
@@ -129,6 +133,7 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   onSelectChat,
   unreadChatsCount,
 }) => {
+  const [swipedChatId, setSwipedChatId] = useState<string | null>(null);
   const starredNotifications = notifications.filter(n => n.is_starred);
 
   const getDisplayList = () => {
@@ -161,6 +166,14 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
     { id: 'drafts', label: 'Drafts', icon: <FileText size={18} />, count: drafts.length || undefined },
   ];
 
+  const handlePlusClick = () => {
+    if (topLevelTab === 'chats') {
+      onNewChat();
+    } else {
+      onCompose();
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm border-r border-slate-700/50 overflow-hidden">
       <div className="flex-shrink-0 p-4 pt-5 space-y-3">
@@ -172,10 +185,11 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
             <h2 className="text-lg font-bold text-white tracking-tight">Conversations</h2>
           </div>
           <button
-            onClick={onCompose}
+            onClick={handlePlusClick}
+            title={topLevelTab === 'chats' ? 'New Chat' : 'Compose Message'}
             className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all hover:scale-105 shadow-lg shadow-blue-600/20"
           >
-            <Plus size={18} />
+            {topLevelTab === 'chats' ? <UserPlus size={17} /> : <Plus size={18} />}
           </button>
         </div>
 
@@ -276,46 +290,64 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
             <div className="space-y-0.5">
               {filteredChats.map(chat => {
                 const isSelected = selectedChatId === chat.id;
+                const showDelete = swipedChatId === chat.id;
                 return (
-                  <button
+                  <div
                     key={chat.id}
-                    onClick={() => onSelectChat(chat)}
-                    className={`w-full text-left p-3 rounded-xl transition-all group relative ${
-                      isSelected
-                        ? 'bg-blue-600/15 border border-blue-500/30'
-                        : chat.is_unread
-                          ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
-                          : 'hover:bg-slate-700/30 border border-transparent'
-                    }`}
+                    className="relative group"
+                    onMouseLeave={() => setSwipedChatId(null)}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <UserAvatar
-                          name={chat.participant_name}
-                          avatarUrl={chat.participant_avatar}
-                          size={44}
-                        />
-                        {chat.is_unread && (
-                          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className={`text-sm truncate ${chat.is_unread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
-                            {chat.participant_name}
-                          </p>
-                          {chat.last_message_at && (
-                            <span className={`text-[11px] ml-2 flex-shrink-0 ${chat.is_unread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
-                              {formatTimeAgo(chat.last_message_at)}
-                            </span>
+                    <button
+                      onClick={() => onSelectChat(chat)}
+                      className={`w-full text-left p-3 rounded-xl transition-all relative ${
+                        isSelected
+                          ? 'bg-blue-600/15 border border-blue-500/30'
+                          : chat.is_unread
+                            ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
+                            : 'hover:bg-slate-700/30 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <UserAvatar
+                            name={chat.participant_name}
+                            avatarUrl={chat.participant_avatar}
+                            size={44}
+                          />
+                          {chat.is_unread && (
+                            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
                           )}
                         </div>
-                        <p className={`text-xs truncate mt-0.5 ${chat.is_unread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
-                          {chat.last_message_text || 'No messages yet'}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className={`text-sm truncate ${chat.is_unread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
+                              {chat.participant_name}
+                            </p>
+                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                              {chat.last_message_at && (
+                                <span className={`text-[11px] ${chat.is_unread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
+                                  {formatTimeAgo(chat.last_message_at)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <p className={`text-xs truncate mt-0.5 pr-6 ${chat.is_unread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                            {chat.last_message_text || 'No messages yet'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteChat(chat.id);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-slate-600 hover:text-red-400"
+                      title="Delete chat"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 );
               })}
             </div>

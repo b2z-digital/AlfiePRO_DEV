@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, MoveVertical as MoreVertical, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, Send } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 
 interface ChatMessage {
   id: string;
@@ -9,12 +10,6 @@ interface ChatMessage {
   sender_id: string;
   content: string;
   created_at: string;
-}
-
-interface ChatParticipant {
-  id: string;
-  full_name: string;
-  avatar_url?: string;
 }
 
 interface ChatViewProps {
@@ -42,6 +37,9 @@ const formatDateSeparator = (dateStr: string) => {
 
 export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, recipientAvatar, onBack, darkMode }) => {
   const { user } = useAuth();
+  const { isImpersonating, effectiveUserId } = useImpersonation();
+  const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -49,16 +47,21 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const convIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (user?.id && recipientId) {
-      loadOrCreateConversation();
+    convIdRef.current = conversationId;
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (currentUserId && recipientId) {
+      findExistingConversation();
     }
-  }, [user?.id, recipientId]);
+  }, [currentUserId, recipientId]);
 
   useEffect(() => {
     if (!conversationId) return;
-    const channelName = `chat-${conversationId}`;
+    const channelName = `chat-messages-${conversationId}`;
     getOrCreateChannel(channelName, (ch) =>
       ch.on('postgres_changes', {
         event: 'INSERT',
@@ -71,7 +74,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
-        markAsRead();
+        updateReadStatus(conversationId);
       }).subscribe()
     );
     return () => { removeChannelByName(channelName); };
@@ -81,32 +84,56 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
     messagesEndRef.current?.scrollIntoView({ behavior: messages.length > 1 ? 'smooth' : 'auto' });
   }, [messages]);
 
-  const loadOrCreateConversation = async () => {
-    if (!user?.id) return;
+  const findExistingConversation = async () => {
+    if (!currentUserId) return;
     setLoading(true);
     try {
       const { data: myConvos } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
-        .eq('user_id', user.id);
+        .eq('user_id', currentUserId);
+
+      if (!myConvos || myConvos.length === 0) {
+        setConversationId(null);
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
+
+      const myConvIds = myConvos.map(c => c.conversation_id);
 
       const { data: theirConvos } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
-        .eq('user_id', recipientId);
+        .eq('user_id', recipientId)
+        .in('conversation_id', myConvIds);
 
-      const myIds = new Set((myConvos || []).map(c => c.conversation_id));
-      const sharedId = (theirConvos || []).find(c => myIds.has(c.conversation_id))?.conversation_id;
+      if (!theirConvos || theirConvos.length === 0) {
+        setConversationId(null);
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
 
-      if (sharedId) {
-        const { data: participantCount } = await supabase
+      let foundConvId: string | null = null;
+      for (const conv of theirConvos) {
+        const { count } = await supabase
           .from('conversation_participants')
           .select('id', { count: 'exact', head: true })
-          .eq('conversation_id', sharedId);
+          .eq('conversation_id', conv.conversation_id);
 
-        setConversationId(sharedId);
-        await loadMessages(sharedId);
-        await markAsRead(sharedId);
+        if (count === 2) {
+          foundConvId = conv.conversation_id;
+          break;
+        }
+      }
+
+      if (foundConvId) {
+        setConversationId(foundConvId);
+        convIdRef.current = foundConvId;
+        await loadMessages(foundConvId);
+        await updateReadStatus(foundConvId);
+        await unhideConversation(foundConvId);
       } else {
         setConversationId(null);
         setMessages([]);
@@ -127,65 +154,129 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
     if (!error && data) setMessages(data);
   };
 
-  const markAsRead = async (convId?: string) => {
-    const id = convId || conversationId;
-    if (!id || !user?.id) return;
+  const updateReadStatus = async (convId?: string) => {
+    const id = convId || convIdRef.current;
+    if (!id || !currentUserId) return;
     await supabase
       .from('conversation_participants')
       .update({ last_read_at: new Date().toISOString() })
       .eq('conversation_id', id)
-      .eq('user_id', user.id);
+      .eq('user_id', currentUserId);
+  };
+
+  const unhideConversation = async (convId: string) => {
+    if (!currentUserId) return;
+    await supabase
+      .from('conversation_participants')
+      .update({ hidden_at: null, hidden_message_id: null })
+      .eq('conversation_id', convId)
+      .eq('user_id', currentUserId);
   };
 
   const createConversation = async (): Promise<string | null> => {
-    if (!user?.id) return null;
-    const { data: conv, error: convErr } = await supabase
-      .from('conversations')
-      .insert({ last_message_text: '', last_message_sender_id: user.id })
-      .select('id')
-      .single();
-    if (convErr || !conv) return null;
-
-    await supabase.from('conversation_participants').insert([
-      { conversation_id: conv.id, user_id: user.id },
-      { conversation_id: conv.id, user_id: recipientId },
-    ]);
-    return conv.id;
-  };
-
-  const handleSend = async () => {
-    if (!newMessage.trim() || !user?.id || sending) return;
-    setSending(true);
+    if (!currentUserId) return null;
     try {
-      let convId = conversationId;
-      if (!convId) {
-        convId = await createConversation();
-        if (!convId) throw new Error('Failed to create conversation');
-        setConversationId(convId);
+      const { data: conv, error: convErr } = await supabase
+        .from('conversations')
+        .insert({
+          last_message_text: '',
+          last_message_sender_id: currentUserId,
+          last_message_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (convErr || !conv) {
+        console.error('Failed to create conversation:', convErr);
+        return null;
       }
 
-      const { error } = await supabase.from('conversation_messages').insert({
+      const { error: partErr } = await supabase
+        .from('conversation_participants')
+        .insert([
+          { conversation_id: conv.id, user_id: currentUserId },
+          { conversation_id: conv.id, user_id: recipientId },
+        ]);
+
+      if (partErr) {
+        console.error('Failed to add participants:', partErr);
+        return null;
+      }
+
+      return conv.id;
+    } catch (err) {
+      console.error('Error creating conversation:', err);
+      return null;
+    }
+  };
+
+  const handleSend = useCallback(async () => {
+    if (!newMessage.trim() || !currentUserId || sending) return;
+    const messageText = newMessage.trim();
+    setNewMessage('');
+    setSending(true);
+
+    try {
+      let convId = convIdRef.current;
+
+      if (!convId) {
+        convId = await createConversation();
+        if (!convId) {
+          setNewMessage(messageText);
+          throw new Error('Failed to create conversation');
+        }
+        setConversationId(convId);
+        convIdRef.current = convId;
+      }
+
+      const optimisticMsg: ChatMessage = {
+        id: `temp-${Date.now()}`,
         conversation_id: convId,
-        sender_id: user.id,
-        content: newMessage.trim(),
-      });
-      if (error) throw error;
+        sender_id: currentUserId,
+        content: messageText,
+        created_at: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, optimisticMsg]);
 
-      await supabase.from('conversations').update({
-        last_message_text: newMessage.trim(),
-        last_message_at: new Date().toISOString(),
-        last_message_sender_id: user.id,
-        updated_at: new Date().toISOString(),
-      }).eq('id', convId);
+      const { data: inserted, error: msgErr } = await supabase
+        .from('conversation_messages')
+        .insert({
+          conversation_id: convId,
+          sender_id: currentUserId,
+          content: messageText,
+        })
+        .select('*')
+        .single();
 
-      setNewMessage('');
+      if (msgErr) {
+        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+        setNewMessage(messageText);
+        console.error('Failed to send message:', msgErr);
+        throw msgErr;
+      }
+
+      setMessages(prev =>
+        prev.map(m => m.id === optimisticMsg.id ? inserted : m)
+      );
+
+      await supabase
+        .from('conversations')
+        .update({
+          last_message_text: messageText,
+          last_message_at: new Date().toISOString(),
+          last_message_sender_id: currentUserId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', convId);
+
+      await updateReadStatus(convId);
       inputRef.current?.focus();
     } catch (err) {
       console.error('Error sending message:', err);
     } finally {
       setSending(false);
     }
-  };
+  }, [newMessage, currentUserId, sending, recipientId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -222,7 +313,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
               {recipientName?.charAt(0) || '?'}
             </div>
           )}
-          <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-slate-800" />
+          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 ${darkMode ? 'border-slate-800' : 'border-white'}`} />
         </div>
         <div className="flex-1 min-w-0">
           <div className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{recipientName}</div>
@@ -263,13 +354,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
                   <div className={`flex-1 h-px ${darkMode ? 'bg-slate-700/50' : 'bg-gray-200'}`} />
                 </div>
                 {group.msgs.map((msg) => {
-                  const isOwn = msg.sender_id === user?.id;
+                  const isOwn = msg.sender_id === currentUserId;
+                  const isOptimistic = msg.id.startsWith('temp-');
                   return (
                     <div key={msg.id} className={`flex mb-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[75%] ${isOwn ? 'order-2' : ''}`}>
                         <div className={`px-4 py-2.5 rounded-2xl ${
                           isOwn
-                            ? 'bg-blue-500 text-white rounded-br-md'
+                            ? `bg-blue-500 text-white rounded-br-md ${isOptimistic ? 'opacity-70' : ''}`
                             : darkMode
                               ? 'bg-slate-700/80 text-slate-200 rounded-bl-md'
                               : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-100'
@@ -277,7 +369,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
                           <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                         </div>
                         <p className={`text-[10px] mt-1 ${isOwn ? 'text-right' : ''} ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                          {formatMessageTime(msg.created_at)}
+                          {isOptimistic ? 'Sending...' : formatMessageTime(msg.created_at)}
                         </p>
                       </div>
                     </div>
@@ -322,7 +414,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
                 : darkMode ? 'bg-slate-700/60 text-slate-500' : 'bg-gray-200 text-gray-400'
             }`}
           >
-            <Send size={18} className={newMessage.trim() ? '' : ''} />
+            <Send size={18} />
           </button>
         </div>
       </div>

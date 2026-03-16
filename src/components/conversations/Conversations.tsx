@@ -8,6 +8,7 @@ import { ConversationsSidebar, SidebarTab, TopLevelTab, ChatConversation } from 
 import { ConversationThread } from './ConversationThread';
 import { ComposeModal } from './ComposeModal';
 import { ChatView } from './ChatView';
+import { NewChatModal } from './NewChatModal';
 
 interface Notification {
   id: string;
@@ -96,12 +97,14 @@ export const Conversations: React.FC<ConversationsProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [showCompose, setShowCompose] = useState(initialShowCompose);
+  const [showNewChat, setShowNewChat] = useState(false);
   const [drafts, setDrafts] = useState<any[]>([]);
   const [useRichText, setUseRichText] = useState(true);
   const editorRef = useRef<any>(null);
   const [replyMode, setReplyMode] = useState<'reply' | 'forward' | null>(null);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ show: boolean; id: string | null; isSent?: boolean }>({ show: false, id: null });
+  const [deleteChatConfirmation, setDeleteChatConfirmation] = useState<{ show: boolean; chatId: string | null }>({ show: false, chatId: null });
   const [marketingLists, setMarketingLists] = useState<MarketingList[]>([]);
   const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
   const [listMemberEmails, setListMemberEmails] = useState<Map<string, string[]>>(new Map());
@@ -169,6 +172,12 @@ export const Conversations: React.FC<ConversationsProps> = ({
         table: 'conversations',
       }, () => {
         fetchChatConversations();
+      }).on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'conversation_messages',
+      }, () => {
+        fetchChatConversations();
       }).subscribe()
     );
     return () => { removeChannelByName(channelName); };
@@ -226,7 +235,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
     try {
       const { data: myParticipations, error: partErr } = await supabase
         .from('conversation_participants')
-        .select('conversation_id, last_read_at')
+        .select('conversation_id, last_read_at, hidden_at, hidden_message_id')
         .eq('user_id', viewingUserId);
 
       if (partErr || !myParticipations || myParticipations.length === 0) {
@@ -236,6 +245,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
 
       const convIds = myParticipations.map(p => p.conversation_id);
       const lastReadMap = new Map(myParticipations.map(p => [p.conversation_id, p.last_read_at]));
+      const hiddenAtMap = new Map(myParticipations.map(p => [p.conversation_id, p.hidden_at]));
 
       const { data: conversations, error: convErr } = await supabase
         .from('conversations')
@@ -248,10 +258,24 @@ export const Conversations: React.FC<ConversationsProps> = ({
         return;
       }
 
+      const visibleConversations = conversations.filter(conv => {
+        const hiddenAt = hiddenAtMap.get(conv.id);
+        if (!hiddenAt) return true;
+        if (!conv.last_message_at) return false;
+        return new Date(conv.last_message_at) > new Date(hiddenAt);
+      });
+
+      if (visibleConversations.length === 0) {
+        setChatConversations([]);
+        return;
+      }
+
+      const visibleIds = visibleConversations.map(c => c.id);
+
       const { data: allParticipants } = await supabase
         .from('conversation_participants')
         .select('conversation_id, user_id')
-        .in('conversation_id', convIds)
+        .in('conversation_id', visibleIds)
         .neq('user_id', viewingUserId);
 
       const otherUserIds = new Set((allParticipants || []).map(p => p.user_id));
@@ -267,7 +291,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
 
-      const chatList: ChatConversation[] = conversations.map(conv => {
+      const chatList: ChatConversation[] = visibleConversations.map(conv => {
         const otherUserId = participantMap.get(conv.id) || '';
         const profile = profileMap.get(otherUserId);
         const lastRead = lastReadMap.get(conv.id);
@@ -293,6 +317,51 @@ export const Conversations: React.FC<ConversationsProps> = ({
       console.error('Error fetching chat conversations:', err);
     }
   }, [viewingUserId]);
+
+  const handleDeleteChat = async (chatId: string) => {
+    setDeleteChatConfirmation({ show: true, chatId });
+  };
+
+  const confirmDeleteChat = async () => {
+    const chatId = deleteChatConfirmation.chatId;
+    if (!chatId || !viewingUserId) return;
+
+    try {
+      const { data: lastMsg } = await supabase
+        .from('conversation_messages')
+        .select('id')
+        .eq('conversation_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      await supabase
+        .from('conversation_participants')
+        .update({
+          hidden_at: new Date().toISOString(),
+          hidden_message_id: lastMsg?.id || null,
+        })
+        .eq('conversation_id', chatId)
+        .eq('user_id', viewingUserId);
+
+      setChatConversations(prev => prev.filter(c => c.id !== chatId));
+      if (selectedChat?.id === chatId) {
+        setSelectedChat(null);
+        setDirectChatTarget(null);
+      }
+      setDeleteChatConfirmation({ show: false, chatId: null });
+    } catch (err) {
+      console.error('Error hiding chat:', err);
+      addNotification('error', 'Failed to delete chat');
+    }
+  };
+
+  const handleNewChatSelect = (userId: string, name: string, avatar?: string) => {
+    setDirectChatTarget({ id: userId, name, avatar });
+    setSelectedChat(null);
+    setSelectedNotification(null);
+    setTopLevelTab('chats');
+  };
 
   const fetchCurrentUserProfile = async () => {
     if (isImpersonating && impersonatedProfile) {
@@ -743,6 +812,8 @@ export const Conversations: React.FC<ConversationsProps> = ({
           onSelect={handleSelect}
           onLoadDraft={loadDraft}
           onCompose={() => setShowCompose(true)}
+          onNewChat={() => setShowNewChat(true)}
+          onDeleteChat={handleDeleteChat}
           unreadCount={unreadCount}
           darkMode={darkMode}
           chatConversations={chatConversations}
@@ -773,8 +844,18 @@ export const Conversations: React.FC<ConversationsProps> = ({
             </div>
             <h3 className="text-lg font-semibold text-slate-300 mb-2">Select a chat</h3>
             <p className="text-sm text-slate-500 max-w-sm">
-              Choose a chat from the sidebar, or start a new one from the Community page.
+              Choose a chat from the sidebar, or start a new one.
             </p>
+            <button
+              onClick={() => setShowNewChat(true)}
+              className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all hover:shadow-lg hover:shadow-blue-600/20 text-sm font-medium"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              New Chat
+            </button>
           </div>
         ) : selectedNotification ? (
           <ConversationThread
@@ -841,6 +922,14 @@ export const Conversations: React.FC<ConversationsProps> = ({
         />
       )}
 
+      {showNewChat && (
+        <NewChatModal
+          onClose={() => setShowNewChat(false)}
+          onSelectUser={handleNewChatSelect}
+          darkMode={darkMode}
+        />
+      )}
+
       {deleteConfirmation.show && (
         <ConfirmationModal
           isOpen={deleteConfirmation.show}
@@ -848,6 +937,20 @@ export const Conversations: React.FC<ConversationsProps> = ({
           onConfirm={handleDeleteNotification}
           title="Delete Message"
           message="Are you sure you want to delete this message? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          darkMode={darkMode}
+          variant="danger"
+        />
+      )}
+
+      {deleteChatConfirmation.show && (
+        <ConfirmationModal
+          isOpen={deleteChatConfirmation.show}
+          onClose={() => setDeleteChatConfirmation({ show: false, chatId: null })}
+          onConfirm={confirmDeleteChat}
+          title="Delete Chat"
+          message="This will remove the chat from your list. If the other person sends a new message, it will reappear."
           confirmText="Delete"
           cancelText="Cancel"
           darkMode={darkMode}
