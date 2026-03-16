@@ -829,9 +829,11 @@ export const Conversations: React.FC<ConversationsProps> = ({
             recipientId={activeChatTarget.id}
             recipientName={activeChatTarget.name}
             recipientAvatar={activeChatTarget.avatar}
+            existingConversationId={selectedChat?.id}
             onBack={() => {
               setSelectedChat(null);
               setDirectChatTarget(null);
+              fetchChatConversations();
             }}
             darkMode={darkMode}
           />

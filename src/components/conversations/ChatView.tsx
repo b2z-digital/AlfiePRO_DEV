@@ -16,6 +16,7 @@ interface ChatViewProps {
   recipientId: string;
   recipientName: string;
   recipientAvatar?: string;
+  existingConversationId?: string;
   onBack: () => void;
   darkMode: boolean;
 }
@@ -35,7 +36,7 @@ const formatDateSeparator = (dateStr: string) => {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
 };
 
-export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, recipientAvatar, onBack, darkMode }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, recipientAvatar, existingConversationId, onBack, darkMode }) => {
   const { user } = useAuth();
   const { isImpersonating, effectiveUserId } = useImpersonation();
   const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
@@ -54,10 +55,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   }, [conversationId]);
 
   useEffect(() => {
-    if (currentUserId && recipientId) {
+    if (!currentUserId || !recipientId) return;
+    if (existingConversationId) {
+      setConversationId(existingConversationId);
+      convIdRef.current = existingConversationId;
+      setLoading(true);
+      Promise.all([
+        loadMessages(existingConversationId),
+        updateReadStatus(existingConversationId),
+        unhideConversation(existingConversationId),
+      ]).finally(() => setLoading(false));
+    } else {
       findExistingConversation();
     }
-  }, [currentUserId, recipientId]);
+  }, [currentUserId, recipientId, existingConversationId]);
 
   useEffect(() => {
     if (!conversationId) return;

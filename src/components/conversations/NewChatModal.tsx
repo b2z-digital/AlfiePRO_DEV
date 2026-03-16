@@ -8,6 +8,7 @@ interface Connection {
   id: string;
   name: string;
   avatar?: string;
+  isConnection?: boolean;
 }
 
 interface NewChatModalProps {
@@ -17,51 +18,79 @@ interface NewChatModalProps {
 }
 
 export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUser, darkMode }) => {
-  const { user } = useAuth();
+  const { user, currentClub, currentOrganization } = useAuth();
   const { isImpersonating, effectiveUserId } = useImpersonation();
   const currentUserId = isImpersonating && effectiveUserId ? effectiveUserId : user?.id;
+  const contextId = currentOrganization?.id || currentClub?.clubId;
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (currentUserId) fetchConnections();
+    if (currentUserId) fetchPeople();
   }, [currentUserId]);
 
-  const fetchConnections = async () => {
+  const fetchPeople = async () => {
     if (!currentUserId) return;
     try {
+      const connectionUserIds = new Set<string>();
+
       const { data: accepted } = await supabase
         .from('social_connections')
-        .select('sender_id, recipient_id')
-        .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+        .select('user_id, connected_user_id')
+        .or(`user_id.eq.${currentUserId},connected_user_id.eq.${currentUserId}`)
         .eq('status', 'accepted');
 
-      if (!accepted || accepted.length === 0) {
+      if (accepted) {
+        accepted.forEach(c => {
+          const otherId = c.user_id === currentUserId ? c.connected_user_id : c.user_id;
+          connectionUserIds.add(otherId);
+        });
+      }
+
+      const allUserIds = new Set<string>(connectionUserIds);
+
+      if (contextId) {
+        const { data: clubMembers } = await supabase
+          .from('members')
+          .select('user_id')
+          .eq('club_id', contextId)
+          .not('user_id', 'is', null)
+          .neq('user_id', currentUserId);
+
+        if (clubMembers) {
+          clubMembers.forEach(m => {
+            if (m.user_id) allUserIds.add(m.user_id);
+          });
+        }
+      }
+
+      if (allUserIds.size === 0) {
         setConnections([]);
         setLoading(false);
         return;
       }
 
-      const otherIds = accepted.map(c =>
-        c.sender_id === currentUserId ? c.recipient_id : c.sender_id
-      );
-
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, avatar_url')
-        .in('id', otherIds);
+        .in('id', Array.from(allUserIds));
 
       setConnections(
         (profiles || []).map(p => ({
           id: p.id,
           name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unknown',
           avatar: p.avatar_url || undefined,
-        })).sort((a, b) => a.name.localeCompare(b.name))
+          isConnection: connectionUserIds.has(p.id),
+        })).sort((a, b) => {
+          if (a.isConnection && !b.isConnection) return -1;
+          if (!a.isConnection && b.isConnection) return 1;
+          return a.name.localeCompare(b.name);
+        })
       );
     } catch (err) {
-      console.error('Error fetching connections:', err);
+      console.error('Error fetching people:', err);
     } finally {
       setLoading(false);
     }
@@ -121,7 +150,7 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                  {searchTerm ? 'No matching connections' : 'No connections yet'}
+                  {searchTerm ? 'No matching people' : 'No people found'}
                 </p>
                 <p className={`text-xs mt-1 ${darkMode ? 'text-slate-600' : 'text-gray-400'}`}>
                   {searchTerm ? 'Try a different search' : 'Connect with people in the Community page'}
@@ -152,7 +181,7 @@ export const NewChatModal: React.FC<NewChatModalProps> = ({ onClose, onSelectUse
                         {conn.name}
                       </p>
                       <p className={`text-xs ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>
-                        Connection
+                        {conn.isConnection ? 'Connection' : 'Club Member'}
                       </p>
                     </div>
                     <MessageSquare size={16} className={darkMode ? 'text-slate-600' : 'text-gray-300'} />
