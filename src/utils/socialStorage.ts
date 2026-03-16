@@ -131,8 +131,9 @@ export const socialStorage = {
     offset?: number;
     groupId?: string;
     privacy?: string[];
+    authorId?: string;
   } = {}) {
-    const { limit = 20, offset = 0, groupId, privacy = ['public'] } = options;
+    const { limit = 20, offset = 0, groupId, privacy = ['public'], authorId } = options;
 
     let query = supabase
       .from('social_posts')
@@ -145,7 +146,9 @@ export const socialStorage = {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (groupId) {
+    if (authorId) {
+      query = query.eq('author_id', authorId);
+    } else if (groupId) {
       query = query.eq('group_id', groupId);
     } else {
       query = query.in('privacy', privacy);

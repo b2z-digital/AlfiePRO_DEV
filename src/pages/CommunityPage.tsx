@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
-import { Users, UserPlus, Settings, Clock, ArrowLeft, Star, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Users, UserPlus, Settings, Clock, ArrowLeft, Star, ChevronDown, ChevronUp, MessageCircle, Search, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PostCreationModal from '../components/social/PostCreationModal';
 import ActivityFeed from '../components/social/ActivityFeed';
 import ConnectionsModal from '../components/social/ConnectionsModal';
 import GroupManagementModal from '../components/social/GroupManagementModal';
+import { ChatView } from '../components/conversations/ChatView';
 import { socialStorage, SocialGroup, SocialConnection } from '../utils/socialStorage';
 
 interface CommunityPageProps {
@@ -35,6 +36,19 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const [selectedGroup, setSelectedGroup] = useState<SocialGroup | null>(null);
   const [postModalGroupId, setPostModalGroupId] = useState<string | undefined>();
   const [showAllGroups, setShowAllGroups] = useState(false);
+  const [connectionSearchTerm, setConnectionSearchTerm] = useState('');
+  const [chatTarget, setChatTarget] = useState<{ id: string; name: string; avatar?: string } | null>(null);
+  const [viewingProfile, setViewingProfile] = useState<{ id: string; name: string; avatar?: string } | null>(null);
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const chatWith = searchParams.get('chatWith');
+    const chatName = searchParams.get('chatName');
+    const chatAvatar = searchParams.get('chatAvatar');
+    if (chatWith && chatName) {
+      setChatTarget({ id: chatWith, name: chatName, avatar: chatAvatar || undefined });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     loadProfile();
@@ -261,7 +275,43 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
       <div className="p-16">
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           <div className="lg:col-span-7 space-y-6">
-            {selectedGroup ? (
+            {viewingProfile ? (
+              <>
+                <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setViewingProfile(null)}
+                      className={`p-2 rounded-lg transition-colors ${lightMode ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-slate-700 text-slate-400'}`}
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    {viewingProfile.avatar ? (
+                      <img src={viewingProfile.avatar} alt={viewingProfile.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                        {viewingProfile.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h2 className={`text-xl font-bold truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{viewingProfile.name}</h2>
+                      <p className={`text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>Connection</p>
+                    </div>
+                    <button
+                      onClick={() => setChatTarget({
+                        id: viewingProfile.id,
+                        name: viewingProfile.name,
+                        avatar: viewingProfile.avatar,
+                      })}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Message
+                    </button>
+                  </div>
+                </div>
+                <ActivityFeed key={viewingProfile.id} darkMode={darkMode} authorId={viewingProfile.id} />
+              </>
+            ) : selectedGroup ? (
               <>
                 <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
                   <div className="flex items-center gap-4">
@@ -375,7 +425,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     return (
                       <button
                         key={group.id}
-                        onClick={() => setSelectedGroup(group)}
+                        onClick={() => { setSelectedGroup(group); setViewingProfile(null); }}
                         className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-colors text-left ${selectedGroup?.id === group.id ? (lightMode ? 'bg-blue-50 ring-1 ring-blue-200' : 'bg-blue-900/30 ring-1 ring-blue-700') : (lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30')}`}
                       >
                         <div className="relative flex-shrink-0">
@@ -416,7 +466,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
 
             {/* My Connections Card - Match Dashboard Card Style */}
             <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className={`font-bold text-lg ${lightMode ? 'text-gray-900' : 'text-white'}`}>My Connections</h3>
                 <div className="flex items-center gap-2">
                   {pendingRequestCount > 0 && (
@@ -438,9 +488,39 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                   </button>
                 </div>
               </div>
+              {connections.length > 0 && (
+                <div className="relative mb-3">
+                  <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${lightMode ? 'text-gray-400' : 'text-slate-500'}`} />
+                  <input
+                    type="text"
+                    placeholder="Search connections..."
+                    value={connectionSearchTerm}
+                    onChange={(e) => setConnectionSearchTerm(e.target.value)}
+                    className={`w-full pl-9 pr-8 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all ${
+                      lightMode
+                        ? 'bg-gray-100 border border-gray-200 text-gray-900 placeholder-gray-400'
+                        : 'bg-slate-700/60 border border-slate-600/50 text-white placeholder-slate-500'
+                    }`}
+                  />
+                  {connectionSearchTerm && (
+                    <button
+                      onClick={() => setConnectionSearchTerm('')}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 ${lightMode ? 'text-gray-400 hover:text-gray-600' : 'text-slate-500 hover:text-white'}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
               {connections.length > 0 ? (
-                <div className="space-y-2">
-                  {connections.slice(0, 8).map(connection => {
+                <div className="space-y-1 max-h-[400px] overflow-y-auto pr-1 scrollbar-thin">
+                  {connections
+                    .filter(c => {
+                      if (!connectionSearchTerm) return true;
+                      const name = c.connected_user?.full_name || '';
+                      return name.toLowerCase().includes(connectionSearchTerm.toLowerCase());
+                    })
+                    .map(connection => {
                     const connUser = connection.connected_user;
                     const isOnline = connUser?.last_seen && (Date.now() - new Date(connUser.last_seen).getTime()) < 15 * 60 * 1000;
                     const connUserId = connUser?.id || (connection as any).connected_user_id;
@@ -448,7 +528,16 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                       <div
                         key={connection.id}
                         className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30'}`}
-                        onClick={() => setShowConnectionsModal(true)}
+                        onClick={() => {
+                          if (connUserId) {
+                            setViewingProfile({
+                              id: connUserId,
+                              name: connUser?.full_name || 'User',
+                              avatar: connUser?.avatar_url,
+                            });
+                            setSelectedGroup(null);
+                          }
+                        }}
                       >
                         <div className="relative flex-shrink-0">
                           {connUser?.avatar_url ? (
@@ -474,7 +563,11 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/comms?compose=true&recipientId=${connUserId}`);
+                              setChatTarget({
+                                id: connUserId,
+                                name: connUser?.full_name || 'User',
+                                avatar: connUser?.avatar_url,
+                              });
                             }}
                             className={`flex-shrink-0 p-2 rounded-lg transition-colors ${lightMode ? 'text-blue-600 hover:bg-blue-50' : 'text-blue-400 hover:bg-slate-700/50'}`}
                             title={`Chat with ${connUser?.full_name || 'User'}`}
@@ -485,13 +578,8 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                       </div>
                     );
                   })}
-                  {connections.length > 8 && (
-                    <button
-                      onClick={() => setShowConnectionsModal(true)}
-                      className={`w-full text-center text-sm py-2 rounded-lg transition-colors ${lightMode ? 'text-blue-600 hover:bg-blue-50' : 'text-blue-400 hover:bg-slate-700/30'}`}
-                    >
-                      View all {connections.length} connections
-                    </button>
+                  {connectionSearchTerm && connections.filter(c => (c.connected_user?.full_name || '').toLowerCase().includes(connectionSearchTerm.toLowerCase())).length === 0 && (
+                    <p className={`text-sm text-center py-3 ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>No matching connections</p>
                   )}
                 </div>
               ) : (
@@ -569,6 +657,21 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
           darkMode={darkMode}
           onGroupsChanged={loadGroups}
         />
+      )}
+
+      {chatTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setChatTarget(null)} />
+          <div className={`relative w-full sm:w-[420px] h-[85vh] sm:h-[600px] sm:max-h-[80vh] rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl flex flex-col ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
+            <ChatView
+              recipientId={chatTarget.id}
+              recipientName={chatTarget.name}
+              recipientAvatar={chatTarget.avatar}
+              onBack={() => setChatTarget(null)}
+              darkMode={darkMode}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
