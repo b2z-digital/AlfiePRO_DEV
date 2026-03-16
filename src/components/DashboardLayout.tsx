@@ -878,14 +878,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/membership-dashboard',
           featureKey: 'membership'
         },
-        ...(!isMember ? [{
-          id: 'my-membership',
-          label: 'My Membership',
-          icon: UserCircle,
-          description: 'View your personal membership details',
-          path: '/my-membership',
-          featureKey: 'membership'
-        }] : []),
         {
           id: 'meetings',
           label: 'Meetings',
@@ -936,6 +928,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       collapsible: true,
       icon: FolderOpen,
       items: [
+        ...(!isMember ? [{
+          id: 'my-membership',
+          label: 'My Membership',
+          icon: UserCircle,
+          description: 'View your personal membership details',
+          path: '/my-membership',
+          featureKey: 'membership'
+        }] : []),
         {
           id: 'my-garage',
           label: 'Boat Shed',
