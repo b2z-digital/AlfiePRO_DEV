@@ -1,7 +1,8 @@
 import React from 'react';
-import { Search, Plus, Inbox, Send, FileText, Star, Archive, MessageCircle, Bell, X } from 'lucide-react';
+import { Search, Plus, Inbox, Send, FileText, Star, MessageCircle, X, MessageSquare } from 'lucide-react';
 
 export type SidebarTab = 'inbox' | 'sent' | 'starred' | 'drafts';
+export type TopLevelTab = 'inbox' | 'chats';
 
 interface Notification {
   id: string;
@@ -23,9 +24,22 @@ interface Notification {
   link_url?: string | null;
 }
 
+export interface ChatConversation {
+  id: string;
+  last_message_text: string;
+  last_message_at: string | null;
+  last_message_sender_id: string | null;
+  participant_name: string;
+  participant_avatar?: string;
+  participant_id: string;
+  is_unread: boolean;
+}
+
 interface ConversationsSidebarProps {
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
+  topLevelTab: TopLevelTab;
+  onTopLevelTabChange: (tab: TopLevelTab) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
   notifications: Notification[];
@@ -37,6 +51,10 @@ interface ConversationsSidebarProps {
   onCompose: () => void;
   unreadCount: number;
   darkMode: boolean;
+  chatConversations: ChatConversation[];
+  selectedChatId: string | null;
+  onSelectChat: (chat: ChatConversation) => void;
+  unreadChatsCount: number;
 }
 
 const UserAvatar = ({ name, avatarUrl, size = 48, isOnline }: { name: string; avatarUrl?: string; size?: number; isOnline?: boolean }) => {
@@ -93,6 +111,8 @@ const formatTimeAgo = (dateString: string) => {
 export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   activeTab,
   onTabChange,
+  topLevelTab,
+  onTopLevelTabChange,
   searchTerm,
   onSearchChange,
   notifications,
@@ -104,6 +124,10 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   onCompose,
   unreadCount,
   darkMode,
+  chatConversations,
+  selectedChatId,
+  onSelectChat,
+  unreadChatsCount,
 }) => {
   const starredNotifications = notifications.filter(n => n.is_starred);
 
@@ -124,6 +148,11 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
   };
 
   const displayList = getDisplayList();
+
+  const filteredChats = chatConversations.filter(c =>
+    c.participant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.last_message_text.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const tabs: { id: SidebarTab; label: string; icon: React.ReactNode; count?: number }[] = [
     { id: 'inbox', label: 'Inbox', icon: <Inbox size={18} />, count: unreadCount || undefined },
@@ -150,11 +179,50 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
           </button>
         </div>
 
+        <div className="flex gap-1 p-1 bg-slate-900/60 rounded-xl border border-slate-700/40">
+          <button
+            onClick={() => onTopLevelTabChange('inbox')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+              topLevelTab === 'inbox'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+            }`}
+          >
+            <Inbox size={16} />
+            Inbox
+            {unreadCount > 0 && (
+              <span className={`min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                topLevelTab === 'inbox' ? 'bg-white/20 text-white' : 'bg-blue-500 text-white'
+              }`}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => onTopLevelTabChange('chats')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-semibold transition-all ${
+              topLevelTab === 'chats'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/40'
+            }`}
+          >
+            <MessageSquare size={16} />
+            Chats
+            {unreadChatsCount > 0 && (
+              <span className={`min-w-[20px] h-[20px] px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                topLevelTab === 'chats' ? 'bg-white/20 text-white' : 'bg-blue-500 text-white'
+              }`}>
+                {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
+              </span>
+            )}
+          </button>
+        </div>
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
           <input
             type="text"
-            placeholder="Search conversations..."
+            placeholder={topLevelTab === 'chats' ? 'Search chats...' : 'Search conversations...'}
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all"
@@ -169,33 +237,90 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
           )}
         </div>
 
-        <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl border border-slate-700/30">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all ${
-                activeTab === tab.id
-                  ? 'bg-slate-700/80 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {tab.icon}
-              <span className="hidden xl:inline">{tab.label}</span>
-              {tab.count && tab.count > 0 && (
-                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
-                  tab.id === 'inbox' ? 'bg-blue-500 text-white' : 'bg-slate-600 text-slate-300'
-                }`}>
-                  {tab.count > 99 ? '99+' : tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {topLevelTab === 'inbox' && (
+          <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl border border-slate-700/30">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-slate-700/80 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {tab.icon}
+                <span className="hidden xl:inline">{tab.label}</span>
+                {tab.count && tab.count > 0 && (
+                  <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    tab.id === 'inbox' ? 'bg-blue-500 text-white' : 'bg-slate-600 text-slate-300'
+                  }`}>
+                    {tab.count > 99 ? '99+' : tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {activeTab === 'drafts' ? (
+        {topLevelTab === 'chats' ? (
+          filteredChats.length === 0 ? (
+            <EmptyState
+              icon={<MessageSquare size={32} />}
+              title={searchTerm ? 'No matching chats' : 'No chats yet'}
+              subtitle={searchTerm ? 'Try a different search' : 'Start a chat from the Community page'}
+            />
+          ) : (
+            <div className="space-y-0.5">
+              {filteredChats.map(chat => {
+                const isSelected = selectedChatId === chat.id;
+                return (
+                  <button
+                    key={chat.id}
+                    onClick={() => onSelectChat(chat)}
+                    className={`w-full text-left p-3 rounded-xl transition-all group relative ${
+                      isSelected
+                        ? 'bg-blue-600/15 border border-blue-500/30'
+                        : chat.is_unread
+                          ? 'bg-slate-700/30 hover:bg-slate-700/50 border border-transparent'
+                          : 'hover:bg-slate-700/30 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <UserAvatar
+                          name={chat.participant_name}
+                          avatarUrl={chat.participant_avatar}
+                          size={44}
+                        />
+                        {chat.is_unread && (
+                          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-[#131c31]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className={`text-sm truncate ${chat.is_unread ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
+                            {chat.participant_name}
+                          </p>
+                          {chat.last_message_at && (
+                            <span className={`text-[11px] ml-2 flex-shrink-0 ${chat.is_unread ? 'text-blue-400 font-medium' : 'text-slate-600'}`}>
+                              {formatTimeAgo(chat.last_message_at)}
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs truncate mt-0.5 ${chat.is_unread ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                          {chat.last_message_text || 'No messages yet'}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )
+        ) : activeTab === 'drafts' ? (
           drafts.length === 0 ? (
             <EmptyState icon={<FileText size={32} />} title="No drafts" subtitle="Saved drafts will appear here" />
           ) : (
@@ -308,9 +433,20 @@ export const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
 
       <div className="flex-shrink-0 p-3 border-t border-slate-700/50">
         <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>{notifications.length} conversations</span>
-          {unreadCount > 0 && (
-            <span className="text-blue-400 font-medium">{unreadCount} unread</span>
+          {topLevelTab === 'chats' ? (
+            <>
+              <span>{chatConversations.length} chats</span>
+              {unreadChatsCount > 0 && (
+                <span className="text-blue-400 font-medium">{unreadChatsCount} unread</span>
+              )}
+            </>
+          ) : (
+            <>
+              <span>{notifications.length} conversations</span>
+              {unreadCount > 0 && (
+                <span className="text-blue-400 font-medium">{unreadCount} unread</span>
+              )}
+            </>
           )}
         </div>
       </div>
