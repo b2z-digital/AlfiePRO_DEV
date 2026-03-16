@@ -7,9 +7,10 @@ interface ActivityFeedProps {
   groupId?: string;
   privacy?: string[];
   darkMode?: boolean;
+  authorId?: string;
 }
 
-export default function ActivityFeed({ groupId, privacy = ['public'], darkMode = false }: ActivityFeedProps) {
+export default function ActivityFeed({ groupId, privacy = ['public'], darkMode = false, authorId }: ActivityFeedProps) {
   const lightMode = !darkMode;
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +31,8 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
         limit: 20,
         offset,
         groupId,
-        privacy
+        privacy,
+        authorId,
       });
 
       if (refresh) {
@@ -52,12 +54,11 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [page, groupId, privacy]);
+  }, [page, groupId, privacy, authorId]);
 
-  // Initial load
   useEffect(() => {
     loadPosts(true);
-  }, [groupId, privacy]);
+  }, [groupId, privacy, authorId]);
 
   useEffect(() => {
     const unsubscribe = socialStorage.subscribeToFeed(async (payload) => {

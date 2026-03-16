@@ -38,6 +38,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [connectionSearchTerm, setConnectionSearchTerm] = useState('');
   const [chatTarget, setChatTarget] = useState<{ id: string; name: string; avatar?: string } | null>(null);
+  const [viewingProfile, setViewingProfile] = useState<{ id: string; name: string; avatar?: string } | null>(null);
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -274,7 +275,43 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
       <div className="p-16">
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           <div className="lg:col-span-7 space-y-6">
-            {selectedGroup ? (
+            {viewingProfile ? (
+              <>
+                <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setViewingProfile(null)}
+                      className={`p-2 rounded-lg transition-colors ${lightMode ? 'hover:bg-gray-100 text-gray-600' : 'hover:bg-slate-700 text-slate-400'}`}
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    {viewingProfile.avatar ? (
+                      <img src={viewingProfile.avatar} alt={viewingProfile.name} className="w-12 h-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                        {viewingProfile.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h2 className={`text-xl font-bold truncate ${lightMode ? 'text-gray-900' : 'text-white'}`}>{viewingProfile.name}</h2>
+                      <p className={`text-sm ${lightMode ? 'text-gray-500' : 'text-slate-400'}`}>Connection</p>
+                    </div>
+                    <button
+                      onClick={() => setChatTarget({
+                        id: viewingProfile.id,
+                        name: viewingProfile.name,
+                        avatar: viewingProfile.avatar,
+                      })}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      Message
+                    </button>
+                  </div>
+                </div>
+                <ActivityFeed darkMode={darkMode} authorId={viewingProfile.id} />
+              </>
+            ) : selectedGroup ? (
               <>
                 <div className={`rounded-xl p-6 border ${lightMode ? 'bg-white/80 backdrop-blur-md shadow-lg border-slate-200/50' : 'bg-slate-800/60 backdrop-blur-md border-slate-700/50 shadow-xl'}`}>
                   <div className="flex items-center gap-4">
@@ -388,7 +425,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     return (
                       <button
                         key={group.id}
-                        onClick={() => setSelectedGroup(group)}
+                        onClick={() => { setSelectedGroup(group); setViewingProfile(null); }}
                         className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-colors text-left ${selectedGroup?.id === group.id ? (lightMode ? 'bg-blue-50 ring-1 ring-blue-200' : 'bg-blue-900/30 ring-1 ring-blue-700') : (lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30')}`}
                       >
                         <div className="relative flex-shrink-0">
@@ -491,7 +528,16 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                       <div
                         key={connection.id}
                         className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/30'}`}
-                        onClick={() => setShowConnectionsModal(true)}
+                        onClick={() => {
+                          if (connUserId) {
+                            setViewingProfile({
+                              id: connUserId,
+                              name: connUser?.full_name || 'User',
+                              avatar: connUser?.avatar_url,
+                            });
+                            setSelectedGroup(null);
+                          }
+                        }}
                       >
                         <div className="relative flex-shrink-0">
                           {connUser?.avatar_url ? (
