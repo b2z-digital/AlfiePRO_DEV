@@ -46,6 +46,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [recipientOnline, setRecipientOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const convIdRef = useRef<string | null>(null);
@@ -53,6 +54,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
   useEffect(() => {
     convIdRef.current = conversationId;
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!recipientId) return;
+    const checkStatus = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('last_seen')
+        .eq('id', recipientId)
+        .maybeSingle();
+      if (data?.last_seen) {
+        setRecipientOnline(Date.now() - new Date(data.last_seen).getTime() < 15 * 60 * 1000);
+      } else {
+        setRecipientOnline(false);
+      }
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 60000);
+    return () => clearInterval(interval);
+  }, [recipientId]);
 
   useEffect(() => {
     if (!currentUserId || !recipientId) return;
@@ -324,11 +344,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ recipientId, recipientName, 
               {recipientName?.charAt(0) || '?'}
             </div>
           )}
-          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 ${darkMode ? 'border-slate-800' : 'border-white'}`} />
+          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${darkMode ? 'border-slate-800' : 'border-white'} ${recipientOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
         </div>
         <div className="flex-1 min-w-0">
           <div className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{recipientName}</div>
-          <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>Connection</div>
+          <div className={`text-xs ${recipientOnline ? 'text-green-500' : darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{recipientOnline ? 'Online' : 'Offline'}</div>
         </div>
       </div>
 

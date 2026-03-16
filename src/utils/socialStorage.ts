@@ -147,7 +147,7 @@ export const socialStorage = {
       .range(offset, offset + limit - 1);
 
     if (authorId) {
-      query = query.eq('user_id', authorId);
+      query = query.eq('author_id', authorId);
     } else if (groupId) {
       query = query.eq('group_id', groupId);
     } else {
