@@ -838,7 +838,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
             darkMode={darkMode}
           />
         ) : topLevelTab === 'chats' ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-gradient-to-br from-slate-800/40 via-slate-800/20 to-slate-900/40">
+          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm">
             <div className="w-20 h-20 rounded-3xl bg-slate-700/40 border border-slate-600/50 flex items-center justify-center mb-6">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -872,7 +872,7 @@ export const Conversations: React.FC<ConversationsProps> = ({
             darkMode={darkMode}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-gradient-to-br from-slate-800/40 via-slate-800/20 to-slate-900/40">
+          <div className="h-full flex flex-col items-center justify-center text-center px-8 bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm">
             <div className="w-20 h-20 rounded-3xl bg-slate-700/40 border border-slate-600/50 flex items-center justify-center mb-6">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
