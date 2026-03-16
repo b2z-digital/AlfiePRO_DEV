@@ -309,7 +309,7 @@ export default function CommunityPage({ darkMode = false }: CommunityPageProps) 
                     </button>
                   </div>
                 </div>
-                <ActivityFeed darkMode={darkMode} authorId={viewingProfile.id} />
+                <ActivityFeed key={viewingProfile.id} darkMode={darkMode} authorId={viewingProfile.id} />
               </>
             ) : selectedGroup ? (
               <>

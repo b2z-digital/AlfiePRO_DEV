@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { socialStorage, SocialPost } from '../../utils/socialStorage';
 import PostCard from './PostCard';
@@ -10,36 +10,44 @@ interface ActivityFeedProps {
   authorId?: string;
 }
 
-export default function ActivityFeed({ groupId, privacy = ['public'], darkMode = false, authorId }: ActivityFeedProps) {
+export default function ActivityFeed({ groupId, privacy, darkMode = false, authorId }: ActivityFeedProps) {
   const lightMode = !darkMode;
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const loadIdRef = useRef(0);
+
+  const stablePrivacy = useMemo(() => privacy || ['public'], [privacy?.join(',')]);
 
   const loadPosts = useCallback(async (refresh = false, pageNum?: number) => {
+    const thisLoadId = ++loadIdRef.current;
+
     if (refresh) {
+      setPosts([]);
+      setPage(0);
+      setIsLoading(true);
       setIsRefreshing(true);
     } else {
       setIsLoading(true);
     }
 
     try {
-      const offset = refresh ? 0 : (pageNum ?? page) * 20;
+      const offset = refresh ? 0 : (pageNum ?? 0) * 20;
       const data = await socialStorage.getFeed({
         limit: 20,
         offset,
         groupId,
-        privacy,
+        privacy: stablePrivacy,
         authorId,
       });
 
+      if (thisLoadId !== loadIdRef.current) return;
+
       if (refresh) {
         setPosts(data || []);
-        setPage(0);
       } else {
-        // Remove duplicates when appending
         setPosts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
           const newPosts = (data || []).filter(p => !existingIds.has(p.id));
@@ -49,16 +57,19 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
 
       setHasMore((data || []).length === 20);
     } catch (error) {
+      if (thisLoadId !== loadIdRef.current) return;
       console.error('Error loading posts:', error);
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (thisLoadId === loadIdRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [page, groupId, privacy, authorId]);
+  }, [groupId, stablePrivacy, authorId]);
 
   useEffect(() => {
     loadPosts(true);
-  }, [groupId, privacy, authorId]);
+  }, [loadPosts]);
 
   useEffect(() => {
     const unsubscribe = socialStorage.subscribeToFeed(async (payload) => {
@@ -88,7 +99,6 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
   const handleLoadMore = () => {
     const nextPage = page + 1;
     setPage(nextPage);
-    // Load posts with the next page
     loadPosts(false, nextPage);
   };
 
