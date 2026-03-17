@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Upload, Search, FileText, Trash2, Edit2, Eye, EyeOff,
-  RefreshCw, CheckCircle2, AlertTriangle, Clock, X,
-  MoreVertical, BookOpen, ExternalLink, Globe
-} from 'lucide-react';
+import { Upload, Search, FileText, Trash2, CreditCard as Edit2, Eye, EyeOff, RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Clock, X, MoveVertical as MoreVertical, BookOpen, ExternalLink, Globe } from 'lucide-react';
 import {
   AlfieKnowledgeDocument, getKnowledgeDocuments, uploadKnowledgeDocument,
   updateKnowledgeDocument, deleteKnowledgeDocument, triggerDocumentProcessing,
@@ -86,10 +82,22 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
     setProcessingDocs(prev => new Set(prev).add(doc.id));
     try {
       await triggerDocumentProcessing(doc.id);
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, processing_status: 'processing', processing_error: null } : d));
       addNotification({ type: 'success', title: 'Processing Started', message: `"${doc.title}" is being processed. This may take a few minutes.` });
-      setTimeout(() => loadData(), 5000);
+      const pollInterval = setInterval(async () => {
+        try {
+          const updated = await getKnowledgeDocuments();
+          setDocuments(updated);
+          const current = updated.find(d => d.id === doc.id);
+          if (current && current.processing_status !== 'processing') {
+            clearInterval(pollInterval);
+          }
+        } catch { /* ignore polling errors */ }
+      }, 5000);
+      setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Processing Failed', message: err.message });
+      loadData();
     } finally {
       setProcessingDocs(prev => {
         const next = new Set(prev);
