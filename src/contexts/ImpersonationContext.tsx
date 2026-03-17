@@ -125,6 +125,8 @@ export const ImpersonationProvider: React.FC<{ children: ReactNode }> = ({ child
       localStorage.setItem('currentClubId', newSession.targetClubs[0].club_id);
     }
 
+    localStorage.removeItem('currentOrganization');
+
     const club = newSession.targetClubs.find(c => c.club_id === newSession.targetDefaultClubId) || newSession.targetClubs[0];
     setPreloaderTarget({
       name: newSession.targetName,

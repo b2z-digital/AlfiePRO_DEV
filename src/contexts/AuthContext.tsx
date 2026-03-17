@@ -860,6 +860,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // and the health check in supabase.ts - no need for duplicate logic here
 
   useEffect(() => {
+    if (!user) return;
+    const updateLastSeen = async () => {
+      try { await supabase.rpc('update_user_last_seen'); } catch {}
+    };
+    updateLastSeen();
+    const interval = setInterval(updateLastSeen, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
     let mounted = true;
     const checkImpersonatedAssociationRoles = async () => {
       try {
@@ -946,7 +956,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     userClubs: impersonationOverrides?.userClubs ?? userClubs,
     currentClub: impersonationOverrides?.currentClub ?? currentClub,
-    currentOrganization,
+    currentOrganization: impersonationOverrides ? null : currentOrganization,
     loading,
     clubsLoaded,
     isLoggingOut,
