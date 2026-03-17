@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, Mail, Phone, Edit2, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CheckCircle2, X, MapIcon, Save, Trash, Link, Zap, UserX } from 'lucide-react';
+import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, CreditCard as Edit2, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2 } from 'lucide-react';
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,6 +19,7 @@ import { SaveFilterModal } from '../membership/SaveFilterModal';
 import { ManageFiltersModal } from '../membership/ManageFiltersModal';
 import { MemberFilterConfig, FilterPreset } from '../../types/memberFilters';
 import { filterMembers, createEmptyFilter } from '../../utils/memberFilters';
+import { activateMembers, ActivationResponse } from '../../utils/memberActivation';
 
 interface MembersPageProps {
   darkMode: boolean;
@@ -71,6 +72,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [showSaveFilterModal, setShowSaveFilterModal] = useState(false);
   const [showManageFiltersModal, setShowManageFiltersModal] = useState(false);
   const [hasActiveFilter, setHasActiveFilter] = useState(false);
+
+  const [showActivateConfirmModal, setShowActivateConfirmModal] = useState(false);
+  const [membersToActivate, setMembersToActivate] = useState<Member[]>([]);
+  const [activating, setActivating] = useState(false);
+  const [activationResults, setActivationResults] = useState<ActivationResponse | null>(null);
+  const [activatingMemberId, setActivatingMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -633,6 +640,42 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setInvitingMemberId(null);
   };
 
+  const unlinkedMembersWithEmail = members.filter(m => !m.user_id && m.email);
+
+  const handleActivateSingle = (member: Member) => {
+    setMembersToActivate([member]);
+    setActivationResults(null);
+    setShowActivateConfirmModal(true);
+  };
+
+  const handleActivateBulk = () => {
+    setMembersToActivate(unlinkedMembersWithEmail);
+    setActivationResults(null);
+    setShowActivateConfirmModal(true);
+  };
+
+  const handleConfirmActivation = async () => {
+    if (!currentClub?.clubId || !currentClub?.clubName || membersToActivate.length === 0) return;
+
+    setActivating(true);
+    const memberIds = membersToActivate.map(m => m.id);
+
+    const result = await activateMembers(memberIds, currentClub.clubId, currentClub.clubName);
+
+    setActivating(false);
+    setActivationResults(result);
+
+    if (result.success && result.summary.created > 0) {
+      addNotification(
+        `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
+        'success'
+      );
+      fetchMembers();
+    } else if (!result.success) {
+      addNotification(result.error || 'Activation failed', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -680,6 +723,26 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
               {members.filter(m => !m.user_id && !emailMatches[m.id]).length} Unlinked
             </span>
+            {members.filter(m => (m as any).activation_status === 'pending').length > 0 && (
+              <span className="flex items-center gap-1.5 text-sky-400">
+                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                {members.filter(m => (m as any).activation_status === 'pending').length} Invite Sent
+              </span>
+            )}
+            {unlinkedMembersWithEmail.length > 0 && (
+              <button
+                onClick={handleActivateBulk}
+                disabled={activating}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-colors disabled:opacity-50"
+              >
+                {activating ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Smartphone size={12} />
+                )}
+                Activate {unlinkedMembersWithEmail.length} for App
+              </button>
+            )}
           </div>
         </div>
 
@@ -923,14 +986,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                   ? 'bg-green-500'
                                   : emailMatches[member.id]
                                     ? 'bg-amber-500'
-                                    : 'bg-slate-500'
+                                    : (member as any).activation_status === 'pending'
+                                      ? 'bg-sky-500'
+                                      : 'bg-slate-500'
                               }`}
                               title={
                                 member.user_id
                                   ? 'Connected - has login account'
                                   : emailMatches[member.id]
                                     ? 'Match found - click to link'
-                                    : 'Not connected'
+                                    : (member as any).activation_status === 'pending'
+                                      ? 'App activation sent - awaiting password setup'
+                                      : 'Not connected'
                               }
                             />
                           </div>
@@ -1080,6 +1147,17 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                   <Link size={16} />
                                 )}
                               </button>
+                            ) : (member as any).activation_status === 'pending' ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleActivateSingle(member);
+                                }}
+                                className="p-1.5 rounded-lg text-sky-400 hover:bg-sky-900/30 transition-colors"
+                                title="App activation sent - click to resend"
+                              >
+                                <Smartphone size={16} />
+                              </button>
                             ) : memberInvitations[member.id] && memberInvitations[member.id].status === 'pending' ? (
                               <button
                                 onClick={(e) => {
@@ -1091,22 +1169,29 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               >
                                 <Clock size={16} />
                               </button>
-                            ) : (
+                            ) : member.email ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleInviteMemberClick(member);
+                                  handleActivateSingle(member);
                                 }}
-                                disabled={invitingMemberId === member.id}
-                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
-                                title="Invite to register"
+                                disabled={activatingMemberId === member.id}
+                                className="p-1.5 rounded-lg text-sky-400 hover:bg-sky-900/30 transition-colors disabled:opacity-50"
+                                title="Activate for AlfiePRO App"
                               >
-                                {invitingMemberId === member.id ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full"></div>
+                                {activatingMemberId === member.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
                                 ) : (
-                                  <Send size={16} />
+                                  <Smartphone size={16} />
                                 )}
                               </button>
+                            ) : (
+                              <div
+                                className="p-1.5 rounded-lg text-slate-600"
+                                title="No email address - cannot activate"
+                              >
+                                <Smartphone size={16} />
+                              </div>
                             )
                           ) : (
                             <div
@@ -1405,6 +1490,199 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   Send Invitation
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activate for App Modal */}
+      {showActivateConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-lg w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                    <Smartphone size={20} className="text-sky-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      {activationResults ? 'Activation Complete' : 'Activate for AlfiePRO App'}
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      {activationResults
+                        ? `${activationResults.summary.created} account${activationResults.summary.created === 1 ? '' : 's'} created`
+                        : `${membersToActivate.length} member${membersToActivate.length === 1 ? '' : 's'} selected`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowActivateConfirmModal(false);
+                    setMembersToActivate([]);
+                    setActivationResults(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {!activationResults ? (
+                <>
+                  <p className="text-slate-300 mb-4">
+                    {membersToActivate.length === 1
+                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to download the AlfiePRO app and set their password.</>
+                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to download the AlfiePRO app and set their password.</>
+                    }
+                  </p>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">1</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Account created</p>
+                        <p className="text-xs text-slate-400">Auth account pre-created with their email on file</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">2</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Welcome email sent</p>
+                        <p className="text-xs text-slate-400">Contains app download links and an activation button</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">3</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Member sets password in app</p>
+                        <p className="text-xs text-slate-400">One tap, set password, they're in -- no registration needed</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {membersToActivate.length <= 5 && (
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Members to activate:</p>
+                      <div className="space-y-1">
+                        {membersToActivate.map(m => (
+                          <div key={m.id} className="flex items-center justify-between text-sm py-1 px-2 bg-slate-700/30 rounded">
+                            <span className="text-slate-300">{m.first_name} {m.last_name}</span>
+                            <span className="text-slate-500 text-xs">{m.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {membersToActivate.some(m => !m.email) && (
+                    <div className="p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg mb-4">
+                      <p className="text-sm text-amber-400">
+                        {membersToActivate.filter(m => !m.email).length} member{membersToActivate.filter(m => !m.email).length === 1 ? '' : 's'} without
+                        an email address will be skipped.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {activationResults.summary.created > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-green-900/20 border border-green-900/30 rounded-lg">
+                      <CheckCircle2 size={18} className="text-green-400 flex-shrink-0" />
+                      <p className="text-sm text-green-300">
+                        {activationResults.summary.created} account{activationResults.summary.created === 1 ? '' : 's'} created and welcome email{activationResults.summary.created === 1 ? '' : 's'} sent
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.existing_linked > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-blue-900/20 border border-blue-900/30 rounded-lg">
+                      <UserCheck size={18} className="text-blue-400 flex-shrink-0" />
+                      <p className="text-sm text-blue-300">
+                        {activationResults.summary.existing_linked} already had an account
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.no_email > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
+                      <Mail size={18} className="text-amber-400 flex-shrink-0" />
+                      <p className="text-sm text-amber-300">
+                        {activationResults.summary.no_email} skipped (no email address)
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.errors > 0 && (
+                    <div className="p-3 bg-red-900/20 border border-red-900/30 rounded-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                        <X size={18} className="text-red-400 flex-shrink-0" />
+                        <p className="text-sm text-red-300">
+                          {activationResults.summary.errors} failed
+                        </p>
+                      </div>
+                      <div className="space-y-1 ml-8">
+                        {activationResults.results
+                          .filter(r => r.status === 'error')
+                          .map(r => (
+                            <p key={r.member_id} className="text-xs text-red-400">
+                              {r.name}: {r.error}
+                            </p>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              {!activationResults ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowActivateConfirmModal(false);
+                      setMembersToActivate([]);
+                    }}
+                    className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmActivation}
+                    disabled={activating}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {activating ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Activating...
+                      </>
+                    ) : (
+                      <>
+                        <Smartphone size={16} />
+                        Activate {membersToActivate.filter(m => m.email).length} Member{membersToActivate.filter(m => m.email).length === 1 ? '' : 's'}
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowActivateConfirmModal(false);
+                    setMembersToActivate([]);
+                    setActivationResults(null);
+                  }}
+                  className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                >
+                  Done
+                </button>
+              )}
             </div>
           </div>
         </div>

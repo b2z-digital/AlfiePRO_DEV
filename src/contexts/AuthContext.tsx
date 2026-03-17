@@ -32,6 +32,16 @@ interface CancelledMembership {
   previous_membership_level: string | null;
 }
 
+interface UnfinancialMemberData {
+  member_id: string;
+  club_id: string;
+  club_name: string;
+  membership_level: string | null;
+  is_new_member: boolean;
+  renewal_date: string | null;
+  date_joined: string | null;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   userClubs: UserClub[];
@@ -50,6 +60,8 @@ interface AuthContextType {
   hasPendingClubApplication: boolean;
   hasCancelledMembership: boolean;
   cancelledMemberships: CancelledMembership[];
+  hasUnfinancialMember: boolean;
+  unfinancialMemberData: UnfinancialMemberData | null;
   signOut: () => Promise<void>;
   refreshUserClubs: () => Promise<UserClub[]>;
   setCurrentClub: (club: UserClub | null) => void;
@@ -85,6 +97,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [hasPendingClubApplication, setHasPendingClubApplication] = useState(false);
   const [hasCancelledMembership, setHasCancelledMembership] = useState(false);
   const [cancelledMemberships, setCancelledMemberships] = useState<CancelledMembership[]>([]);
+  const [hasUnfinancialMember, setHasUnfinancialMember] = useState(false);
+  const [unfinancialMemberData, setUnfinancialMemberData] = useState<UnfinancialMemberData | null>(null);
   const [isStateOrgAdmin, setIsStateOrgAdmin] = useState(false);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -544,6 +558,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setCancelledMemberships([]);
           }
 
+          if (!hasCancelled) {
+            const { data: unfinancialData } = await supabase
+              .from('members')
+              .select('id, club_id, club, membership_level, is_financial, renewal_date, date_joined')
+              .eq('user_id', validatedUser.id)
+              .eq('is_financial', false)
+              .in('membership_status', ['active', 'expired'])
+              .limit(1)
+              .maybeSingle();
+
+            const { data: userRoleData } = await supabase
+              .from('user_clubs')
+              .select('role')
+              .eq('user_id', validatedUser.id)
+              .in('role', ['admin', 'editor', 'super_admin', 'state_admin', 'national_admin']);
+
+            const isAdminUser = (userRoleData || []).length > 0 || validatedUser.user_metadata?.is_super_admin === true;
+
+            if (unfinancialData && !isAdminUser) {
+              const hasRecentJoin = unfinancialData.date_joined &&
+                (new Date().getTime() - new Date(unfinancialData.date_joined).getTime()) < 30 * 24 * 60 * 60 * 1000;
+
+              setHasUnfinancialMember(true);
+              setUnfinancialMemberData({
+                member_id: unfinancialData.id,
+                club_id: unfinancialData.club_id,
+                club_name: unfinancialData.club || 'Your Club',
+                membership_level: unfinancialData.membership_level,
+                is_new_member: !!hasRecentJoin,
+                renewal_date: unfinancialData.renewal_date,
+                date_joined: unfinancialData.date_joined,
+              });
+            } else {
+              setHasUnfinancialMember(false);
+              setUnfinancialMemberData(null);
+            }
+          } else {
+            setHasUnfinancialMember(false);
+            setUnfinancialMemberData(null);
+          }
+
           await refreshUserClubs(validatedUser.id);
 
           // Restore currentOrganization from localStorage if exists
@@ -560,11 +615,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           clearTimeout(loadingTimeout);
           setLoading(false);
         } else if (mounted) {
-          currentUserIdRef.current = null; // Clear ref when no session
+          currentUserIdRef.current = null;
           setUser(null);
           setOnboardingCompleted(false);
           setHasCancelledMembership(false);
           setCancelledMemberships([]);
+          setHasUnfinancialMember(false);
+          setUnfinancialMemberData(null);
           clearTimeout(loadingTimeout);
           setLoading(false);
         }
@@ -696,7 +753,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setCancelledMemberships([]);
               }
 
-              // Refresh clubs with explicit user ID
+              if (!hasCancelled2) {
+                const { data: unfinData2 } = await supabase
+                  .from('members')
+                  .select('id, club_id, club, membership_level, is_financial, renewal_date, date_joined')
+                  .eq('user_id', session.user.id)
+                  .eq('is_financial', false)
+                  .in('membership_status', ['active', 'expired'])
+                  .limit(1)
+                  .maybeSingle();
+
+                const { data: roleData2 } = await supabase
+                  .from('user_clubs')
+                  .select('role')
+                  .eq('user_id', session.user.id)
+                  .in('role', ['admin', 'editor', 'super_admin', 'state_admin', 'national_admin']);
+
+                const isAdmin2 = (roleData2 || []).length > 0 || session.user.user_metadata?.is_super_admin === true;
+
+                if (unfinData2 && !isAdmin2) {
+                  const recentJoin2 = unfinData2.date_joined &&
+                    (new Date().getTime() - new Date(unfinData2.date_joined).getTime()) < 30 * 24 * 60 * 60 * 1000;
+
+                  setHasUnfinancialMember(true);
+                  setUnfinancialMemberData({
+                    member_id: unfinData2.id,
+                    club_id: unfinData2.club_id,
+                    club_name: unfinData2.club || 'Your Club',
+                    membership_level: unfinData2.membership_level,
+                    is_new_member: !!recentJoin2,
+                    renewal_date: unfinData2.renewal_date,
+                    date_joined: unfinData2.date_joined,
+                  });
+                } else {
+                  setHasUnfinancialMember(false);
+                  setUnfinancialMemberData(null);
+                }
+              } else {
+                setHasUnfinancialMember(false);
+                setUnfinancialMemberData(null);
+              }
+
               await refreshUserClubs(session.user.id);
             } else if (mounted) {
               currentUserIdRef.current = null; // Clear ref when no session
@@ -712,6 +809,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setHasPendingClubApplication(false);
               setHasCancelledMembership(false);
               setCancelledMemberships([]);
+              setHasUnfinancialMember(false);
+              setUnfinancialMemberData(null);
               localStorage.removeItem('currentClubId');
             }
           }
@@ -861,6 +960,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     hasPendingClubApplication,
     hasCancelledMembership,
     cancelledMemberships,
+    hasUnfinancialMember,
+    unfinancialMemberData,
     signOut,
     refreshUserClubs,
     setCurrentClub: handleSetCurrentClub,

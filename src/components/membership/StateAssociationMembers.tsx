@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Search, Download, Mail, Phone, Building2, CheckCircle2, ArrowUpRight, Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, X, Pencil, Eye } from 'lucide-react';
+import { Users, Search, Download, Mail, Phone, Building2, CircleCheck as CheckCircle2, ArrowUpRight, ListFilter as Filter, Save, FolderOpen, Upload, Trash2, UserPlus, DollarSign, X, Pencil, Eye, Smartphone, Loader as Loader2, Hop as Home } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { supabase } from '../../utils/supabase';
@@ -14,6 +14,8 @@ import { SaveFilterModal } from './SaveFilterModal';
 import AssociationMemberImportModal from './AssociationMemberImportModal';
 import { MemberEditModal } from './MemberEditModal';
 import { AdminAddToClubModal } from './AdminAddToClubModal';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { activateMembers, ActivationResponse } from '../../utils/memberActivation';
 
 interface StateAssociationMembersProps {
   darkMode: boolean;
@@ -44,6 +46,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
 }) => {
   const { user, currentOrganization, isSuperAdmin } = useAuth();
   const { startImpersonation, isImpersonating } = useImpersonation();
+  const { addNotification } = useNotifications();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<MemberWithClub[]>([]);
@@ -67,6 +70,14 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [showAddToClubModal, setShowAddToClubModal] = useState(false);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [showActivateModal, setShowActivateModal] = useState(false);
+  const [membersToActivate, setMembersToActivate] = useState<MemberWithClub[]>([]);
+  const [activating, setActivating] = useState(false);
+  const [activationResults, setActivationResults] = useState<ActivationResponse | null>(null);
+  const [showDefaultClubModal, setShowDefaultClubModal] = useState(false);
+  const [defaultClubMember, setDefaultClubMember] = useState<MemberWithClub | null>(null);
+  const [settingDefaultClub, setSettingDefaultClub] = useState(false);
+  const [selectedDefaultClubId, setSelectedDefaultClubId] = useState('');
 
   useEffect(() => {
     const state = location.state as { viewClubId?: string } | null;
@@ -276,6 +287,111 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
     setBulkProcessing(false);
   };
 
+  const unlinkedMembersWithEmail = members.filter(m => !m.user_id && m.email);
+
+  const handleBulkActivate = () => {
+    const selected = members.filter(m => selectedMemberIds.has(m.id) && !m.user_id && m.email);
+    if (selected.length > 0) {
+      setMembersToActivate(selected);
+    } else {
+      setMembersToActivate(unlinkedMembersWithEmail);
+    }
+    setActivationResults(null);
+    setShowActivateModal(true);
+  };
+
+  const handleActivateSingleMember = (member: MemberWithClub) => {
+    setMembersToActivate([member]);
+    setActivationResults(null);
+    setShowActivateModal(true);
+  };
+
+  const handleConfirmActivation = async () => {
+    if (membersToActivate.length === 0) return;
+    setActivating(true);
+
+    const membersByClub = new Map<string, { clubName: string; memberIds: string[] }>();
+    for (const m of membersToActivate) {
+      if (!m.email || !m.club_id) continue;
+      const existing = membersByClub.get(m.club_id);
+      if (existing) {
+        existing.memberIds.push(m.id);
+      } else {
+        membersByClub.set(m.club_id, {
+          clubName: m.club_name || 'Unknown Club',
+          memberIds: [m.id],
+        });
+      }
+    }
+
+    let totalCreated = 0;
+    let totalErrors = 0;
+    let lastResult: ActivationResponse | null = null;
+
+    for (const [clubId, info] of membersByClub) {
+      const result = await activateMembers(info.memberIds, clubId, info.clubName);
+      if (result.success) {
+        totalCreated += result.summary.created;
+        totalErrors += result.summary.errors;
+      } else {
+        totalErrors += info.memberIds.length;
+      }
+      lastResult = result;
+    }
+
+    setActivating(false);
+
+    if (lastResult && membersByClub.size === 1) {
+      setActivationResults(lastResult);
+    } else {
+      setActivationResults({
+        success: totalCreated > 0,
+        summary: {
+          created: totalCreated,
+          existing_linked: 0,
+          errors: totalErrors,
+          no_email: membersToActivate.filter(m => !m.email).length,
+          total: membersToActivate.length,
+        },
+        results: [],
+      });
+    }
+
+    if (totalCreated > 0) {
+      addNotification(
+        `${totalCreated} member${totalCreated === 1 ? '' : 's'} activated and invited to AlfiePRO`,
+        'success'
+      );
+      loadStateAssociationData();
+    }
+  };
+
+  const handleSetDefaultClub = async () => {
+    if (!defaultClubMember?.user_id || !selectedDefaultClubId) return;
+    setSettingDefaultClub(true);
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          default_club_id: selectedDefaultClubId,
+          primary_club_id: selectedDefaultClubId,
+        })
+        .eq('id', defaultClubMember.user_id);
+
+      addNotification(
+        `Default club updated for ${defaultClubMember.first_name} ${defaultClubMember.last_name}`,
+        'success'
+      );
+      setShowDefaultClubModal(false);
+      setDefaultClubMember(null);
+      setSelectedDefaultClubId('');
+    } catch (err) {
+      console.error('Error setting default club:', err);
+      addNotification('Failed to update default club', 'error');
+    }
+    setSettingDefaultClub(false);
+  };
+
   const exportToCSV = () => {
     const csvData = filteredMembers.map((m) => ({
       'First Name': m.first_name,
@@ -398,14 +514,49 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 {selectedMemberIds.size} member{selectedMemberIds.size !== 1 ? 's' : ''} selected
               </span>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => setShowAddToClubModal(true)}
-                  disabled={bulkProcessing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
-                >
-                  <UserPlus size={15} />
-                  Add to Club
-                </button>
+                {(() => {
+                  const selectedMembers = members.filter(m => selectedMemberIds.has(m.id));
+                  const allHaveClubs = selectedMembers.every(m => m.club_id);
+                  const allHaveAccounts = selectedMembers.every(m => m.user_id);
+                  const singleMemberWithAccount = selectedMembers.length === 1 && selectedMembers[0].user_id && selectedMembers[0].club_id;
+
+                  return (
+                    <>
+                      {singleMemberWithAccount ? (
+                        <button
+                          onClick={() => {
+                            setDefaultClubMember(selectedMembers[0]);
+                            setSelectedDefaultClubId(selectedMembers[0].club_id || '');
+                            setShowDefaultClubModal(true);
+                          }}
+                          disabled={bulkProcessing}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                        >
+                          <Home size={15} />
+                          Set Default Club
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => setShowAddToClubModal(true)}
+                        disabled={bulkProcessing}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition disabled:opacity-50"
+                      >
+                        <UserPlus size={15} />
+                        Add to Club
+                      </button>
+                      {!allHaveAccounts && (
+                        <button
+                          onClick={handleBulkActivate}
+                          disabled={bulkProcessing || activating}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium transition disabled:opacity-50"
+                        >
+                          {activating ? <Loader2 size={15} className="animate-spin" /> : <Smartphone size={15} />}
+                          Activate for App
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
                 <button
                   onClick={() => handleBulkSetFinancial(true)}
                   disabled={bulkProcessing}
@@ -766,6 +917,270 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           darkMode={darkMode}
           onSuccess={handleAddToClubSuccess}
         />
+      )}
+
+      {showActivateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-lg w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                    <Smartphone size={20} className="text-sky-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      {activationResults ? 'Activation Complete' : 'Activate for AlfiePRO App'}
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      {activationResults
+                        ? `${activationResults.summary.created} account${activationResults.summary.created === 1 ? '' : 's'} created`
+                        : `${membersToActivate.length} member${membersToActivate.length === 1 ? '' : 's'} selected`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowActivateModal(false);
+                    setMembersToActivate([]);
+                    setActivationResults(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {!activationResults ? (
+                <>
+                  <p className="text-slate-300 mb-4">
+                    {membersToActivate.length === 1
+                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to download the AlfiePRO app and set their password.</>
+                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to download the AlfiePRO app and set their password.</>
+                    }
+                  </p>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">1</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Account created</p>
+                        <p className="text-xs text-slate-400">Auth account pre-created with their email on file</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">2</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Welcome email sent</p>
+                        <p className="text-xs text-slate-400">Contains app download links and an activation button</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">3</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Member sets password in app</p>
+                        <p className="text-xs text-slate-400">One tap, set password, they're in -- no registration needed</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {membersToActivate.length <= 5 && (
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Members to activate:</p>
+                      <div className="space-y-1">
+                        {membersToActivate.map(m => (
+                          <div key={m.id} className="flex items-center justify-between text-sm py-1 px-2 bg-slate-700/30 rounded">
+                            <span className="text-slate-300">{m.first_name} {m.last_name}</span>
+                            <span className="text-slate-500 text-xs">{m.email} ({m.club_name})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {activationResults.summary.created > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-green-900/20 border border-green-900/30 rounded-lg">
+                      <CheckCircle2 size={18} className="text-green-400 flex-shrink-0" />
+                      <p className="text-sm text-green-300">
+                        {activationResults.summary.created} account{activationResults.summary.created === 1 ? '' : 's'} created and welcome email{activationResults.summary.created === 1 ? '' : 's'} sent
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.existing_linked > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-blue-900/20 border border-blue-900/30 rounded-lg">
+                      <CheckCircle2 size={18} className="text-blue-400 flex-shrink-0" />
+                      <p className="text-sm text-blue-300">
+                        {activationResults.summary.existing_linked} already had an account
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.no_email > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
+                      <Mail size={18} className="text-amber-400 flex-shrink-0" />
+                      <p className="text-sm text-amber-300">
+                        {activationResults.summary.no_email} skipped (no email address)
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.errors > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-900/30 rounded-lg">
+                      <X size={18} className="text-red-400 flex-shrink-0" />
+                      <p className="text-sm text-red-300">
+                        {activationResults.summary.errors} failed
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              {!activationResults ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowActivateModal(false);
+                      setMembersToActivate([]);
+                    }}
+                    className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmActivation}
+                    disabled={activating}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
+                  >
+                    {activating ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Activating...
+                      </>
+                    ) : (
+                      <>
+                        <Smartphone size={16} />
+                        Activate {membersToActivate.filter(m => m.email).length} Member{membersToActivate.filter(m => m.email).length === 1 ? '' : 's'}
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowActivateModal(false);
+                    setMembersToActivate([]);
+                    setActivationResults(null);
+                  }}
+                  className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                >
+                  Done
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDefaultClubModal && defaultClubMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                    <Home size={20} className="text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Set Default Club</h3>
+                    <p className="text-sm text-slate-400">
+                      {defaultClubMember.first_name} {defaultClubMember.last_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowDefaultClubModal(false);
+                    setDefaultClubMember(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-300 mb-4">
+                Choose which club this member sees when they first log in to AlfiePRO:
+              </p>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {clubs.map(club => (
+                  <button
+                    key={club.id}
+                    onClick={() => setSelectedDefaultClubId(club.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all border ${
+                      selectedDefaultClubId === club.id
+                        ? 'bg-blue-600/20 border-blue-500/50 ring-1 ring-blue-500/30'
+                        : 'bg-slate-700/30 border-slate-700/50 hover:bg-slate-700/60'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      selectedDefaultClubId === club.id ? 'bg-blue-500' : 'bg-slate-700'
+                    }`}>
+                      <Building2 size={14} className={selectedDefaultClubId === club.id ? 'text-white' : 'text-slate-400'} />
+                    </div>
+                    <span className={`font-medium text-sm ${selectedDefaultClubId === club.id ? 'text-white' : 'text-slate-300'}`}>
+                      {club.name}
+                    </span>
+                    {defaultClubMember.club_id === club.id && (
+                      <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-slate-600 text-slate-300">Current</span>
+                    )}
+                    {selectedDefaultClubId === club.id && (
+                      <CheckCircle2 size={16} className="text-blue-400 ml-auto flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowDefaultClubModal(false);
+                  setDefaultClubMember(null);
+                }}
+                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSetDefaultClub}
+                disabled={!selectedDefaultClubId || settingDefaultClub}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+              >
+                {settingDefaultClub ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Home size={16} />
+                    Set as Default
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

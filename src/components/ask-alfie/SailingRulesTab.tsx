@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Upload, Search, FileText, Trash2, Edit2, Eye, EyeOff,
-  RefreshCw, CheckCircle2, AlertTriangle, Clock, X,
-  MoreVertical, BookOpen, ExternalLink, Globe
-} from 'lucide-react';
+import { Upload, Search, FileText, Trash2, CreditCard as Edit2, Eye, EyeOff, RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Clock, X, MoveVertical as MoreVertical, BookOpen, ExternalLink, Globe, Type, Plus } from 'lucide-react';
 import {
   AlfieKnowledgeDocument, getKnowledgeDocuments, uploadKnowledgeDocument,
-  updateKnowledgeDocument, deleteKnowledgeDocument, triggerDocumentProcessing,
-  reuploadKnowledgeDocumentFile, DOCUMENT_CATEGORIES
+  createTextKnowledgeDocument, updateKnowledgeDocument, deleteKnowledgeDocument,
+  triggerDocumentProcessing, reuploadKnowledgeDocumentFile, DOCUMENT_CATEGORIES
 } from '../../utils/alfieKnowledgeStorage';
 import { useNotification } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';
@@ -39,7 +35,9 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
     title: '',
     category: 'sailing-rules',
     source_url: '',
-    file: null as File | null
+    file: null as File | null,
+    inputType: 'pdf' as 'pdf' | 'text',
+    content_text: ''
   });
   const [uploading, setUploading] = useState(false);
 
@@ -60,21 +58,54 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
   };
 
   const handleUpload = async () => {
-    if (!uploadForm.file || !uploadForm.title) return;
+    if (!uploadForm.title) return;
+    if (uploadForm.inputType === 'pdf' && !uploadForm.file) return;
+    if (uploadForm.inputType === 'text' && !uploadForm.content_text.trim()) return;
+
     setUploading(true);
     try {
-      const doc = await uploadKnowledgeDocument(
-        uploadForm.file,
-        {
+      let doc: AlfieKnowledgeDocument;
+      if (uploadForm.inputType === 'text') {
+        doc = await createTextKnowledgeDocument({
           title: uploadForm.title,
           category: uploadForm.category,
-          source_url: uploadForm.source_url || undefined
-        }
-      );
+          source_url: uploadForm.source_url || undefined,
+          content_text: uploadForm.content_text
+        });
+      } else {
+        doc = await uploadKnowledgeDocument(
+          uploadForm.file!,
+          {
+            title: uploadForm.title,
+            category: uploadForm.category,
+            source_url: uploadForm.source_url || undefined
+          }
+        );
+      }
       setDocuments(prev => [doc, ...prev]);
       setShowUploadModal(false);
-      setUploadForm({ title: '', category: 'sailing-rules', source_url: '', file: null });
-      addNotification({ type: 'success', title: 'Document Uploaded', message: `"${doc.title}" has been uploaded. Click Process to extract knowledge chunks.` });
+      setUploadForm({ title: '', category: 'sailing-rules', source_url: '', file: null, inputType: 'pdf', content_text: '' });
+
+      if (uploadForm.inputType === 'text') {
+        addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" is being processed automatically.` });
+        try {
+          await triggerDocumentProcessing(doc.id);
+          setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, processing_status: 'processing' } : d));
+          const pollInterval = setInterval(async () => {
+            try {
+              const updated = await getKnowledgeDocuments();
+              setDocuments(updated);
+              const current = updated.find(d => d.id === doc.id);
+              if (current && current.processing_status !== 'processing') {
+                clearInterval(pollInterval);
+              }
+            } catch { /* ignore */ }
+          }, 5000);
+          setTimeout(() => clearInterval(pollInterval), 120000);
+        } catch { /* ignore auto-process errors */ }
+      } else {
+        addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" has been added. Click Process to extract knowledge chunks.` });
+      }
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
     } finally {
@@ -86,10 +117,22 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
     setProcessingDocs(prev => new Set(prev).add(doc.id));
     try {
       await triggerDocumentProcessing(doc.id);
+      setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, processing_status: 'processing', processing_error: null } : d));
       addNotification({ type: 'success', title: 'Processing Started', message: `"${doc.title}" is being processed. This may take a few minutes.` });
-      setTimeout(() => loadData(), 5000);
+      const pollInterval = setInterval(async () => {
+        try {
+          const updated = await getKnowledgeDocuments();
+          setDocuments(updated);
+          const current = updated.find(d => d.id === doc.id);
+          if (current && current.processing_status !== 'processing') {
+            clearInterval(pollInterval);
+          }
+        } catch { /* ignore polling errors */ }
+      }, 5000);
+      setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Processing Failed', message: err.message });
+      loadData();
     } finally {
       setProcessingDocs(prev => {
         const next = new Set(prev);
@@ -117,11 +160,15 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
   const handleSaveEdit = async () => {
     if (!editingDoc) return;
     try {
-      const updated = await updateKnowledgeDocument(editingDoc.id, {
+      const updates: Partial<Pick<AlfieKnowledgeDocument, 'title' | 'category' | 'source_url' | 'content_text'>> = {
         title: editingDoc.title,
         category: editingDoc.category,
         source_url: editingDoc.source_url
-      });
+      };
+      if (!editingDoc.storage_path && editingDoc.content_text !== null) {
+        updates.content_text = editingDoc.content_text;
+      }
+      const updated = await updateKnowledgeDocument(editingDoc.id, updates);
       setDocuments(prev => prev.map(d => d.id === updated.id ? updated : d));
       setShowEditModal(false);
       setEditingDoc(null);
@@ -253,8 +300,8 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
           onClick={() => setShowUploadModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
         >
-          <Upload className="w-4 h-4" />
-          Upload Document
+          <Plus className="w-4 h-4" />
+          Add Document
         </button>
       </div>
 
@@ -268,7 +315,7 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
         }`}>
           <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p className="text-lg font-medium mb-1">No documents found</p>
-          <p className="text-sm">Upload sailing rules PDFs to build Alfie's knowledge base</p>
+          <p className="text-sm">Upload a PDF or type text to build Alfie's knowledge base</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -301,13 +348,24 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
                       )}
                     </div>
                     <div className={`flex items-center gap-4 mt-2 text-xs flex-wrap ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                        !doc.storage_path && doc.content_text
+                          ? (darkMode ? 'bg-emerald-900/30 text-emerald-400' : 'bg-emerald-50 text-emerald-700')
+                          : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700')
+                      }`}>
+                        {!doc.storage_path && doc.content_text ? <Type className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                        {!doc.storage_path && doc.content_text ? 'Text' : 'PDF'}
+                      </span>
                       <span className={`px-2 py-0.5 rounded-full ${
                         darkMode ? 'bg-teal-900/30 text-teal-400' : 'bg-teal-50 text-teal-700'
                       }`}>
                         {formatCategory(doc.category)}
                       </span>
                       {doc.file_name && <span>{doc.file_name}</span>}
-                      {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                      {doc.file_size ? <span>{formatFileSize(doc.file_size)}</span> : null}
+                      {!doc.storage_path && doc.content_text && (
+                        <span>{doc.content_text.length} chars</span>
+                      )}
                       {doc.chunk_count != null && doc.chunk_count > 0 && (
                         <span>{doc.chunk_count} chunks</span>
                       )}
@@ -327,7 +385,7 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
                     {doc.processing_status === 'failed' && doc.processing_error && (
                       <p className="text-xs text-red-500 mt-1">Error: {doc.processing_error}</p>
                     )}
-                    {!doc.storage_path && (
+                    {!doc.storage_path && !doc.content_text && (
                       <div className="flex items-center gap-2 mt-2">
                         <span className={`text-xs ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
                           File missing - please re-upload the PDF
@@ -346,7 +404,7 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {doc.storage_path && (doc.processing_status === 'pending' || doc.processing_status === 'failed' || !doc.processing_status) && (
+                  {(doc.storage_path || doc.content_text) && (doc.processing_status === 'pending' || doc.processing_status === 'failed' || !doc.processing_status) && (
                     <button
                       onClick={() => handleProcess(doc)}
                       disabled={processingDocs.has(doc.id)}
@@ -411,14 +469,47 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
 
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`w-full max-w-lg rounded-2xl shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className={`flex items-center justify-between p-5 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Upload Sailing Rules Document</h3>
+          <div className={`w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between p-5 border-b shrink-0 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Add Sailing Rules Document</h3>
               <button onClick={() => setShowUploadModal(false)} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Input Method
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setUploadForm(prev => ({ ...prev, inputType: 'pdf' }))}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                      uploadForm.inputType === 'pdf'
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : darkMode
+                          ? 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload PDF
+                  </button>
+                  <button
+                    onClick={() => setUploadForm(prev => ({ ...prev, inputType: 'text' }))}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                      uploadForm.inputType === 'text'
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : darkMode
+                          ? 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                          : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <Type className="w-4 h-4" />
+                    Type Text
+                  </button>
+                </div>
+              </div>
               <div>
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   Document Title *
@@ -463,39 +554,59 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
                   }`}
                 />
               </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  PDF File *
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={e => {
-                    const file = e.target.files?.[0] || null;
-                    setUploadForm(prev => ({ ...prev, file }));
-                    if (file && !uploadForm.title) {
-                      setUploadForm(prev => ({
-                        ...prev,
-                        file,
-                        title: file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
-                      }));
-                    }
-                  }}
-                  className={`w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium ${
-                    darkMode
-                      ? 'text-gray-300 file:bg-gray-600 file:text-gray-200'
-                      : 'text-gray-600 file:bg-blue-50 file:text-blue-700'
-                  }`}
-                />
-                {uploadForm.file && (
+              {uploadForm.inputType === 'pdf' ? (
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    PDF File *
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setUploadForm(prev => ({ ...prev, file }));
+                      if (file && !uploadForm.title) {
+                        setUploadForm(prev => ({
+                          ...prev,
+                          file,
+                          title: file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
+                        }));
+                      }
+                    }}
+                    className={`w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium ${
+                      darkMode
+                        ? 'text-gray-300 file:bg-gray-600 file:text-gray-200'
+                        : 'text-gray-600 file:bg-blue-50 file:text-blue-700'
+                    }`}
+                  />
+                  {uploadForm.file && (
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {formatFileSize(uploadForm.file.size)}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Document Content *
+                  </label>
+                  <textarea
+                    value={uploadForm.content_text}
+                    onChange={e => setUploadForm(prev => ({ ...prev, content_text: e.target.value }))}
+                    placeholder="Type or paste the sailing rules content here. Include rules, interpretations, case studies, etc."
+                    rows={10}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                    }`}
+                  />
                   <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {formatFileSize(uploadForm.file.size)}
+                    {uploadForm.content_text.length} characters
                   </p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-            <div className={`flex items-center justify-end gap-3 p-5 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className={`flex items-center justify-end gap-3 p-5 border-t shrink-0 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
               <button
                 onClick={() => setShowUploadModal(false)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium ${
@@ -506,11 +617,15 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
               </button>
               <button
                 onClick={handleUpload}
-                disabled={!uploadForm.file || !uploadForm.title || uploading}
+                disabled={
+                  !uploadForm.title || uploading ||
+                  (uploadForm.inputType === 'pdf' && !uploadForm.file) ||
+                  (uploadForm.inputType === 'text' && !uploadForm.content_text.trim())
+                }
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {uploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {uploading ? 'Uploading...' : 'Upload Document'}
+                {uploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {uploading ? 'Saving...' : 'Add Document'}
               </button>
             </div>
           </div>
@@ -519,14 +634,14 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
 
       {showEditModal && editingDoc && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`w-full max-w-lg rounded-2xl shadow-2xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className={`flex items-center justify-between p-5 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className={`w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] flex flex-col ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between p-5 border-b shrink-0 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
               <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Edit Document Details</h3>
               <button onClick={() => { setShowEditModal(false); setEditingDoc(null); }} className={`p-1.5 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto">
               <div>
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Document Title</label>
                 <input
@@ -563,8 +678,24 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
                   }`}
                 />
               </div>
+              {!editingDoc.storage_path && editingDoc.content_text !== null && (
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Document Content</label>
+                  <textarea
+                    value={editingDoc.content_text || ''}
+                    onChange={e => setEditingDoc({ ...editingDoc, content_text: e.target.value })}
+                    rows={10}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'
+                    }`}
+                  />
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {(editingDoc.content_text || '').length} characters. Save changes then re-process to update knowledge.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className={`flex items-center justify-end gap-3 p-5 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className={`flex items-center justify-end gap-3 p-5 border-t shrink-0 ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
               <button
                 onClick={() => { setShowEditModal(false); setEditingDoc(null); }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium ${

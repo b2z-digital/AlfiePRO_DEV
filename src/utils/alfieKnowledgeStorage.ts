@@ -7,10 +7,12 @@ export interface AlfieTuningGuide {
   hull_type: string;
   description: string;
   version: string;
-  storage_path: string;
-  file_name: string;
-  file_size: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  storage_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  content_text: string | null;
+  input_type: 'pdf' | 'text';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'error';
   processing_error: string | null;
   processed_at: string | null;
   chunk_count: number;
@@ -121,9 +123,43 @@ export async function uploadTuningGuide(
   return data;
 }
 
+export async function createTextTuningGuide(
+  metadata: {
+    name: string;
+    boat_type: string;
+    hull_type?: string;
+    description?: string;
+    version?: string;
+    content_text: string;
+  },
+  userId: string
+): Promise<AlfieTuningGuide> {
+  const { data, error } = await supabase
+    .from('alfie_tuning_guides')
+    .insert({
+      name: metadata.name,
+      boat_type: metadata.boat_type || '',
+      hull_type: metadata.hull_type || '',
+      description: metadata.description || '',
+      version: metadata.version || '1.0',
+      content_text: metadata.content_text,
+      input_type: 'text',
+      storage_path: null,
+      file_name: null,
+      file_size: 0,
+      status: 'pending',
+      uploaded_by: userId
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function updateTuningGuide(
   id: string,
-  updates: Partial<Pick<AlfieTuningGuide, 'name' | 'boat_type' | 'hull_type' | 'description' | 'version' | 'is_active'>>
+  updates: Partial<Pick<AlfieTuningGuide, 'name' | 'boat_type' | 'hull_type' | 'description' | 'version' | 'is_active' | 'content_text'>>
 ): Promise<AlfieTuningGuide> {
   const { data, error } = await supabase
     .from('alfie_tuning_guides')
@@ -151,32 +187,25 @@ export async function deleteTuningGuide(id: string): Promise<void> {
 }
 
 export async function triggerGuideProcessing(guideId: string): Promise<void> {
-  await supabase
-    .from('alfie_tuning_guides')
-    .update({ status: 'processing', updated_at: new Date().toISOString() })
-    .eq('id', guideId);
+  const { data, error } = await supabase.rpc('trigger_alfie_document_processing', {
+    p_guide_id: guideId,
+    p_document_id: null
+  });
 
-  try {
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ guideId })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Processing failed: ${errorText}`);
-    }
-  } catch (err: any) {
+  if (error) {
     await supabase
       .from('alfie_tuning_guides')
-      .update({ status: 'failed', processing_error: err.message || 'Network error', updated_at: new Date().toISOString() })
+      .update({ status: 'failed', processing_error: error.message || 'Failed to trigger processing', updated_at: new Date().toISOString() })
       .eq('id', guideId);
-    throw err;
+    throw new Error(error.message || 'Failed to trigger processing');
+  }
+
+  if (data?.error) {
+    await supabase
+      .from('alfie_tuning_guides')
+      .update({ status: 'failed', processing_error: data.error, updated_at: new Date().toISOString() })
+      .eq('id', guideId);
+    throw new Error(data.error);
   }
 }
 
@@ -336,9 +365,38 @@ export async function uploadKnowledgeDocument(
   return data;
 }
 
+export async function createTextKnowledgeDocument(
+  metadata: {
+    title: string;
+    category: string;
+    source_url?: string;
+    content_text: string;
+  }
+): Promise<AlfieKnowledgeDocument> {
+  const { data, error } = await supabase
+    .from('alfie_knowledge_documents')
+    .insert({
+      title: metadata.title,
+      category: metadata.category || 'sailing-rules',
+      source_url: metadata.source_url || null,
+      content_text: metadata.content_text,
+      storage_path: null,
+      file_name: null,
+      file_size: 0,
+      mime_type: 'text/plain',
+      is_active: true,
+      processing_status: 'pending'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function updateKnowledgeDocument(
   id: string,
-  updates: Partial<Pick<AlfieKnowledgeDocument, 'title' | 'category' | 'source_url' | 'is_active'>>
+  updates: Partial<Pick<AlfieKnowledgeDocument, 'title' | 'category' | 'source_url' | 'is_active' | 'content_text'>>
 ): Promise<AlfieKnowledgeDocument> {
   const { data, error } = await supabase
     .from('alfie_knowledge_documents')
@@ -419,33 +477,128 @@ export async function deleteKnowledgeDocument(id: string): Promise<void> {
 }
 
 export async function triggerDocumentProcessing(documentId: string): Promise<void> {
-  await supabase
-    .from('alfie_knowledge_documents')
-    .update({ processing_status: 'processing', updated_at: new Date().toISOString() })
-    .eq('id', documentId);
+  const { data, error } = await supabase.rpc('trigger_alfie_document_processing', {
+    p_guide_id: null,
+    p_document_id: documentId
+  });
 
-  try {
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ documentId })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Processing failed: ${errorText}`);
-    }
-  } catch (err: any) {
+  if (error) {
     await supabase
       .from('alfie_knowledge_documents')
-      .update({ processing_status: 'failed', processing_error: err.message || 'Network error', updated_at: new Date().toISOString() })
+      .update({ processing_status: 'failed', processing_error: error.message || 'Failed to trigger processing', updated_at: new Date().toISOString() })
       .eq('id', documentId);
-    throw err;
+    throw new Error(error.message || 'Failed to trigger processing');
   }
+
+  if (data?.error) {
+    await supabase
+      .from('alfie_knowledge_documents')
+      .update({ processing_status: 'failed', processing_error: data.error, updated_at: new Date().toISOString() })
+      .eq('id', documentId);
+    throw new Error(data.error);
+  }
+}
+
+export interface AlfieAiInstruction {
+  id: string;
+  title: string;
+  category: string;
+  instruction_text: string;
+  priority: number;
+  is_active: boolean;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const AI_INSTRUCTION_CATEGORIES = [
+  'core_identity',
+  'personality',
+  'response_structure',
+  'rule_references',
+  'rc_yachts',
+  'tuning_rules',
+  'race_scenarios',
+  'capabilities',
+  'navigation_commands',
+  'skipper_data',
+  'tone_of_voice',
+  'response_style',
+  'context_rules',
+  'persona',
+  'boundaries',
+  'formatting',
+  'general'
+] as const;
+
+export const AI_INSTRUCTION_CATEGORY_LABELS: Record<string, string> = {
+  core_identity: 'Core Identity',
+  personality: 'Personality',
+  response_structure: 'Response Structure',
+  rule_references: 'Rule References',
+  rc_yachts: 'RC Yacht Specifics',
+  tuning_rules: 'Tuning Rules',
+  race_scenarios: 'Race Scenarios',
+  capabilities: 'Capabilities',
+  navigation_commands: 'Navigation Commands',
+  skipper_data: 'Skipper Data',
+  tone_of_voice: 'Tone of Voice',
+  response_style: 'Response Style',
+  context_rules: 'Context & Usage',
+  persona: 'Persona & Identity',
+  boundaries: 'Boundaries & Limits',
+  formatting: 'Formatting Rules',
+  general: 'General'
+};
+
+export async function getAiInstructions(): Promise<AlfieAiInstruction[]> {
+  const { data, error } = await supabase
+    .from('alfie_ai_instructions')
+    .select('*')
+    .order('priority', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createAiInstruction(
+  instruction: Pick<AlfieAiInstruction, 'title' | 'category' | 'instruction_text' | 'priority'>,
+  userId: string
+): Promise<AlfieAiInstruction> {
+  const { data, error } = await supabase
+    .from('alfie_ai_instructions')
+    .insert({
+      ...instruction,
+      created_by: userId
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateAiInstruction(
+  id: string,
+  updates: Partial<Pick<AlfieAiInstruction, 'title' | 'category' | 'instruction_text' | 'priority' | 'is_active'>>,
+  userId?: string
+): Promise<AlfieAiInstruction> {
+  const { data, error } = await supabase
+    .from('alfie_ai_instructions')
+    .update({ ...updates, ...(userId ? { updated_by: userId } : {}) })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAiInstruction(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('alfie_ai_instructions')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 export async function getKnowledgeStats(): Promise<{
@@ -457,18 +610,22 @@ export async function getKnowledgeStats(): Promise<{
   activeDocuments: number;
   totalChunks: number;
   totalImages: number;
+  totalInstructions: number;
+  activeInstructions: number;
 }> {
-  const [guides, corrections, documents, chunks, images] = await Promise.all([
+  const [guides, corrections, documents, chunks, images, instructions] = await Promise.all([
     supabase.from('alfie_tuning_guides').select('id, is_active'),
     supabase.from('alfie_knowledge_corrections').select('id, status'),
     supabase.from('alfie_knowledge_documents').select('id, is_active'),
     supabase.from('alfie_knowledge_chunks').select('id', { count: 'exact', head: true }),
-    supabase.from('alfie_knowledge_images').select('id', { count: 'exact', head: true })
+    supabase.from('alfie_knowledge_images').select('id', { count: 'exact', head: true }),
+    supabase.from('alfie_ai_instructions').select('id, is_active')
   ]);
 
   const guideData = guides.data || [];
   const correctionData = corrections.data || [];
   const documentData = documents.data || [];
+  const instructionData = instructions.data || [];
 
   return {
     totalGuides: guideData.length,
@@ -478,6 +635,8 @@ export async function getKnowledgeStats(): Promise<{
     totalDocuments: documentData.length,
     activeDocuments: documentData.filter(d => d.is_active).length,
     totalChunks: chunks.count || 0,
-    totalImages: images.count || 0
+    totalImages: images.count || 0,
+    totalInstructions: instructionData.length,
+    activeInstructions: instructionData.filter(i => i.is_active).length
   };
 }

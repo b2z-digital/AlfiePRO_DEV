@@ -1,26 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  Youtube,
-  DollarSign,
-  Globe,
-  Mail,
-  Database,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  ExternalLink,
-  RefreshCw,
-  AlertCircle,
-  Cloud,
-  Server,
-  Send,
-  Brain,
-  CloudSun,
-  Megaphone,
-  Camera,
-  Shield
-} from 'lucide-react';
+import { Youtube, DollarSign, Globe, Mail, Database, Plus, Trash2, CircleCheck as CheckCircle2, Circle as XCircle, ExternalLink, RefreshCw, CircleAlert as AlertCircle, Cloud, Server, Send, Brain, CloudSun, Megaphone, Camera, Shield, Smartphone, Save, Loader as Loader2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -44,11 +23,65 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
   const [loading, setLoading] = useState(true);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [iosAppStoreUrl, setIosAppStoreUrl] = useState('');
+  const [androidPlayStoreUrl, setAndroidPlayStoreUrl] = useState('');
+  const [appDeepLinkBase, setAppDeepLinkBase] = useState('');
+  const [savingAppSettings, setSavingAppSettings] = useState(false);
+  const [appSettingsLoaded, setAppSettingsLoaded] = useState(false);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
     loadIntegrations();
+    loadMobileAppSettings();
   }, []);
+
+  const loadMobileAppSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('key, value')
+        .eq('category', 'mobile_app');
+
+      if (error) throw error;
+
+      (data || []).forEach((setting: { key: string; value: string }) => {
+        if (setting.key === 'ios_app_store_url') setIosAppStoreUrl(setting.value);
+        if (setting.key === 'android_play_store_url') setAndroidPlayStoreUrl(setting.value);
+        if (setting.key === 'app_deep_link_base') setAppDeepLinkBase(setting.value);
+      });
+      setAppSettingsLoaded(true);
+    } catch (err: any) {
+      console.error('Error loading mobile app settings:', err);
+    }
+  };
+
+  const handleSaveMobileAppSettings = async () => {
+    try {
+      setSavingAppSettings(true);
+      const settings = [
+        { key: 'ios_app_store_url', value: iosAppStoreUrl, category: 'mobile_app' },
+        { key: 'android_play_store_url', value: androidPlayStoreUrl, category: 'mobile_app' },
+        { key: 'app_deep_link_base', value: appDeepLinkBase, category: 'mobile_app' },
+      ];
+
+      for (const setting of settings) {
+        const { error } = await supabase
+          .from('platform_settings')
+          .upsert(
+            { ...setting, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+          );
+        if (error) throw error;
+      }
+
+      addNotification('success', 'Mobile app settings saved');
+    } catch (err: any) {
+      console.error('Error saving mobile app settings:', err);
+      addNotification('error', 'Failed to save mobile app settings');
+    } finally {
+      setSavingAppSettings(false);
+    }
+  };
 
   const loadIntegrations = async () => {
     try {
@@ -246,6 +279,79 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
             <p className="text-xs text-blue-300/80 leading-relaxed">
               These integrations are available system-wide. Credentials are managed through Supabase Edge Function secrets. Default integrations are used by organizations that haven't connected their own accounts.
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile App Settings */}
+      <div className="rounded-xl border border-slate-700/50 bg-slate-800/30 backdrop-blur-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-700/50 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+            <Smartphone size={20} className="text-sky-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Mobile App Settings</h3>
+            <p className="text-xs text-slate-400">Configure app store links used in member activation emails</p>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">iOS App Store URL</label>
+            <input
+              type="url"
+              value={iosAppStoreUrl}
+              onChange={(e) => setIosAppStoreUrl(e.target.value)}
+              placeholder="https://apps.apple.com/app/alfiepro/id..."
+              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 outline-none"
+            />
+            <p className="text-xs text-slate-500 mt-1">Leave blank until the iOS app is published</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">Android Play Store URL</label>
+            <input
+              type="url"
+              value={androidPlayStoreUrl}
+              onChange={(e) => setAndroidPlayStoreUrl(e.target.value)}
+              placeholder="https://play.google.com/store/apps/details?id=..."
+              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 outline-none"
+            />
+            <p className="text-xs text-slate-500 mt-1">Leave blank until the Android app is published</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">App Deep Link Base URL</label>
+            <input
+              type="url"
+              value={appDeepLinkBase}
+              onChange={(e) => setAppDeepLinkBase(e.target.value)}
+              placeholder="https://app.alfiepro.com"
+              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 outline-none"
+            />
+            <p className="text-xs text-slate-500 mt-1">Used for activation deep links in the mobile app</p>
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            {!iosAppStoreUrl && !androidPlayStoreUrl && (
+              <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                <AlertCircle size={14} />
+                App store links not configured -- activation emails will omit download buttons
+              </p>
+            )}
+            <button
+              onClick={handleSaveMobileAppSettings}
+              disabled={savingAppSettings}
+              className="ml-auto flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-medium text-sm transition-colors disabled:opacity-50"
+            >
+              {savingAppSettings ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Save App Settings
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
