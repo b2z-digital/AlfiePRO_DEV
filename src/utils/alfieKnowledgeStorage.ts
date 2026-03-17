@@ -7,10 +7,12 @@ export interface AlfieTuningGuide {
   hull_type: string;
   description: string;
   version: string;
-  storage_path: string;
-  file_name: string;
-  file_size: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  storage_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  content_text: string | null;
+  input_type: 'pdf' | 'text';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'error';
   processing_error: string | null;
   processed_at: string | null;
   chunk_count: number;
@@ -121,9 +123,43 @@ export async function uploadTuningGuide(
   return data;
 }
 
+export async function createTextTuningGuide(
+  metadata: {
+    name: string;
+    boat_type: string;
+    hull_type?: string;
+    description?: string;
+    version?: string;
+    content_text: string;
+  },
+  userId: string
+): Promise<AlfieTuningGuide> {
+  const { data, error } = await supabase
+    .from('alfie_tuning_guides')
+    .insert({
+      name: metadata.name,
+      boat_type: metadata.boat_type || '',
+      hull_type: metadata.hull_type || '',
+      description: metadata.description || '',
+      version: metadata.version || '1.0',
+      content_text: metadata.content_text,
+      input_type: 'text',
+      storage_path: null,
+      file_name: null,
+      file_size: 0,
+      status: 'pending',
+      uploaded_by: userId
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function updateTuningGuide(
   id: string,
-  updates: Partial<Pick<AlfieTuningGuide, 'name' | 'boat_type' | 'hull_type' | 'description' | 'version' | 'is_active'>>
+  updates: Partial<Pick<AlfieTuningGuide, 'name' | 'boat_type' | 'hull_type' | 'description' | 'version' | 'is_active' | 'content_text'>>
 ): Promise<AlfieTuningGuide> {
   const { data, error } = await supabase
     .from('alfie_tuning_guides')
@@ -329,9 +365,38 @@ export async function uploadKnowledgeDocument(
   return data;
 }
 
+export async function createTextKnowledgeDocument(
+  metadata: {
+    title: string;
+    category: string;
+    source_url?: string;
+    content_text: string;
+  }
+): Promise<AlfieKnowledgeDocument> {
+  const { data, error } = await supabase
+    .from('alfie_knowledge_documents')
+    .insert({
+      title: metadata.title,
+      category: metadata.category || 'sailing-rules',
+      source_url: metadata.source_url || null,
+      content_text: metadata.content_text,
+      storage_path: null,
+      file_name: null,
+      file_size: 0,
+      mime_type: 'text/plain',
+      is_active: true,
+      processing_status: 'pending'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function updateKnowledgeDocument(
   id: string,
-  updates: Partial<Pick<AlfieKnowledgeDocument, 'title' | 'category' | 'source_url' | 'is_active'>>
+  updates: Partial<Pick<AlfieKnowledgeDocument, 'title' | 'category' | 'source_url' | 'is_active' | 'content_text'>>
 ): Promise<AlfieKnowledgeDocument> {
   const { data, error } = await supabase
     .from('alfie_knowledge_documents')

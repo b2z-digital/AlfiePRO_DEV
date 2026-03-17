@@ -398,22 +398,37 @@ async function processGuide(supabase: any, guideId: string) {
 
   await supabase.from("alfie_tuning_guides").update({ status: "processing" }).eq("id", guideId);
 
-  const pdfBytes = await downloadFromStorage(guide.storage_path);
-  console.log(`Downloaded ${pdfBytes.length} bytes for guide ${guideId}`);
+  let extractedText = "";
 
-  let extractedText = extractTextFromPdf(pdfBytes);
-  console.log(`Extracted ${extractedText.length} chars of text`);
+  if (guide.content_text && guide.input_type === "text") {
+    extractedText = guide.content_text;
+    console.log(`Using direct text content: ${extractedText.length} chars`);
+  } else if (guide.storage_path) {
+    const pdfBytes = await downloadFromStorage(guide.storage_path);
+    console.log(`Downloaded ${pdfBytes.length} bytes for guide ${guideId}`);
 
-  const hasReadableContent = isReadableText(extractedText);
-  if (!hasReadableContent || extractedText.trim().length < 100) {
-    console.log(`PDF appears to be image-based or has no extractable text (readable=${hasReadableContent}, length=${extractedText.trim().length})`);
+    extractedText = extractTextFromPdf(pdfBytes);
+    console.log(`Extracted ${extractedText.length} chars of text`);
+
+    const hasReadableContent = isReadableText(extractedText);
+    if (!hasReadableContent || extractedText.trim().length < 100) {
+      console.log(`PDF appears to be image-based or has no extractable text (readable=${hasReadableContent}, length=${extractedText.trim().length})`);
+      await supabase.from("alfie_tuning_guides").update({
+        status: "error",
+        processing_error: "PDF appears to be image-based (scanned). Text extraction is not possible without OCR. Please upload a text-based PDF.",
+        chunk_count: 0,
+        processed_at: new Date().toISOString(),
+      }).eq("id", guideId);
+      return { chunksCreated: 0, insertedCount: 0, textLength: extractedText.length, error: "image-based-pdf" };
+    }
+  } else {
     await supabase.from("alfie_tuning_guides").update({
       status: "error",
-      processing_error: "PDF appears to be image-based (scanned). Text extraction is not possible without OCR. Please upload a text-based PDF.",
+      processing_error: "No content provided. Please upload a PDF or enter text content.",
       chunk_count: 0,
       processed_at: new Date().toISOString(),
     }).eq("id", guideId);
-    return { chunksCreated: 0, insertedCount: 0, textLength: extractedText.length, error: "image-based-pdf" };
+    return { chunksCreated: 0, insertedCount: 0, textLength: 0, error: "no-content" };
   }
 
   const chunks = splitTextIntoChunks(extractedText).filter(c => isReadableText(c));
@@ -480,29 +495,35 @@ async function processDocument(supabase: any, documentId: string) {
 
   await supabase.from("alfie_knowledge_documents").update({ processing_status: "processing" }).eq("id", documentId);
 
-  if (!doc.storage_path) {
-    await supabase.from("alfie_knowledge_documents").update({
-      processing_status: "failed", processing_error: "No file attached to this document",
-    }).eq("id", documentId);
-    throw new Error("No file attached to this document");
-  }
+  let extractedText = "";
 
-  const pdfBytes = await downloadFromStorage(doc.storage_path);
-  console.log(`Downloaded ${pdfBytes.length} bytes for document ${documentId}`);
+  if (doc.content_text && !doc.storage_path) {
+    extractedText = doc.content_text;
+    console.log(`Using direct text content: ${extractedText.length} chars`);
+  } else if (doc.storage_path) {
+    const pdfBytes = await downloadFromStorage(doc.storage_path);
+    console.log(`Downloaded ${pdfBytes.length} bytes for document ${documentId}`);
 
-  let extractedText = extractTextFromPdf(pdfBytes);
-  console.log(`Extracted ${extractedText.length} chars of text`);
+    extractedText = extractTextFromPdf(pdfBytes);
+    console.log(`Extracted ${extractedText.length} chars of text`);
 
-  const hasReadableContent = isReadableText(extractedText);
-  if (!hasReadableContent || extractedText.trim().length < 100) {
-    console.log(`PDF appears to be image-based or has no extractable text (readable=${hasReadableContent}, length=${extractedText.trim().length})`);
+    const hasReadableContent = isReadableText(extractedText);
+    if (!hasReadableContent || extractedText.trim().length < 100) {
+      console.log(`PDF appears to be image-based or has no extractable text (readable=${hasReadableContent}, length=${extractedText.trim().length})`);
+      await supabase.from("alfie_knowledge_documents").update({
+        processing_status: "failed",
+        processing_error: "PDF appears to be image-based (scanned). Text extraction is not possible without OCR. Please upload a text-based PDF.",
+        chunk_count: 0,
+        processed_at: new Date().toISOString(),
+      }).eq("id", documentId);
+      return { chunksCreated: 0, insertedCount: 0, textLength: extractedText.length, error: "image-based-pdf" };
+    }
+  } else {
     await supabase.from("alfie_knowledge_documents").update({
       processing_status: "failed",
-      processing_error: "PDF appears to be image-based (scanned). Text extraction is not possible without OCR. Please upload a text-based PDF.",
-      chunk_count: 0,
-      processed_at: new Date().toISOString(),
+      processing_error: "No content provided. Please upload a PDF or enter text content.",
     }).eq("id", documentId);
-    return { chunksCreated: 0, insertedCount: 0, textLength: extractedText.length, error: "image-based-pdf" };
+    throw new Error("No content provided");
   }
 
   const chunks = splitTextIntoChunks(extractedText).filter(c => isReadableText(c));
