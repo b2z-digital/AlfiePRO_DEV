@@ -956,7 +956,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     userClubs: impersonationOverrides?.userClubs ?? userClubs,
     currentClub: impersonationOverrides?.currentClub ?? currentClub,
-    currentOrganization,
+    currentOrganization: impersonationOverrides ? null : currentOrganization,
     loading,
     clubsLoaded,
     isLoggingOut,
