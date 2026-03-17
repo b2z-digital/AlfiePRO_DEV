@@ -861,8 +861,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!user) return;
-    const updateLastSeen = () => {
-      supabase.rpc('update_user_last_seen').catch(() => {});
+    const updateLastSeen = async () => {
+      try { await supabase.rpc('update_user_last_seen'); } catch {}
     };
     updateLastSeen();
     const interval = setInterval(updateLastSeen, 5 * 60 * 1000);
