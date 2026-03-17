@@ -462,6 +462,16 @@ export interface AlfieAiInstruction {
 }
 
 export const AI_INSTRUCTION_CATEGORIES = [
+  'core_identity',
+  'personality',
+  'response_structure',
+  'rule_references',
+  'rc_yachts',
+  'tuning_rules',
+  'race_scenarios',
+  'capabilities',
+  'navigation_commands',
+  'skipper_data',
   'tone_of_voice',
   'response_style',
   'context_rules',
@@ -472,6 +482,16 @@ export const AI_INSTRUCTION_CATEGORIES = [
 ] as const;
 
 export const AI_INSTRUCTION_CATEGORY_LABELS: Record<string, string> = {
+  core_identity: 'Core Identity',
+  personality: 'Personality',
+  response_structure: 'Response Structure',
+  rule_references: 'Rule References',
+  rc_yachts: 'RC Yacht Specifics',
+  tuning_rules: 'Tuning Rules',
+  race_scenarios: 'Race Scenarios',
+  capabilities: 'Capabilities',
+  navigation_commands: 'Navigation Commands',
+  skipper_data: 'Skipper Data',
   tone_of_voice: 'Tone of Voice',
   response_style: 'Response Style',
   context_rules: 'Context & Usage',
