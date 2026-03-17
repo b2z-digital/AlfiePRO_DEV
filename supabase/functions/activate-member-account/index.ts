@@ -236,10 +236,11 @@ Deno.serve(async (req: Request) => {
         }
 
         if (sendGridApiKey && defaultFromEmail) {
-          const deepLinkBase = app_deep_link_base || platformConfig.app_deep_link_base || "https://app.alfiepro.com";
+          const deepLinkBase = (app_deep_link_base || platformConfig.app_deep_link_base || "alfiepro://").replace(/\/+$/, "");
+          const separator = deepLinkBase.endsWith("://") ? "" : "/";
           const activationDeepLink = recoveryToken
-            ? `${deepLinkBase}/activate?token=${encodeURIComponent(recoveryToken)}&email=${encodeURIComponent(member.email)}`
-            : `${deepLinkBase}/activate?email=${encodeURIComponent(member.email)}`;
+            ? `${deepLinkBase}${separator}activate?token=${encodeURIComponent(recoveryToken)}&email=${encodeURIComponent(member.email)}`
+            : `${deepLinkBase}${separator}activate?email=${encodeURIComponent(member.email)}`;
 
           const appStoreUrl = platformConfig.ios_app_store_url || "";
           const playStoreUrl = platformConfig.android_play_store_url || "";

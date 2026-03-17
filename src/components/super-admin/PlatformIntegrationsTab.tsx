@@ -318,15 +318,15 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
             <p className="text-xs text-slate-500 mt-1">Leave blank until the Android app is published</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">App Deep Link Base URL</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1.5">App Deep Link Scheme</label>
             <input
-              type="url"
+              type="text"
               value={appDeepLinkBase}
               onChange={(e) => setAppDeepLinkBase(e.target.value)}
-              placeholder="https://app.alfiepro.com"
-              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 outline-none"
+              placeholder="alfiepro://"
+              className="w-full px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 outline-none font-mono"
             />
-            <p className="text-xs text-slate-500 mt-1">Used for activation deep links in the mobile app</p>
+            <p className="text-xs text-slate-500 mt-1">Custom URL scheme for the mobile app (e.g. alfiepro://). Links will be sent as alfiepro://activate?token=XXX&email=XXX</p>
           </div>
           <div className="flex items-center justify-between pt-2">
             {!iosAppStoreUrl && !androidPlayStoreUrl && (
