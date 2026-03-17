@@ -12,6 +12,23 @@ const corsHeaders = {
 const CHUNK_SIZE = 1500;
 const CHUNK_OVERLAP = 200;
 const MAX_STREAM_SIZE = 500000;
+const EMBEDDING_MODEL = "text-embedding-ada-002";
+const MAX_EMBEDDING_CHARS = 6000;
+
+function isReadableText(text: string): boolean {
+  if (!text || text.length < 10) return false;
+  const sample = text.slice(0, 500);
+  let printable = 0;
+  let alpha = 0;
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i);
+    if (code >= 32 && code <= 126) printable++;
+    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) alpha++;
+  }
+  const printableRatio = printable / sample.length;
+  const alphaRatio = alpha / sample.length;
+  return printableRatio > 0.7 && alphaRatio > 0.3;
+}
 
 function sanitizeText(text: string): string {
   // deno-lint-ignore no-control-regex
@@ -225,6 +242,82 @@ function extractTextFromPdf(pdfBytes: Uint8Array): string {
   return sanitizeText(cleanedLines.join("\n\n"));
 }
 
+async function generateEmbedding(text: string): Promise<number[] | null> {
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiKey) {
+    console.error("OPENAI_API_KEY not configured");
+    return null;
+  }
+
+  const truncated = text.slice(0, MAX_EMBEDDING_CHARS);
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openaiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: EMBEDDING_MODEL,
+        input: truncated,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`OpenAI embedding error ${res.status}: ${errBody}`);
+      return null;
+    }
+
+    const data = await res.json();
+    return data.data?.[0]?.embedding || null;
+  } catch (err) {
+    console.error("Embedding generation failed:", err);
+    return null;
+  }
+}
+
+async function generateEmbeddingsBatch(texts: string[]): Promise<(number[] | null)[]> {
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiKey) {
+    console.error("OPENAI_API_KEY not configured");
+    return texts.map(() => null);
+  }
+
+  const truncated = texts.map(t => t.slice(0, MAX_EMBEDDING_CHARS));
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openaiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: EMBEDDING_MODEL,
+        input: truncated,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`OpenAI batch embedding error ${res.status}: ${errBody}`);
+      return texts.map(() => null);
+    }
+
+    const data = await res.json();
+    const embeddings: (number[] | null)[] = texts.map(() => null);
+    for (const item of data.data || []) {
+      embeddings[item.index] = item.embedding;
+    }
+    return embeddings;
+  } catch (err) {
+    console.error("Batch embedding generation failed:", err);
+    return texts.map(() => null);
+  }
+}
+
 async function downloadFromStorage(storagePath: string): Promise<Uint8Array> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -253,6 +346,47 @@ function createServiceClient() {
   });
 }
 
+async function embedAndInsertChunks(
+  supabase: any,
+  chunkRecords: any[],
+): Promise<number> {
+  let insertedCount = 0;
+  const batchSize = 20;
+
+  for (let i = 0; i < chunkRecords.length; i += batchSize) {
+    const batch = chunkRecords.slice(i, i + batchSize);
+    const texts = batch.map((c: any) => c.content);
+    const embeddings = await generateEmbeddingsBatch(texts);
+
+    const recordsWithEmbeddings = batch.map((rec: any, idx: number) => ({
+      ...rec,
+      embedding: embeddings[idx] ? JSON.stringify(embeddings[idx]) : null,
+    }));
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("alfie_knowledge_chunks")
+      .insert(recordsWithEmbeddings)
+      .select("id");
+
+    if (insertError) {
+      console.error(`Chunk insert error (batch ${i}):`, JSON.stringify(insertError));
+      const { data: insertedNoEmbed, error: fallbackErr } = await supabase
+        .from("alfie_knowledge_chunks")
+        .insert(batch)
+        .select("id");
+      if (fallbackErr) {
+        throw new Error(`Failed to insert chunks batch ${i}: ${fallbackErr.message}`);
+      }
+      insertedCount += (insertedNoEmbed?.length || 0);
+      console.warn(`Batch ${i} inserted without embeddings`);
+    } else {
+      insertedCount += (inserted?.length || 0);
+    }
+  }
+
+  return insertedCount;
+}
+
 async function processGuide(supabase: any, guideId: string) {
   const { data: guide, error: guideError } = await supabase
     .from("alfie_tuning_guides")
@@ -270,13 +404,20 @@ async function processGuide(supabase: any, guideId: string) {
   let extractedText = extractTextFromPdf(pdfBytes);
   console.log(`Extracted ${extractedText.length} chars of text`);
 
-  if (extractedText.trim().length < 100) {
-    extractedText = `Tuning guide for ${guide.boat_type || "RC yacht"}: ${guide.name}. ` +
-      `Version ${guide.version}. ${guide.description || ""}`;
+  const hasReadableContent = isReadableText(extractedText);
+  if (!hasReadableContent || extractedText.trim().length < 100) {
+    console.log(`PDF appears to be image-based or has no extractable text (readable=${hasReadableContent}, length=${extractedText.trim().length})`);
+    await supabase.from("alfie_tuning_guides").update({
+      status: "error",
+      processing_error: "PDF appears to be image-based (scanned). Text extraction is not possible without OCR. Please upload a text-based PDF.",
+      chunk_count: 0,
+      processed_at: new Date().toISOString(),
+    }).eq("id", guideId);
+    return { chunksCreated: 0, insertedCount: 0, textLength: extractedText.length, error: "image-based-pdf" };
   }
 
-  const chunks = splitTextIntoChunks(extractedText);
-  console.log(`Created ${chunks.length} chunks`);
+  const chunks = splitTextIntoChunks(extractedText).filter(c => isReadableText(c));
+  console.log(`Created ${chunks.length} readable chunks`);
 
   await supabase.from("alfie_knowledge_chunks").delete().eq("tuning_guide_id", guideId);
 
@@ -316,18 +457,8 @@ async function processGuide(supabase: any, guideId: string) {
     boat_type: guide.boat_type || "", hull_type: guide.hull_type || "", source_type: "tuning-guide", tuning_guide_id: guideId,
   }));
 
-  let insertedCount = 0;
-  const batchSize = 50;
-  for (let i = 0; i < chunkRecords.length; i += batchSize) {
-    const batch = chunkRecords.slice(i, i + batchSize);
-    const { data: inserted, error: insertError } = await supabase.from("alfie_knowledge_chunks").insert(batch).select("id");
-    if (insertError) {
-      console.error(`Chunk insert error (batch ${i}):`, JSON.stringify(insertError));
-      throw new Error(`Failed to insert chunks batch ${i}: ${insertError.message}`);
-    }
-    insertedCount += (inserted?.length || 0);
-  }
-  console.log(`Actually inserted ${insertedCount} chunks for guide ${guideId}`);
+  const insertedCount = await embedAndInsertChunks(supabase, chunkRecords);
+  console.log(`Inserted ${insertedCount} chunks with embeddings for guide ${guideId}`);
 
   const { error: updateError } = await supabase.from("alfie_tuning_guides").update({
     status: "completed", chunk_count: chunks.length, image_count: 0,
@@ -362,12 +493,20 @@ async function processDocument(supabase: any, documentId: string) {
   let extractedText = extractTextFromPdf(pdfBytes);
   console.log(`Extracted ${extractedText.length} chars of text`);
 
-  if (extractedText.trim().length < 100) {
-    extractedText = `${doc.title}: ${doc.category || "sailing rules document"}. ` + (doc.content_text || "");
+  const hasReadableContent = isReadableText(extractedText);
+  if (!hasReadableContent || extractedText.trim().length < 100) {
+    console.log(`PDF appears to be image-based or has no extractable text (readable=${hasReadableContent}, length=${extractedText.trim().length})`);
+    await supabase.from("alfie_knowledge_documents").update({
+      processing_status: "failed",
+      processing_error: "PDF appears to be image-based (scanned). Text extraction is not possible without OCR. Please upload a text-based PDF.",
+      chunk_count: 0,
+      processed_at: new Date().toISOString(),
+    }).eq("id", documentId);
+    return { chunksCreated: 0, insertedCount: 0, textLength: extractedText.length, error: "image-based-pdf" };
   }
 
-  const chunks = splitTextIntoChunks(extractedText);
-  console.log(`Created ${chunks.length} chunks`);
+  const chunks = splitTextIntoChunks(extractedText).filter(c => isReadableText(c));
+  console.log(`Created ${chunks.length} readable chunks`);
 
   await supabase.from("alfie_knowledge_chunks").delete().eq("document_id", documentId);
 
@@ -377,18 +516,8 @@ async function processDocument(supabase: any, documentId: string) {
     source_type: "sailing-rules",
   }));
 
-  let insertedCount = 0;
-  const batchSize = 50;
-  for (let i = 0; i < chunkRecords.length; i += batchSize) {
-    const batch = chunkRecords.slice(i, i + batchSize);
-    const { data: inserted, error: insertError } = await supabase.from("alfie_knowledge_chunks").insert(batch).select("id");
-    if (insertError) {
-      console.error(`Chunk insert error (batch ${i}):`, JSON.stringify(insertError));
-      throw new Error(`Failed to insert chunks batch ${i}: ${insertError.message}`);
-    }
-    insertedCount += (inserted?.length || 0);
-  }
-  console.log(`Actually inserted ${insertedCount} chunks for document ${documentId}`);
+  const insertedCount = await embedAndInsertChunks(supabase, chunkRecords);
+  console.log(`Inserted ${insertedCount} chunks with embeddings for document ${documentId}`);
 
   const { error: updateError } = await supabase.from("alfie_knowledge_documents").update({
     processing_status: "completed", chunk_count: chunks.length,
@@ -398,6 +527,170 @@ async function processDocument(supabase: any, documentId: string) {
   if (updateError) console.error("Document status update error:", JSON.stringify(updateError));
 
   return { chunksCreated: chunks.length, insertedCount, textLength: extractedText.length };
+}
+
+async function backfillEmbeddings(supabase: any) {
+  console.log("Starting backfill-embeddings...");
+
+  const { data: badChunks, error: badErr } = await supabase
+    .from("alfie_knowledge_chunks")
+    .select("id, content, document_id, tuning_guide_id, chunk_index, metadata, source_type, boat_type, hull_type")
+    .is("embedding", null)
+    .order("created_at", { ascending: true });
+
+  if (badErr) throw new Error(`Failed to fetch chunks: ${badErr.message}`);
+
+  console.log(`Found ${badChunks?.length || 0} chunks missing embeddings`);
+
+  let deletedGarbage = 0;
+  let rechunked = 0;
+  let embedded = 0;
+  let failed = 0;
+
+  const validChunks: any[] = [];
+  const garbageIds: string[] = [];
+
+  for (const chunk of badChunks || []) {
+    if (!isReadableText(chunk.content)) {
+      garbageIds.push(chunk.id);
+      continue;
+    }
+    validChunks.push(chunk);
+  }
+
+  if (garbageIds.length > 0) {
+    console.log(`Deleting ${garbageIds.length} garbage/binary chunks`);
+    const batchSize = 50;
+    for (let i = 0; i < garbageIds.length; i += batchSize) {
+      const batch = garbageIds.slice(i, i + batchSize);
+      await supabase.from("alfie_knowledge_chunks").delete().in("id", batch);
+    }
+    deletedGarbage = garbageIds.length;
+  }
+
+  const oversized: any[] = [];
+  const normalSized: any[] = [];
+
+  for (const chunk of validChunks) {
+    if (chunk.content.length > MAX_EMBEDDING_CHARS) {
+      oversized.push(chunk);
+    } else {
+      normalSized.push(chunk);
+    }
+  }
+
+  if (oversized.length > 0) {
+    console.log(`Re-chunking ${oversized.length} oversized chunks`);
+    for (const chunk of oversized) {
+      const subChunks = splitTextIntoChunks(chunk.content);
+      console.log(`  Chunk ${chunk.id}: ${chunk.content.length} chars -> ${subChunks.length} sub-chunks`);
+
+      await supabase.from("alfie_knowledge_chunks").delete().eq("id", chunk.id);
+
+      const newRecords = subChunks.map((content: string, idx: number) => ({
+        document_id: chunk.document_id,
+        chunk_index: chunk.chunk_index * 100 + idx,
+        content: sanitizeText(content),
+        metadata: chunk.metadata,
+        source_type: chunk.source_type,
+        boat_type: chunk.boat_type || null,
+        hull_type: chunk.hull_type || null,
+        tuning_guide_id: chunk.tuning_guide_id || null,
+      }));
+
+      const batchSize = 20;
+      for (let i = 0; i < newRecords.length; i += batchSize) {
+        const batch = newRecords.slice(i, i + batchSize);
+        const texts = batch.map((r: any) => r.content);
+        const embeddings = await generateEmbeddingsBatch(texts);
+
+        const withEmbeddings = batch.map((rec: any, idx: number) => ({
+          ...rec,
+          embedding: embeddings[idx] ? JSON.stringify(embeddings[idx]) : null,
+        }));
+
+        const { error: insertErr } = await supabase
+          .from("alfie_knowledge_chunks")
+          .insert(withEmbeddings);
+
+        if (insertErr) {
+          console.error(`Re-chunk insert error:`, insertErr.message);
+          failed += batch.length;
+        } else {
+          rechunked += batch.length;
+        }
+      }
+    }
+  }
+
+  if (normalSized.length > 0) {
+    console.log(`Generating embeddings for ${normalSized.length} normal chunks`);
+    const batchSize = 20;
+    for (let i = 0; i < normalSized.length; i += batchSize) {
+      const batch = normalSized.slice(i, i + batchSize);
+      const texts = batch.map((c: any) => c.content);
+      const embeddings = await generateEmbeddingsBatch(texts);
+
+      for (let j = 0; j < batch.length; j++) {
+        if (embeddings[j]) {
+          const { error: updateErr } = await supabase
+            .from("alfie_knowledge_chunks")
+            .update({ embedding: JSON.stringify(embeddings[j]) })
+            .eq("id", batch[j].id);
+
+          if (updateErr) {
+            console.error(`Embedding update error for ${batch[j].id}:`, updateErr.message);
+            failed++;
+          } else {
+            embedded++;
+          }
+        } else {
+          failed++;
+        }
+      }
+    }
+  }
+
+  const updatedDocIds = new Set<string>();
+  for (const chunk of validChunks) {
+    if (chunk.document_id) updatedDocIds.add(chunk.document_id);
+  }
+  for (const docId of updatedDocIds) {
+    const { count } = await supabase
+      .from("alfie_knowledge_chunks")
+      .select("id", { count: "exact", head: true })
+      .eq("document_id", docId);
+
+    await supabase
+      .from("alfie_knowledge_documents")
+      .update({ chunk_count: count || 0 })
+      .eq("id", docId);
+  }
+
+  const updatedGuideIds = new Set<string>();
+  for (const chunk of validChunks) {
+    if (chunk.tuning_guide_id) updatedGuideIds.add(chunk.tuning_guide_id);
+  }
+  for (const id of garbageIds) {
+    const orig = (badChunks || []).find((c: any) => c.id === id);
+    if (orig?.tuning_guide_id) updatedGuideIds.add(orig.tuning_guide_id);
+    if (orig?.document_id) updatedDocIds.add(orig.document_id);
+  }
+  for (const guideId of updatedGuideIds) {
+    const { count } = await supabase
+      .from("alfie_knowledge_chunks")
+      .select("id", { count: "exact", head: true })
+      .eq("tuning_guide_id", guideId);
+
+    await supabase
+      .from("alfie_tuning_guides")
+      .update({ chunk_count: count || 0 })
+      .eq("id", guideId);
+  }
+
+  console.log(`Backfill complete: deleted=${deletedGarbage}, rechunked=${rechunked}, embedded=${embedded}, failed=${failed}`);
+
+  return { deletedGarbage, rechunked, embedded, failed };
 }
 
 Deno.serve(async (req: Request) => {
@@ -426,11 +719,19 @@ Deno.serve(async (req: Request) => {
     }
 
     parsedBody = await req.json();
-    const { guideId, documentId } = parsedBody;
+    const { guideId, documentId, action } = parsedBody;
+
+    if (action === "backfill-embeddings") {
+      const result = await backfillEmbeddings(supabase);
+      return new Response(
+        JSON.stringify({ success: true, action: "backfill-embeddings", ...result }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!guideId && !documentId) {
       return new Response(
-        JSON.stringify({ error: "guideId or documentId is required" }),
+        JSON.stringify({ error: "guideId, documentId, or action is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
