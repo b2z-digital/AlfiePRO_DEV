@@ -85,7 +85,27 @@ export default function SailingRulesTab({ darkMode }: SailingRulesTabProps) {
       setDocuments(prev => [doc, ...prev]);
       setShowUploadModal(false);
       setUploadForm({ title: '', category: 'sailing-rules', source_url: '', file: null, inputType: 'pdf', content_text: '' });
-      addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" has been added. Click Process to extract knowledge chunks.` });
+
+      if (uploadForm.inputType === 'text') {
+        addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" is being processed automatically.` });
+        try {
+          await triggerDocumentProcessing(doc.id);
+          setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, processing_status: 'processing' } : d));
+          const pollInterval = setInterval(async () => {
+            try {
+              const updated = await getKnowledgeDocuments();
+              setDocuments(updated);
+              const current = updated.find(d => d.id === doc.id);
+              if (current && current.processing_status !== 'processing') {
+                clearInterval(pollInterval);
+              }
+            } catch { /* ignore */ }
+          }, 5000);
+          setTimeout(() => clearInterval(pollInterval), 120000);
+        } catch { /* ignore auto-process errors */ }
+      } else {
+        addNotification({ type: 'success', title: 'Document Added', message: `"${doc.title}" has been added. Click Process to extract knowledge chunks.` });
+      }
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
     } finally {

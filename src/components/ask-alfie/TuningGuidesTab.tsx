@@ -100,7 +100,27 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
       setGuides(prev => [guide, ...prev]);
       setShowUploadModal(false);
       setUploadForm({ name: '', boat_type: '', hull_type: '', description: '', version: '1.0', file: null, inputType: 'pdf', content_text: '' });
-      addNotification({ type: 'success', title: 'Guide Added', message: `"${guide.name}" has been added. Click Process to extract knowledge.` });
+
+      if (uploadForm.inputType === 'text') {
+        addNotification({ type: 'success', title: 'Guide Added', message: `"${guide.name}" is being processed automatically.` });
+        try {
+          await triggerGuideProcessing(guide.id);
+          setGuides(prev => prev.map(g => g.id === guide.id ? { ...g, status: 'processing' as const } : g));
+          const pollInterval = setInterval(async () => {
+            try {
+              const updated = await getTuningGuides();
+              setGuides(updated);
+              const current = updated.find(g => g.id === guide.id);
+              if (current && current.status !== 'processing') {
+                clearInterval(pollInterval);
+              }
+            } catch { /* ignore */ }
+          }, 5000);
+          setTimeout(() => clearInterval(pollInterval), 120000);
+        } catch { /* ignore auto-process errors */ }
+      } else {
+        addNotification({ type: 'success', title: 'Guide Added', message: `"${guide.name}" has been added. Click Process to extract knowledge.` });
+      }
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Upload Failed', message: err.message });
     } finally {
