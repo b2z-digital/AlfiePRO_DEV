@@ -20,6 +20,7 @@ import { InvitationSignup } from './pages/InvitationSignup';
 import { OnboardingRouter } from './components/onboarding/OnboardingRouter';
 import { ApplicationPendingScreen } from './components/onboarding/ApplicationPendingScreen';
 import { CancelledMembershipScreen } from './components/onboarding/CancelledMembershipScreen';
+import { UnfinancialMemberScreen } from './components/onboarding/UnfinancialMemberScreen';
 import { ClubSelfRegistration } from './components/auth/ClubSelfRegistration';
 import { ClubApplicationPendingScreen } from './components/auth/ClubApplicationPendingScreen';
 import { PublicClubHomepageNew } from './components/public/PublicClubHomepageNew';
@@ -95,7 +96,7 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships, hasUnfinancialMember, unfinancialMemberData } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
   const isMobilePhone = useIsMobilePhone();
@@ -362,6 +363,8 @@ function App() {
               </div>
             ) : userClubs.length === 0 && !onboardingCompleted ? (
               <Navigate to="/onboarding" />
+            ) : hasUnfinancialMember && unfinancialMemberData ? (
+              <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />
             ) : isMobilePhone ? (
               <MobileAppComingSoon />
             ) : (
