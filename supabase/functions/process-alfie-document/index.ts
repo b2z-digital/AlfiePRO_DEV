@@ -431,17 +431,23 @@ async function processGuide(supabase: any, guideId: string) {
     return { chunksCreated: 0, insertedCount: 0, textLength: 0, error: "no-content" };
   }
 
-  const chunks = splitTextIntoChunks(extractedText).filter(c => isReadableText(c));
-  console.log(`Created ${chunks.length} readable chunks`);
+  const chunks = splitTextIntoChunks(extractedText).filter(c => c.length > 50);
+  console.log(`Created ${chunks.length} chunks`);
 
   await supabase.from("alfie_knowledge_chunks").delete().eq("tuning_guide_id", guideId);
 
-  const { data: existingDoc } = await supabase
+  let existingDocQuery = supabase
     .from("alfie_knowledge_documents")
     .select("id")
-    .eq("title", guide.name)
-    .eq("storage_path", guide.storage_path)
-    .maybeSingle();
+    .eq("title", guide.name);
+
+  if (guide.storage_path) {
+    existingDocQuery = existingDocQuery.eq("storage_path", guide.storage_path);
+  } else {
+    existingDocQuery = existingDocQuery.is("storage_path", null).eq("category", "tuning-guide");
+  }
+
+  const { data: existingDoc } = await existingDocQuery.maybeSingle();
 
   let documentId: string;
 
@@ -452,14 +458,21 @@ async function processGuide(supabase: any, guideId: string) {
       chunk_count: chunks.length,
       processing_status: "completed",
       processed_at: new Date().toISOString(),
+      content_text: extractedText.slice(0, 5000),
     }).eq("id", documentId);
   } else {
+    const isText = guide.input_type === "text";
     const { data: newDoc, error: docError } = await supabase
       .from("alfie_knowledge_documents")
       .insert({
-        title: guide.name, category: "tuning-guide", storage_path: guide.storage_path,
-        file_name: guide.file_name, file_size: guide.file_size, mime_type: "application/pdf",
-        chunk_count: chunks.length, processing_status: "completed", processed_at: new Date().toISOString(),
+        title: guide.name, category: "tuning-guide",
+        storage_path: guide.storage_path || null,
+        file_name: guide.file_name || null,
+        file_size: isText ? (guide.content_text?.length || 0) : (guide.file_size || 0),
+        mime_type: isText ? "text/plain" : "application/pdf",
+        chunk_count: chunks.length, processing_status: "completed",
+        processed_at: new Date().toISOString(),
+        content_text: extractedText.slice(0, 5000),
       })
       .select().single();
     if (docError) throw new Error(`Failed to create document record: ${docError.message}`);
