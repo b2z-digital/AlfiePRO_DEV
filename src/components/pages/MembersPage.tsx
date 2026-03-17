@@ -984,12 +984,16 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                             {member.user_id && (() => {
                               const isOnline = (member as any).last_seen && (Date.now() - new Date((member as any).last_seen).getTime()) < 15 * 60 * 1000;
                               return (
-                                <div
-                                  className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
-                                    isOnline ? 'bg-green-500' : 'bg-orange-400'
-                                  }`}
-                                  title={isOnline ? 'Online now' : 'Offline'}
-                                />
+                                <div className="group/status absolute -bottom-0.5 -right-0.5">
+                                  <div
+                                    className={`w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
+                                      isOnline ? 'bg-green-500' : 'bg-orange-400'
+                                    }`}
+                                  />
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded shadow-lg whitespace-nowrap opacity-0 group-hover/status:opacity-100 pointer-events-none transition-opacity z-50">
+                                    {isOnline ? 'Online' : 'Offline'}
+                                  </div>
+                                </div>
                               );
                             })()}
                           </div>
