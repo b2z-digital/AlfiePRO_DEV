@@ -87,6 +87,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: appSettings } = await supabase
+      .from("platform_settings")
+      .select("key, value")
+      .eq("category", "mobile_app");
+
+    const platformConfig: Record<string, string> = {};
+    (appSettings || []).forEach((s: { key: string; value: string }) => {
+      platformConfig[s.key] = s.value;
+    });
+
     const { data: members, error: membersError } = await supabase
       .from("members")
       .select("id, first_name, last_name, email, user_id, club_id")
@@ -226,13 +236,13 @@ Deno.serve(async (req: Request) => {
         }
 
         if (sendGridApiKey && defaultFromEmail) {
-          const deepLinkBase = app_deep_link_base || "https://app.alfiepro.com";
+          const deepLinkBase = app_deep_link_base || platformConfig.app_deep_link_base || "https://app.alfiepro.com";
           const activationDeepLink = recoveryToken
             ? `${deepLinkBase}/activate?token=${encodeURIComponent(recoveryToken)}&email=${encodeURIComponent(member.email)}`
             : `${deepLinkBase}/activate?email=${encodeURIComponent(member.email)}`;
 
-          const appStoreUrl = "https://apps.apple.com/app/alfiepro/id0000000000";
-          const playStoreUrl = "https://play.google.com/store/apps/details?id=com.alfiepro.app";
+          const appStoreUrl = platformConfig.ios_app_store_url || "";
+          const playStoreUrl = platformConfig.android_play_store_url || "";
 
           await sendActivationEmail({
             sendGridApiKey,
@@ -309,6 +319,156 @@ async function sendActivationEmail(params: EmailParams) {
     playStoreUrl,
   } = params;
 
+  const hasAppStoreLinks = !!(appStoreUrl || playStoreUrl);
+
+  const appStoreButtonsHtml = hasAppStoreLinks
+    ? `<tr>
+        <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:12px;padding:24px;text-align:center;">
+          <p style="margin:0;color:rgba(255,255,255,0.75);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Step 1</p>
+          <p style="margin:4px 0 16px;color:#ffffff;font-size:20px;font-weight:700;">Download AlfiePRO</p>
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr>
+              ${appStoreUrl ? `<td style="padding:0 6px;"><a href="${appStoreUrl}" style="display:inline-block;background:rgba(0,0,0,0.3);color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">App Store</a></td>` : ""}
+              ${playStoreUrl ? `<td style="padding:0 6px;"><a href="${playStoreUrl}" style="display:inline-block;background:rgba(0,0,0,0.3);color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">Google Play</a></td>` : ""}
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr><td style="height:20px;"></td></tr>`
+    : "";
+
+  const stepNumber = hasAppStoreLinks ? "Step 2" : "";
+
+  const emailHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:16px 16px 0 0;padding:32px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Welcome to ${clubName}</h1>
+                    <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Your AlfiePRO membership account is ready</p>
+                  </td>
+                  <td align="right" valign="top">
+                    <div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;display:inline-block;">
+                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">NEW ACCOUNT</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#ffffff;padding:32px 40px;">
+              <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+                Hi ${recipientName},
+              </p>
+              <p style="margin:0 0 24px;color:#334155;font-size:15px;line-height:1.6;">
+                Great news! <strong>${clubName}</strong> has set up your AlfiePRO account. ${hasAppStoreLinks ? "Download the app, set your password, and you're in." : "Set your password using the button below and you're in."}
+              </p>
+
+              <!-- App Store Download -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+                ${appStoreButtonsHtml}
+              </table>
+
+              <!-- Activation Card -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="border:1px solid #e2e8f0;border-radius:12px;padding:28px;text-align:center;">
+                    ${stepNumber ? `<p style="margin:0 0 4px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${stepNumber}</p>` : ""}
+                    <p style="margin:0 0 16px;color:#0f172a;font-size:20px;font-weight:700;">Set Your Password</p>
+                    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                      <tr>
+                        <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;">
+                          <a href="${activationDeepLink}" style="display:inline-block;color:#ffffff;padding:14px 40px;text-decoration:none;font-size:16px;font-weight:600;letter-spacing:0.3px;">Activate My Account</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:14px 0 0;color:#94a3b8;font-size:12px;">${hasAppStoreLinks ? "Opens in the AlfiePRO app" : "Click to set your password and get started"}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Account Details -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <tr>
+                  <td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;">
+                    <p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Account Details</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:35%;">
+                          <span style="color:#64748b;font-size:13px;">Club</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:600;">${clubName}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#64748b;font-size:13px;">Email</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:500;">${toEmail}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#64748b;font-size:13px;">Password</span>
+                        </td>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:500;">Set via the activation button above</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Fallback tip -->
+              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border-left:4px solid #0ea5e9;">
+                <p style="margin:0 0 4px;color:#334155;font-size:13px;font-weight:600;">Already have the app?</p>
+                <p style="margin:0;color:#64748b;font-size:13px;line-height:1.5;">Open it and tap "Forgot password?" on the login screen. Enter <strong>${toEmail}</strong> and follow the prompts.</p>
+              </div>
+
+              <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;text-align:center;">
+                This activation was sent on behalf of ${clubName}. If you did not expect this email, you can safely ignore it.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;">
+              <p style="margin:0;color:#94a3b8;font-size:12px;">
+                Powered by <strong style="color:#0ea5e9;">AlfiePRO</strong> &mdash; RC Yacht Club Management Platform
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
   const emailData = {
     personalizations: [
       {
@@ -320,60 +480,7 @@ async function sendActivationEmail(params: EmailParams) {
     content: [
       {
         type: "text/html",
-        value: `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to ${clubName} on AlfiePRO</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1a1a2e; max-width: 600px; margin: 0 auto; padding: 0; background-color: #f0f2f5;">
-  <div style="background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%); padding: 40px 30px; text-align: center;">
-    <img src="https://ehgbpdqbsykhepuwdgrj.supabase.co/storage/v1/object/public/media/alfie_app_logo.svg" alt="AlfiePRO" style="height: 48px; margin-bottom: 16px;" />
-    <h1 style="color: white; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">Welcome to ${clubName}!</h1>
-    <p style="color: #94a3b8; margin: 8px 0 0; font-size: 15px;">Your membership account is ready</p>
-  </div>
-
-  <div style="background-color: white; padding: 36px 30px;">
-    <p style="font-size: 16px; margin: 0 0 20px; color: #334155;">Hi ${recipientName},</p>
-
-    <p style="font-size: 15px; margin: 0 0 24px; color: #475569;">
-      Great news! <strong>${clubName}</strong> has set up your AlfiePRO account. Download the app, set your password, and you're in.
-    </p>
-
-    <div style="background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); border-radius: 12px; padding: 28px; text-align: center; margin: 28px 0;">
-      <p style="color: rgba(255,255,255,0.9); font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Step 1</p>
-      <p style="color: white; font-size: 18px; font-weight: 700; margin: 0 0 16px;">Download AlfiePRO</p>
-      <div style="margin: 0 0 8px;">
-        <a href="${appStoreUrl}" style="display: inline-block; margin: 4px 6px;">
-          <img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" alt="Download on App Store" style="height: 40px; border-radius: 6px;" />
-        </a>
-        <a href="${playStoreUrl}" style="display: inline-block; margin: 4px 6px;">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" style="height: 40px; border-radius: 6px;" />
-        </a>
-      </div>
-    </div>
-
-    <div style="background-color: #f8fafc; border-radius: 12px; padding: 28px; text-align: center; margin: 20px 0; border: 1px solid #e2e8f0;">
-      <p style="color: #64748b; font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Step 2</p>
-      <p style="color: #1e293b; font-size: 18px; font-weight: 700; margin: 0 0 16px;">Set Your Password</p>
-      <a href="${activationDeepLink}" style="display: inline-block; background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); color: white; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px;">Activate My Account</a>
-      <p style="color: #94a3b8; font-size: 12px; margin: 12px 0 0;">Opens in the AlfiePRO app</p>
-    </div>
-
-    <div style="margin: 28px 0 0; padding: 20px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #0ea5e9;">
-      <p style="font-size: 14px; color: #475569; margin: 0;">
-        <strong>Already have the app?</strong> Open it and tap "Forgot password?" on the login screen. Enter your email <strong>${toEmail}</strong> and follow the prompts.
-      </p>
-    </div>
-  </div>
-
-  <div style="text-align: center; padding: 24px 30px; color: #94a3b8; font-size: 13px;">
-    <p style="margin: 0;">Sent by ${clubName} via AlfiePRO</p>
-    <p style="margin: 8px 0 0; color: #64748b;">The complete RC yacht club management platform</p>
-  </div>
-</body>
-</html>`,
+        value: emailHtml,
       },
     ],
   };

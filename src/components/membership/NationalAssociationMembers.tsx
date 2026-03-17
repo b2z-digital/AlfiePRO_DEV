@@ -979,11 +979,10 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
               {!activationResults ? (
                 <>
                   <p className="text-slate-300 mb-4">
-                    This will create login accounts for{' '}
                     {membersToActivate.length === 1
-                      ? <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span>
-                      : <span className="font-semibold text-white">{membersToActivate.length} members</span>
-                    }{' '}and email each of them with a link to download the AlfiePRO app and set their password.
+                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to download the AlfiePRO app and set their password.</>
+                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to download the AlfiePRO app and set their password.</>
+                    }
                   </p>
 
                   <div className="space-y-2 mb-4">
