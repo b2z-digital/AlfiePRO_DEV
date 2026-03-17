@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Upload, Search, FileText, Trash2, Edit2, Eye, EyeOff,
-  RefreshCw, CheckCircle2, AlertTriangle, Clock, X,
-  ChevronDown, MoreVertical, Download
-} from 'lucide-react';
+import { Upload, Search, FileText, Trash2, CreditCard as Edit2, Eye, EyeOff, RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Clock, X, ChevronDown, MoveVertical as MoreVertical, Download } from 'lucide-react';
 import {
   AlfieTuningGuide, getTuningGuides, uploadTuningGuide,
   updateTuningGuide, deleteTuningGuide, triggerGuideProcessing,
@@ -96,10 +92,22 @@ export default function TuningGuidesTab({ darkMode }: TuningGuidesTabProps) {
     setProcessingGuides(prev => new Set(prev).add(guide.id));
     try {
       await triggerGuideProcessing(guide.id);
+      setGuides(prev => prev.map(g => g.id === guide.id ? { ...g, status: 'processing' as const, processing_error: null } : g));
       addNotification({ type: 'success', title: 'Processing Started', message: `"${guide.name}" is being processed. This may take a few minutes.` });
-      setTimeout(() => loadData(), 5000);
+      const pollInterval = setInterval(async () => {
+        try {
+          const updated = await getTuningGuides();
+          setGuides(updated);
+          const current = updated.find(g => g.id === guide.id);
+          if (current && current.status !== 'processing') {
+            clearInterval(pollInterval);
+          }
+        } catch { /* ignore polling errors */ }
+      }, 5000);
+      setTimeout(() => clearInterval(pollInterval), 120000);
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Processing Failed', message: err.message });
+      loadData();
     } finally {
       setProcessingGuides(prev => {
         const next = new Set(prev);

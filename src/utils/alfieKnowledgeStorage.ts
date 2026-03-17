@@ -151,29 +151,25 @@ export async function deleteTuningGuide(id: string): Promise<void> {
 }
 
 export async function triggerGuideProcessing(guideId: string): Promise<void> {
-  await supabase
-    .from('alfie_tuning_guides')
-    .update({ status: 'processing', updated_at: new Date().toISOString() })
-    .eq('id', guideId);
+  const { data, error } = await supabase.rpc('trigger_alfie_document_processing', {
+    p_guide_id: guideId,
+    p_document_id: null
+  });
 
-  try {
-    const { data, error } = await supabase.functions.invoke('process-alfie-document', {
-      body: { guideId }
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Processing failed');
-    }
-
-    if (data?.error) {
-      throw new Error(data.error);
-    }
-  } catch (err: any) {
+  if (error) {
     await supabase
       .from('alfie_tuning_guides')
-      .update({ status: 'failed', processing_error: err.message || 'Network error', updated_at: new Date().toISOString() })
+      .update({ status: 'failed', processing_error: error.message || 'Failed to trigger processing', updated_at: new Date().toISOString() })
       .eq('id', guideId);
-    throw err;
+    throw new Error(error.message || 'Failed to trigger processing');
+  }
+
+  if (data?.error) {
+    await supabase
+      .from('alfie_tuning_guides')
+      .update({ status: 'failed', processing_error: data.error, updated_at: new Date().toISOString() })
+      .eq('id', guideId);
+    throw new Error(data.error);
   }
 }
 
@@ -416,29 +412,25 @@ export async function deleteKnowledgeDocument(id: string): Promise<void> {
 }
 
 export async function triggerDocumentProcessing(documentId: string): Promise<void> {
-  await supabase
-    .from('alfie_knowledge_documents')
-    .update({ processing_status: 'processing', updated_at: new Date().toISOString() })
-    .eq('id', documentId);
+  const { data, error } = await supabase.rpc('trigger_alfie_document_processing', {
+    p_guide_id: null,
+    p_document_id: documentId
+  });
 
-  try {
-    const { data, error } = await supabase.functions.invoke('process-alfie-document', {
-      body: { documentId }
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Processing failed');
-    }
-
-    if (data?.error) {
-      throw new Error(data.error);
-    }
-  } catch (err: any) {
+  if (error) {
     await supabase
       .from('alfie_knowledge_documents')
-      .update({ processing_status: 'failed', processing_error: err.message || 'Network error', updated_at: new Date().toISOString() })
+      .update({ processing_status: 'failed', processing_error: error.message || 'Failed to trigger processing', updated_at: new Date().toISOString() })
       .eq('id', documentId);
-    throw err;
+    throw new Error(error.message || 'Failed to trigger processing');
+  }
+
+  if (data?.error) {
+    await supabase
+      .from('alfie_knowledge_documents')
+      .update({ processing_status: 'failed', processing_error: data.error, updated_at: new Date().toISOString() })
+      .eq('id', documentId);
+    throw new Error(data.error);
   }
 }
 
