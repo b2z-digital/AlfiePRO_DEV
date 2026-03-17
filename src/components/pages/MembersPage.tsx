@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, CreditCard as Edit2, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2 } from 'lucide-react';
+import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Pencil, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2 } from 'lucide-react';
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -357,24 +357,25 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       // Fetch avatar URLs from profiles for members with user_id (only if member doesn't have one)
       if (data && data.length > 0) {
-        const userIds = data.filter(m => m.user_id && !m.avatar_url).map(m => m.user_id);
-        if (userIds.length > 0) {
+        const linkedUserIds = data.filter(m => m.user_id).map(m => m.user_id);
+        const unlinkedWithoutAvatar = data.filter(m => !m.user_id && !m.avatar_url);
+        if (linkedUserIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, avatar_url')
-            .in('id', userIds);
+            .select('id, avatar_url, last_seen')
+            .in('id', linkedUserIds);
 
-          // Merge avatar data only for members without their own avatar
-          const membersWithAvatars = data.map(member => {
-            if (member.avatar_url) return member; // Keep existing member avatar
+          const membersWithProfiles = data.map(member => {
+            if (!member.user_id) return member;
             const profile = profiles?.find(p => p.id === member.user_id);
             return {
               ...member,
-              avatar_url: profile?.avatar_url || member.avatar_url
+              avatar_url: member.avatar_url || profile?.avatar_url || null,
+              last_seen: profile?.last_seen || null,
             };
           });
 
-          setMembers(membersWithAvatars);
+          setMembers(membersWithProfiles);
         } else {
           setMembers(data);
         }
@@ -980,26 +981,17 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                 {member.first_name?.[0]}{member.last_name?.[0]}
                               </div>
                             )}
-                            <div
-                              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
-                                member.user_id
-                                  ? 'bg-green-500'
-                                  : emailMatches[member.id]
-                                    ? 'bg-amber-500'
-                                    : (member as any).activation_status === 'pending'
-                                      ? 'bg-sky-500'
-                                      : 'bg-slate-500'
-                              }`}
-                              title={
-                                member.user_id
-                                  ? 'Connected - has login account'
-                                  : emailMatches[member.id]
-                                    ? 'Match found - click to link'
-                                    : (member as any).activation_status === 'pending'
-                                      ? 'App activation sent - awaiting password setup'
-                                      : 'Not connected'
-                              }
-                            />
+                            {member.user_id && (() => {
+                              const isOnline = (member as any).last_seen && (Date.now() - new Date((member as any).last_seen).getTime()) < 15 * 60 * 1000;
+                              return (
+                                <div
+                                  className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
+                                    isOnline ? 'bg-green-500' : 'bg-orange-400'
+                                  }`}
+                                  title={isOnline ? 'Online now' : 'Offline'}
+                                />
+                              );
+                            })()}
                           </div>
                           <span className="text-white font-medium">
                             {member.first_name} {member.last_name}
@@ -1120,16 +1112,6 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewMember(member.id);
-                            }}
-                            className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-900/30 transition-colors"
-                            title="View member details"
-                          >
-                            <Eye size={16} />
-                          </button>
                           {!member.user_id ? (
                             emailMatches[member.id] ? (
                               <button
@@ -1252,12 +1234,22 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  handleViewMember(member.id);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700/50 transition-colors"
+                                title="View membership"
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleEditMember(member.id);
                                 }}
                                 className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-900/30 transition-colors"
                                 title="Edit member"
                               >
-                                <Edit2 size={16} />
+                                <Pencil size={16} />
                               </button>
                               <button
                                 onClick={(e) => {
