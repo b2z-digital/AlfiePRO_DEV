@@ -157,19 +157,16 @@ export async function triggerGuideProcessing(guideId: string): Promise<void> {
     .eq('id', guideId);
 
   try {
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ guideId })
+    const { data, error } = await supabase.functions.invoke('process-alfie-document', {
+      body: { guideId }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Processing failed: ${errorText}`);
+    if (error) {
+      throw new Error(error.message || 'Processing failed');
+    }
+
+    if (data?.error) {
+      throw new Error(data.error);
     }
   } catch (err: any) {
     await supabase
@@ -425,19 +422,16 @@ export async function triggerDocumentProcessing(documentId: string): Promise<voi
     .eq('id', documentId);
 
   try {
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-alfie-document`;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ documentId })
+    const { data, error } = await supabase.functions.invoke('process-alfie-document', {
+      body: { documentId }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Processing failed: ${errorText}`);
+    if (error) {
+      throw new Error(error.message || 'Processing failed');
+    }
+
+    if (data?.error) {
+      throw new Error(data.error);
     }
   } catch (err: any) {
     await supabase
