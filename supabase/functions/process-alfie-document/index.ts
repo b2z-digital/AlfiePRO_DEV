@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import pako from "npm:pako@2.1.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -54,16 +53,40 @@ function splitTextIntoChunks(text: string): string[] {
   return chunks.filter((c) => c.length > 50);
 }
 
-function inflateStream(compressedData: Uint8Array): Uint8Array | null {
-  try {
-    return pako.inflate(compressedData);
-  } catch {
+async function inflateStreamAsync(compressedData: Uint8Array): Promise<Uint8Array | null> {
+  for (const format of ["deflate", "raw"] as const) {
     try {
-      return pako.inflateRaw(compressedData);
+      const ds = new DecompressionStream(format);
+      const writer = ds.writable.getWriter();
+      const reader = ds.readable.getReader();
+      const chunks: Uint8Array[] = [];
+
+      const readPromise = (async () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+      })();
+
+      await writer.write(compressedData);
+      await writer.close();
+      await readPromise;
+
+      let totalLen = 0;
+      for (const c of chunks) totalLen += c.length;
+      const result = new Uint8Array(totalLen);
+      let offset = 0;
+      for (const c of chunks) {
+        result.set(c, offset);
+        offset += c.length;
+      }
+      return result;
     } catch {
-      return null;
+      continue;
     }
   }
+  return null;
 }
 
 function extractTextOperators(content: string): string[] {
@@ -123,7 +146,7 @@ function extractTextOperators(content: string): string[] {
   return segments;
 }
 
-function extractTextFromPdf(pdfBytes: Uint8Array): string {
+async function extractTextFromPdf(pdfBytes: Uint8Array): Promise<string> {
   const decoder = new TextDecoder("latin1");
   const raw = decoder.decode(pdfBytes);
   console.log(`PDF raw size: ${raw.length} chars`);
@@ -134,8 +157,10 @@ function extractTextFromPdf(pdfBytes: Uint8Array): string {
   let flateStreams = 0;
   let decompressedStreams = 0;
 
+  const streamEntries: { isFlate: boolean; bytes: Uint8Array | null; rawStr: string }[] = [];
+
   let searchPos = 0;
-  while (allTextSegments.length < maxSegments) {
+  while (streamEntries.length < 500) {
     const sIdx = raw.indexOf("stream", searchPos);
     if (sIdx === -1) break;
 
@@ -159,16 +184,25 @@ function extractTextFromPdf(pdfBytes: Uint8Array): string {
     const lookbackStart = Math.max(0, sIdx - 500);
     const objDict = raw.substring(lookbackStart, sIdx);
     const isFlate = objDict.includes("/FlateDecode");
+    const streamRaw = raw.substring(streamContentStart, eIdx);
 
     if (isFlate) {
       flateStreams++;
-      const streamRaw = raw.substring(streamContentStart, eIdx);
       const streamBytes = new Uint8Array(streamRaw.length);
       for (let k = 0; k < streamRaw.length; k++) {
         streamBytes[k] = streamRaw.charCodeAt(k);
       }
+      streamEntries.push({ isFlate: true, bytes: streamBytes, rawStr: "" });
+    } else {
+      streamEntries.push({ isFlate: false, bytes: null, rawStr: streamRaw });
+    }
+  }
 
-      const decompressed = inflateStream(streamBytes);
+  for (const entry of streamEntries) {
+    if (allTextSegments.length >= maxSegments) break;
+
+    if (entry.isFlate && entry.bytes) {
+      const decompressed = await inflateStreamAsync(entry.bytes);
       if (decompressed) {
         decompressedStreams++;
         const textDecoder = new TextDecoder("latin1");
@@ -179,9 +213,8 @@ function extractTextFromPdf(pdfBytes: Uint8Array): string {
           allTextSegments.push(seg);
         }
       }
-    } else {
-      const streamRaw = raw.substring(streamContentStart, eIdx);
-      const segments = extractTextOperators(streamRaw);
+    } else if (!entry.isFlate) {
+      const segments = extractTextOperators(entry.rawStr);
       for (const seg of segments) {
         if (allTextSegments.length >= maxSegments) break;
         allTextSegments.push(seg);
@@ -257,7 +290,7 @@ async function processGuide(supabase: any, guideId: string) {
   const pdfBytes = await downloadFromStorage(guide.storage_path);
   console.log(`Downloaded ${pdfBytes.length} bytes for guide ${guideId}`);
 
-  let extractedText = extractTextFromPdf(pdfBytes);
+  let extractedText = await extractTextFromPdf(pdfBytes);
   console.log(`Extracted ${extractedText.length} chars of text`);
 
   if (extractedText.trim().length < 100) {
@@ -349,7 +382,7 @@ async function processDocument(supabase: any, documentId: string) {
   const pdfBytes = await downloadFromStorage(doc.storage_path);
   console.log(`Downloaded ${pdfBytes.length} bytes for document ${documentId}`);
 
-  let extractedText = extractTextFromPdf(pdfBytes);
+  let extractedText = await extractTextFromPdf(pdfBytes);
   console.log(`Extracted ${extractedText.length} chars of text`);
 
   if (extractedText.trim().length < 100) {
