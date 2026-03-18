@@ -480,17 +480,44 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const forceYouTubeLive = async () => {
     if (!activeSession?.youtube_broadcast_id) return;
     setForcingYouTubeLive(true);
+    const apiBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
+      const headers = { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' };
       const broadcastId = activeSession.youtube_broadcast_id;
+      let streamId = (activeSession as any)?.youtube_stream_id;
 
-      const statusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      addNotification('info', 'Checking YouTube broadcast status...', 3000);
+      const statusResponse = await fetch(apiBase, {
+        method: 'POST', headers,
         body: JSON.stringify({ action: 'getBroadcastStatus', clubId, sessionData: { broadcastId } }),
       });
       const statusData = await statusResponse.json();
-      const currentStatus = statusData?.items?.[0]?.status?.lifeCycleStatus;
+      const broadcast = statusData?.items?.[0];
+      const currentStatus = broadcast?.status?.lifeCycleStatus;
+
+      if (!streamId && broadcast?.contentDetails?.boundStreamId) {
+        streamId = broadcast.contentDetails.boundStreamId;
+      }
+
+      if (streamId) {
+        const streamRes = await fetch(apiBase, {
+          method: 'POST', headers,
+          body: JSON.stringify({ action: 'getStreamStatus', clubId, sessionData: { streamId } }),
+        });
+        if (streamRes.ok) {
+          const streamData = await streamRes.json();
+          const streamHealth = streamData?.items?.[0]?.status?.streamStatus;
+          if (streamHealth === 'inactive' || streamHealth === 'noData') {
+            addNotification('error', `YouTube stream status is "${streamHealth}". Cloudflare is not yet sending data to YouTube. Wait 30-60 seconds for the relay to connect, then try again.`, 12000);
+            return;
+          }
+          if (streamHealth === 'active' || streamHealth === 'ready') {
+            addNotification('info', `YouTube stream is receiving data (${streamHealth}). Proceeding with transition...`, 3000);
+          }
+        }
+      }
 
       if (currentStatus === 'live') {
         setYoutubeStatus('live');
@@ -500,39 +527,62 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
       if (currentStatus === 'ready' || currentStatus === 'created') {
         addNotification('info', 'Transitioning YouTube to testing...', 3000);
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-          method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        const testingRes = await fetch(apiBase, {
+          method: 'POST', headers,
           body: JSON.stringify({ action: 'transitionBroadcast', clubId, sessionData: { broadcastId, broadcastStatus: 'testing' } }),
         });
-        setYoutubeStatus('testing');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        const testingData = await testingRes.json();
+        if (!testingRes.ok) {
+          const reason = testingData?.reason || '';
+          const errorMsg = testingData?.error || 'Unknown error';
+          if (reason === 'redundantTransition') {
+            setYoutubeStatus('testing');
+          } else if (reason === 'errorStreamInactive' || errorMsg.includes('Invalid transition')) {
+            addNotification('error', 'YouTube cannot start testing because no stream data is arriving. Cloudflare may still be connecting its relay to YouTube. Wait 30-60 seconds and try again.', 12000);
+            return;
+          } else {
+            addNotification('error', `Failed to start testing: ${errorMsg}`, 8000);
+            return;
+          }
+        } else {
+          setYoutubeStatus('testing');
+        }
+        await new Promise(resolve => setTimeout(resolve, 8000));
+      }
+
+      if (currentStatus === 'testStarting') {
+        addNotification('info', 'YouTube is still starting its test. Waiting...', 3000);
+        await new Promise(resolve => setTimeout(resolve, 10000));
       }
 
       addNotification('info', 'Transitioning YouTube to live...', 3000);
-      const liveResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      const liveResponse = await fetch(apiBase, {
+        method: 'POST', headers,
         body: JSON.stringify({ action: 'transitionBroadcast', clubId, sessionData: { broadcastId, broadcastStatus: 'live' } }),
       });
+      const liveData = await liveResponse.json();
 
-      if (liveResponse.ok) {
+      if (liveResponse.ok && liveData?.success) {
         setYoutubeStatus('live');
         addNotification('success', 'YouTube is now live!', 5000);
         stopYouTubeMonitor();
       } else {
-        const errorData = await liveResponse.json();
-        const errorMsg = errorData?.error || 'Failed to transition';
-        if (errorMsg.includes('redundantTransition')) {
+        const reason = liveData?.reason || '';
+        const errorMsg = liveData?.error || 'Failed to transition';
+        if (reason === 'redundantTransition') {
           setYoutubeStatus('live');
           addNotification('success', 'YouTube is already live!', 3000);
-        } else if (errorMsg.includes('errorStreamInactive')) {
-          addNotification('error', 'YouTube cannot detect the stream yet. The Cloudflare relay may need a moment to connect. Try again in 30 seconds.', 10000);
+        } else if (reason === 'errorStreamInactive' || errorMsg.includes('Invalid transition')) {
+          addNotification('error', 'YouTube rejected the transition. The stream data may not be arriving yet. Wait 30-60 seconds for Cloudflare to relay to YouTube, then try again.', 12000);
+        } else if (reason === 'liveStreamingNotEnabled') {
+          addNotification('error', 'Live streaming is not enabled on this YouTube account. Enable it at youtube.com/features.', 10000);
         } else {
           addNotification('error', `YouTube transition failed: ${errorMsg}`, 8000);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Force YouTube live error:', error);
-      addNotification('error', 'Failed to force YouTube live. Check the console for details.', 5000);
+      addNotification('error', `Failed to force YouTube live: ${error.message || 'Unknown error'}`, 5000);
     } finally {
       setForcingYouTubeLive(false);
     }

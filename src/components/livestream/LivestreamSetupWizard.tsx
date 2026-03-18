@@ -506,6 +506,7 @@ export function LivestreamSetupWizard({
 
                 sessionData.youtube_stream_key = streamKey;
                 sessionData.youtube_stream_url = preferredUrl;
+                sessionData.youtube_stream_id = streamData.stream.id;
                 sessionData.youtube_rtmp_url = preferredUrl ? `${preferredUrl}/${streamKey}` : undefined;
 
                 // Bind broadcast to stream

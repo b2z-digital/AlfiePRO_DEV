@@ -436,7 +436,17 @@ async function transitionBroadcast(
   );
 
   if (!response.ok) {
-    throw new Error(`YouTube API error: ${JSON.stringify(data)}`);
+    const errorReason = data?.error?.errors?.[0]?.reason || '';
+    const errorMessage = data?.error?.message || JSON.stringify(data);
+    return new Response(
+      JSON.stringify({
+        error: errorMessage,
+        reason: errorReason,
+        code: data?.error?.code || response.status,
+        details: data
+      }),
+      { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   return new Response(
