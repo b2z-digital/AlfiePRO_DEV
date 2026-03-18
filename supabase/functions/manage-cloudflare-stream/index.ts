@@ -282,9 +282,22 @@ async function addOutput(
   let { liveInputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Adding output to live input:", liveInputId);
-  console.log("[CF Stream] Stream URL:", streamUrl);
+  console.log("[CF Stream] Original Stream URL:", streamUrl);
   console.log("[CF Stream] Stream key length:", streamKey?.length);
   console.log("[CF Stream] Stream key first 10 chars:", streamKey?.substring(0, 10));
+
+  if (streamUrl && streamUrl.startsWith('rtmps://')) {
+    const originalUrl = streamUrl;
+    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
+    console.log("[CF Stream] Converted RTMPS to RTMP:", originalUrl, "->", streamUrl);
+  }
+
+  if (!streamUrl && streamKey) {
+    streamUrl = 'rtmp://a.rtmp.youtube.com/live2';
+    console.log("[CF Stream] No stream URL provided, defaulting to YouTube RTMP:", streamUrl);
+  }
+
+  console.log("[CF Stream] Final Stream URL:", streamUrl);
 
   const outputPayload = {
     url: streamUrl,
@@ -616,8 +629,18 @@ async function recreateOutput(
   let { liveInputId, outputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Recreating output:", { liveInputId, outputId });
-  console.log("[CF Stream] Stream URL:", streamUrl);
+  console.log("[CF Stream] Original Stream URL:", streamUrl);
   console.log("[CF Stream] StreamKey provided:", !!streamKey);
+
+  if (streamUrl && streamUrl.startsWith('rtmps://')) {
+    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
+    console.log("[CF Stream] Converted RTMPS to RTMP for recreate:", streamUrl);
+  }
+
+  if (!streamUrl && streamKey) {
+    streamUrl = 'rtmp://a.rtmp.youtube.com/live2';
+    console.log("[CF Stream] No stream URL provided, defaulting to YouTube RTMP:", streamUrl);
+  }
 
   if (!liveInputId) {
     return new Response(

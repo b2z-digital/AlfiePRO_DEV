@@ -510,11 +510,83 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           const streamData = await streamRes.json();
           const streamHealth = streamData?.items?.[0]?.status?.streamStatus;
           if (streamHealth === 'inactive' || streamHealth === 'noData') {
-            addNotification('error', `YouTube stream status is "${streamHealth}". Cloudflare is not yet sending data to YouTube. Wait 30-60 seconds for the relay to connect, then try again.`, 12000);
+            const cfApiBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
+            const liveInputId = (activeSession as any)?.cloudflare_live_input_id;
+            const outputId = (activeSession as any)?.cloudflare_output_id;
+
+            if (liveInputId) {
+              addNotification('info', 'YouTube stream inactive. Diagnosing Cloudflare relay...', 5000);
+              const inputRes = await fetch(cfApiBase, {
+                method: 'POST', headers,
+                body: JSON.stringify({ action: 'getLiveInput', clubId, sessionData: { liveInputId } }),
+              });
+              if (inputRes.ok) {
+                const inputData = await inputRes.json();
+                const outputs = inputData?.liveInput?.outputs || [];
+                const ytOutput = outputs.find((o: any) => o.url?.includes('youtube') || o.url?.includes('rtmp'));
+
+                if (outputs.length === 0 || !ytOutput) {
+                  addNotification('info', 'No YouTube relay output found. Creating one now...', 5000);
+                  const ytStreamKey = activeSession.youtube_stream_key;
+                  if (ytStreamKey) {
+                    const createRes = await fetch(cfApiBase, {
+                      method: 'POST', headers,
+                      body: JSON.stringify({
+                        action: 'addOutput', clubId,
+                        sessionData: { liveInputId, streamUrl: 'rtmp://a.rtmp.youtube.com/live2', streamKey: ytStreamKey }
+                      }),
+                    });
+                    const createData = await createRes.json();
+                    if (createRes.ok && createData?.output) {
+                      addNotification('success', 'Cloudflare relay to YouTube created. Wait 30 seconds then try Force Live again.', 10000);
+                    } else {
+                      addNotification('error', `Failed to create relay: ${createData?.error || 'Unknown error'}`, 8000);
+                    }
+                  } else {
+                    addNotification('error', 'Cannot create relay -- no YouTube stream key stored in session.', 8000);
+                  }
+                  return;
+                }
+
+                if (ytOutput && ytOutput.url?.includes('rtmps://')) {
+                  addNotification('info', 'Relay is using RTMPS which Cloudflare does not support. Recreating with RTMP...', 5000);
+                  const ytStreamKey = activeSession.youtube_stream_key || ytOutput.streamKey;
+                  const recreateRes = await fetch(cfApiBase, {
+                    method: 'POST', headers,
+                    body: JSON.stringify({
+                      action: 'recreateOutput', clubId,
+                      sessionData: { liveInputId, outputId: ytOutput.uid, streamUrl: 'rtmp://a.rtmp.youtube.com/live2', streamKey: ytStreamKey }
+                    }),
+                  });
+                  const recreateData = await recreateRes.json();
+                  if (recreateRes.ok && recreateData?.success) {
+                    addNotification('success', 'Relay recreated with correct RTMP URL. Wait 30 seconds then try Force Live again.', 10000);
+                  } else {
+                    addNotification('error', `Failed to recreate relay: ${recreateData?.error || 'Unknown error'}`, 8000);
+                  }
+                  return;
+                }
+
+                if (ytOutput && !ytOutput.enabled) {
+                  addNotification('info', 'Relay output is disabled. Re-enabling...', 5000);
+                  await fetch(cfApiBase, {
+                    method: 'POST', headers,
+                    body: JSON.stringify({ action: 'updateOutput', clubId, sessionData: { liveInputId, outputId: ytOutput.uid, enabled: true } }),
+                  });
+                  addNotification('success', 'Relay re-enabled. Wait 30 seconds then try Force Live again.', 10000);
+                  return;
+                }
+
+                addNotification('error', `YouTube stream is "${streamHealth}" but Cloudflare relay looks configured. The relay may need time to connect. Wait 60 seconds and try again.`, 12000);
+                return;
+              }
+            }
+
+            addNotification('error', `YouTube stream status is "${streamHealth}". Cloudflare relay may not be sending data. Wait 30-60 seconds and try again.`, 12000);
             return;
           }
           if (streamHealth === 'active' || streamHealth === 'ready') {
-            addNotification('info', `YouTube stream is receiving data (${streamHealth}). Proceeding with transition...`, 3000);
+            addNotification('info', `YouTube stream is receiving data (${streamHealth}). Proceeding...`, 3000);
           }
         }
       }

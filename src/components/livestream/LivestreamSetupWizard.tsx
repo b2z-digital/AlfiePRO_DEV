@@ -530,7 +530,13 @@ export function LivestreamSetupWizard({
 
                   setLoadingMessage('Creating Cloudflare → YouTube relay output...');
                   try {
-                    const outputStreamUrl = rtmpUrl || rtmpsUrl;
+                    let outputStreamUrl = rtmpUrl || rtmpsUrl || '';
+                    if (outputStreamUrl.startsWith('rtmps://')) {
+                      outputStreamUrl = outputStreamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
+                    }
+                    if (!outputStreamUrl) {
+                      outputStreamUrl = 'rtmp://a.rtmp.youtube.com/live2';
+                    }
                     console.log('[LivestreamWizard] Creating Cloudflare output to YouTube RTMP:', outputStreamUrl, 'key:', streamKey?.substring(0, 4) + '...');
                     const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
                       method: 'POST',
