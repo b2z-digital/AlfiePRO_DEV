@@ -46,6 +46,7 @@ export interface LivestreamSession {
   cloudflare_whip_url?: string;
   cloudflare_whip_playback_url?: string;
   cloudflare_output_id?: string;
+  cloudflare_customer_code?: string;
 
   streaming_mode: 'direct_youtube' | 'cloudflare_relay';
 
@@ -154,9 +155,14 @@ export interface LivestreamArchive {
   session_id: string;
   club_id: string;
 
-  youtube_video_id: string;
-  youtube_url: string;
+  youtube_video_id?: string;
+  youtube_url?: string;
   thumbnail_url?: string;
+
+  cloudflare_video_id?: string;
+  cloudflare_customer_code?: string;
+  cloudflare_playback_url?: string;
+  source?: 'youtube' | 'cloudflare';
 
   event_id?: string;
   heat_number?: number;

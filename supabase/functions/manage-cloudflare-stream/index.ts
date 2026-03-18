@@ -94,6 +94,9 @@ Deno.serve(async (req: Request) => {
       case "recreateOutput":
         return await recreateOutput(credentials, sessionData, corsHeaders);
 
+      case "getRecordings":
+        return await getRecordings(credentials, sessionData, corsHeaders);
+
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action" }),
@@ -282,9 +285,22 @@ async function addOutput(
   let { liveInputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Adding output to live input:", liveInputId);
-  console.log("[CF Stream] Stream URL:", streamUrl);
+  console.log("[CF Stream] Original Stream URL:", streamUrl);
   console.log("[CF Stream] Stream key length:", streamKey?.length);
   console.log("[CF Stream] Stream key first 10 chars:", streamKey?.substring(0, 10));
+
+  if (streamUrl && streamUrl.startsWith('rtmps://')) {
+    const originalUrl = streamUrl;
+    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
+    console.log("[CF Stream] Converted RTMPS to RTMP:", originalUrl, "->", streamUrl);
+  }
+
+  if (!streamUrl && streamKey) {
+    streamUrl = 'rtmp://a.rtmp.youtube.com/live2';
+    console.log("[CF Stream] No stream URL provided, defaulting to YouTube RTMP:", streamUrl);
+  }
+
+  console.log("[CF Stream] Final Stream URL:", streamUrl);
 
   const outputPayload = {
     url: streamUrl,
@@ -616,8 +632,18 @@ async function recreateOutput(
   let { liveInputId, outputId, streamUrl, streamKey } = sessionData;
 
   console.log("[CF Stream] Recreating output:", { liveInputId, outputId });
-  console.log("[CF Stream] Stream URL:", streamUrl);
+  console.log("[CF Stream] Original Stream URL:", streamUrl);
   console.log("[CF Stream] StreamKey provided:", !!streamKey);
+
+  if (streamUrl && streamUrl.startsWith('rtmps://')) {
+    streamUrl = streamUrl.replace('rtmps://', 'rtmp://').replace('.rtmps.', '.rtmp.');
+    console.log("[CF Stream] Converted RTMPS to RTMP for recreate:", streamUrl);
+  }
+
+  if (!streamUrl && streamKey) {
+    streamUrl = 'rtmp://a.rtmp.youtube.com/live2';
+    console.log("[CF Stream] No stream URL provided, defaulting to YouTube RTMP:", streamUrl);
+  }
 
   if (!liveInputId) {
     return new Response(
@@ -686,6 +712,57 @@ async function recreateOutput(
 
   return new Response(
     JSON.stringify({ success: true, output: createData.result, recreated: true, newOutputId: createData.result?.uid }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function getRecordings(
+  credentials: CloudflareCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  const { liveInputId } = sessionData;
+
+  console.log("[CF Stream] Getting recordings for live input:", liveInputId);
+
+  const response = await fetch(
+    `${CF_API_BASE}/accounts/${credentials.account_id}/stream?search=${liveInputId}&type=live`,
+    {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${credentials.api_token}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    console.error("[CF Stream] Error getting recordings:", data);
+    return new Response(
+      JSON.stringify({ error: data.errors?.[0]?.message || "Failed to get recordings" }),
+      { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const recordings = (data.result || []).map((video: any) => ({
+    uid: video.uid,
+    duration: video.duration,
+    thumbnail: video.thumbnail,
+    thumbnailTimestampPct: video.thumbnailTimestampPct,
+    readyToStream: video.readyToStream,
+    status: video.status,
+    created: video.created,
+    size: video.size,
+    preview: video.preview,
+    playback: video.playback,
+    liveInput: video.liveInput,
+  }));
+
+  console.log("[CF Stream] Found", recordings.length, "recordings");
+
+  return new Response(
+    JSON.stringify({ success: true, recordings }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }

@@ -2,22 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
-import {
-  Play,
-  Plus,
-  Search,
-  Info,
-  Volume2,
-  VolumeX,
-  ChevronLeft,
-  ChevronRight,
-  Settings,
-  X,
-  LogOut,
-  Youtube,
-  Filter,
-  Lightbulb
-} from 'lucide-react';
+import { Play, Plus, Search, Info, Volume2, VolumeX, ChevronLeft, ChevronRight, Settings, X, LogOut, Youtube, ListFilter as Filter, Lightbulb, Radio, Calendar } from 'lucide-react';
 import { alfieTVStorage, AlfieTVVideo } from '../utils/alfieTVStorage';
 import { useNotification } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -26,6 +11,7 @@ import { SuggestChannelModal } from '../components/alfie-tv/SuggestChannelModal'
 import { Logo } from '../components/Logo';
 import { getPersonalizedVideos, trackVideoView, getUserPreferences } from '../utils/alfieTVPersonalization';
 import { AdDisplay } from '../components/advertising/AdDisplay';
+import type { LivestreamSession, LivestreamArchive } from '../types/livestream';
 
 interface AlfieTVPageProps {
   darkMode?: boolean;
@@ -50,6 +36,53 @@ interface Channel {
   is_visible?: boolean;
   category?: string;
 }
+
+const LiveStreamPlayerModal = React.memo(({ session, onClose }: { session: LivestreamSession | null; onClose: () => void }) => {
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    if (session) {
+      window.addEventListener('keydown', handleEscape);
+      return () => window.removeEventListener('keydown', handleEscape);
+    }
+  }, [session, onClose]);
+
+  if (!session?.cloudflare_live_input_id || !session?.cloudflare_customer_code) return null;
+
+  const embedUrl = `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`;
+
+  return (
+    <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+      <iframe
+        src={embedUrl}
+        className="absolute inset-0 w-full h-full"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        title={session.title || 'Live Stream'}
+        loading="eager"
+        style={{ border: 'none' }}
+      />
+      <button
+        onClick={onClose}
+        className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
+        style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999, cursor: 'pointer' }}
+        title="Close (ESC)"
+        type="button"
+      >
+        <LogOut className="w-7 h-7 stroke-[2.5]" />
+      </button>
+      <div
+        className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
+        style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
+      >
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+        </span>
+        <span className="text-white font-medium text-sm">{session.title}</span>
+      </div>
+    </div>
+  );
+});
 
 // Hero video background component - MUST be outside to prevent re-creation on parent renders
 // Uses internal state to track current video and prevent reloads
@@ -279,6 +312,11 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [watchlist, setWatchlist] = useState<AlfieTVVideo[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [showSuggestChannel, setShowSuggestChannel] = useState(false);
+  const [liveStreams, setLiveStreams] = useState<LivestreamSession[]>([]);
+  const [upcomingStreams, setUpcomingStreams] = useState<LivestreamSession[]>([]);
+  const [replayArchives, setReplayArchives] = useState<LivestreamArchive[]>([]);
+  const [selectedLiveStream, setSelectedLiveStream] = useState<LivestreamSession | null>(null);
+  const [selectedReplay, setSelectedReplay] = useState<LivestreamArchive | null>(null);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
 
   // Get organization ID for both clubs and associations
@@ -309,6 +347,49 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       loadContent();
     }
   }, [organizationId]);
+
+  useEffect(() => {
+    const loadLiveStreams = async () => {
+      try {
+        const { data } = await supabase
+          .from('livestream_sessions')
+          .select('*')
+          .in('status', ['live', 'testing'])
+          .eq('is_public', true)
+          .not('cloudflare_live_input_id', 'is', null)
+          .not('cloudflare_customer_code', 'is', null)
+          .order('actual_start_time', { ascending: false });
+        setLiveStreams(data || []);
+
+        const oneWeekFromNow = new Date();
+        oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+        const { data: upcoming } = await supabase
+          .from('livestream_sessions')
+          .select('*')
+          .eq('status', 'scheduled')
+          .eq('is_public', true)
+          .not('scheduled_start_time', 'is', null)
+          .gte('scheduled_start_time', new Date().toISOString())
+          .lte('scheduled_start_time', oneWeekFromNow.toISOString())
+          .order('scheduled_start_time', { ascending: true })
+          .limit(3);
+        setUpcomingStreams(upcoming || []);
+
+        const { data: archives } = await supabase
+          .from('livestream_archives')
+          .select('*')
+          .eq('is_public', true)
+          .order('recorded_at', { ascending: false })
+          .limit(20);
+        setReplayArchives(archives || []);
+      } catch (err) {
+        console.error('Error loading live streams:', err);
+      }
+    };
+    loadLiveStreams();
+    const interval = setInterval(loadLiveStreams, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadCachedData = () => {
     try {
@@ -629,6 +710,126 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     }
     return `${minutes}m`;
   };
+
+  const formatScheduledDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) return 'Starting soon';
+    if (diffHours < 24) return `In ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays < 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const LiveHero = ({ stream }: { stream: LivestreamSession }) => {
+    const embedUrl = stream.cloudflare_customer_code && stream.cloudflare_live_input_id
+      ? `https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`
+      : null;
+
+    return (
+      <div className="relative h-[85vh] w-full overflow-hidden">
+        {embedUrl ? (
+          <div className="absolute inset-0">
+            <iframe
+              src={embedUrl}
+              className="w-full h-full object-cover scale-110"
+              allow="autoplay"
+              style={{ pointerEvents: 'none', border: 'none' }}
+              loading="eager"
+            />
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
+
+        <div className="absolute bottom-[20%] left-20 right-0 px-12">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
+                </span>
+                <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
+              </div>
+              {stream.viewer_count > 0 && (
+                <span className="text-white/70 text-sm">{stream.viewer_count} watching</span>
+              )}
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
+              {stream.title}
+            </h1>
+            {stream.description && (
+              <p className="text-lg text-white/80 mb-6 line-clamp-2 drop-shadow-lg max-w-2xl">
+                {stream.description}
+              </p>
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedLiveStream(stream)}
+                className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
+              >
+                <Play className="w-6 h-6 fill-current" />
+                <span>Watch Live</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession }) => (
+    <div className="relative h-[85vh] w-full overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-transparent" />
+
+      <div className="absolute bottom-[20%] left-20 right-0 px-12">
+        <div className="max-w-3xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-3 py-1.5 rounded-md">
+              <Radio className="w-4 h-4 text-white" />
+              <span className="text-sm font-bold text-white uppercase tracking-wider">Coming Soon</span>
+            </div>
+            <span className="text-white/70 text-sm font-medium">
+              {formatScheduledDate(stream.scheduled_start_time!)}
+            </span>
+          </div>
+          <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
+            {stream.title}
+          </h1>
+          {stream.description && (
+            <p className="text-lg text-white/80 mb-6 line-clamp-2 drop-shadow-lg max-w-2xl">
+              {stream.description}
+            </p>
+          )}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 backdrop-blur-md text-white font-semibold border border-white/20">
+              <Calendar className="w-5 h-5" />
+              <span>
+                {new Date(stream.scheduled_start_time!).toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'long', day: 'numeric'
+                })}
+                {' at '}
+                {new Date(stream.scheduled_start_time!).toLocaleTimeString('en-US', {
+                  hour: 'numeric', minute: '2-digit'
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const HeroCarousel = () => {
     const currentHero = heroVideos[currentHeroIndex];
@@ -1137,8 +1338,12 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         </div>
       ) : (
         <>
-          {/* Hero Carousel */}
-          {loading && heroVideos.length === 0 ? (
+          {/* Hero Section: Live > Upcoming > Video Carousel */}
+          {liveStreams.length > 0 ? (
+            <LiveHero stream={liveStreams[0]} />
+          ) : upcomingStreams.length > 0 ? (
+            <UpcomingStreamHero stream={upcomingStreams[0]} />
+          ) : loading && heroVideos.length === 0 ? (
             <div className="relative h-[85vh] w-full overflow-hidden bg-gray-900">
               <div className="absolute inset-0 bg-gray-800/50 animate-pulse" />
             </div>
@@ -1181,6 +1386,165 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                       );
                     }
                   };
+
+                  // Additional live streams (shown as tiles if more than 1)
+                  if (liveStreams.length > 1) {
+                    rows.push(
+                      <div key="more-live" className="mb-10">
+                        <div className="flex items-center gap-3 mb-5">
+                          <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                          </span>
+                          <h2 className="text-2xl font-bold text-white">Also Live</h2>
+                        </div>
+                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
+                          {liveStreams.slice(1).map(stream => (
+                            <div
+                              key={stream.id}
+                              onClick={() => setSelectedLiveStream(stream)}
+                              className="group flex-shrink-0 cursor-pointer"
+                              style={{ width: '400px' }}
+                            >
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border-2 border-red-500/50 group-hover:border-red-500 transition-colors">
+                                {stream.cloudflare_customer_code && stream.cloudflare_live_input_id ? (
+                                  <iframe
+                                    src={`https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`}
+                                    className="absolute inset-0 w-full h-full pointer-events-none"
+                                    allow="autoplay"
+                                    style={{ border: 'none' }}
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Radio className="w-12 h-12 text-red-500 animate-pulse" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                                  </span>
+                                  Live
+                                </div>
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                    <Play className="w-7 h-7 text-white fill-white ml-1" />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2.5">
+                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{stream.title}</h3>
+                                {stream.description && (
+                                  <p className="text-gray-500 text-xs mt-0.5 truncate">{stream.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                    rowIndex++;
+                  }
+
+                  // Upcoming streams row (when not already in hero)
+                  if (upcomingStreams.length > (liveStreams.length === 0 ? 1 : 0)) {
+                    const streamsToShow = liveStreams.length === 0 ? upcomingStreams.slice(1) : upcomingStreams;
+                    if (streamsToShow.length > 0) {
+                      rows.push(
+                        <div key="upcoming-streams" className="mb-10">
+                          <div className="flex items-center gap-3 mb-5">
+                            <Calendar className="w-5 h-5 text-blue-400" />
+                            <h2 className="text-2xl font-bold text-white">Coming Soon</h2>
+                          </div>
+                          <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
+                            {streamsToShow.map(stream => (
+                              <div
+                                key={stream.id}
+                                className="flex-shrink-0 rounded-lg overflow-hidden bg-gray-800/50 border border-gray-700/50"
+                                style={{ width: '400px' }}
+                              >
+                                <div className="relative aspect-video bg-gradient-to-br from-gray-800 via-blue-950/20 to-gray-800 flex items-center justify-center">
+                                  <Radio className="w-12 h-12 text-blue-400/50" />
+                                  <div className="absolute top-3 left-3 flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
+                                    <Calendar className="w-3 h-3" />
+                                    {formatScheduledDate(stream.scheduled_start_time!)}
+                                  </div>
+                                </div>
+                                <div className="p-3">
+                                  <h3 className="text-white font-semibold text-sm truncate">{stream.title}</h3>
+                                  <p className="text-gray-500 text-xs mt-1">
+                                    {new Date(stream.scheduled_start_time!).toLocaleDateString('en-US', {
+                                      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                      rowIndex++;
+                    }
+                  }
+
+                  if (replayArchives.length > 0) {
+                    rows.push(
+                      <div key="race-replays" className="mb-10">
+                        <div className="flex items-center gap-3 mb-5 px-12">
+                          <Play className="w-5 h-5 text-blue-400" />
+                          <h2 className="text-2xl font-bold text-white">Race Replays</h2>
+                        </div>
+                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide px-12">
+                          {replayArchives.map(archive => (
+                            <div
+                              key={archive.id}
+                              onClick={() => setSelectedReplay(archive)}
+                              className="group flex-shrink-0 cursor-pointer"
+                              style={{ width: '320px' }}
+                            >
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border border-gray-700/50 group-hover:border-blue-500/50 transition-colors">
+                                {archive.thumbnail_url ? (
+                                  <img
+                                    src={archive.thumbnail_url}
+                                    alt={archive.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-blue-950/30 to-gray-800 flex items-center justify-center">
+                                    <Play className="w-10 h-10 text-gray-600" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                    <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+                                  </div>
+                                </div>
+                                {archive.duration && archive.duration > 0 && (
+                                  <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 rounded text-[11px] text-white font-medium">
+                                    {formatDuration(archive.duration)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-2.5">
+                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{archive.title}</h3>
+                                <div className="flex items-center gap-3 mt-1 text-gray-500 text-xs">
+                                  {archive.view_count > 0 && (
+                                    <span>{archive.view_count.toLocaleString()} views</span>
+                                  )}
+                                  <span>{new Date(archive.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                    rowIndex++;
+                    maybeAddAd();
+                  }
 
                   // Continue Watching
                   if (continueWatching.length > 0) {
@@ -1348,6 +1712,47 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       <div className="h-32" />
     </div>
     <FullscreenVideoModal video={selectedVideo} onClose={handleCloseVideo} />
+    <LiveStreamPlayerModal session={selectedLiveStream} onClose={() => setSelectedLiveStream(null)} />
+    {selectedReplay && (
+      <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+        {selectedReplay.source === 'cloudflare' && selectedReplay.cloudflare_playback_url ? (
+          <iframe
+            src={`${selectedReplay.cloudflare_playback_url}?autoplay=true&muted=false&preload=auto&letterboxColor=000000`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
+            title={selectedReplay.title}
+            style={{ border: 'none' }}
+          />
+        ) : selectedReplay.youtube_video_id ? (
+          <iframe
+            src={`https://www.youtube.com/embed/${selectedReplay.youtube_video_id}?autoplay=1`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title={selectedReplay.title}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="text-gray-400">Replay not available</p>
+          </div>
+        )}
+        <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/80 to-transparent z-10 flex items-start justify-between">
+          <div>
+            <h2 className="text-white text-xl font-bold">{selectedReplay.title}</h2>
+            {selectedReplay.description && (
+              <p className="text-gray-400 text-sm mt-1 max-w-2xl">{selectedReplay.description}</p>
+            )}
+          </div>
+          <button
+            onClick={() => setSelectedReplay(null)}
+            className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors ml-4 flex-shrink-0"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+        </div>
+      </div>
+    )}
     <SuggestChannelModal
       isOpen={showSuggestChannel}
       onClose={() => setShowSuggestChannel(false)}
