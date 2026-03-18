@@ -559,6 +559,20 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const actualStartTime = new Date().toISOString();
       const streamToSend = activePreviewStream || mediaStream;
       if (!streamToSend) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
+      if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_live_input_id) {
+        try {
+          const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
+          await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'ensureRecording',
+              clubId: activeSession.club_id,
+              sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
+            }),
+          });
+        } catch (e) { console.warn('Could not verify recording mode:', e); }
+      }
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Connecting to streaming server...', 3000);
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);

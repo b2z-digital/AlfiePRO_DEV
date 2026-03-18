@@ -97,6 +97,9 @@ Deno.serve(async (req: Request) => {
       case "getRecordings":
         return await getRecordings(credentials, sessionData, corsHeaders);
 
+      case "ensureRecording":
+        return await ensureRecording(credentials, sessionData, corsHeaders);
+
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action" }),
@@ -763,6 +766,71 @@ async function getRecordings(
 
   return new Response(
     JSON.stringify({ success: true, recordings }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function ensureRecording(
+  credentials: CloudflareCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  const { liveInputId } = sessionData;
+
+  console.log("[CF Stream] Ensuring recording is enabled for live input:", liveInputId);
+
+  const getResponse = await fetch(
+    `${CF_API_BASE}/accounts/${credentials.account_id}/stream/live_inputs/${liveInputId}`,
+    {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${credentials.api_token}` },
+    }
+  );
+
+  const getData = await getResponse.json();
+  if (!getResponse.ok || !getData.success) {
+    return new Response(
+      JSON.stringify({ error: getData.errors?.[0]?.message || "Failed to get live input" }),
+      { status: getResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const currentMode = getData.result?.recording?.mode;
+  console.log("[CF Stream] Current recording mode:", currentMode);
+
+  if (currentMode === "automatic") {
+    return new Response(
+      JSON.stringify({ success: true, message: "Recording already enabled", mode: currentMode }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const updateResponse = await fetch(
+    `${CF_API_BASE}/accounts/${credentials.account_id}/stream/live_inputs/${liveInputId}`,
+    {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${credentials.api_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recording: { mode: "automatic", timeoutSeconds: 0, requireSignedURLs: false },
+      }),
+    }
+  );
+
+  const updateData = await updateResponse.json();
+  if (!updateResponse.ok || !updateData.success) {
+    console.error("[CF Stream] Error enabling recording:", updateData);
+    return new Response(
+      JSON.stringify({ error: updateData.errors?.[0]?.message || "Failed to enable recording" }),
+      { status: updateResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log("[CF Stream] Recording enabled successfully for:", liveInputId);
+  return new Response(
+    JSON.stringify({ success: true, message: "Recording enabled", mode: "automatic" }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }

@@ -43,8 +43,9 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   venueImage?: string;
   clubName?: string;
 }) => {
-  const [isPaused, setIsPaused] = React.useState(false);
-  const [isEnded, setIsEnded] = React.useState(false);
+  const [isPaused, setIsPaused] = React.useState(session?.is_paused || false);
+  const [isEnded, setIsEnded] = React.useState(session?.status === 'ended');
+  const [iframeKey, setIframeKey] = React.useState(0);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -53,6 +54,12 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       return () => window.removeEventListener('keydown', handleEscape);
     }
   }, [session, onClose]);
+
+  React.useEffect(() => {
+    if (!session) return;
+    setIsPaused(session.is_paused || false);
+    setIsEnded(session.status === 'ended');
+  }, [session?.id]);
 
   React.useEffect(() => {
     if (!session) return;
@@ -65,13 +72,37 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         filter: `id=eq.${session.id}`,
       }, (payload: any) => {
         const updated = payload.new;
-        if (updated.is_paused) setIsPaused(true);
-        else setIsPaused(false);
+        const wasPaused = isPaused;
+        if (updated.is_paused) {
+          setIsPaused(true);
+        } else {
+          setIsPaused(false);
+          if (wasPaused) {
+            setIframeKey(prev => prev + 1);
+          }
+        }
         if (updated.status === 'ended') setIsEnded(true);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [session?.id]);
+  }, [session?.id, isPaused]);
+
+  React.useEffect(() => {
+    if (!session || isPaused || isEnded) return;
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from('livestream_sessions')
+        .select('is_paused, status')
+        .eq('id', session.id)
+        .maybeSingle();
+      if (data) {
+        if (data.is_paused && !isPaused) setIsPaused(true);
+        if (!data.is_paused && isPaused) { setIsPaused(false); setIframeKey(prev => prev + 1); }
+        if (data.status === 'ended') setIsEnded(true);
+      }
+    }, 10000);
+    return () => clearInterval(pollInterval);
+  }, [session?.id, isPaused, isEnded]);
 
   if (!session?.cloudflare_live_input_id || !session?.cloudflare_customer_code) return null;
 
@@ -81,6 +112,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
     <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
       {!isPaused && !isEnded && (
         <iframe
+          key={`stream-${iframeKey}`}
           src={embedUrl}
           className="absolute inset-0 w-full h-full"
           allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
@@ -419,13 +451,53 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         .from('clubs')
         .select('id, name, cover_image_url, featured_image_url')
         .in('id', clubIds);
-      if (!clubs) return streams;
-      const clubMap = new Map(clubs.map(c => [c.id, c]));
+      const clubMap = new Map((clubs || []).map(c => [c.id, c]));
+
+      const eventIds = streams
+        .map(s => s.event_id)
+        .filter((id): id is string => !!id);
+      const rawEventIds = eventIds.map(id => id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, ''));
+      const uniqueEventIds = [...new Set(rawEventIds)];
+
+      let venueMap = new Map<string, { image: string | null; name: string }>();
+      if (uniqueEventIds.length > 0) {
+        const { data: events } = await supabase
+          .from('public_events')
+          .select('id, venue_id')
+          .in('id', uniqueEventIds);
+        if (events && events.length > 0) {
+          const venueIds = events.map(e => e.venue_id).filter((id): id is string => !!id);
+          if (venueIds.length > 0) {
+            const { data: venues } = await supabase
+              .from('venues')
+              .select('id, name, image')
+              .in('id', [...new Set(venueIds)]);
+            if (venues) {
+              const venueById = new Map(venues.map(v => [v.id, v]));
+              for (const event of events) {
+                if (event.venue_id && venueById.has(event.venue_id)) {
+                  venueMap.set(event.id, venueById.get(event.venue_id)!);
+                }
+              }
+            }
+          }
+        }
+      }
+
       return streams.map(s => {
         const club = clubMap.get(s.club_id);
+        let venueImage: string | undefined;
+        if (s.event_id) {
+          const baseEventId = s.event_id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, '');
+          const venue = venueMap.get(s.event_id) || venueMap.get(baseEventId);
+          if (venue?.image) venueImage = venue.image;
+        }
+        if (!venueImage) {
+          venueImage = club?.cover_image_url || club?.featured_image_url || undefined;
+        }
         return {
           ...s,
-          venue_image: club?.cover_image_url || club?.featured_image_url || undefined,
+          venue_image: venueImage,
           club_name: club?.name || undefined,
         };
       });
