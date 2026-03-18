@@ -65,7 +65,7 @@ export default function LivestreamPage() {
         )}
 
         {activeTab === 'archives' && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 lg:p-8 space-y-6">
             <div>
               <h2 className="text-xl font-semibold text-white mb-2">Race Replays</h2>
               <p className="text-slate-400">

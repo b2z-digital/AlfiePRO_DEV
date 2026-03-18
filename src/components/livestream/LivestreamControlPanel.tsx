@@ -479,6 +479,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const startYouTubeMonitor = (broadcastId: string, monitorClubId: string, accessToken: string) => {
     stopYouTubeMonitor();
     let ytLiveTransitioned = false;
+    let hasAttemptedTestingTransition = false;
     const checkYouTube = async () => {
       if (ytLiveTransitioned) { stopYouTubeMonitor(); return; }
       try {
@@ -492,7 +493,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         const lifecycleStatus = broadcast?.status?.lifeCycleStatus;
         const boundStreamId = broadcast?.contentDetails?.boundStreamId;
         setYoutubeStatus(lifecycleStatus || 'unknown');
-        if (lifecycleStatus === 'live') { ytLiveTransitioned = true; stopYouTubeMonitor(); return; }
+        if (lifecycleStatus === 'live') {
+          addNotification('success', 'Now streaming live on YouTube!', 5000);
+          ytLiveTransitioned = true; stopYouTubeMonitor(); return;
+        }
         if (boundStreamId) {
           const streamResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
             method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
@@ -500,23 +504,39 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           });
           const streamData = await streamResponse.json();
           if (streamData?.items?.length) {
+            const streamStatus = streamData.items[0]?.status?.streamStatus;
             const health = streamData.items[0]?.status?.healthStatus?.status;
-            if ((health === 'good' || health === 'ok') && lifecycleStatus === 'testing') {
-              const transResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'transitionBroadcast', clubId: monitorClubId, sessionData: { broadcastId, broadcastStatus: 'live' } }),
-              });
-              if (transResponse.ok) {
-                addNotification('success', 'Now streaming live on YouTube!', 5000);
-                ytLiveTransitioned = true; setYoutubeStatus('live'); stopYouTubeMonitor();
-              }
+
+            if (streamStatus === 'active' && !hasAttemptedTestingTransition && lifecycleStatus === 'ready') {
+              hasAttemptedTestingTransition = true;
+              try {
+                await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+                  method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'transitionBroadcast', clubId: monitorClubId, sessionData: { broadcastId, broadcastStatus: 'testing' } }),
+                });
+                setYoutubeStatus('testing');
+                addNotification('info', 'YouTube is testing the stream...', 5000);
+              } catch {}
+            }
+
+            if ((health === 'good' || health === 'ok' || streamStatus === 'active') && lifecycleStatus === 'testing') {
+              try {
+                const transResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+                  method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'transitionBroadcast', clubId: monitorClubId, sessionData: { broadcastId, broadcastStatus: 'live' } }),
+                });
+                if (transResponse.ok) {
+                  addNotification('success', 'Now streaming live on YouTube!', 5000);
+                  ytLiveTransitioned = true; setYoutubeStatus('live'); stopYouTubeMonitor();
+                }
+              } catch {}
             }
           }
         }
       } catch (err) { console.error('[YouTube Monitor] Error:', err); }
     };
-    setTimeout(checkYouTube, 10000);
-    youtubeMonitorRef.current = setInterval(checkYouTube, 30000);
+    setTimeout(checkYouTube, 8000);
+    youtubeMonitorRef.current = setInterval(checkYouTube, 15000);
   };
 
   const goLive = async () => {
@@ -532,18 +552,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         addNotification('info', 'Connecting to streaming server...', 3000);
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
         if (!whipSuccess) { addNotification('error', 'Failed to connect to streaming server.', 8000); setStreamStatus('testing'); return; }
-        addNotification('success', 'Cloudflare preview is live!', 4000);
+        addNotification('success', 'Connected to Cloudflare!', 4000);
         if (activeSession.youtube_broadcast_id) {
-          const hasRtmpsUrl = !!(activeSession as any)?.cloudflare_rtmps_url;
-          if (hasRtmpsUrl) {
-            addNotification('info', 'YouTube requires RTMPS input. Use OBS with the RTMP URL below.', 15000);
-          } else {
-            addNotification('info', 'YouTube requires an RTMPS encoder like OBS.', 12000);
-          }
+          addNotification('info', 'YouTube broadcast will go live automatically when it detects the stream.', 8000);
           startYouTubeMonitor(activeSession.youtube_broadcast_id, clubId, session.access_token);
         }
       } else if (activeSession.youtube_broadcast_id) {
-        addNotification('info', 'Connect OBS to the YouTube RTMP URL to go live.', 10000);
+        addNotification('info', 'YouTube broadcast will go live when it detects stream data.', 8000);
         startYouTubeMonitor(activeSession.youtube_broadcast_id, clubId, session.access_token);
       }
       const { data: updatedSession, error: updateError } = await supabase
@@ -628,12 +643,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════
-  // SESSION LIST VIEW (no active session)
-  // ═══════════════════════════════════════════════════════════════
   if (!activeSession) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
         <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 rounded-2xl p-10 text-center border border-slate-700/40">
           <div className="w-16 h-16 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-red-500/20">
             <Video className="w-8 h-8 text-red-400" />
@@ -737,9 +749,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#1a1a1e]">
+    <div className="flex flex-col h-[calc(100vh-7rem)] min-h-[500px] bg-[#1a1a1e]">
       {/* ── Top Transport Bar ── */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#232328] border-b border-[#3a3a40] flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 bg-[#232328] border-b border-[#3a3a40] flex-shrink-0">
         <div className="flex items-center gap-3">
           {/* Back Button */}
           <button
@@ -856,11 +868,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       </div>
 
       {/* ── Main Studio Area ── */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Program Monitor + Source Strip */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Program Monitor */}
-          <div className="flex-1 p-3 min-h-0">
+          <div className="flex-1 p-3 min-h-0 overflow-hidden">
             <div className={`relative w-full h-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`}>
               <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-contain bg-black" />
 
@@ -1168,14 +1180,42 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     </div>
                   </div>
 
-                  {/* YouTube RTMP Credentials */}
-                  {activeSession?.youtube_broadcast_id && activeSession?.youtube_stream_key && (
+                  {/* Streaming Destinations */}
+                  {activeSession?.youtube_broadcast_id && (
                     <div>
-                      <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">YouTube RTMP</h4>
-                      <div className="space-y-2">
-                        <CredentialField label="Server URL" value={activeSession.youtube_stream_url || 'rtmp://a.rtmp.youtube.com/live2'} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
-                        <CredentialField label="Stream Key" value={activeSession.youtube_stream_key} field="key" copiedField={copiedField} onCopy={copyToClipboard} isSecret showSecret={showStreamKey} onToggleSecret={() => setShowStreamKey(!showStreamKey)} />
-                        <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-red-400 hover:text-red-300 transition-colors pt-1">
+                      <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Destinations</h4>
+                      <div className="space-y-1.5">
+                        {activeSession.streaming_mode === 'cloudflare_relay' && (
+                          <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
+                            <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-xs text-white font-medium block">Cloudflare Stream</span>
+                              <span className="text-[10px] text-slate-500">WebRTC relay to YouTube</span>
+                            </div>
+                            <div className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                              whipStatus === 'connected' ? 'bg-green-400' :
+                              whipStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+                            }`} />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
+                          <Video className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-xs text-white font-medium block">YouTube Live</span>
+                            <span className="text-[10px] text-slate-500">
+                              {youtubeStatus === 'live' ? 'Broadcasting' :
+                               youtubeStatus === 'testing' ? 'Receiving stream' :
+                               youtubeStatus === 'ready' ? 'Waiting for stream' :
+                               'Auto-start enabled'}
+                            </span>
+                          </div>
+                          <div className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            youtubeStatus === 'live' ? 'bg-red-400' :
+                            youtubeStatus === 'testing' ? 'bg-amber-400 animate-pulse' :
+                            'bg-slate-600'
+                          }`} />
+                        </div>
+                        <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-red-400 hover:text-red-300 transition-colors pt-1 pl-1">
                           <ExternalLink className="w-3 h-3" />
                           Open YouTube Studio
                         </a>
@@ -1183,23 +1223,36 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     </div>
                   )}
 
-                  {/* Cloudflare RTMP */}
-                  {(activeSession as any)?.cloudflare_rtmps_url && (
+                  {/* Advanced: RTMP Credentials (collapsible) */}
+                  {(activeSession?.youtube_stream_key || (activeSession as any)?.cloudflare_rtmps_url) && (
                     <div>
-                      <h4 className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-2">
-                        {activeSession.youtube_broadcast_id ? 'OBS Required for YouTube' : 'Cloudflare RTMP'}
-                      </h4>
-                      <p className="text-[10px] text-slate-500 mb-2">
-                        {activeSession.youtube_broadcast_id
-                          ? 'Stream to this RTMP URL with OBS for YouTube relay.'
-                          : 'Stream to Cloudflare with OBS.'}
-                      </p>
-                      <div className="space-y-2">
-                        <CredentialField label="RTMP URL" value={(activeSession as any).cloudflare_rtmps_url} field="cf-url" copiedField={copiedField} onCopy={copyToClipboard} />
-                        {(activeSession as any)?.cloudflare_rtmps_stream_key && (
-                          <CredentialField label="Stream Key" value={(activeSession as any).cloudflare_rtmps_stream_key} field="cf-key" copiedField={copiedField} onCopy={copyToClipboard} isSecret showSecret={showStreamKey} onToggleSecret={() => setShowStreamKey(!showStreamKey)} />
-                        )}
-                      </div>
+                      <button
+                        onClick={() => setShowStreamKey(!showStreamKey)}
+                        className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 hover:text-slate-400 transition-colors"
+                      >
+                        {showStreamKey ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        Advanced Credentials
+                      </button>
+                      {showStreamKey && (
+                        <div className="space-y-3 pl-1">
+                          {activeSession?.youtube_stream_key && (
+                            <div className="space-y-2">
+                              <span className="text-[10px] text-slate-500 font-medium">YouTube RTMP</span>
+                              <CredentialField label="Server URL" value={activeSession.youtube_stream_url || 'rtmps://a.rtmps.youtube.com/live2'} field="url" copiedField={copiedField} onCopy={copyToClipboard} />
+                              <CredentialField label="Stream Key" value={activeSession.youtube_stream_key} field="key" copiedField={copiedField} onCopy={copyToClipboard} isSecret showSecret={true} onToggleSecret={() => {}} />
+                            </div>
+                          )}
+                          {(activeSession as any)?.cloudflare_rtmps_url && (
+                            <div className="space-y-2">
+                              <span className="text-[10px] text-slate-500 font-medium">Cloudflare RTMPS</span>
+                              <CredentialField label="RTMP URL" value={(activeSession as any).cloudflare_rtmps_url} field="cf-url" copiedField={copiedField} onCopy={copyToClipboard} />
+                              {(activeSession as any)?.cloudflare_rtmps_stream_key && (
+                                <CredentialField label="Stream Key" value={(activeSession as any).cloudflare_rtmps_stream_key} field="cf-key" copiedField={copiedField} onCopy={copyToClipboard} isSecret showSecret={true} onToggleSecret={() => {}} />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

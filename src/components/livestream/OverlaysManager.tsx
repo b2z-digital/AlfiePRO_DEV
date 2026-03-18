@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, EyeOff, Hash, Users, AlertCircle, Trophy } from 'lucide-react';
+import { Hash, Users, CircleAlert as AlertCircle, Trophy, Eye, ChevronDown } from 'lucide-react';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import type { LivestreamSession, OverlayConfig } from '../../types/livestream';
 
@@ -11,8 +11,8 @@ interface OverlaysManagerProps {
 export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
   const [config, setConfig] = useState<OverlayConfig>(session.overlay_config);
   const [saving, setSaving] = useState(false);
-  const [statusText, setStatusText] = useState('Live - Racing');
-  const [showStatusEditor, setShowStatusEditor] = useState(false);
+  const [statusText, setStatusText] = useState(session.overlay_config?.statusText || 'Live - Racing');
+  const [expandedOverlay, setExpandedOverlay] = useState<string | null>(null);
 
   useEffect(() => {
     setConfig(session.overlay_config);
@@ -21,18 +21,12 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
   const updateConfig = async (updates: Partial<OverlayConfig>) => {
     const newConfig = { ...config, ...updates };
     setConfig(newConfig);
-
     try {
       setSaving(true);
-      // If statusText is being updated, include it
       if ('statusText' in updates) {
         newConfig.statusText = updates.statusText || statusText;
       }
-
-      await livestreamStorage.updateSession(session.id, {
-        overlay_config: newConfig
-      });
-
+      await livestreamStorage.updateSession(session.id, { overlay_config: newConfig });
       if (onUpdate) {
         onUpdate({ ...session, overlay_config: newConfig });
       }
@@ -49,259 +43,189 @@ export function OverlaysManager({ session, onUpdate }: OverlaysManagerProps) {
     }
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedOverlay(expandedOverlay === id ? null : id);
+  };
+
+  const overlays = [
+    {
+      id: 'heat',
+      key: 'showHeatNumber' as keyof OverlayConfig,
+      icon: <Hash className="w-3.5 h-3.5" />,
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-500/15',
+      label: 'Race / Heat Number',
+      description: 'Current race or heat number',
+      position: 'Top Right',
+    },
+    {
+      id: 'skippers',
+      key: 'showSkippers' as keyof OverlayConfig,
+      icon: <Users className="w-3.5 h-3.5" />,
+      color: 'text-green-400',
+      bgColor: 'bg-green-500/15',
+      label: 'Skippers List',
+      description: 'Sail numbers & standings',
+      position: 'Top Left',
+      hasSubToggle: true,
+      subToggleKey: 'showHandicaps' as keyof OverlayConfig,
+      subToggleLabel: 'Show handicaps',
+    },
+    {
+      id: 'status',
+      key: 'showStandings' as keyof OverlayConfig,
+      icon: <AlertCircle className="w-3.5 h-3.5" />,
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/15',
+      label: 'Status Updates',
+      description: 'Race status display',
+      position: 'Bottom Center',
+      hasCustomText: true,
+    },
+    {
+      id: 'weather',
+      key: 'showWeather' as keyof OverlayConfig,
+      icon: <Trophy className="w-3.5 h-3.5" />,
+      color: 'text-cyan-400',
+      bgColor: 'bg-cyan-500/15',
+      label: 'Weather',
+      description: 'Wind speed & direction',
+      position: 'Top Right',
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-2">Stream Overlays</h3>
-        <p className="text-sm text-gray-400">
-          Configure which overlays appear during your livestream
-        </p>
-      </div>
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        {overlays.map((overlay) => {
+          const isEnabled = !!config[overlay.key];
+          const isExpanded = expandedOverlay === overlay.id;
+          const hasExpandableContent = overlay.hasSubToggle || overlay.hasCustomText;
 
-      {/* Overlay Toggles */}
-      <div className="space-y-4">
-        {/* Race Number / Heat */}
-        <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Hash className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Race Number / Heat</h4>
-                <p className="text-sm text-gray-400">Display current race or heat number</p>
-              </div>
-            </div>
-            <button
-              onClick={() => toggleOverlay('showHeatNumber')}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                config.showHeatNumber ? 'bg-blue-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  config.showHeatNumber ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {config.showHeatNumber && (
-            <div className="pl-14 space-y-2">
-              <div className="bg-slate-800/50 border border-slate-600/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-2">Preview Position</p>
-                <div className="text-sm text-gray-300">Top Right Corner</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Skippers List */}
-        <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-600 rounded-lg">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Skippers List</h4>
-                <p className="text-sm text-gray-400">Show live standings with sail numbers</p>
-              </div>
-            </div>
-            <button
-              onClick={() => toggleOverlay('showSkippers')}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                config.showSkippers ? 'bg-green-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  config.showSkippers ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {config.showSkippers && (
-            <div className="pl-14 space-y-2">
-              <div className="bg-slate-800/50 border border-slate-600/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-2">Preview Position</p>
-                <div className="text-sm text-gray-300">Top Left Corner (Vertical List)</div>
-              </div>
-
-              {/* Show Handicaps Toggle */}
-              <div className="flex items-center justify-between bg-slate-800/50 border border-slate-600/50 rounded-lg p-3">
-                <label className="text-sm text-gray-300">Show Handicaps</label>
-                <button
-                  onClick={() => toggleOverlay('showHandicaps')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.showHandicaps ? 'bg-blue-600' : 'bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.showHandicaps ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Status Updates */}
-        <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-600 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Status Updates</h4>
-                <p className="text-sm text-gray-400">Display race status (On-hold, Live, etc.)</p>
-              </div>
-            </div>
-            <button
-              onClick={() => toggleOverlay('showStandings')}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                config.showStandings ? 'bg-orange-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  config.showStandings ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          {config.showStandings && (
-            <div className="pl-14 space-y-2">
-              <div className="bg-slate-800/50 border border-slate-600/50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-2">Preview Position</p>
-                <div className="text-sm text-gray-300">Bottom Center</div>
-              </div>
-
-              {/* Status Text Customization */}
-              <div className="bg-slate-800/50 border border-slate-600/50 rounded-lg p-3">
-                <label className="block text-xs text-gray-400 mb-2">Custom Status Text</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={statusText}
-                    onChange={(e) => setStatusText(e.target.value)}
-                    placeholder="e.g., Live - Racing, On Hold, etc."
-                    className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <button
-                    onClick={() => updateConfig({ statusText })}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm font-medium transition-colors"
-                  >
-                    Save
-                  </button>
+          return (
+            <div key={overlay.id} className="rounded-lg border border-[#3a3a40] overflow-hidden bg-[#1a1a1e]">
+              <div className="flex items-center gap-2.5 px-3 py-2.5">
+                <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${overlay.bgColor}`}>
+                  <span className={overlay.color}>{overlay.icon}</span>
                 </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-white font-medium">{overlay.label}</span>
+                    {isEnabled && hasExpandableContent && (
+                      <button
+                        onClick={() => toggleExpand(overlay.id)}
+                        className="p-0.5 text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-500 leading-tight">{overlay.description}</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={() => toggleOverlay(overlay.key)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-8 h-[18px] bg-[#3a3a40] peer-focus:ring-1 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-[14px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 peer-checked:after:bg-white after:rounded-full after:h-[14px] after:w-[14px] after:transition-all peer-checked:bg-blue-600" />
+                </label>
               </div>
-            </div>
-          )}
-        </div>
 
-        {/* Weather (Existing) */}
-        <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-600 rounded-lg">
-                <Trophy className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Weather Conditions</h4>
-                <p className="text-sm text-gray-400">Show wind speed and direction</p>
-              </div>
+              {isEnabled && isExpanded && (
+                <div className="px-3 pb-2.5 space-y-2 border-t border-[#3a3a40]/50 pt-2">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-500">Position</span>
+                    <span className="text-slate-400">{overlay.position}</span>
+                  </div>
+
+                  {overlay.hasSubToggle && overlay.subToggleKey && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">{overlay.subToggleLabel}</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!config[overlay.subToggleKey]}
+                          onChange={() => toggleOverlay(overlay.subToggleKey!)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-7 h-[16px] bg-[#3a3a40] rounded-full peer peer-checked:after:translate-x-[12px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 peer-checked:after:bg-white after:rounded-full after:h-[12px] after:w-[12px] after:transition-all peer-checked:bg-blue-600" />
+                      </label>
+                    </div>
+                  )}
+
+                  {overlay.hasCustomText && (
+                    <div>
+                      <label className="text-[10px] text-slate-500 block mb-1">Status text</label>
+                      <div className="flex gap-1">
+                        <input
+                          type="text"
+                          value={statusText}
+                          onChange={(e) => setStatusText(e.target.value)}
+                          onBlur={() => updateConfig({ statusText })}
+                          onKeyDown={(e) => { if (e.key === 'Enter') updateConfig({ statusText }); }}
+                          placeholder="e.g., Live - Racing"
+                          className="flex-1 px-2 py-1 bg-[#232328] border border-[#3a3a40] rounded text-white text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <button
-              onClick={() => toggleOverlay('showWeather')}
-              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                config.showWeather ? 'bg-cyan-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                  config.showWeather ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {/* Theme Selection */}
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-        <h4 className="font-semibold text-white mb-3">Overlay Theme</h4>
-        <div className="grid grid-cols-3 gap-3">
+      <div className="border-t border-[#3a3a40] pt-3 space-y-2">
+        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Theme</span>
+        <div className="grid grid-cols-3 gap-1.5">
           {(['dark', 'light', 'transparent'] as const).map((theme) => (
             <button
               key={theme}
               onClick={() => updateConfig({ theme })}
-              className={`p-3 rounded-lg border-2 transition-all ${
+              className={`px-2 py-2 rounded-lg border text-center transition-all ${
                 config.theme === theme
-                  ? 'border-blue-500 bg-blue-500/20'
-                  : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                  ? 'border-blue-500 bg-blue-500/10 text-white'
+                  : 'border-[#3a3a40] bg-[#1a1a1e] text-slate-400 hover:border-slate-500 hover:text-slate-300'
               }`}
             >
-              <div className="text-sm font-medium text-white capitalize">{theme}</div>
-              <div className="text-xs text-gray-400 mt-1">
-                {theme === 'dark' && 'Best for bright conditions'}
-                {theme === 'light' && 'Best for dark conditions'}
-                {theme === 'transparent' && 'Minimal overlay'}
-              </div>
+              <span className="text-[11px] font-medium capitalize block">{theme}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Status Position */}
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-        <h4 className="font-semibold text-white mb-3">Status Position</h4>
-        <div className="grid grid-cols-3 gap-3">
+      <div className="space-y-2">
+        <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Status Position</span>
+        <div className="grid grid-cols-3 gap-1.5">
           {([
-            { value: 'left', label: 'Bottom Left' },
-            { value: 'bottom', label: 'Bottom Center' },
-            { value: 'right', label: 'Bottom Right' }
+            { value: 'left', label: 'Left' },
+            { value: 'bottom', label: 'Center' },
+            { value: 'right', label: 'Right' }
           ] as const).map(({ value, label }) => (
             <button
               key={value}
               onClick={() => updateConfig({ position: value })}
-              className={`p-3 rounded-lg border-2 transition-all ${
+              className={`px-2 py-2 rounded-lg border text-center transition-all ${
                 config.position === value
-                  ? 'border-blue-500 bg-blue-500/20'
-                  : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                  ? 'border-blue-500 bg-blue-500/10 text-white'
+                  : 'border-[#3a3a40] bg-[#1a1a1e] text-slate-400 hover:border-slate-500 hover:text-slate-300'
               }`}
             >
-              <div className="text-sm font-medium text-white">{label}</div>
+              <span className="text-[11px] font-medium block">{label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Preview Notice */}
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-        <div className="flex items-start gap-3">
-          <Eye className="w-5 h-5 text-blue-400 mt-0.5" />
-          <div>
-            <h4 className="font-semibold text-blue-300 mb-1">Live Preview</h4>
-            <p className="text-sm text-blue-200/80">
-              Your overlay settings will appear in the 'Start Test Stream' preview and during live broadcasts.
-              Overlays update automatically as race data changes.
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center gap-2 p-2.5 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+        <Eye className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+        <p className="text-[10px] text-blue-300/80 leading-relaxed">
+          Overlays update automatically during preview and live broadcasts.
+        </p>
       </div>
-
-      {saving && (
-        <div className="text-center text-sm text-gray-400">
-          Saving changes...
-        </div>
-      )}
     </div>
   );
 }
