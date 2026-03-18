@@ -60,6 +60,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [sessionToDelete, setSessionToDelete] = useState<SessionWithVenue | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [streamDuration, setStreamDuration] = useState(0);
+  const [forcingYouTubeLive, setForcingYouTubeLive] = useState(false);
 
   useEffect(() => {
     if (sessionId) {
@@ -475,6 +476,67 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   };
 
   const stopYouTubeMonitor = () => { if (youtubeMonitorRef.current) { clearInterval(youtubeMonitorRef.current); youtubeMonitorRef.current = null; } };
+
+  const forceYouTubeLive = async () => {
+    if (!activeSession?.youtube_broadcast_id) return;
+    setForcingYouTubeLive(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const broadcastId = activeSession.youtube_broadcast_id;
+
+      const statusResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getBroadcastStatus', clubId, sessionData: { broadcastId } }),
+      });
+      const statusData = await statusResponse.json();
+      const currentStatus = statusData?.items?.[0]?.status?.lifeCycleStatus;
+
+      if (currentStatus === 'live') {
+        setYoutubeStatus('live');
+        addNotification('success', 'YouTube is already live!', 3000);
+        return;
+      }
+
+      if (currentStatus === 'ready' || currentStatus === 'created') {
+        addNotification('info', 'Transitioning YouTube to testing...', 3000);
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+          method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'transitionBroadcast', clubId, sessionData: { broadcastId, broadcastStatus: 'testing' } }),
+        });
+        setYoutubeStatus('testing');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+
+      addNotification('info', 'Transitioning YouTube to live...', 3000);
+      const liveResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'transitionBroadcast', clubId, sessionData: { broadcastId, broadcastStatus: 'live' } }),
+      });
+
+      if (liveResponse.ok) {
+        setYoutubeStatus('live');
+        addNotification('success', 'YouTube is now live!', 5000);
+        stopYouTubeMonitor();
+      } else {
+        const errorData = await liveResponse.json();
+        const errorMsg = errorData?.error || 'Failed to transition';
+        if (errorMsg.includes('redundantTransition')) {
+          setYoutubeStatus('live');
+          addNotification('success', 'YouTube is already live!', 3000);
+        } else if (errorMsg.includes('errorStreamInactive')) {
+          addNotification('error', 'YouTube cannot detect the stream yet. The Cloudflare relay may need a moment to connect. Try again in 30 seconds.', 10000);
+        } else {
+          addNotification('error', `YouTube transition failed: ${errorMsg}`, 8000);
+        }
+      }
+    } catch (error) {
+      console.error('Force YouTube live error:', error);
+      addNotification('error', 'Failed to force YouTube live. Check the console for details.', 5000);
+    } finally {
+      setForcingYouTubeLive(false);
+    }
+  };
 
   const startYouTubeMonitor = (broadcastId: string, monitorClubId: string, accessToken: string) => {
     stopYouTubeMonitor();
@@ -1198,22 +1260,45 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                             }`} />
                           </div>
                         )}
-                        <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
-                          <Video className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <span className="text-xs text-white font-medium block">YouTube Live</span>
-                            <span className="text-[10px] text-slate-500">
-                              {youtubeStatus === 'live' ? 'Broadcasting' :
-                               youtubeStatus === 'testing' ? 'Receiving stream' :
-                               youtubeStatus === 'ready' ? 'Waiting for stream' :
-                               'Auto-start enabled'}
-                            </span>
+                        <div className="bg-[#1a1a1e] border border-[#3a3a40] rounded-lg overflow-hidden">
+                          <div className="flex items-center gap-2.5 p-2.5">
+                            <Video className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <span className="text-xs text-white font-medium block">YouTube Live</span>
+                              <span className="text-[10px] text-slate-500">
+                                {youtubeStatus === 'live' ? 'Broadcasting' :
+                                 youtubeStatus === 'testing' ? 'Receiving stream' :
+                                 youtubeStatus === 'ready' ? 'Waiting for stream' :
+                                 'Auto-start enabled'}
+                              </span>
+                            </div>
+                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                              youtubeStatus === 'live' ? 'bg-red-400' :
+                              youtubeStatus === 'testing' ? 'bg-amber-400 animate-pulse' :
+                              'bg-slate-600'
+                            }`} />
                           </div>
-                          <div className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                            youtubeStatus === 'live' ? 'bg-red-400' :
-                            youtubeStatus === 'testing' ? 'bg-amber-400 animate-pulse' :
-                            'bg-slate-600'
-                          }`} />
+                          {streamStatus === 'live' && youtubeStatus !== 'live' && (
+                            <div className="px-2.5 pb-2.5">
+                              <button
+                                onClick={forceYouTubeLive}
+                                disabled={forcingYouTubeLive}
+                                className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 text-white rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                              >
+                                {forcingYouTubeLive ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Connecting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Zap className="w-3 h-3" />
+                                    Force Live on YouTube
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-red-400 hover:text-red-300 transition-colors pt-1 pl-1">
                           <ExternalLink className="w-3 h-3" />
