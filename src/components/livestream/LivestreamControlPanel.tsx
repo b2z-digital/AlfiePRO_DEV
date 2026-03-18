@@ -1,6 +1,6 @@
 // Build: 2026-03-18-fcp-studio-redesign
 import React, { useState, useEffect, useRef } from 'react';
-import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, ChevronRight, Monitor, Radio, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Plus, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc } from 'lucide-react';
+import { Video, Play, Square, Settings, Eye, EyeOff, Calendar, Camera, Layers, Loader as Loader2, X, Smartphone, RefreshCw, ChevronDown, ChevronRight, Monitor, Radio, Maximize2, Minimize2, ChartBar as BarChart3, Clock, Wifi, Users, MessageSquare, Plus, Trash2, CircleStop as StopCircle, Cloud, CloudOff, Copy, ExternalLink, Signal, Zap, Activity, CircleDot, Disc, Pause } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import type { LivestreamSession, LivestreamCamera } from '../../types/livestream';
@@ -58,6 +58,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [sessionToDelete, setSessionToDelete] = useState<SessionWithVenue | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [streamDuration, setStreamDuration] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     if (sessionId) {
@@ -392,12 +393,38 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     setWhipStatus('disconnected');
   };
 
+  const reconnectToLiveSession = async (session: LivestreamSession) => {
+    try {
+      const stream = await requestCameraAccess();
+      if (!stream) return;
+      if (session.status === 'live' && session.streaming_mode === 'cloudflare_relay' && session.cloudflare_whip_url) {
+        const whipSuccess = await startWhipStreaming(session.cloudflare_whip_url, stream);
+        if (whipSuccess) {
+          addNotification('success', 'Reconnected to live stream!', 4000);
+        } else {
+          setIsPaused(true);
+          addNotification('warning', 'Reconnected locally but cloud relay is paused. Click Resume to re-enable.', 6000);
+        }
+      }
+    } catch (error) {
+      console.error('Error reconnecting to session:', error);
+    }
+  };
+
   const loadSpecificSession = async (id: string) => {
     try {
       setLoading(true);
       const { data, error } = await supabase.from('livestream_sessions').select('*').eq('id', id).single();
       if (error) throw error;
-      if (data) { setActiveSession(data); updateStreamStatus(data.status); loadCameras(data.id); loadSessions(); }
+      if (data) {
+        setActiveSession(data);
+        updateStreamStatus(data.status);
+        loadCameras(data.id);
+        loadSessions();
+        if (data.status === 'live' || data.status === 'testing') {
+          reconnectToLiveSession(data);
+        }
+      }
     } catch (error) { console.error('Error loading session:', error); }
     finally { setLoading(false); }
   };
@@ -411,7 +438,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const checkActiveSession = async () => {
     try {
       const session = await livestreamStorage.getActiveSession(clubId);
-      if (session && session.status === 'live') { setActiveSession(session); updateStreamStatus(session.status); loadCameras(session.id); }
+      if (session && (session.status === 'live' || session.status === 'testing')) {
+        setActiveSession(session);
+        updateStreamStatus(session.status);
+        loadCameras(session.id);
+        reconnectToLiveSession(session);
+      }
     } catch (error) { console.error('Error checking active session:', error); }
   };
 
@@ -490,6 +522,40 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       setActiveSession(updatedSession); setStreamStatus('live');
       addNotification('success', 'Stream is now live!', 5000);
     } catch (error) { console.error('Error going live:', error); setStreamStatus('testing'); stopWhipStreaming(); alert('Failed to go live.'); }
+  };
+
+  const pauseBroadcast = async () => {
+    if (!activeSession || streamStatus !== 'live') return;
+    try {
+      stopWhipStreaming();
+      setIsPaused(true);
+      addNotification('info', 'Broadcast paused. Viewers will see the last frame.', 4000);
+    } catch (error) {
+      console.error('Error pausing broadcast:', error);
+    }
+  };
+
+  const resumeBroadcast = async () => {
+    if (!activeSession || streamStatus !== 'live' || !isPaused) return;
+    try {
+      const streamToSend = activePreviewStream || mediaStream;
+      if (!streamToSend) {
+        const newStream = await requestCameraAccess();
+        if (!newStream) { addNotification('error', 'No video source available.', 5000); return; }
+      }
+      const currentStream = activePreviewStream || mediaStream;
+      if (!currentStream) return;
+      if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
+        addNotification('info', 'Reconnecting to streaming server...', 3000);
+        const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, currentStream);
+        if (!whipSuccess) { addNotification('error', 'Failed to reconnect to streaming server.', 8000); return; }
+      }
+      setIsPaused(false);
+      addNotification('success', 'Broadcast resumed!', 3000);
+    } catch (error) {
+      console.error('Error resuming broadcast:', error);
+      addNotification('error', 'Failed to resume broadcast.', 5000);
+    }
   };
 
   const stopTesting = async () => {
@@ -694,9 +760,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] min-h-[500px] bg-[#1a1a1e]">
+    <div className="flex flex-col h-[calc(100vh-7rem)] min-h-[500px] bg-slate-900 p-3 gap-2">
       {/* ── Top Transport Bar ── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#232328] border-b border-[#3a3a40] flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border border-slate-700/50 rounded-xl flex-shrink-0">
         <div className="flex items-center gap-3">
           {/* Back Button */}
           <button
@@ -705,13 +771,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                 if (confirm('Stream is active. Close this view? The stream will continue.')) setActiveSession(null);
               } else setActiveSession(null);
             }}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-[#3a3a40] rounded-lg transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
             title="Back to sessions"
           >
             <X className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-5 bg-[#3a3a40]" />
+          <div className="w-px h-5 bg-slate-700" />
 
           {/* Status Indicator */}
           {streamStatus === 'live' ? (
@@ -730,7 +796,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               <span className="text-blue-400 font-bold text-xs tracking-widest">CONNECTING</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 bg-[#2a2a30] border border-[#3a3a40] px-3 py-1.5 rounded-lg">
+            <div className="flex items-center gap-2 bg-slate-700/50 border border-slate-700/50 px-3 py-1.5 rounded-lg">
               <div className="w-2 h-2 bg-slate-500 rounded-full" />
               <span className="text-slate-500 font-bold text-xs tracking-widest">STANDBY</span>
             </div>
@@ -751,14 +817,16 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               )}
               {activeSession?.streaming_mode === 'cloudflare_relay' && streamStatus === 'live' && (
                 <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold ${
+                  isPaused ? 'bg-amber-500/10 text-amber-400' :
                   whipStatus === 'connected' ? 'bg-green-500/10 text-green-400' :
                   whipStatus === 'connecting' ? 'bg-amber-500/10 text-amber-400' :
                   'bg-red-500/10 text-red-400'
                 }`}>
-                  {whipStatus === 'connected' ? <Signal className="w-3 h-3" /> :
+                  {isPaused ? <Pause className="w-3 h-3" /> :
+                   whipStatus === 'connected' ? <Signal className="w-3 h-3" /> :
                    whipStatus === 'connecting' ? <Loader2 className="w-3 h-3 animate-spin" /> :
                    <CloudOff className="w-3 h-3" />}
-                  {whipStatus === 'connected' ? 'CLOUD' : whipStatus === 'connecting' ? 'SYNC' : 'OFFLINE'}
+                  {isPaused ? 'PAUSED' : whipStatus === 'connected' ? 'CLOUD' : whipStatus === 'connecting' ? 'SYNC' : 'OFFLINE'}
                 </div>
               )}
             </div>
@@ -784,7 +852,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           )}
           {streamStatus === 'testing' && (
             <>
-              <button onClick={stopTesting} className="px-3 py-1.5 bg-[#3a3a40] hover:bg-[#4a4a50] text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
+              <button onClick={stopTesting} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
                 <StopCircle className="w-3.5 h-3.5" />
                 Stop
               </button>
@@ -795,31 +863,44 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             </>
           )}
           {streamStatus === 'live' && (
-            <button onClick={stopStream} className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
-              <Square className="w-3 h-3" />
-              End Stream
-            </button>
+            <>
+              {isPaused ? (
+                <button onClick={resumeBroadcast} className="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-500/20 animate-pulse">
+                  <Play className="w-3.5 h-3.5" />
+                  Resume
+                </button>
+              ) : (
+                <button onClick={pauseBroadcast} className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
+                  <Pause className="w-3.5 h-3.5" />
+                  Pause
+                </button>
+              )}
+              <button onClick={stopStream} className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-colors">
+                <Square className="w-3 h-3" />
+                End Stream
+              </button>
+            </>
           )}
 
-          <div className="w-px h-5 bg-[#3a3a40] mx-1" />
+          <div className="w-px h-5 bg-slate-700 mx-1" />
 
-          <button onClick={() => setShowAnalytics(true)} className="p-1.5 text-slate-500 hover:text-white hover:bg-[#3a3a40] rounded-lg transition-colors" title="Analytics">
+          <button onClick={() => setShowAnalytics(true)} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" title="Analytics">
             <BarChart3 className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowInspector(!showInspector)} className={`p-1.5 rounded-lg transition-colors ${showInspector ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-white hover:bg-[#3a3a40]'}`} title="Toggle Inspector">
+          <button onClick={() => setShowInspector(!showInspector)} className={`p-1.5 rounded-lg transition-colors ${showInspector ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-white hover:bg-slate-700'}`} title="Toggle Inspector">
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* ── Main Studio Area ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/30">
         {/* Program Monitor + Source Strip */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Program Monitor */}
-          <div className="flex-1 p-3 min-h-0 overflow-hidden">
-            <div className={`relative w-full h-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''}`}>
-              <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-contain bg-black" />
+          <div className="flex-1 p-4 min-h-0 overflow-hidden flex items-center justify-center">
+            <div className={`relative w-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'aspect-video max-h-full'}`}>
+              <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
               {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && (
                 <LivestreamOverlayRenderer session={activeSession} />
@@ -887,15 +968,15 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           </div>
 
           {/* ── Source Strip (Timeline-style) ── */}
-          <div className="flex-shrink-0 bg-[#1e1e22] border-t border-[#3a3a40]">
+          <div className="flex-shrink-0 bg-slate-900/80 border-t border-slate-700/50">
             <div className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center gap-2">
                 <Camera className="w-3.5 h-3.5 text-slate-500" />
                 <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Sources</span>
-                <span className="text-[10px] text-slate-600 bg-[#2a2a30] px-1.5 py-0.5 rounded">{cameras.length}</span>
+                <span className="text-[10px] text-slate-600 bg-slate-700/50 px-1.5 py-0.5 rounded">{cameras.length}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={forceReconnectMobileCameras} className="p-1 text-slate-500 hover:text-white hover:bg-[#3a3a40] rounded transition-colors" title="Reconnect">
+                <button onClick={forceReconnectMobileCameras} className="p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Reconnect">
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
                 {streamStatus !== 'offline' && (
@@ -923,13 +1004,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                       onClick={() => isConnected && !isActive && handleSwitchCamera(camera.id)}
                       className={`flex-shrink-0 w-36 rounded-lg overflow-hidden transition-all group ${
                         isActive
-                          ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-[#1e1e22]'
+                          ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-slate-900'
                           : isConnected
                             ? 'hover:ring-1 hover:ring-slate-500 cursor-pointer'
                             : 'opacity-40'
                       }`}
                     >
-                      <div className="aspect-video bg-[#0a0a0c] relative">
+                      <div className="aspect-video bg-slate-950 relative">
                         {isLaptop && mediaStream ? (
                           <VideoThumbnail stream={mediaStream} muted />
                         ) : isMobile && remoteStream ? (
@@ -952,7 +1033,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                         )}
                       </div>
 
-                      <div className="bg-[#232328] px-2 py-1.5 flex items-center justify-between gap-1">
+                      <div className="bg-slate-800 px-2 py-1.5 flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1.5 min-w-0">
                           {isLaptop ? <Monitor className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" /> : <Smartphone className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />}
                           <span className="text-[10px] text-slate-400 truncate">{camera.camera_name}</span>
@@ -983,9 +1064,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
         {/* ── Inspector Panel ── */}
         {showInspector && (
-          <div className="w-72 xl:w-80 flex-shrink-0 bg-[#232328] border-l border-[#3a3a40] flex flex-col overflow-hidden">
+          <div className="w-72 xl:w-80 flex-shrink-0 bg-slate-800 border-l border-slate-700/50 flex flex-col overflow-hidden">
             {/* Inspector Tab Bar */}
-            <div className="flex items-center border-b border-[#3a3a40] bg-[#28282e]">
+            <div className="flex items-center border-b border-slate-700/50 bg-slate-800/80">
               {(['settings', 'overlays', 'output'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -1014,7 +1095,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                         setActiveSession({ ...activeSession, title: newTitle });
                         await livestreamStorage.updateSession(activeSession.id, { title: newTitle });
                       }}
-                      className="w-full px-3 py-2 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     />
                   </div>
 
@@ -1028,7 +1109,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                         await livestreamStorage.updateSession(activeSession.id, { description: newDesc });
                       }}
                       rows={3}
-                      className="w-full px-3 py-2 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700/50 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all"
                     />
                   </div>
 
@@ -1054,11 +1135,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   </div>
 
                   <div className="space-y-1.5 pt-1">
-                    <button onClick={() => setShowSelectRace(true)} className="w-full px-3 py-2 bg-[#1a1a1e] hover:bg-[#2a2a30] border border-[#3a3a40] text-slate-300 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors">
+                    <button onClick={() => setShowSelectRace(true)} className="w-full px-3 py-2 bg-slate-900 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors">
                       <Users className="w-3.5 h-3.5 text-slate-500" />
                       Link Race/Heat
                     </button>
-                    <button onClick={() => setShowSchedule(true)} className="w-full px-3 py-2 bg-[#1a1a1e] hover:bg-[#2a2a30] border border-[#3a3a40] text-slate-300 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors">
+                    <button onClick={() => setShowSchedule(true)} className="w-full px-3 py-2 bg-slate-900 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors">
                       <Calendar className="w-3.5 h-3.5 text-slate-500" />
                       Schedule Stream
                     </button>
@@ -1106,7 +1187,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                         </div>
                       )}
                       {streamStatus !== 'live' && (
-                        <div className="flex items-center gap-2 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg text-xs text-slate-500">
+                        <div className="flex items-center gap-2 p-2.5 bg-slate-900 border border-slate-700/50 rounded-lg text-xs text-slate-500">
                           <Wifi className="w-3.5 h-3.5" />
                           Ready to stream
                         </div>
@@ -1119,7 +1200,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Destinations</h4>
                     <div className="space-y-1.5">
                       {/* AlfieTV - Primary Destination */}
-                      <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-sky-500/30 rounded-lg">
+                      <div className="flex items-center gap-2.5 p-2.5 bg-slate-900 border border-sky-500/30 rounded-lg">
                         <Radio className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <span className="text-xs text-white font-medium block">AlfieTV</span>
@@ -1137,7 +1218,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
                       {/* Cloudflare Stream relay */}
                       {activeSession?.streaming_mode === 'cloudflare_relay' && (
-                        <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
+                        <div className="flex items-center gap-2.5 p-2.5 bg-slate-900 border border-slate-700/50 rounded-lg">
                           <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
                           <div className="min-w-0">
                             <span className="text-xs text-white font-medium block">Cloudflare Stream</span>
@@ -1213,14 +1294,14 @@ function VideoThumbnail({ stream, muted = false }: { stream: MediaStream; muted?
 
 function ToggleRow({ icon, label, checked, onChange }: { icon: React.ReactNode; label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
+    <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-700/50 rounded-lg">
       <div className="flex items-center gap-2.5">
         <span className="text-slate-500">{icon}</span>
         <span className="text-xs text-slate-300">{label}</span>
       </div>
       <label className="relative inline-flex items-center cursor-pointer">
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only peer" />
-        <div className="w-8 h-4 bg-[#3a3a40] peer-focus:ring-1 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 peer-checked:after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600" />
+        <div className="w-8 h-4 bg-slate-700 peer-focus:ring-1 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 peer-checked:after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600" />
       </label>
     </div>
   );
@@ -1228,7 +1309,7 @@ function ToggleRow({ icon, label, checked, onChange }: { icon: React.ReactNode; 
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-2 px-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
+    <div className="flex items-center justify-between py-2 px-2.5 bg-slate-900 border border-slate-700/50 rounded-lg">
       <span className="text-[10px] text-slate-500">{label}</span>
       <span className="text-xs text-white font-medium">{value}</span>
     </div>
@@ -1244,15 +1325,15 @@ function CredentialField({ label, value, field, copiedField, onCopy, isSecret, s
     <div>
       <label className="text-[10px] text-slate-600 mb-1 block">{label}</label>
       <div className="flex items-center gap-1">
-        <div className="flex-1 bg-[#1a1a1e] border border-[#3a3a40] rounded px-2 py-1.5 text-[10px] text-slate-400 font-mono truncate">
+        <div className="flex-1 bg-slate-900 border border-slate-700/50 rounded px-2 py-1.5 text-[10px] text-slate-400 font-mono truncate">
           {isSecret && !showSecret ? '••••••••••••' : value}
         </div>
         {isSecret && onToggleSecret && (
-          <button onClick={onToggleSecret} className="p-1.5 bg-[#1a1a1e] border border-[#3a3a40] hover:bg-[#2a2a30] rounded transition-colors">
+          <button onClick={onToggleSecret} className="p-1.5 bg-slate-900 border border-slate-700/50 hover:bg-slate-700/50 rounded transition-colors">
             {showSecret ? <EyeOff className="w-3 h-3 text-slate-500" /> : <Eye className="w-3 h-3 text-slate-500" />}
           </button>
         )}
-        <button onClick={() => onCopy(value, field)} className="p-1.5 bg-[#1a1a1e] border border-[#3a3a40] hover:bg-[#2a2a30] rounded transition-colors">
+        <button onClick={() => onCopy(value, field)} className="p-1.5 bg-slate-900 border border-slate-700/50 hover:bg-slate-700/50 rounded transition-colors">
           {copiedField === field ? <span className="text-[9px] text-green-400 font-medium px-0.5">OK</span> : <Copy className="w-3 h-3 text-slate-500" />}
         </button>
       </div>

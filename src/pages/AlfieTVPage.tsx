@@ -312,8 +312,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [watchlist, setWatchlist] = useState<AlfieTVVideo[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [showSuggestChannel, setShowSuggestChannel] = useState(false);
-  const [liveStreams, setLiveStreams] = useState<LivestreamSession[]>([]);
-  const [upcomingStreams, setUpcomingStreams] = useState<LivestreamSession[]>([]);
+  const [liveStreams, setLiveStreams] = useState<(LivestreamSession & { venue_image?: string })[]>([]);
+  const [upcomingStreams, setUpcomingStreams] = useState<(LivestreamSession & { venue_image?: string })[]>([]);
   const [replayArchives, setReplayArchives] = useState<LivestreamArchive[]>([]);
   const [selectedLiveStream, setSelectedLiveStream] = useState<LivestreamSession | null>(null);
   const [selectedReplay, setSelectedReplay] = useState<LivestreamArchive | null>(null);
@@ -349,6 +349,33 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   }, [organizationId]);
 
   useEffect(() => {
+    const fetchVenueImages = async (streams: LivestreamSession[]) => {
+      const eventIds = streams.filter(s => s.event_id).map(s => s.event_id!);
+      if (eventIds.length === 0) return streams;
+      const { data: events } = await supabase
+        .from('public_events')
+        .select('id, venue_id')
+        .in('id', eventIds);
+      if (!events || events.length === 0) return streams;
+      const venueIds = events.filter(e => e.venue_id).map(e => e.venue_id);
+      if (venueIds.length === 0) return streams;
+      const { data: venues } = await supabase
+        .from('venues')
+        .select('id, image')
+        .in('id', venueIds);
+      if (!venues) return streams;
+      const venueMap = new Map(venues.map(v => [v.id, v.image]));
+      const eventVenueMap = new Map(events.map(e => [e.id, e.venue_id ? venueMap.get(e.venue_id) : null]));
+      return streams.map(s => {
+        const img = s.event_id ? eventVenueMap.get(s.event_id) : null;
+        let venueImage: string | undefined;
+        if (img) {
+          venueImage = img.startsWith('http') ? img : supabase.storage.from('media').getPublicUrl(img).data.publicUrl;
+        }
+        return { ...s, venue_image: venueImage };
+      });
+    };
+
     const loadLiveStreams = async () => {
       try {
         const { data } = await supabase
@@ -359,7 +386,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .not('cloudflare_live_input_id', 'is', null)
           .not('cloudflare_customer_code', 'is', null)
           .order('actual_start_time', { ascending: false });
-        setLiveStreams(data || []);
+        const liveWithVenues = await fetchVenueImages(data || []);
+        setLiveStreams(liveWithVenues);
 
         const oneWeekFromNow = new Date();
         oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
@@ -373,7 +401,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .lte('scheduled_start_time', oneWeekFromNow.toISOString())
           .order('scheduled_start_time', { ascending: true })
           .limit(3);
-        setUpcomingStreams(upcoming || []);
+        const upcomingWithVenues = await fetchVenueImages(upcoming || []);
+        setUpcomingStreams(upcomingWithVenues);
 
         const { data: archives } = await supabase
           .from('livestream_archives')
@@ -727,13 +756,17 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  const LiveHero = ({ stream }: { stream: LivestreamSession }) => {
+  const LiveHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string } }) => {
+    const venueImg = (stream as any).venue_image;
     const embedUrl = stream.cloudflare_customer_code && stream.cloudflare_live_input_id
       ? `https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`
       : null;
 
     return (
       <div className="relative h-[85vh] w-full overflow-hidden">
+        {venueImg && (
+          <img src={venueImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        )}
         {embedUrl ? (
           <div className="absolute inset-0">
             <iframe
@@ -744,9 +777,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               loading="eager"
             />
           </div>
-        ) : (
+        ) : !venueImg ? (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
-        )}
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
 
@@ -787,9 +820,13 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     );
   };
 
-  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession }) => (
+  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string } }) => (
     <div className="relative h-[85vh] w-full overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
+      {(stream as any).venue_image ? (
+        <img src={(stream as any).venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-transparent" />
 
