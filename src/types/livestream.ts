@@ -46,6 +46,7 @@ export interface LivestreamSession {
   cloudflare_whip_url?: string;
   cloudflare_whip_playback_url?: string;
   cloudflare_output_id?: string;
+  cloudflare_customer_code?: string;
 
   streaming_mode: 'direct_youtube' | 'cloudflare_relay';
 

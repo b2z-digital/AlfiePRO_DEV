@@ -432,6 +432,13 @@ export function LivestreamSetupWizard({
           sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
           sessionData.cloudflare_rtmps_url = cfData.liveInput.rtmps?.url;
           sessionData.cloudflare_rtmps_stream_key = cfData.liveInput.rtmps?.streamKey;
+
+          const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
+          const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
+          if (customerMatch) {
+            sessionData.cloudflare_customer_code = customerMatch[1];
+            console.log('[LivestreamWizard] Extracted Cloudflare customer code:', customerMatch[1]);
+          }
           console.log('[LivestreamWizard] Cloudflare RTMPS ingest URL:', cfData.liveInput.rtmps?.url);
 
           // Step 2: Create YouTube broadcast (always if integration exists)

@@ -2,22 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
-import {
-  Play,
-  Plus,
-  Search,
-  Info,
-  Volume2,
-  VolumeX,
-  ChevronLeft,
-  ChevronRight,
-  Settings,
-  X,
-  LogOut,
-  Youtube,
-  Filter,
-  Lightbulb
-} from 'lucide-react';
+import { Play, Plus, Search, Info, Volume2, VolumeX, ChevronLeft, ChevronRight, Settings, X, LogOut, Youtube, ListFilter as Filter, Lightbulb, Radio } from 'lucide-react';
 import { alfieTVStorage, AlfieTVVideo } from '../utils/alfieTVStorage';
 import { useNotification } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -26,6 +11,7 @@ import { SuggestChannelModal } from '../components/alfie-tv/SuggestChannelModal'
 import { Logo } from '../components/Logo';
 import { getPersonalizedVideos, trackVideoView, getUserPreferences } from '../utils/alfieTVPersonalization';
 import { AdDisplay } from '../components/advertising/AdDisplay';
+import type { LivestreamSession } from '../types/livestream';
 
 interface AlfieTVPageProps {
   darkMode?: boolean;
@@ -50,6 +36,53 @@ interface Channel {
   is_visible?: boolean;
   category?: string;
 }
+
+const LiveStreamPlayerModal = React.memo(({ session, onClose }: { session: LivestreamSession | null; onClose: () => void }) => {
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    if (session) {
+      window.addEventListener('keydown', handleEscape);
+      return () => window.removeEventListener('keydown', handleEscape);
+    }
+  }, [session, onClose]);
+
+  if (!session?.cloudflare_live_input_id || !session?.cloudflare_customer_code) return null;
+
+  const embedUrl = `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`;
+
+  return (
+    <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+      <iframe
+        src={embedUrl}
+        className="absolute inset-0 w-full h-full"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
+        title={session.title || 'Live Stream'}
+        loading="eager"
+        style={{ border: 'none' }}
+      />
+      <button
+        onClick={onClose}
+        className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
+        style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999, cursor: 'pointer' }}
+        title="Close (ESC)"
+        type="button"
+      >
+        <LogOut className="w-7 h-7 stroke-[2.5]" />
+      </button>
+      <div
+        className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
+        style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
+      >
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+        </span>
+        <span className="text-white font-medium text-sm">{session.title}</span>
+      </div>
+    </div>
+  );
+});
 
 // Hero video background component - MUST be outside to prevent re-creation on parent renders
 // Uses internal state to track current video and prevent reloads
@@ -279,6 +312,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [watchlist, setWatchlist] = useState<AlfieTVVideo[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [showSuggestChannel, setShowSuggestChannel] = useState(false);
+  const [liveStreams, setLiveStreams] = useState<LivestreamSession[]>([]);
+  const [selectedLiveStream, setSelectedLiveStream] = useState<LivestreamSession | null>(null);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
 
   // Get organization ID for both clubs and associations
@@ -309,6 +344,27 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       loadContent();
     }
   }, [organizationId]);
+
+  useEffect(() => {
+    const loadLiveStreams = async () => {
+      try {
+        const { data } = await supabase
+          .from('livestream_sessions')
+          .select('*')
+          .in('status', ['live', 'testing'])
+          .eq('is_public', true)
+          .not('cloudflare_live_input_id', 'is', null)
+          .not('cloudflare_customer_code', 'is', null)
+          .order('actual_start_time', { ascending: false });
+        setLiveStreams(data || []);
+      } catch (err) {
+        console.error('Error loading live streams:', err);
+      }
+    };
+    loadLiveStreams();
+    const interval = setInterval(loadLiveStreams, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadCachedData = () => {
     try {
@@ -1182,6 +1238,67 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     }
                   };
 
+                  // LIVE NOW
+                  if (liveStreams.length > 0) {
+                    rows.push(
+                      <div key="live-now" className="mb-10">
+                        <div className="flex items-center gap-3 mb-5">
+                          <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                          </span>
+                          <h2 className="text-2xl font-bold text-white">LIVE NOW</h2>
+                        </div>
+                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
+                          {liveStreams.map(stream => (
+                            <div
+                              key={stream.id}
+                              onClick={() => setSelectedLiveStream(stream)}
+                              className="group flex-shrink-0 cursor-pointer"
+                              style={{ width: '400px' }}
+                            >
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border-2 border-red-500/50 group-hover:border-red-500 transition-colors">
+                                {stream.cloudflare_customer_code && stream.cloudflare_live_input_id ? (
+                                  <iframe
+                                    src={`https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`}
+                                    className="absolute inset-0 w-full h-full pointer-events-none"
+                                    allow="autoplay"
+                                    style={{ border: 'none' }}
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Radio className="w-12 h-12 text-red-500 animate-pulse" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                                  </span>
+                                  Live
+                                </div>
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                    <Play className="w-7 h-7 text-white fill-white ml-1" />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2.5">
+                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{stream.title}</h3>
+                                {stream.description && (
+                                  <p className="text-gray-500 text-xs mt-0.5 truncate">{stream.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                    rowIndex++;
+                  }
+
                   // Continue Watching
                   if (continueWatching.length > 0) {
                     rows.push(
@@ -1348,6 +1465,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       <div className="h-32" />
     </div>
     <FullscreenVideoModal video={selectedVideo} onClose={handleCloseVideo} />
+    <LiveStreamPlayerModal session={selectedLiveStream} onClose={() => setSelectedLiveStream(null)} />
     <SuggestChannelModal
       isOpen={showSuggestChannel}
       onClose={() => setShowSuggestChannel(false)}

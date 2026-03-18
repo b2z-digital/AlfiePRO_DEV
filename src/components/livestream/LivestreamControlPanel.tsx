@@ -1365,70 +1365,92 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   </div>
 
                   {/* Streaming Destinations */}
-                  {activeSession?.youtube_broadcast_id && (
-                    <div>
-                      <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Destinations</h4>
-                      <div className="space-y-1.5">
-                        {activeSession.streaming_mode === 'cloudflare_relay' && (
-                          <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
-                            <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <span className="text-xs text-white font-medium block">Cloudflare Stream</span>
-                              <span className="text-[10px] text-slate-500">WebRTC relay to YouTube</span>
-                            </div>
-                            <div className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                              whipStatus === 'connected' ? 'bg-green-400' :
-                              whipStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
-                            }`} />
-                          </div>
-                        )}
-                        <div className="bg-[#1a1a1e] border border-[#3a3a40] rounded-lg overflow-hidden">
-                          <div className="flex items-center gap-2.5 p-2.5">
-                            <Video className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <span className="text-xs text-white font-medium block">YouTube Live</span>
-                              <span className="text-[10px] text-slate-500">
-                                {youtubeStatus === 'live' ? 'Broadcasting' :
-                                 youtubeStatus === 'testing' ? 'Receiving stream' :
-                                 youtubeStatus === 'ready' ? 'Waiting for stream' :
-                                 'Auto-start enabled'}
-                              </span>
-                            </div>
-                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                              youtubeStatus === 'live' ? 'bg-red-400' :
-                              youtubeStatus === 'testing' ? 'bg-amber-400 animate-pulse' :
-                              'bg-slate-600'
-                            }`} />
-                          </div>
-                          {streamStatus === 'live' && youtubeStatus !== 'live' && (
-                            <div className="px-2.5 pb-2.5">
-                              <button
-                                onClick={forceYouTubeLive}
-                                disabled={forcingYouTubeLive}
-                                className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 text-white rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
-                              >
-                                {forcingYouTubeLive ? (
-                                  <>
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    Connecting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Zap className="w-3 h-3" />
-                                    Force Live on YouTube
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
+                  <div>
+                    <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Destinations</h4>
+                    <div className="space-y-1.5">
+                      {/* AlfieTV - Primary Destination */}
+                      <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-sky-500/30 rounded-lg">
+                        <Radio className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs text-white font-medium block">AlfieTV</span>
+                          <span className="text-[10px] text-slate-500">
+                            {whipStatus === 'connected' ? 'Live on AlfieTV' :
+                             whipStatus === 'connecting' ? 'Connecting...' :
+                             streamStatus === 'live' ? 'Streaming via Cloudflare' : 'Ready'}
+                          </span>
                         </div>
-                        <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-red-400 hover:text-red-300 transition-colors pt-1 pl-1">
-                          <ExternalLink className="w-3 h-3" />
-                          Open YouTube Studio
-                        </a>
+                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                          (whipStatus === 'connected' || streamStatus === 'live') ? 'bg-green-400' :
+                          whipStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+                        }`} />
                       </div>
+
+                      {/* Cloudflare Stream relay */}
+                      {activeSession?.streaming_mode === 'cloudflare_relay' && (
+                        <div className="flex items-center gap-2.5 p-2.5 bg-[#1a1a1e] border border-[#3a3a40] rounded-lg">
+                          <Cloud className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <span className="text-xs text-white font-medium block">Cloudflare Stream</span>
+                            <span className="text-[10px] text-slate-500">Cloud relay active</span>
+                          </div>
+                          <div className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            whipStatus === 'connected' ? 'bg-green-400' :
+                            whipStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+                          }`} />
+                        </div>
+                      )}
+
+                      {/* YouTube - Optional/Secondary */}
+                      {activeSession?.youtube_broadcast_id && (
+                        <>
+                          <div className="bg-[#1a1a1e] border border-[#3a3a40] rounded-lg overflow-hidden">
+                            <div className="flex items-center gap-2.5 p-2.5">
+                              <Video className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <span className="text-xs text-white font-medium block">YouTube Live</span>
+                                <span className="text-[10px] text-slate-500">
+                                  {youtubeStatus === 'live' ? 'Broadcasting' :
+                                   youtubeStatus === 'testing' ? 'Receiving stream' :
+                                   youtubeStatus === 'ready' ? 'Waiting for stream' :
+                                   'Optional restream'}
+                                </span>
+                              </div>
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                youtubeStatus === 'live' ? 'bg-red-400' :
+                                youtubeStatus === 'testing' ? 'bg-amber-400 animate-pulse' :
+                                'bg-slate-600'
+                              }`} />
+                            </div>
+                            {streamStatus === 'live' && youtubeStatus !== 'live' && (
+                              <div className="px-2.5 pb-2.5">
+                                <button
+                                  onClick={forceYouTubeLive}
+                                  disabled={forcingYouTubeLive}
+                                  className="w-full px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 text-white rounded-md text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                                >
+                                  {forcingYouTubeLive ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                      Connecting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Zap className="w-3 h-3" />
+                                      Force Live on YouTube
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <a href="https://studio.youtube.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-red-400 hover:text-red-300 transition-colors pt-1 pl-1">
+                            <ExternalLink className="w-3 h-3" />
+                            Open YouTube Studio
+                          </a>
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Advanced: RTMP Credentials (collapsible) */}
                   {(activeSession?.youtube_stream_key || (activeSession as any)?.cloudflare_rtmps_url) && (
