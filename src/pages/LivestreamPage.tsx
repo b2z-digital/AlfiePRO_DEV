@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Video, Archive } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { LivestreamControlPanel } from '../components/livestream/LivestreamControlPanel';
@@ -6,6 +7,8 @@ import { LivestreamArchiveViewer } from '../components/livestream/LivestreamArch
 
 export default function LivestreamPage() {
   const { currentClub } = useAuth();
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('sessionId') || undefined;
   const [activeTab, setActiveTab] = useState<'stream' | 'archives'>('stream');
 
   const clubId = currentClub?.club?.id;
@@ -61,7 +64,7 @@ export default function LivestreamPage() {
 
       <div className="flex-1 min-h-0 overflow-auto">
         {activeTab === 'stream' && (
-          <LivestreamControlPanel clubId={clubId} />
+          <LivestreamControlPanel clubId={clubId} sessionId={sessionId} />
         )}
 
         {activeTab === 'archives' && (

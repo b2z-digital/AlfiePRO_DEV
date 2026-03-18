@@ -94,6 +94,9 @@ Deno.serve(async (req: Request) => {
       case "recreateOutput":
         return await recreateOutput(credentials, sessionData, corsHeaders);
 
+      case "getRecordings":
+        return await getRecordings(credentials, sessionData, corsHeaders);
+
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action" }),
@@ -709,6 +712,57 @@ async function recreateOutput(
 
   return new Response(
     JSON.stringify({ success: true, output: createData.result, recreated: true, newOutputId: createData.result?.uid }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function getRecordings(
+  credentials: CloudflareCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  const { liveInputId } = sessionData;
+
+  console.log("[CF Stream] Getting recordings for live input:", liveInputId);
+
+  const response = await fetch(
+    `${CF_API_BASE}/accounts/${credentials.account_id}/stream?search=${liveInputId}&type=live`,
+    {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${credentials.api_token}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    console.error("[CF Stream] Error getting recordings:", data);
+    return new Response(
+      JSON.stringify({ error: data.errors?.[0]?.message || "Failed to get recordings" }),
+      { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const recordings = (data.result || []).map((video: any) => ({
+    uid: video.uid,
+    duration: video.duration,
+    thumbnail: video.thumbnail,
+    thumbnailTimestampPct: video.thumbnailTimestampPct,
+    readyToStream: video.readyToStream,
+    status: video.status,
+    created: video.created,
+    size: video.size,
+    preview: video.preview,
+    playback: video.playback,
+    liveInput: video.liveInput,
+  }));
+
+  console.log("[CF Stream] Found", recordings.length, "recordings");
+
+  return new Response(
+    JSON.stringify({ success: true, recordings }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
