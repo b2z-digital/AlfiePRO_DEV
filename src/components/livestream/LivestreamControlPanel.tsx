@@ -417,7 +417,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const { data, error } = await supabase.from('livestream_sessions').select('*').eq('id', id).single();
       if (error) throw error;
       if (data) {
-        setActiveSession(data);
+        const enriched = await enrichSessionsWithVenueData([data]);
+        setActiveSession(enriched[0] || data);
         updateStreamStatus(data.status);
         loadCameras(data.id);
         loadSessions();
@@ -430,9 +431,57 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   };
 
   const loadSessions = async () => {
-    try { const data = await livestreamStorage.getSessions(clubId); setSessions(data); }
+    try {
+      const data = await livestreamStorage.getSessions(clubId);
+      const sessionsWithVenues = await enrichSessionsWithVenueData(data);
+      setSessions(sessionsWithVenues);
+    }
     catch (error) { console.error('Error loading sessions:', error); }
     finally { setLoading(false); }
+  };
+
+  const enrichSessionsWithVenueData = async (sessionList: LivestreamSession[]): Promise<SessionWithVenue[]> => {
+    const eventIds = sessionList
+      .map(s => s.event_id)
+      .filter((id): id is string => !!id && !id.includes('-round-') && !id.includes('-day-'));
+
+    const compoundEventIds = sessionList
+      .map(s => s.event_id)
+      .filter((id): id is string => !!id && (id.includes('-round-') || id.includes('-day-')));
+    const baseEventIds = compoundEventIds.map(id => id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, ''));
+
+    const allEventIds = [...new Set([...eventIds, ...baseEventIds])];
+    if (allEventIds.length === 0) return sessionList;
+
+    const { data: events } = await supabase
+      .from('public_events')
+      .select('id, venue_id')
+      .in('id', allEventIds);
+
+    if (!events || events.length === 0) return sessionList;
+
+    const venueIds = events.map(e => e.venue_id).filter((id): id is string => !!id);
+    if (venueIds.length === 0) return sessionList;
+
+    const { data: venues } = await supabase
+      .from('venues')
+      .select('id, name, image')
+      .in('id', [...new Set(venueIds)]);
+
+    if (!venues || venues.length === 0) return sessionList;
+
+    const venueMap = new Map(venues.map(v => [v.id, v]));
+    const eventVenueMap = new Map(events.map(e => [e.id, e.venue_id]));
+
+    return sessionList.map(session => {
+      if (!session.event_id) return session;
+      const baseId = session.event_id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, '');
+      const venueId = eventVenueMap.get(session.event_id) || eventVenueMap.get(baseId);
+      if (!venueId) return session;
+      const venue = venueMap.get(venueId);
+      if (!venue) return session;
+      return { ...session, venueImage: venue.image || undefined, venueName: venue.name || undefined };
+    });
   };
 
   const checkActiveSession = async () => {
@@ -584,6 +633,46 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
       if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
         try {
+          const { data: { session: authSession } } = await supabase.auth.getSession();
+          let recordingVideoId = activeSession.cloudflare_live_input_id;
+          let recordingThumbnail: string | null = null;
+          let recordingDuration: number | null = null;
+
+          if (authSession) {
+            const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
+            const retryFetch = async (attempt: number): Promise<any> => {
+              const res = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${authSession.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  action: 'getRecordings',
+                  clubId: activeSession.club_id,
+                  sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
+                }),
+              });
+              const result = await res.json();
+              if (result.success && result.recordings?.length > 0) {
+                return result.recordings[0];
+              }
+              if (attempt < 3) {
+                await new Promise(r => setTimeout(r, 5000));
+                return retryFetch(attempt + 1);
+              }
+              return null;
+            };
+
+            await new Promise(r => setTimeout(r, 3000));
+            const recording = await retryFetch(1);
+            if (recording) {
+              recordingVideoId = recording.uid;
+              recordingThumbnail = recording.thumbnail || null;
+              recordingDuration = recording.duration ? Math.round(recording.duration) : null;
+            }
+          }
+
           await supabase.from('livestream_archives').insert({
             session_id: activeSession.id,
             club_id: activeSession.club_id,
@@ -591,9 +680,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             description: activeSession.description,
             event_id: activeSession.event_id || null,
             heat_number: activeSession.heat_number || null,
-            cloudflare_video_id: activeSession.cloudflare_live_input_id,
+            cloudflare_video_id: recordingVideoId,
             cloudflare_customer_code: activeSession.cloudflare_customer_code,
-            cloudflare_playback_url: `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${activeSession.cloudflare_live_input_id}/iframe`,
+            cloudflare_playback_url: `https://customer-${activeSession.cloudflare_customer_code}.cloudflarestream.com/${recordingVideoId}/iframe`,
+            thumbnail_url: recordingThumbnail,
+            duration: recordingDuration,
             source: 'cloudflare',
             recorded_at: activeSession.actual_start_time || activeSession.created_at,
             is_public: activeSession.is_public,
@@ -686,7 +777,15 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   <div className="flex items-center justify-between p-4">
                     <div
                       className="flex-1 cursor-pointer flex items-center gap-4"
-                      onClick={() => { setActiveSession(session); updateStreamStatus(session.status); loadCameras(session.id); }}
+                      onClick={() => {
+                        if (session.status === 'ended') {
+                          setActiveSession({ ...session, _viewOnly: true } as any);
+                        } else {
+                          setActiveSession(session);
+                        }
+                        updateStreamStatus(session.status);
+                        loadCameras(session.id);
+                      }}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                         session.status === 'live' ? 'bg-red-500/20 border border-red-500/30' :
@@ -717,7 +816,15 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => { setActiveSession(session); updateStreamStatus(session.status); loadCameras(session.id); }}
+                        onClick={() => {
+                          if (session.status === 'ended') {
+                            setActiveSession({ ...session, _viewOnly: true } as any);
+                          } else {
+                            setActiveSession(session);
+                          }
+                          updateStreamStatus(session.status);
+                          loadCameras(session.id);
+                        }}
                         className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"
                       >
                         <ChevronRight className="w-4 h-4" />
@@ -797,6 +904,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               <Loader2 className="w-3 h-3 text-blue-400 animate-spin" />
               <span className="text-blue-400 font-bold text-xs tracking-widest">CONNECTING</span>
             </div>
+          ) : activeSession?.status === 'ended' ? (
+            <div className="flex items-center gap-2 bg-slate-700/50 border border-slate-600/30 px-3 py-1.5 rounded-lg">
+              <Square className="w-3 h-3 text-slate-500" />
+              <span className="text-slate-500 font-bold text-xs tracking-widest">ENDED</span>
+            </div>
           ) : (
             <div className="flex items-center gap-2 bg-slate-700/50 border border-slate-700/50 px-3 py-1.5 rounded-lg">
               <div className="w-2 h-2 bg-slate-500 rounded-full" />
@@ -837,7 +949,22 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
         {/* Transport Controls */}
         <div className="flex items-center gap-2">
-          {streamStatus === 'offline' && (
+          {streamStatus === 'offline' && activeSession?.status === 'ended' && (
+            <>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 border border-slate-600/30 rounded-lg">
+                <Square className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-xs font-medium text-slate-400">Stream Ended</span>
+              </div>
+              <button
+                onClick={() => { setSessionToDelete(activeSession); setShowDeleteConfirm(true); }}
+                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                title="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {streamStatus === 'offline' && activeSession?.status !== 'ended' && (
             <>
               <button onClick={startTestStream} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition-all">
                 <Camera className="w-3.5 h-3.5" />
@@ -904,17 +1031,86 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             <div className={`relative w-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'aspect-video max-h-full'}`}>
               <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
-              {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && (
+              {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && !isPaused && (
                 <LivestreamOverlayRenderer session={activeSession} />
               )}
 
-              {streamStatus === 'offline' && (
+              {isPaused && streamStatus === 'live' && (
+                <div className="absolute inset-0 bg-slate-900/95 flex items-center justify-center z-10">
+                  {(activeSession as SessionWithVenue).venueImage && (
+                    <img
+                      src={(activeSession as SessionWithVenue).venueImage}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover opacity-15"
+                    />
+                  )}
+                  <div className="text-center relative z-10">
+                    <div className="w-20 h-20 bg-slate-800/80 border-2 border-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-5 backdrop-blur-sm">
+                      <Pause className="w-10 h-10 text-slate-400" />
+                    </div>
+                    <h3 className="text-white text-xl font-bold mb-2">Event Pending</h3>
+                    {(activeSession as SessionWithVenue).venueName && (
+                      <p className="text-slate-300 text-sm mb-1">{(activeSession as SessionWithVenue).venueName}</p>
+                    )}
+                    <p className="text-slate-400 text-sm max-w-sm">
+                      The broadcast is temporarily paused. Racing will resume shortly.
+                    </p>
+                    <div className="mt-4 flex items-center justify-center gap-2 text-amber-400 text-xs font-medium">
+                      <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                      <span>Stream Paused</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {streamStatus === 'offline' && activeSession?.status === 'ended' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black">
-                  <div className="text-center">
-                    <div className="w-16 h-16 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  {(activeSession as SessionWithVenue).venueImage && (
+                    <img
+                      src={(activeSession as SessionWithVenue).venueImage}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover opacity-20"
+                    />
+                  )}
+                  <div className="text-center relative z-10">
+                    <div className="w-16 h-16 bg-slate-800/80 border border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                      <Square className="w-7 h-7 text-slate-500" />
+                    </div>
+                    <p className="text-slate-400 text-sm font-medium">Stream Completed</p>
+                    {(activeSession as SessionWithVenue).venueName && (
+                      <p className="text-slate-500 text-xs mt-1">{(activeSession as SessionWithVenue).venueName}</p>
+                    )}
+                    <p className="text-slate-600 text-xs mt-1">
+                      {activeSession.actual_start_time
+                        ? `Streamed on ${new Date(activeSession.actual_start_time).toLocaleDateString()}`
+                        : 'This stream has ended'}
+                    </p>
+                    {activeSession.end_time && activeSession.actual_start_time && (
+                      <p className="text-slate-600 text-xs mt-0.5">
+                        Duration: {formatDuration(Math.floor((new Date(activeSession.end_time).getTime() - new Date(activeSession.actual_start_time).getTime()) / 1000))}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {streamStatus === 'offline' && activeSession?.status !== 'ended' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black">
+                  {(activeSession as SessionWithVenue).venueImage && (
+                    <img
+                      src={(activeSession as SessionWithVenue).venueImage}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover opacity-30"
+                    />
+                  )}
+                  <div className="text-center relative z-10">
+                    <div className="w-16 h-16 border-2 border-dashed border-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-black/50 backdrop-blur-sm">
                       <Video className="w-7 h-7 text-slate-600" />
                     </div>
                     <p className="text-slate-600 text-sm font-medium">No Signal</p>
+                    {(activeSession as SessionWithVenue).venueName && (
+                      <p className="text-slate-500 text-xs mt-1">{(activeSession as SessionWithVenue).venueName}</p>
+                    )}
                     <p className="text-slate-700 text-xs mt-1">Click "Start Preview" to begin</p>
                   </div>
                 </div>
