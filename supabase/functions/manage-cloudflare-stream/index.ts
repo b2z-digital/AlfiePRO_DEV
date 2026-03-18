@@ -117,9 +117,9 @@ async function createLiveInput(
   sessionData: any,
   corsHeaders: Record<string, string>
 ): Promise<Response> {
-  const { title, recording = false } = sessionData;
+  const { title } = sessionData;
 
-  console.log("[CF Stream] Creating live input:", title);
+  console.log("[CF Stream] Creating live input:", title, "(recording: always enabled)");
 
   const response = await fetch(
     `${CF_API_BASE}/accounts/${credentials.account_id}/stream/live_inputs`,
@@ -131,7 +131,7 @@ async function createLiveInput(
       },
       body: JSON.stringify({
         meta: { name: title },
-        recording: { mode: recording ? "automatic" : "off" },
+        recording: { mode: "automatic", timeoutSeconds: 0, requireSignedURLs: false },
         defaultCreator: "alfie-livestream",
       }),
     }
