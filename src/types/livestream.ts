@@ -68,6 +68,7 @@ export interface LivestreamSession {
   sponsor_rotation_interval: number;
 
   is_public: boolean;
+  is_paused: boolean;
 
   audio_source: AudioSource;
   enable_commentary: boolean;
