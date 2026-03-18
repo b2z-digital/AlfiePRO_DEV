@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
-import { Play, Plus, Search, Info, Volume2, VolumeX, ChevronLeft, ChevronRight, Settings, X, LogOut, Youtube, ListFilter as Filter, Lightbulb, Radio, Calendar } from 'lucide-react';
+import { Play, Plus, Search, Info, Volume2, VolumeX, ChevronLeft, ChevronRight, Settings, X, LogOut, Youtube, ListFilter as Filter, Lightbulb, Radio, Calendar, Square } from 'lucide-react';
 import { alfieTVStorage, AlfieTVVideo } from '../utils/alfieTVStorage';
 import { useNotification } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -37,7 +37,15 @@ interface Channel {
   category?: string;
 }
 
-const LiveStreamPlayerModal = React.memo(({ session, onClose }: { session: LivestreamSession | null; onClose: () => void }) => {
+const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubName }: {
+  session: LivestreamSession | null;
+  onClose: () => void;
+  venueImage?: string;
+  clubName?: string;
+}) => {
+  const [isPaused, setIsPaused] = React.useState(false);
+  const [isEnded, setIsEnded] = React.useState(false);
+
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     if (session) {
@@ -46,21 +54,74 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose }: { session: Lives
     }
   }, [session, onClose]);
 
+  React.useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel(`live-player-${session.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'livestream_sessions',
+        filter: `id=eq.${session.id}`,
+      }, (payload: any) => {
+        const updated = payload.new;
+        if (updated.is_paused) setIsPaused(true);
+        else setIsPaused(false);
+        if (updated.status === 'ended') setIsEnded(true);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.id]);
+
   if (!session?.cloudflare_live_input_id || !session?.cloudflare_customer_code) return null;
 
   const embedUrl = `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`;
 
   return (
     <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
-      <iframe
-        src={embedUrl}
-        className="absolute inset-0 w-full h-full"
-        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-        allowFullScreen
-        title={session.title || 'Live Stream'}
-        loading="eager"
-        style={{ border: 'none' }}
-      />
+      {!isPaused && !isEnded && (
+        <iframe
+          src={embedUrl}
+          className="absolute inset-0 w-full h-full"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+          title={session.title || 'Live Stream'}
+          loading="eager"
+          style={{ border: 'none' }}
+        />
+      )}
+
+      {(isPaused || isEnded) && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          {venueImage && <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative z-10 text-center max-w-lg px-8">
+            <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mx-auto mb-6 border border-white/20">
+              {isEnded ? (
+                <Square className="w-8 h-8 text-white/80" />
+              ) : (
+                <Radio className="w-8 h-8 text-amber-400" />
+              )}
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-3">
+              {isEnded ? 'Stream Ended' : 'Event on Hold'}
+            </h2>
+            <p className="text-white/70 text-lg mb-2">
+              {isEnded
+                ? 'This livestream has ended. Thank you for watching!'
+                : 'The broadcast is temporarily paused. Come back soon!'}
+            </p>
+            <p className="text-white font-semibold text-xl mt-6">{session.title}</p>
+            {clubName && <p className="text-white/60 mt-1">Hosted by {clubName}</p>}
+            {isEnded && (
+              <button onClick={onClose} className="mt-8 px-8 py-3 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-all">
+                Back to AlfieTV
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={onClose}
         className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
@@ -70,16 +131,18 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose }: { session: Lives
       >
         <LogOut className="w-7 h-7 stroke-[2.5]" />
       </button>
-      <div
-        className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
-        style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
-      >
-        <span className="relative flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-        </span>
-        <span className="text-white font-medium text-sm">{session.title}</span>
-      </div>
+      {!isPaused && !isEnded && (
+        <div
+          className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
+          style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
+        >
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+          </span>
+          <span className="text-white font-medium text-sm">{session.title}</span>
+        </div>
+      )}
     </div>
   );
 });
@@ -312,10 +375,10 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [watchlist, setWatchlist] = useState<AlfieTVVideo[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [showSuggestChannel, setShowSuggestChannel] = useState(false);
-  const [liveStreams, setLiveStreams] = useState<(LivestreamSession & { venue_image?: string })[]>([]);
-  const [upcomingStreams, setUpcomingStreams] = useState<(LivestreamSession & { venue_image?: string })[]>([]);
+  const [liveStreams, setLiveStreams] = useState<(LivestreamSession & { venue_image?: string; club_name?: string })[]>([]);
+  const [upcomingStreams, setUpcomingStreams] = useState<(LivestreamSession & { venue_image?: string; club_name?: string })[]>([]);
   const [replayArchives, setReplayArchives] = useState<LivestreamArchive[]>([]);
-  const [selectedLiveStream, setSelectedLiveStream] = useState<LivestreamSession | null>(null);
+  const [selectedLiveStream, setSelectedLiveStream] = useState<(LivestreamSession & { venue_image?: string; club_name?: string }) | null>(null);
   const [selectedReplay, setSelectedReplay] = useState<LivestreamArchive | null>(null);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -349,30 +412,22 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   }, [organizationId]);
 
   useEffect(() => {
-    const fetchVenueImages = async (streams: LivestreamSession[]) => {
-      const eventIds = streams.filter(s => s.event_id).map(s => s.event_id!);
-      if (eventIds.length === 0) return streams;
-      const { data: events } = await supabase
-        .from('public_events')
-        .select('id, venue_id')
-        .in('id', eventIds);
-      if (!events || events.length === 0) return streams;
-      const venueIds = events.filter(e => e.venue_id).map(e => e.venue_id);
-      if (venueIds.length === 0) return streams;
-      const { data: venues } = await supabase
-        .from('venues')
-        .select('id, image')
-        .in('id', venueIds);
-      if (!venues) return streams;
-      const venueMap = new Map(venues.map(v => [v.id, v.image]));
-      const eventVenueMap = new Map(events.map(e => [e.id, e.venue_id ? venueMap.get(e.venue_id) : null]));
+    const enrichStreamsWithClubData = async (streams: LivestreamSession[]) => {
+      const clubIds = [...new Set(streams.map(s => s.club_id))];
+      if (clubIds.length === 0) return streams;
+      const { data: clubs } = await supabase
+        .from('clubs')
+        .select('id, name, cover_image_url, featured_image_url')
+        .in('id', clubIds);
+      if (!clubs) return streams;
+      const clubMap = new Map(clubs.map(c => [c.id, c]));
       return streams.map(s => {
-        const img = s.event_id ? eventVenueMap.get(s.event_id) : null;
-        let venueImage: string | undefined;
-        if (img) {
-          venueImage = img.startsWith('http') ? img : supabase.storage.from('media').getPublicUrl(img).data.publicUrl;
-        }
-        return { ...s, venue_image: venueImage };
+        const club = clubMap.get(s.club_id);
+        return {
+          ...s,
+          venue_image: club?.cover_image_url || club?.featured_image_url || undefined,
+          club_name: club?.name || undefined,
+        };
       });
     };
 
@@ -386,7 +441,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .not('cloudflare_live_input_id', 'is', null)
           .not('cloudflare_customer_code', 'is', null)
           .order('actual_start_time', { ascending: false });
-        const liveWithVenues = await fetchVenueImages(data || []);
+        const liveWithVenues = await enrichStreamsWithClubData(data || []);
         setLiveStreams(liveWithVenues);
 
         const oneWeekFromNow = new Date();
@@ -401,7 +456,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .lte('scheduled_start_time', oneWeekFromNow.toISOString())
           .order('scheduled_start_time', { ascending: true })
           .limit(3);
-        const upcomingWithVenues = await fetchVenueImages(upcoming || []);
+        const upcomingWithVenues = await enrichStreamsWithClubData(upcoming || []);
         setUpcomingStreams(upcomingWithVenues);
 
         const { data: archives } = await supabase
@@ -459,16 +514,29 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     }
   };
 
-  // Auto-rotate hero carousel - single timer to avoid glitching
+  type HeroSlide =
+    | { type: 'live'; stream: LivestreamSession & { venue_image?: string; club_name?: string } }
+    | { type: 'upcoming'; stream: LivestreamSession & { venue_image?: string; club_name?: string } }
+    | { type: 'video'; video: AlfieTVVideo };
+
+  const heroSlides = useMemo<HeroSlide[]>(() => {
+    const slides: HeroSlide[] = [];
+    liveStreams.forEach(s => slides.push({ type: 'live', stream: s }));
+    upcomingStreams.forEach(s => slides.push({ type: 'upcoming', stream: s }));
+    heroVideos.forEach(v => slides.push({ type: 'video', video: v }));
+    return slides;
+  }, [liveStreams, upcomingStreams, heroVideos]);
+
   useEffect(() => {
-    if (heroVideos.length === 0) return;
+    if (heroSlides.length === 0) return;
+    if (currentHeroIndex >= heroSlides.length) setCurrentHeroIndex(0);
 
     const interval = setInterval(() => {
-      setCurrentHeroIndex((prev) => (prev + 1) % heroVideos.length);
-    }, 30000); // Change every 30 seconds
+      setCurrentHeroIndex((prev) => (prev + 1) % heroSlides.length);
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [heroVideos.length]);
+  }, [heroSlides.length]);
 
   const loadContent = async () => {
     if (!organizationId) {
@@ -756,8 +824,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  const LiveHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string } }) => {
-    const venueImg = (stream as any).venue_image;
+  const LiveHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => {
+    const venueImg = stream.venue_image;
+    const clubName = stream.club_name;
     const embedUrl = stream.cloudflare_customer_code && stream.cloudflare_live_input_id
       ? `https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`
       : null;
@@ -787,10 +856,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           <div className="max-w-3xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white" />
-                </span>
+                <Radio className="w-4 h-4 text-white" />
                 <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
               </div>
               {stream.viewer_count > 0 && (
@@ -800,9 +866,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
             <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
               {stream.title}
             </h1>
-            {stream.description && (
-              <p className="text-lg text-white/80 mb-6 line-clamp-2 drop-shadow-lg max-w-2xl">
-                {stream.description}
+            {clubName && (
+              <p className="text-lg text-white/70 mb-6 drop-shadow-lg">
+                Hosted by {clubName}
               </p>
             )}
             <div className="flex items-center gap-3">
@@ -810,7 +876,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                 onClick={() => setSelectedLiveStream(stream)}
                 className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
               >
-                <Play className="w-6 h-6 fill-current" />
+                <Radio className="w-5 h-5" />
                 <span>Watch Live</span>
               </button>
             </div>
@@ -820,10 +886,10 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     );
   };
 
-  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string } }) => (
+  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => (
     <div className="relative h-[85vh] w-full overflow-hidden">
-      {(stream as any).venue_image ? (
-        <img src={(stream as any).venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      {stream.venue_image ? (
+        <img src={stream.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
       )}
@@ -844,9 +910,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
             {stream.title}
           </h1>
-          {stream.description && (
-            <p className="text-lg text-white/80 mb-6 line-clamp-2 drop-shadow-lg max-w-2xl">
-              {stream.description}
+          {stream.club_name && (
+            <p className="text-lg text-white/70 mb-6 drop-shadow-lg">
+              Hosted by {stream.club_name}
             </p>
           )}
           <div className="flex items-center gap-4">
@@ -869,84 +935,152 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   );
 
   const HeroCarousel = () => {
-    const currentHero = heroVideos[currentHeroIndex];
-    if (!currentHero) return null;
+    const slide = heroSlides[currentHeroIndex];
+    if (!slide) return null;
+
+    const renderSlideBackground = () => {
+      if (slide.type === 'live') {
+        const s = slide.stream;
+        const embedUrl = s.cloudflare_customer_code && s.cloudflare_live_input_id
+          ? `https://customer-${s.cloudflare_customer_code}.cloudflarestream.com/${s.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`
+          : null;
+        return (
+          <>
+            {s.venue_image && <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+            {embedUrl ? (
+              <div className="absolute inset-0">
+                <iframe src={embedUrl} className="w-full h-full object-cover scale-110" allow="autoplay" style={{ pointerEvents: 'none', border: 'none' }} loading="eager" />
+              </div>
+            ) : !s.venue_image ? (
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
+            ) : null}
+          </>
+        );
+      }
+      if (slide.type === 'upcoming') {
+        const s = slide.stream;
+        return s.venue_image
+          ? <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          : <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />;
+      }
+      const v = slide.video;
+      return <HeroVideoBackground videoId={v.youtube_id} thumbnailUrl={v.thumbnail_high_url || v.thumbnail_url} />;
+    };
+
+    const renderSlideContent = () => {
+      if (slide.type === 'live') {
+        const s = slide.stream;
+        return (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
+                <Radio className="w-4 h-4 text-white" />
+                <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
+              </div>
+              {s.viewer_count > 0 && <span className="text-white/70 text-sm">{s.viewer_count} watching</span>}
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">{s.title}</h1>
+            {s.club_name && <p className="text-lg text-white/70 mb-6 drop-shadow-lg">Hosted by {s.club_name}</p>}
+            <button
+              onClick={() => setSelectedLiveStream(s)}
+              className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
+            >
+              <Radio className="w-5 h-5" />
+              <span>Watch Live</span>
+            </button>
+          </>
+        );
+      }
+      if (slide.type === 'upcoming') {
+        const s = slide.stream;
+        return (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-3 py-1.5 rounded-md">
+                <Radio className="w-4 h-4 text-white" />
+                <span className="text-sm font-bold text-white uppercase tracking-wider">Coming Soon</span>
+              </div>
+              <span className="text-white/70 text-sm font-medium">{formatScheduledDate(s.scheduled_start_time!)}</span>
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">{s.title}</h1>
+            {s.club_name && <p className="text-lg text-white/70 mb-6 drop-shadow-lg">Hosted by {s.club_name}</p>}
+            <div className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 backdrop-blur-md text-white font-semibold border border-white/20 w-fit">
+              <Calendar className="w-5 h-5" />
+              <span>
+                {new Date(s.scheduled_start_time!).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {' at '}
+                {new Date(s.scheduled_start_time!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            </div>
+          </>
+        );
+      }
+      const v = slide.video;
+      return (
+        <>
+          <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl">{v.title}</h1>
+          <p className="text-base text-white/90 mb-6 line-clamp-2 drop-shadow-lg">{v.description}</p>
+          <div className="flex items-center space-x-3">
+            <button onClick={() => handleVideoClick(v)} className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white text-black font-bold hover:bg-white/90 transition-all shadow-2xl">
+              <Play className="w-5 h-5 fill-current" />
+              <span>Play</span>
+            </button>
+            <button onClick={(e) => handleAddToWatchlist(e, v)} className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white/20 backdrop-blur-md text-white font-bold hover:bg-white/30 transition-all">
+              <Plus className="w-5 h-5" />
+              <span>My List</span>
+            </button>
+            <button onClick={() => setShowHeroInfo(!showHeroInfo)} className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all">
+              <Info className="w-5 h-5" />
+            </button>
+          </div>
+        </>
+      );
+    };
 
     return (
       <div className="relative h-[85vh] w-full overflow-hidden">
-        {/* Memoized Video Background - only re-renders when videoId changes */}
-        <HeroVideoBackground
-          videoId={currentHero.youtube_id}
-          thumbnailUrl={currentHero.thumbnail_high_url || currentHero.thumbnail_url}
-        />
+        {renderSlideBackground()}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
 
+        {heroSlides.length > 1 && (
+          <div className="absolute bottom-[15%] left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
+            {heroSlides.map((s, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentHeroIndex(index)}
+                className={`h-1.5 rounded-full transition-all ${
+                  index === currentHeroIndex
+                    ? `w-8 ${s.type === 'live' ? 'bg-red-500' : s.type === 'upcoming' ? 'bg-blue-400' : 'bg-white'}`
+                    : 'w-1.5 bg-white/40 hover:bg-white/60'
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
-        {/* Navigation Dots */}
-        <div className="absolute bottom-[15%] left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
-          {heroVideos.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                setCurrentHeroIndex(index);
-              }}
-              className={`h-1 rounded-full transition-all ${
-                index === currentHeroIndex ? 'w-8 bg-white' : 'w-1 bg-white/50'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="absolute bottom-[25%] left-20 right-0 px-12">
+        <div className="absolute bottom-[20%] left-20 right-0 px-12">
           <div className="max-w-3xl">
-            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl">
-              {currentHero.title}
-            </h1>
-            <p className="text-base text-white/90 mb-6 line-clamp-2 drop-shadow-lg">
-              {currentHero.description}
-            </p>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => handleVideoClick(currentHero)}
-                className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white text-black font-bold hover:bg-white/90 transition-all shadow-2xl"
-              >
-                <Play className="w-5 h-5 fill-current" />
-                <span>Play</span>
-              </button>
-              <button
-                onClick={(e) => handleAddToWatchlist(e, currentHero)}
-                className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white/20 backdrop-blur-md text-white font-bold hover:bg-white/30 transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                <span>My List</span>
-              </button>
-              <button
-                onClick={() => setShowHeroInfo(!showHeroInfo)}
-                className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all"
-              >
-                <Info className="w-5 h-5" />
-              </button>
-            </div>
+            {renderSlideContent()}
           </div>
         </div>
 
-        {/* Navigation Arrows */}
-        <button
-          onClick={() => {
-            setCurrentHeroIndex((prev) => (prev - 1 + heroVideos.length) % heroVideos.length);
-          }}
-          className="absolute left-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
-        >
-          <ChevronLeft className="w-8 h-8" />
-        </button>
-        <button
-          onClick={() => {
-            setCurrentHeroIndex((prev) => (prev + 1) % heroVideos.length);
-          }}
-          className="absolute right-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
-        >
-          <ChevronRight className="w-8 h-8" />
-        </button>
+        {heroSlides.length > 1 && (
+          <>
+            <button
+              onClick={() => setCurrentHeroIndex((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
+              className="absolute left-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            <button
+              onClick={() => setCurrentHeroIndex((prev) => (prev + 1) % heroSlides.length)}
+              className="absolute right-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          </>
+        )}
       </div>
     );
   };
@@ -1375,18 +1509,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         </div>
       ) : (
         <>
-          {/* Hero Section: Live > Upcoming > Video Carousel */}
-          {liveStreams.length > 0 ? (
-            <LiveHero stream={liveStreams[0]} />
-          ) : upcomingStreams.length > 0 ? (
-            <UpcomingStreamHero stream={upcomingStreams[0]} />
-          ) : loading && heroVideos.length === 0 ? (
+          {/* Hero Section: Unified carousel with live/upcoming/video slides */}
+          {loading && heroSlides.length === 0 ? (
             <div className="relative h-[85vh] w-full overflow-hidden bg-gray-900">
               <div className="absolute inset-0 bg-gray-800/50 animate-pulse" />
             </div>
-          ) : (
-            heroVideos.length > 0 && <HeroCarousel />
-          )}
+          ) : heroSlides.length > 0 ? (
+            <HeroCarousel />
+          ) : null}
 
           {/* Content Rows */}
           <div className="relative -mt-32 z-10 px-12">
@@ -1749,7 +1879,12 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       <div className="h-32" />
     </div>
     <FullscreenVideoModal video={selectedVideo} onClose={handleCloseVideo} />
-    <LiveStreamPlayerModal session={selectedLiveStream} onClose={() => setSelectedLiveStream(null)} />
+    <LiveStreamPlayerModal
+      session={selectedLiveStream}
+      onClose={() => setSelectedLiveStream(null)}
+      venueImage={selectedLiveStream?.venue_image}
+      clubName={selectedLiveStream?.club_name}
+    />
     {selectedReplay && (
       <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
         {selectedReplay.source === 'cloudflare' && selectedReplay.cloudflare_playback_url ? (

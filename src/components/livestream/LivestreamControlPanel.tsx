@@ -529,7 +529,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     try {
       stopWhipStreaming();
       setIsPaused(true);
-      addNotification('info', 'Broadcast paused. Viewers will see the last frame.', 4000);
+      await livestreamStorage.updateSession(activeSession.id, { is_paused: true });
+      addNotification('info', 'Broadcast paused. Viewers will see a hold screen.', 4000);
     } catch (error) {
       console.error('Error pausing broadcast:', error);
     }
@@ -551,6 +552,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         if (!whipSuccess) { addNotification('error', 'Failed to reconnect to streaming server.', 8000); return; }
       }
       setIsPaused(false);
+      await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
       addNotification('success', 'Broadcast resumed!', 3000);
     } catch (error) {
       console.error('Error resuming broadcast:', error);
@@ -577,7 +579,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     try {
       stopWhipStreaming();
       if (mediaStream) { mediaStream.getTracks().forEach(track => track.stop()); setMediaStream(null); }
-      await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString() });
+      await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString(), is_paused: false });
       setStreamStatus('offline');
 
       if (activeSession.cloudflare_live_input_id && activeSession.cloudflare_customer_code) {
