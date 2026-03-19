@@ -477,24 +477,71 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       const rawEventIds = eventIds.map(id => id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, ''));
       const uniqueEventIds = [...new Set(rawEventIds)];
 
-      let venueMap = new Map<string, { image: string | null; name: string }>();
+      const venueImageMap = new Map<string, string>();
+
       if (uniqueEventIds.length > 0) {
-        const { data: events } = await supabase
+        const { data: publicEvents } = await supabase
           .from('public_events')
           .select('id, venue_id')
           .in('id', uniqueEventIds);
-        if (events && events.length > 0) {
-          const venueIds = events.map(e => e.venue_id).filter((id): id is string => !!id);
-          if (venueIds.length > 0) {
-            const { data: venues } = await supabase
-              .from('venues')
-              .select('id, name, image')
-              .in('id', [...new Set(venueIds)]);
-            if (venues) {
-              const venueById = new Map(venues.map(v => [v.id, v]));
-              for (const event of events) {
-                if (event.venue_id && venueById.has(event.venue_id)) {
-                  venueMap.set(event.id, venueById.get(event.venue_id)!);
+
+        const matchedPublicEventIds = new Set((publicEvents || []).map(e => e.id));
+        const venueIds = (publicEvents || []).map(e => e.venue_id).filter((id): id is string => !!id);
+
+        if (venueIds.length > 0) {
+          const { data: venues } = await supabase
+            .from('venues')
+            .select('id, name, image')
+            .in('id', [...new Set(venueIds)]);
+          if (venues) {
+            const venueById = new Map(venues.map(v => [v.id, v]));
+            for (const event of (publicEvents || [])) {
+              if (event.venue_id && venueById.has(event.venue_id)) {
+                const v = venueById.get(event.venue_id)!;
+                if (v.image) venueImageMap.set(event.id, v.image);
+              }
+            }
+          }
+        }
+
+        const unmatchedIds = uniqueEventIds.filter(id => !matchedPublicEventIds.has(id));
+        if (unmatchedIds.length > 0) {
+          const { data: quickRaces } = await supabase
+            .from('quick_races')
+            .select('id, race_venue, club_id')
+            .in('id', unmatchedIds);
+
+          if (quickRaces && quickRaces.length > 0) {
+            const venueNames = quickRaces
+              .map(r => r.race_venue)
+              .filter((name): name is string => !!name && name.trim() !== '');
+            const raceClubIds = quickRaces.map(r => r.club_id).filter((id): id is string => !!id);
+            const allClubIds = [...new Set([...clubIds, ...raceClubIds])];
+
+            if (venueNames.length > 0) {
+              const { data: clubVenueRows } = await supabase
+                .from('club_venues')
+                .select('venue_id, club_id')
+                .in('club_id', allClubIds);
+
+              if (clubVenueRows && clubVenueRows.length > 0) {
+                const cvVenueIds = [...new Set(clubVenueRows.map(cv => cv.venue_id))];
+                const { data: allVenues } = await supabase
+                  .from('venues')
+                  .select('id, name, image')
+                  .in('id', cvVenueIds);
+
+                if (allVenues) {
+                  const venueByName = new Map<string, typeof allVenues[0]>();
+                  for (const v of allVenues) {
+                    if (v.name) venueByName.set(v.name.toLowerCase().trim(), v);
+                  }
+                  for (const race of quickRaces) {
+                    if (race.race_venue) {
+                      const venue = venueByName.get(race.race_venue.toLowerCase().trim());
+                      if (venue?.image) venueImageMap.set(race.id, venue.image);
+                    }
+                  }
                 }
               }
             }
@@ -507,8 +554,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         let venueImage: string | undefined;
         if (s.event_id) {
           const baseEventId = s.event_id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, '');
-          const venue = venueMap.get(s.event_id) || venueMap.get(baseEventId);
-          if (venue?.image) venueImage = venue.image;
+          venueImage = venueImageMap.get(s.event_id) || venueImageMap.get(baseEventId);
         }
         if (!venueImage) {
           venueImage = club?.cover_image_url || club?.featured_image_url || undefined;

@@ -77,6 +77,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }
   }, [activeSession, streamStatus]);
 
+  const activePreviewStreamRef = useRef<MediaStream | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  useEffect(() => { activePreviewStreamRef.current = activePreviewStream; }, [activePreviewStream]);
+  useEffect(() => { mediaStreamRef.current = mediaStream; }, [mediaStream]);
+
   useEffect(() => {
     if (whipHealthRef.current) { clearInterval(whipHealthRef.current); whipHealthRef.current = null; }
     if (streamStatus === 'live' && whipStatus === 'connected' && whipPeerConnectionRef.current && !isPaused) {
@@ -96,7 +101,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             setWhipStatus('error');
             addNotification('warning', 'Stream connection stalled. Attempting reconnect...', 5000);
             if (activeSession?.cloudflare_whip_url) {
-              const stream = activePreviewStream || mediaStream;
+              const stream = activePreviewStreamRef.current || mediaStreamRef.current;
               if (stream) {
                 stopWhipStreaming();
                 await new Promise(r => setTimeout(r, 1000));
@@ -218,9 +223,32 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         if (pc.connectionState === 'connected') {
           livestreamStorage.updateCamera(camera.id, { status: 'streaming' });
           addNotification('success', `${camera.camera_name} streaming`, 3000);
-        } else if (pc.connectionState === 'failed') {
-          addNotification('error', `${camera.camera_name} connection failed`, 5000);
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          const wasPrimary = cameras.find(c => c.id === camera.id)?.is_primary;
+          addNotification('error', `${camera.camera_name} ${pc.connectionState}`, 5000);
           cleanupMobileCameraConnection(camera.id);
+          livestreamStorage.updateCamera(camera.id, { status: 'disconnected' }).catch(() => {});
+
+          if (wasPrimary && activeSession) {
+            const laptopCam = cameras.find(c => c.camera_type === 'laptop');
+            const anotherMobile = cameras.find(c => c.camera_type === 'mobile' && c.id !== camera.id && remoteStreams[c.id]);
+            if (anotherMobile && remoteStreams[anotherMobile.id]) {
+              const fallbackStream = remoteStreams[anotherMobile.id]!;
+              setActivePreviewStream(fallbackStream);
+              livestreamStorage.setPrimaryCamera(activeSession.id, anotherMobile.id).catch(() => {});
+              if (streamStatus === 'live' && whipPeerConnectionRef.current) {
+                replaceWhipTracks(fallbackStream);
+              }
+              addNotification('info', `Switched to ${anotherMobile.camera_name}`, 4000);
+            } else if (laptopCam && mediaStream) {
+              setActivePreviewStream(mediaStream);
+              livestreamStorage.setPrimaryCamera(activeSession.id, laptopCam.id).catch(() => {});
+              if (streamStatus === 'live' && whipPeerConnectionRef.current) {
+                replaceWhipTracks(mediaStream);
+              }
+              addNotification('info', 'Switched to laptop camera', 4000);
+            }
+          }
         }
       };
 
@@ -805,15 +833,56 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     } catch (error) { console.error('Error removing camera:', error); addNotification('error', 'Failed to remove camera', 3000); }
   };
 
+  const replaceWhipTracks = async (newStream: MediaStream) => {
+    const pc = whipPeerConnectionRef.current;
+    if (!pc || pc.connectionState !== 'connected') return;
+
+    const senders = pc.getSenders();
+    for (const sender of senders) {
+      if (!sender.track) continue;
+      const newTrack = newStream.getTracks().find(
+        t => t.kind === sender.track!.kind && t.readyState === 'live'
+      );
+      if (newTrack) {
+        try {
+          await sender.replaceTrack(newTrack);
+        } catch (e) {
+          console.warn(`[WHIP] replaceTrack failed for ${sender.track.kind}, will reconnect`, e);
+          if (activeSession?.cloudflare_whip_url) {
+            stopWhipStreaming();
+            await new Promise(r => setTimeout(r, 500));
+            await startWhipStreaming(activeSession.cloudflare_whip_url, newStream);
+          }
+          return;
+        }
+      }
+    }
+    lastBytesSentRef.current = 0;
+  };
+
   const handleSwitchCamera = async (cameraId: string) => {
     if (!activeSession) return;
     try {
       await livestreamStorage.setPrimaryCamera(activeSession.id, cameraId);
       const targetCamera = cameras.find(c => c.id === cameraId);
+      let newStream: MediaStream | null = null;
       if (targetCamera) {
-        if (targetCamera.camera_type === 'laptop') setActivePreviewStream(mediaStream);
-        else if (targetCamera.camera_type === 'mobile') { const mobileStream = remoteStreams[cameraId]; if (mobileStream) setActivePreviewStream(mobileStream); }
+        if (targetCamera.camera_type === 'laptop') {
+          newStream = mediaStream;
+          setActivePreviewStream(mediaStream);
+        } else if (targetCamera.camera_type === 'mobile') {
+          const mobileStream = remoteStreams[cameraId];
+          if (mobileStream) {
+            newStream = mobileStream;
+            setActivePreviewStream(mobileStream);
+          }
+        }
       }
+
+      if (newStream && streamStatus === 'live' && whipStatus === 'connected') {
+        await replaceWhipTracks(newStream);
+      }
+
       await loadCameras(activeSession.id);
       addNotification('success', 'Camera switched', 2000);
     } catch (error) { console.error('Error switching camera:', error); addNotification('error', 'Failed to switch camera', 3000); }
