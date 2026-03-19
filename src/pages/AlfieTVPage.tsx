@@ -48,10 +48,8 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   const [isConnecting, setIsConnecting] = React.useState(true);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
   const [isMuted, setIsMuted] = React.useState(false);
-  const isPausedRef = React.useRef(isPaused);
-  const isEndedRef = React.useRef(isEnded);
-  React.useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
-  React.useEffect(() => { isEndedRef.current = isEnded; }, [isEnded]);
+  const isPausedRef = React.useRef(session?.is_paused || false);
+  const isEndedRef = React.useRef(session?.status === 'ended');
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const pcRef = React.useRef<RTCPeerConnection | null>(null);
   const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,11 +57,20 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   const retryCountRef = React.useRef(0);
   const isFallbackRef = React.useRef(false);
   const [usingFallback, setUsingFallback] = React.useState(false);
+  const whepUrlRef = React.useRef(session?.cloudflare_whip_playback_url);
+  const iframeEmbedUrlRef = React.useRef(
+    session?.cloudflare_customer_code && session?.cloudflare_live_input_id
+      ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
+      : null
+  );
 
   const whepUrl = session?.cloudflare_whip_playback_url;
   const iframeEmbedUrl = session?.cloudflare_customer_code && session?.cloudflare_live_input_id
     ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
     : null;
+
+  whepUrlRef.current = whepUrl;
+  iframeEmbedUrlRef.current = iframeEmbedUrl;
 
   const cleanupConnection = React.useCallback(() => {
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
@@ -72,7 +79,8 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   }, []);
 
   const connectWhep = React.useCallback(async () => {
-    if (!whepUrl || isPausedRef.current || isEndedRef.current) return;
+    const url = whepUrlRef.current;
+    if (!url || isPausedRef.current || isEndedRef.current) return;
 
     setIsConnecting(true);
     setConnectionError(null);
@@ -105,7 +113,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
             if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
             const vid = videoRef.current;
             if (vid && Math.abs(vid.currentTime - initialTime) < 0.1 && !vid.paused) {
-              console.log('[WHEP] Video stalled after resume, reconnecting...');
+              console.log('[WHEP] Video stalled after connect, reconnecting...');
               retryCountRef.current = 0;
               connectWhep();
             }
@@ -121,11 +129,12 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
           setConnectionError(null);
         } else if (state === 'failed' || state === 'disconnected') {
           if (isPausedRef.current || isEndedRef.current) return;
+          const fallbackUrl = iframeEmbedUrlRef.current;
           if (retryCountRef.current < 8) {
             retryCountRef.current += 1;
             const delay = Math.min(retryCountRef.current * 2000, 10000);
             retryTimerRef.current = setTimeout(() => connectWhep(), delay);
-          } else if (!isFallbackRef.current && iframeEmbedUrl) {
+          } else if (!isFallbackRef.current && fallbackUrl) {
             isFallbackRef.current = true;
             setUsingFallback(true);
             setIsConnecting(false);
@@ -154,7 +163,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       const localDesc = pc.localDescription;
       if (!localDesc) throw new Error('No local description');
 
-      const response = await fetch(whepUrl, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/sdp' },
         body: localDesc.sdp,
@@ -169,11 +178,12 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
     } catch (err: any) {
       console.error('[WHEP] Connection error:', err);
       if (isPausedRef.current || isEndedRef.current) return;
+      const fallbackUrl = iframeEmbedUrlRef.current;
       if (retryCountRef.current < 8) {
         retryCountRef.current += 1;
         const delay = Math.min(retryCountRef.current * 2000, 10000);
         retryTimerRef.current = setTimeout(() => connectWhep(), delay);
-      } else if (!isFallbackRef.current && iframeEmbedUrl) {
+      } else if (!isFallbackRef.current && fallbackUrl) {
         isFallbackRef.current = true;
         setUsingFallback(true);
         setIsConnecting(false);
@@ -182,7 +192,34 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         setIsConnecting(false);
       }
     }
-  }, [whepUrl, iframeEmbedUrl, cleanupConnection]);
+  }, [cleanupConnection]);
+
+  const handlePauseChange = React.useCallback((paused: boolean) => {
+    const wasPaused = isPausedRef.current;
+    if (paused && !wasPaused) {
+      console.log('[Viewer] Session paused - showing hold screen');
+      setIsPaused(true);
+      isPausedRef.current = true;
+      cleanupConnection();
+    } else if (!paused && wasPaused) {
+      console.log('[Viewer] Session resumed - reconnecting');
+      setIsPaused(false);
+      isPausedRef.current = false;
+      retryCountRef.current = 0;
+      isFallbackRef.current = false;
+      setUsingFallback(false);
+      setConnectionError(null);
+      retryTimerRef.current = setTimeout(() => connectWhep(), 2000);
+    }
+  }, [cleanupConnection, connectWhep]);
+
+  const handleEnded = React.useCallback(() => {
+    if (isEndedRef.current) return;
+    console.log('[Viewer] Session ended');
+    setIsEnded(true);
+    isEndedRef.current = true;
+    cleanupConnection();
+  }, [cleanupConnection]);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -220,7 +257,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   React.useEffect(() => {
     if (!session) return;
     const channel = supabase
-      .channel(`live-player-${session.id}`)
+      .channel(`live-player-${session.id}-${Date.now()}`)
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -228,67 +265,44 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         filter: `id=eq.${session.id}`,
       }, (payload: any) => {
         const updated = payload.new;
-        const wasPaused = isPausedRef.current;
-        if (updated.is_paused) {
-          setIsPaused(true);
-          isPausedRef.current = true;
-          cleanupConnection();
-        } else if (wasPaused) {
-          setIsPaused(false);
-          isPausedRef.current = false;
-          if (whepUrl && !isFallbackRef.current) {
-            retryCountRef.current = 0;
-            isFallbackRef.current = false;
-            setUsingFallback(false);
-            setConnectionError(null);
-            retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
-          }
+        console.log('[Viewer RT] Session update received:', { is_paused: updated.is_paused, status: updated.status });
+        if (updated.is_paused === true) {
+          handlePauseChange(true);
+        } else if (updated.is_paused === false) {
+          handlePauseChange(false);
         }
         if (updated.status === 'ended') {
-          setIsEnded(true);
-          isEndedRef.current = true;
-          cleanupConnection();
+          handleEnded();
         }
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log('[Viewer RT] Subscription status:', status);
+      });
     return () => { supabase.removeChannel(channel); };
-  }, [session?.id, whepUrl, connectWhep, cleanupConnection]);
+  }, [session?.id, handlePauseChange, handleEnded]);
 
   React.useEffect(() => {
     if (!session) return;
     const pollInterval = setInterval(async () => {
       if (isEndedRef.current) return;
-      const { data } = await supabase
-        .from('livestream_sessions')
-        .select('is_paused, status')
-        .eq('id', session.id)
-        .maybeSingle();
-      if (data) {
-        if (data.is_paused && !isPausedRef.current) {
-          setIsPaused(true);
-          isPausedRef.current = true;
-          cleanupConnection();
-        }
-        if (!data.is_paused && isPausedRef.current) {
-          setIsPaused(false);
-          isPausedRef.current = false;
-          if (whepUrl && !isFallbackRef.current) {
-            retryCountRef.current = 0;
-            isFallbackRef.current = false;
-            setUsingFallback(false);
-            setConnectionError(null);
-            retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+      try {
+        const { data } = await supabase
+          .from('livestream_sessions')
+          .select('is_paused, status')
+          .eq('id', session.id)
+          .maybeSingle();
+        if (data) {
+          handlePauseChange(!!data.is_paused);
+          if (data.status === 'ended') {
+            handleEnded();
           }
         }
-        if (data.status === 'ended') {
-          setIsEnded(true);
-          isEndedRef.current = true;
-          cleanupConnection();
-        }
+      } catch (_e) {
+        // ignore poll errors
       }
-    }, 10000);
+    }, 3000);
     return () => clearInterval(pollInterval);
-  }, [session?.id, whepUrl, connectWhep, cleanupConnection]);
+  }, [session?.id, handlePauseChange, handleEnded]);
 
   if (!session) return null;
   if (!session.cloudflare_whip_playback_url && !iframeEmbedUrl) return null;
