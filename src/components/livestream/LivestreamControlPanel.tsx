@@ -777,6 +777,23 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           pauseResumeInProgressRef.current = false;
           return;
         }
+
+        await new Promise<void>((resolve) => {
+          const pc = whipPeerConnectionRef.current;
+          if (!pc) { resolve(); return; }
+          if (pc.connectionState === 'connected') { resolve(); return; }
+          const timeout = setTimeout(resolve, 5000);
+          const handler = () => {
+            if (pc.connectionState === 'connected' || pc.connectionState === 'failed') {
+              clearTimeout(timeout);
+              pc.removeEventListener('connectionstatechange', handler);
+              resolve();
+            }
+          };
+          pc.addEventListener('connectionstatechange', handler);
+        });
+
+        console.log('[Resume] WHIP connection state:', whipPeerConnectionRef.current?.connectionState);
       }
 
       setIsPaused(false);
@@ -1261,7 +1278,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             <div className={`relative w-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'aspect-video max-h-full'}`}>
               <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
-              {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && !isPaused && (
+              {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && (
                 <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} />
               )}
 
