@@ -64,16 +64,17 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
     ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
     : null;
 
+  const cleanupConnection = React.useCallback(() => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
+  }, []);
+
   const connectWhep = React.useCallback(async () => {
     if (!whepUrl || isPausedRef.current || isEndedRef.current) return;
 
     setIsConnecting(true);
     setConnectionError(null);
-
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
+    cleanupConnection();
 
     try {
       const pc = new RTCPeerConnection({
@@ -91,6 +92,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       pc.ontrack = (event) => {
         if (videoRef.current && event.streams[0]) {
           videoRef.current.srcObject = event.streams[0];
+          videoRef.current.play().catch(() => {});
           setIsConnecting(false);
           setConnectionError(null);
           retryCountRef.current = 0;
@@ -98,14 +100,17 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       };
 
       pc.onconnectionstatechange = () => {
+        if (pc !== pcRef.current) return;
         const state = pc.connectionState;
         if (state === 'connected') {
           setIsConnecting(false);
           setConnectionError(null);
         } else if (state === 'failed' || state === 'disconnected') {
-          if (retryCountRef.current < 5) {
+          if (isPausedRef.current || isEndedRef.current) return;
+          if (retryCountRef.current < 8) {
             retryCountRef.current += 1;
-            retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+            const delay = Math.min(retryCountRef.current * 2000, 10000);
+            retryTimerRef.current = setTimeout(() => connectWhep(), delay);
           } else if (!isFallbackRef.current && iframeEmbedUrl) {
             isFallbackRef.current = true;
             setUsingFallback(true);
@@ -149,9 +154,11 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
     } catch (err: any) {
       console.error('[WHEP] Connection error:', err);
-      if (retryCountRef.current < 5) {
+      if (isPausedRef.current || isEndedRef.current) return;
+      if (retryCountRef.current < 8) {
         retryCountRef.current += 1;
-        retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+        const delay = Math.min(retryCountRef.current * 2000, 10000);
+        retryTimerRef.current = setTimeout(() => connectWhep(), delay);
       } else if (!isFallbackRef.current && iframeEmbedUrl) {
         isFallbackRef.current = true;
         setUsingFallback(true);
@@ -161,7 +168,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         setIsConnecting(false);
       }
     }
-  }, [whepUrl, iframeEmbedUrl]);
+  }, [whepUrl, iframeEmbedUrl, cleanupConnection]);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -173,26 +180,27 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
 
   React.useEffect(() => {
     if (!session) return;
-    setIsPaused(session.is_paused || false);
-    setIsEnded(session.status === 'ended');
+    const paused = session.is_paused || false;
+    const ended = session.status === 'ended';
+    setIsPaused(paused);
+    isPausedRef.current = paused;
+    setIsEnded(ended);
+    isEndedRef.current = ended;
     retryCountRef.current = 0;
     isFallbackRef.current = false;
     setUsingFallback(false);
     setConnectionError(null);
     setIsConnecting(true);
 
-    if (whepUrl) {
+    if (whepUrl && !paused && !ended) {
       connectWhep();
-    } else if (iframeEmbedUrl) {
+    } else if (iframeEmbedUrl && !paused && !ended) {
       isFallbackRef.current = true;
       setUsingFallback(true);
       setIsConnecting(false);
     }
 
-    return () => {
-      if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    };
+    return () => { cleanupConnection(); };
   }, [session?.id]);
 
   React.useEffect(() => {
@@ -210,24 +218,27 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         if (updated.is_paused) {
           setIsPaused(true);
           isPausedRef.current = true;
-          if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
+          cleanupConnection();
         } else if (wasPaused) {
           setIsPaused(false);
           isPausedRef.current = false;
           if (whepUrl && !isFallbackRef.current) {
             retryCountRef.current = 0;
-            setTimeout(() => connectWhep(), 2000);
+            isFallbackRef.current = false;
+            setUsingFallback(false);
+            setConnectionError(null);
+            retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
           }
         }
         if (updated.status === 'ended') {
           setIsEnded(true);
           isEndedRef.current = true;
-          if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
+          cleanupConnection();
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [session?.id, whepUrl, connectWhep]);
+  }, [session?.id, whepUrl, connectWhep, cleanupConnection]);
 
   React.useEffect(() => {
     if (!session) return;
@@ -242,22 +253,28 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         if (data.is_paused && !isPausedRef.current) {
           setIsPaused(true);
           isPausedRef.current = true;
-          if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
+          cleanupConnection();
         }
         if (!data.is_paused && isPausedRef.current) {
           setIsPaused(false);
           isPausedRef.current = false;
-          if (whepUrl && !isFallbackRef.current) { retryCountRef.current = 0; setTimeout(() => connectWhep(), 2000); }
+          if (whepUrl && !isFallbackRef.current) {
+            retryCountRef.current = 0;
+            isFallbackRef.current = false;
+            setUsingFallback(false);
+            setConnectionError(null);
+            retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+          }
         }
         if (data.status === 'ended') {
           setIsEnded(true);
           isEndedRef.current = true;
-          if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
+          cleanupConnection();
         }
       }
     }, 10000);
     return () => clearInterval(pollInterval);
-  }, [session?.id, whepUrl, connectWhep]);
+  }, [session?.id, whepUrl, connectWhep, cleanupConnection]);
 
   if (!session) return null;
   if (!session.cloudflare_whip_playback_url && !iframeEmbedUrl) return null;
