@@ -55,6 +55,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const pcRef = React.useRef<RTCPeerConnection | null>(null);
   const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stallCheckRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = React.useRef(0);
   const isFallbackRef = React.useRef(false);
   const [usingFallback, setUsingFallback] = React.useState(false);
@@ -66,6 +67,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
 
   const cleanupConnection = React.useCallback(() => {
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    if (stallCheckRef.current) { clearTimeout(stallCheckRef.current); stallCheckRef.current = null; }
     if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
   }, []);
 
@@ -96,6 +98,18 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
           setIsConnecting(false);
           setConnectionError(null);
           retryCountRef.current = 0;
+
+          if (stallCheckRef.current) clearTimeout(stallCheckRef.current);
+          const initialTime = videoRef.current.currentTime;
+          stallCheckRef.current = setTimeout(() => {
+            if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
+            const vid = videoRef.current;
+            if (vid && Math.abs(vid.currentTime - initialTime) < 0.1 && !vid.paused) {
+              console.log('[WHEP] Video stalled after resume, reconnecting...');
+              retryCountRef.current = 0;
+              connectWhep();
+            }
+          }, 4000);
         }
       };
 
