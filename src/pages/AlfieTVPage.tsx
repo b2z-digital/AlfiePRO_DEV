@@ -128,17 +128,30 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
 
   return (
     <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+      {venueImage && (
+        <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+      )}
       {!isPaused && !isEnded && (
-        <iframe
-          key={`stream-${iframeKey}`}
-          src={embedUrl}
-          className="absolute inset-0 w-full h-full"
-          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          allowFullScreen
-          title={session.title || 'Live Stream'}
-          loading="eager"
-          style={{ border: 'none' }}
-        />
+        <>
+          <iframe
+            key={`stream-${iframeKey}`}
+            src={embedUrl}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
+            title={session.title || 'Live Stream'}
+            loading="eager"
+            style={{ border: 'none' }}
+          />
+          {isWaitingForStream && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-white/70 text-sm">Connecting to live stream...</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {(isPaused || isEnded) && (
@@ -963,28 +976,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const LiveHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => {
     const venueImg = stream.venue_image;
     const clubName = stream.club_name;
-    const embedUrl = stream.cloudflare_customer_code && stream.cloudflare_live_input_id
-      ? `https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`
-      : null;
 
     return (
       <div className="relative h-[85vh] w-full overflow-hidden">
-        {venueImg && (
+        {venueImg ? (
           <img src={venueImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        )}
-        {embedUrl ? (
-          <div className="absolute inset-0">
-            <iframe
-              src={embedUrl}
-              className="w-full h-full object-cover scale-110"
-              allow="autoplay"
-              style={{ pointerEvents: 'none', border: 'none' }}
-              loading="eager"
-            />
-          </div>
-        ) : !venueImg ? (
+        ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
-        ) : null}
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
 
@@ -1077,19 +1076,13 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     const renderSlideBackground = () => {
       if (slide.type === 'live') {
         const s = slide.stream;
-        const embedUrl = s.cloudflare_customer_code && s.cloudflare_live_input_id
-          ? `https://customer-${s.cloudflare_customer_code}.cloudflarestream.com/${s.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`
-          : null;
         return (
           <>
-            {s.venue_image && <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-            {embedUrl ? (
-              <div className="absolute inset-0">
-                <iframe src={embedUrl} className="w-full h-full object-cover scale-110" allow="autoplay" style={{ pointerEvents: 'none', border: 'none' }} loading="eager" />
-              </div>
-            ) : !s.venue_image ? (
+            {s.venue_image ? (
+              <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
-            ) : null}
+            )}
           </>
         );
       }
@@ -1710,14 +1703,8 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                               style={{ width: '400px' }}
                             >
                               <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border-2 border-red-500/50 group-hover:border-red-500 transition-colors">
-                                {stream.cloudflare_customer_code && stream.cloudflare_live_input_id ? (
-                                  <iframe
-                                    src={`https://customer-${stream.cloudflare_customer_code}.cloudflarestream.com/${stream.cloudflare_live_input_id}/iframe?autoplay=true&muted=true&controls=false&preload=auto&letterboxColor=000000`}
-                                    className="absolute inset-0 w-full h-full pointer-events-none"
-                                    allow="autoplay"
-                                    style={{ border: 'none' }}
-                                    loading="lazy"
-                                  />
+                                {stream.venue_image ? (
+                                  <img src={stream.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
                                 ) : (
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <Radio className="w-12 h-12 text-red-500 animate-pulse" />
