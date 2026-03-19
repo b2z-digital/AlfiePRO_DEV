@@ -72,28 +72,36 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   whepUrlRef.current = whepUrl;
   iframeEmbedUrlRef.current = iframeEmbedUrl;
 
-  const resumeStallCheckRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
-  const isResumeRef = React.useRef(false);
-
-  const cleanupConnection = React.useCallback(() => {
-    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
-    if (stallCheckRef.current) { clearTimeout(stallCheckRef.current); stallCheckRef.current = null; }
-    if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
-    if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+  const cleanupPeerConnection = React.useCallback(() => {
+    if (pcRef.current) {
+      pcRef.current.onconnectionstatechange = null;
+      pcRef.current.ontrack = null;
+      pcRef.current.close();
+      pcRef.current = null;
     }
   }, []);
 
+  const cleanupTimers = React.useCallback(() => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    if (stallCheckRef.current) { clearTimeout(stallCheckRef.current); stallCheckRef.current = null; }
+  }, []);
+
+  const cleanupConnection = React.useCallback(() => {
+    cleanupTimers();
+    cleanupPeerConnection();
+  }, [cleanupTimers, cleanupPeerConnection]);
+
   const connectWhep = React.useCallback(async () => {
     const url = whepUrlRef.current;
-    if (!url || isPausedRef.current || isEndedRef.current) return;
+    if (!url || isPausedRef.current || isEndedRef.current) {
+      console.log('[WHEP] Skip connect - paused:', isPausedRef.current, 'ended:', isEndedRef.current, 'url:', !!url);
+      return;
+    }
 
+    console.log('[WHEP] Connecting... retry:', retryCountRef.current);
     setIsConnecting(true);
     setConnectionError(null);
-    cleanupConnection();
-
-    const isResume = isResumeRef.current;
+    cleanupPeerConnection();
 
     try {
       const pc = new RTCPeerConnection({
@@ -117,82 +125,31 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
           retryCountRef.current = 0;
 
           if (stallCheckRef.current) clearTimeout(stallCheckRef.current);
-          if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
-
-          if (isResume) {
-            let frameCheckCount = 0;
-            let lastFrameTime = performance.now();
-            const videoTrack = event.streams[0].getVideoTracks()[0];
-
-            if (videoTrack && typeof (videoTrack as any).requestFrame === 'function') {
-              let lastStats: any = null;
-              resumeStallCheckRef.current = setInterval(async () => {
-                if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) {
-                  if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
-                  return;
+          stallCheckRef.current = setTimeout(async () => {
+            if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
+            try {
+              const stats = await pc.getStats();
+              let framesDecoded = 0;
+              stats.forEach((report: any) => {
+                if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                  framesDecoded = report.framesDecoded || 0;
                 }
-                frameCheckCount++;
-                try {
-                  const stats = await pc.getStats();
-                  let framesDecoded = 0;
-                  stats.forEach((report: any) => {
-                    if (report.type === 'inbound-rtp' && report.kind === 'video') {
-                      framesDecoded = report.framesDecoded || 0;
-                    }
-                  });
-                  if (lastStats !== null && framesDecoded > lastStats) {
-                    lastFrameTime = performance.now();
-                    isResumeRef.current = false;
-                    if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
-                    console.log('[WHEP] Fresh frames confirmed after resume');
-                    return;
-                  }
-                  lastStats = framesDecoded;
-                } catch (_e) { /* ignore */ }
-
-                if (frameCheckCount >= 8) {
-                  if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
-                  if (performance.now() - lastFrameTime > 3000) {
-                    console.log('[WHEP] Stale stream after resume, reconnecting with delay...');
-                    cleanupConnection();
-                    retryCountRef.current = 0;
-                    retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
-                  }
-                }
-              }, 500);
-            } else {
-              const vid = videoRef.current;
-              const initialTime = vid.currentTime;
-              stallCheckRef.current = setTimeout(() => {
-                if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
-                if (vid && Math.abs(vid.currentTime - initialTime) < 0.01 && !vid.paused) {
-                  console.log('[WHEP] Video stalled after resume (currentTime), reconnecting...');
-                  cleanupConnection();
-                  retryCountRef.current = 0;
-                  retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
-                } else {
-                  isResumeRef.current = false;
-                }
-              }, 4000);
-            }
-          } else {
-            const initialTime = videoRef.current.currentTime;
-            stallCheckRef.current = setTimeout(() => {
-              if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
-              const vid = videoRef.current;
-              if (vid && Math.abs(vid.currentTime - initialTime) < 0.1 && !vid.paused) {
-                console.log('[WHEP] Video stalled after connect, reconnecting...');
+              });
+              if (framesDecoded < 5) {
+                console.log('[WHEP] Low frame count after 5s, reconnecting...');
+                cleanupPeerConnection();
                 retryCountRef.current = 0;
-                connectWhep();
+                retryTimerRef.current = setTimeout(() => connectWhep(), 2000);
               }
-            }, 4000);
-          }
+            } catch (_e) { /* ignore */ }
+          }, 5000);
         }
       };
 
       pc.onconnectionstatechange = () => {
         if (pc !== pcRef.current) return;
         const state = pc.connectionState;
+        console.log('[WHEP] Connection state:', state);
         if (state === 'connected') {
           setIsConnecting(false);
           setConnectionError(null);
@@ -201,9 +158,8 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
           const fallbackUrl = iframeEmbedUrlRef.current;
           if (retryCountRef.current < 10) {
             retryCountRef.current += 1;
-            const delay = isResume
-              ? Math.min(retryCountRef.current * 1500, 6000)
-              : Math.min(retryCountRef.current * 2000, 10000);
+            const delay = Math.min(retryCountRef.current * 2000, 8000);
+            console.log('[WHEP] Will retry in', delay, 'ms');
             retryTimerRef.current = setTimeout(() => connectWhep(), delay);
           } else if (!isFallbackRef.current && fallbackUrl) {
             isFallbackRef.current = true;
@@ -252,9 +208,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       const fallbackUrl = iframeEmbedUrlRef.current;
       if (retryCountRef.current < 10) {
         retryCountRef.current += 1;
-        const delay = isResume
-          ? Math.min(retryCountRef.current * 1500, 6000)
-          : Math.min(retryCountRef.current * 2000, 10000);
+        const delay = Math.min(retryCountRef.current * 2000, 8000);
         retryTimerRef.current = setTimeout(() => connectWhep(), delay);
       } else if (!isFallbackRef.current && fallbackUrl) {
         isFallbackRef.current = true;
@@ -265,29 +219,35 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         setIsConnecting(false);
       }
     }
-  }, [cleanupConnection]);
+  }, [cleanupPeerConnection]);
 
   const handlePauseChange = React.useCallback((paused: boolean) => {
     const wasPaused = isPausedRef.current;
-    if (paused && !wasPaused) {
+    if (paused === wasPaused) return;
+
+    if (paused) {
       console.log('[Viewer] Session paused - showing hold screen');
-      setIsPaused(true);
       isPausedRef.current = true;
-      isResumeRef.current = false;
-      cleanupConnection();
-    } else if (!paused && wasPaused) {
-      console.log('[Viewer] Session resumed - will reconnect after broadcaster stabilizes');
-      setIsPaused(false);
+      setIsPaused(true);
+      cleanupTimers();
+      cleanupPeerConnection();
+      if (videoRef.current) videoRef.current.srcObject = null;
+    } else {
+      console.log('[Viewer] Session resumed - reconnecting');
       isPausedRef.current = false;
+      setIsPaused(false);
       retryCountRef.current = 0;
       isFallbackRef.current = false;
-      isResumeRef.current = true;
       setUsingFallback(false);
       setConnectionError(null);
       setIsConnecting(true);
-      retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+      cleanupTimers();
+      retryTimerRef.current = setTimeout(() => {
+        console.log('[Viewer] Resume timer fired, calling connectWhep');
+        connectWhep();
+      }, 3000);
     }
-  }, [cleanupConnection, connectWhep]);
+  }, [cleanupTimers, cleanupPeerConnection, connectWhep]);
 
   const handleEnded = React.useCallback(() => {
     if (isEndedRef.current) return;
