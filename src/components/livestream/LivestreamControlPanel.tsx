@@ -722,8 +722,11 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     } catch (error) { console.error('Error going live:', error); setStreamStatus('testing'); stopWhipStreaming(); alert('Failed to go live.'); }
   };
 
+  const pauseResumeInProgressRef = useRef(false);
+
   const pauseBroadcast = async () => {
-    if (!activeSession || streamStatus !== 'live') return;
+    if (!activeSession || streamStatus !== 'live' || pauseResumeInProgressRef.current) return;
+    pauseResumeInProgressRef.current = true;
     try {
       stopWhipStreaming();
       setIsPaused(true);
@@ -731,20 +734,31 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       addNotification('info', 'Broadcast paused. Viewers will see a hold screen.', 4000);
     } catch (error) {
       console.error('Error pausing broadcast:', error);
+      addNotification('error', 'Failed to pause broadcast.', 5000);
+    } finally {
+      pauseResumeInProgressRef.current = false;
     }
   };
 
   const resumeBroadcast = async () => {
-    if (!activeSession || streamStatus !== 'live' || !isPaused) return;
+    if (!activeSession || streamStatus !== 'live' || !isPaused || pauseResumeInProgressRef.current) return;
+    pauseResumeInProgressRef.current = true;
     try {
       let rawStream = activePreviewStream || mediaStream;
       if (!rawStream || rawStream.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
         const newStream = await requestCameraAccess();
-        if (!newStream) { addNotification('error', 'No video source available.', 5000); return; }
+        if (!newStream) {
+          addNotification('error', 'No video source available.', 5000);
+          pauseResumeInProgressRef.current = false;
+          return;
+        }
         rawStream = newStream;
       }
-      setIsPaused(false);
-      await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
+
+      if (videoRef.current && rawStream) {
+        videoRef.current.srcObject = rawStream;
+        videoRef.current.play().catch(() => {});
+      }
 
       let streamToSend = rawStream;
       const cs = compositedStreamRef.current;
@@ -758,18 +772,21 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Reconnecting to streaming server...', 3000);
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-        if (!whipSuccess) { addNotification('error', 'Failed to reconnect to streaming server.', 8000); return; }
+        if (!whipSuccess) {
+          addNotification('error', 'Failed to reconnect to streaming server.', 8000);
+          pauseResumeInProgressRef.current = false;
+          return;
+        }
       }
 
-      if (videoRef.current && rawStream) {
-        videoRef.current.srcObject = rawStream;
-        videoRef.current.play().catch(() => {});
-      }
-
+      setIsPaused(false);
+      await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
       addNotification('success', 'Broadcast resumed!', 3000);
     } catch (error) {
       console.error('Error resuming broadcast:', error);
       addNotification('error', 'Failed to resume broadcast.', 5000);
+    } finally {
+      pauseResumeInProgressRef.current = false;
     }
   };
 
