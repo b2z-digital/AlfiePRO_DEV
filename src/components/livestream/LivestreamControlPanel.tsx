@@ -92,8 +92,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     overlayElement: overlayElReady,
     sourceStream: activePreviewStream || mediaStream,
     enabled: activeSession?.enable_overlays === true &&
-             (streamStatus === 'testing' || streamStatus === 'live') &&
-             !isPaused,
+             (streamStatus === 'testing' || streamStatus === 'live'),
     width: 1280,
     height: 720,
     overlayCaptureFps: 2,
@@ -746,13 +745,27 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       }
       setIsPaused(false);
       await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
-      await new Promise(r => setTimeout(r, 500));
-      const streamToSend = compositedStreamRef.current || rawStream;
+
+      let streamToSend = rawStream;
+      const cs = compositedStreamRef.current;
+      if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
+        streamToSend = cs;
+        console.log('[Resume] Using composited stream');
+      } else {
+        console.log('[Resume] Using raw camera stream');
+      }
+
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Reconnecting to streaming server...', 3000);
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
         if (!whipSuccess) { addNotification('error', 'Failed to reconnect to streaming server.', 8000); return; }
       }
+
+      if (videoRef.current && rawStream) {
+        videoRef.current.srcObject = rawStream;
+        videoRef.current.play().catch(() => {});
+      }
+
       addNotification('success', 'Broadcast resumed!', 3000);
     } catch (error) {
       console.error('Error resuming broadcast:', error);
