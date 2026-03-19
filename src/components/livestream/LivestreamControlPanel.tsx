@@ -15,6 +15,7 @@ import { OverlaysManager } from './OverlaysManager';
 import { LivestreamOverlayRenderer } from './LivestreamOverlayRenderer';
 import { CameraFeedGridRef } from './CameraFeedGrid';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 
 interface LivestreamControlPanelProps {
   clubId: string;
@@ -45,6 +46,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const peerConnectionsRef = useRef<Record<string, RTCPeerConnection>>({});
   const signalingChannelsRef = useRef<Record<string, ReturnType<typeof supabase.channel>>>({});
   const cameraLastConnectedRef = useRef<Record<string, string>>({});
+  const overlayRef = useRef<HTMLDivElement>(null);
   const whipPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const [whipStatus, setWhipStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [showMobileQR, setShowMobileQR] = useState(false);
@@ -79,8 +81,24 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
   const activePreviewStreamRef = useRef<MediaStream | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const compositedStreamRef = useRef<MediaStream | null>(null);
   useEffect(() => { activePreviewStreamRef.current = activePreviewStream; }, [activePreviewStream]);
   useEffect(() => { mediaStreamRef.current = mediaStream; }, [mediaStream]);
+
+  const { compositedStream, isCompositing } = useCanvasCompositor({
+    videoElement: videoRef.current,
+    overlayElement: overlayRef.current,
+    sourceStream: activePreviewStream || mediaStream,
+    enabled: activeSession?.enable_overlays === true &&
+             (streamStatus === 'testing' || streamStatus === 'live') &&
+             !isPaused,
+    width: 1280,
+    height: 720,
+    overlayCaptureFps: 2,
+    frameRate: 30,
+  });
+
+  useEffect(() => { compositedStreamRef.current = compositedStream; }, [compositedStream]);
 
   useEffect(() => {
     if (whipHealthRef.current) { clearInterval(whipHealthRef.current); whipHealthRef.current = null; }
@@ -101,7 +119,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             setWhipStatus('error');
             addNotification('warning', 'Stream connection stalled. Attempting reconnect...', 5000);
             if (activeSession?.cloudflare_whip_url) {
-              const stream = activePreviewStreamRef.current || mediaStreamRef.current;
+              const stream = compositedStreamRef.current || activePreviewStreamRef.current || mediaStreamRef.current;
               if (stream) {
                 stopWhipStreaming();
                 await new Promise(r => setTimeout(r, 1000));
@@ -492,7 +510,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const stream = await requestCameraAccess();
       if (!stream) return;
       if (session.status === 'live' && session.streaming_mode === 'cloudflare_relay' && session.cloudflare_whip_url) {
-        const whipSuccess = await startWhipStreaming(session.cloudflare_whip_url, stream);
+        await new Promise(r => setTimeout(r, 500));
+        const reconnectStream = compositedStreamRef.current || stream;
+        const whipSuccess = await startWhipStreaming(session.cloudflare_whip_url, reconnectStream);
         if (whipSuccess) {
           addNotification('success', 'Reconnected to live stream!', 4000);
         } else {
@@ -651,7 +671,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
       const actualStartTime = new Date().toISOString();
-      let streamToSend = activePreviewStream || mediaStream;
+      let streamToSend = compositedStream || activePreviewStream || mediaStream;
       if (!streamToSend) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
 
       const videoTracks = streamToSend.getVideoTracks().filter(t => t.readyState === 'live');
@@ -664,6 +684,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           return;
         }
         streamToSend = freshStream;
+      }
+      if (compositedStream) {
+        console.log('[GoLive] Using composited stream with overlays');
+        streamToSend = compositedStream;
       }
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_live_input_id) {
         try {
@@ -708,19 +732,21 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const resumeBroadcast = async () => {
     if (!activeSession || streamStatus !== 'live' || !isPaused) return;
     try {
-      let streamToSend = activePreviewStream || mediaStream;
-      if (!streamToSend || streamToSend.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
+      let rawStream = activePreviewStream || mediaStream;
+      if (!rawStream || rawStream.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
         const newStream = await requestCameraAccess();
         if (!newStream) { addNotification('error', 'No video source available.', 5000); return; }
-        streamToSend = newStream;
+        rawStream = newStream;
       }
+      setIsPaused(false);
+      await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
+      await new Promise(r => setTimeout(r, 500));
+      const streamToSend = compositedStreamRef.current || rawStream;
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Reconnecting to streaming server...', 3000);
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
         if (!whipSuccess) { addNotification('error', 'Failed to reconnect to streaming server.', 8000); return; }
       }
-      setIsPaused(false);
-      await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
       addNotification('success', 'Broadcast resumed!', 3000);
     } catch (error) {
       console.error('Error resuming broadcast:', error);
@@ -880,7 +906,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       }
 
       if (newStream && streamStatus === 'live' && whipStatus === 'connected') {
-        await replaceWhipTracks(newStream);
+        await new Promise(r => setTimeout(r, 300));
+        const whipStream = compositedStreamRef.current || newStream;
+        await replaceWhipTracks(whipStream);
       }
 
       await loadCameras(activeSession.id);
@@ -1103,6 +1131,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                   {isPaused ? 'PAUSED' : whipStatus === 'connected' ? 'CLOUD' : whipStatus === 'connecting' ? 'SYNC' : 'OFFLINE'}
                 </div>
               )}
+              {isCompositing && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-400">
+                  <Layers className="w-3 h-3" />
+                  OVERLAY
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1192,7 +1226,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
               {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && !isPaused && (
-                <LivestreamOverlayRenderer session={activeSession} />
+                <LivestreamOverlayRenderer ref={overlayRef} session={activeSession} />
               )}
 
               {isPaused && streamStatus === 'live' && (

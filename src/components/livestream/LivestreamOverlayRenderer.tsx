@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Wind, Trophy, Users, Hash, Timer, AlertCircle } from 'lucide-react';
+import { Wind, Trophy, Users, Hash, Timer, CircleAlert as AlertCircle } from 'lucide-react';
 import type { LivestreamSession, LivestreamOverlay } from '../../types/livestream';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import { getActiveSessionsForEvent, getRaceStatus } from '../../utils/liveTrackingStorage';
@@ -11,7 +11,7 @@ interface LivestreamOverlayRendererProps {
   weatherData?: any;
 }
 
-export function LivestreamOverlayRenderer({ session, raceData, weatherData }: LivestreamOverlayRendererProps) {
+export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData }, ref) {
   const [overlays, setOverlays] = useState<LivestreamOverlay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
@@ -366,7 +366,7 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
   const themeStyles = getThemeStyles();
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10">
+    <div ref={ref} className="absolute inset-0 pointer-events-none z-10">
 
       {config.showWeather && weatherData && (
         <div
@@ -492,12 +492,11 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
       )}
 
       {/* Alfie Logo Watermark - Bottom Right */}
-      <div className="absolute bottom-4 right-4">
-        <img
-          src="/alfie_app_logo.svg"
-          alt="Alfie Logo"
-          className="w-16 h-16 opacity-40"
-        />
+      <div className="absolute bottom-4 right-4 opacity-40">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-16 h-16">
+          <path fill="white" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+          <path fill="rgba(255,255,255,0.7)" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+        </svg>
       </div>
 
       {overlays.map((overlay) => (
@@ -569,7 +568,7 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
       `}</style>
     </div>
   );
-}
+});
 
 function CustomOverlay({ overlay }: { overlay: LivestreamOverlay }) {
   const style = {
