@@ -47,6 +47,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const signalingChannelsRef = useRef<Record<string, ReturnType<typeof supabase.channel>>>({});
   const cameraLastConnectedRef = useRef<Record<string, string>>({});
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [videoElReady, setVideoElReady] = useState<HTMLVideoElement | null>(null);
+  const [overlayElReady, setOverlayElReady] = useState<HTMLDivElement | null>(null);
   const whipPeerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const [whipStatus, setWhipStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [showMobileQR, setShowMobileQR] = useState(false);
@@ -86,8 +88,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   useEffect(() => { mediaStreamRef.current = mediaStream; }, [mediaStream]);
 
   const { compositedStream, isCompositing } = useCanvasCompositor({
-    videoElement: videoRef.current,
-    overlayElement: overlayRef.current,
+    videoElement: videoElReady,
+    overlayElement: overlayElReady,
     sourceStream: activePreviewStream || mediaStream,
     enabled: activeSession?.enable_overlays === true &&
              (streamStatus === 'testing' || streamStatus === 'live') &&
@@ -671,10 +673,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
       const actualStartTime = new Date().toISOString();
-      let streamToSend = compositedStream || activePreviewStream || mediaStream;
-      if (!streamToSend) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
+      let rawStream = activePreviewStream || mediaStream;
+      if (!rawStream) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
 
-      const videoTracks = streamToSend.getVideoTracks().filter(t => t.readyState === 'live');
+      const videoTracks = rawStream.getVideoTracks().filter(t => t.readyState === 'live');
       if (videoTracks.length === 0) {
         console.warn('[GoLive] Active stream has no live video tracks, requesting fresh camera access');
         const freshStream = await requestCameraAccess();
@@ -683,11 +685,15 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           setStreamStatus('testing');
           return;
         }
-        streamToSend = freshStream;
+        rawStream = freshStream;
       }
-      if (compositedStream) {
+      let streamToSend = rawStream;
+      const cs = compositedStreamRef.current;
+      if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
         console.log('[GoLive] Using composited stream with overlays');
-        streamToSend = compositedStream;
+        streamToSend = cs;
+      } else {
+        console.log('[GoLive] Using raw camera stream (compositor not ready)');
       }
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_live_input_id) {
         try {
@@ -1223,10 +1229,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           {/* Program Monitor */}
           <div className="flex-1 p-4 min-h-0 overflow-hidden flex items-center justify-center">
             <div className={`relative w-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'aspect-video max-h-full'}`}>
-              <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
+              <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
               {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && !isPaused && (
-                <LivestreamOverlayRenderer ref={overlayRef} session={activeSession} />
+                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} />
               )}
 
               {isPaused && streamStatus === 'live' && (
