@@ -371,9 +371,6 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       {config.showWeather && weatherData && (
         <div
           className={`absolute top-3 right-3 bg-gradient-to-br ${themeStyles.bg} backdrop-blur-md px-2.5 py-2 rounded-md border ${themeStyles.border} shadow-lg`}
-          style={{
-            animation: 'slideLeft 0.5s ease-out'
-          }}
         >
           <div className="flex items-center gap-2">
             <Wind className={`w-4 h-4 ${config.theme === 'light' ? 'text-cyan-600' : 'text-cyan-400'}`} />
@@ -393,38 +390,31 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         </div>
       )}
 
-      {/* Skippers List - Top Left - Simple Design like example */}
+      {/* Skippers List - Top Left */}
       {config.showSkippers && displaySkippers && displaySkippers.length > 0 && (
-        <div
-          className="absolute top-3 left-3"
-          style={{
-            animation: 'slideRight 0.5s ease-out'
-          }}
-        >
-          <div className="bg-slate-700/70 backdrop-blur-md rounded-md shadow-lg overflow-hidden max-w-[280px]">
-            {/* Header */}
-            <div className="px-2 py-0.5 bg-slate-800/70">
-              <div className="flex items-center gap-1.5">
-                <Users className="w-2.5 h-2.5 text-slate-300" />
-                <p className="text-[10px] font-semibold text-white">
+        <div className="absolute top-4 left-8">
+          <div className="bg-slate-800/80 backdrop-blur-md rounded-lg shadow-lg overflow-hidden min-w-[240px] max-w-[340px]">
+            <div className="px-3 py-1.5 bg-slate-900/80 border-b border-slate-600/40">
+              <div className="flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-yellow-400" />
+                <p className="text-sm font-bold text-white tracking-wide">
                   Skippers
                 </p>
               </div>
             </div>
 
-            {/* Skipper List - Minimal like example */}
-            <div className="max-h-[400px] overflow-y-auto">
-              <table className="w-full text-[10px]">
+            <div className="max-h-[500px] overflow-y-auto">
+              <table className="w-full">
                 <tbody className="text-white">
-                  {displaySkippers.slice(0, 20).map((skipper: any, index: number) => (
+                  {displaySkippers.slice(0, 25).map((skipper: any, index: number) => (
                     <tr
                       key={skipper.id || index}
-                      className="hover:bg-slate-600/30 transition-colors"
+                      className={index % 2 === 0 ? 'bg-slate-700/30' : ''}
                     >
-                      <td className="pl-2 pr-0.5 font-medium w-[40px]">
-                        {skipper.sail_number || skipper.sailNo || 'N/A'}
+                      <td className="pl-3 pr-1 py-0.5 text-sm font-semibold text-yellow-400 w-[50px]">
+                        {skipper.sail_number || skipper.sailNo || ''}
                       </td>
-                      <td className="pl-0.5 pr-2">
+                      <td className="pl-1 pr-3 py-0.5 text-sm font-medium">
                         {skipper.skipper_name || skipper.name || `Skipper ${index + 1}`}
                       </td>
                     </tr>
@@ -432,10 +422,10 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
                 </tbody>
               </table>
 
-              {displaySkippers.length > 20 && (
-                <div className="px-2 py-0.5 bg-slate-800/50 text-center border-t border-slate-600/30">
-                  <p className="text-[9px] text-white/70">
-                    +{displaySkippers.length - 20} more
+              {displaySkippers.length > 25 && (
+                <div className="px-3 py-1 bg-slate-900/60 text-center border-t border-slate-600/30">
+                  <p className="text-xs text-white/60">
+                    +{displaySkippers.length - 25} more
                   </p>
                 </div>
               )}
@@ -492,10 +482,10 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       )}
 
       {/* Alfie Logo Watermark - Bottom Right */}
-      <div className="absolute bottom-4 right-4 opacity-40">
+      <div className="absolute bottom-4 right-4 opacity-60">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-16 h-16">
-          <path fill="white" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
-          <path fill="rgba(255,255,255,0.7)" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+          <path fill="#0066b4" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+          <path fill="#0078d3" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
         </svg>
       </div>
 

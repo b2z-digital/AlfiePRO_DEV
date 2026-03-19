@@ -48,6 +48,10 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   const [isConnecting, setIsConnecting] = React.useState(true);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
   const [isMuted, setIsMuted] = React.useState(false);
+  const isPausedRef = React.useRef(isPaused);
+  const isEndedRef = React.useRef(isEnded);
+  React.useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  React.useEffect(() => { isEndedRef.current = isEnded; }, [isEnded]);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const pcRef = React.useRef<RTCPeerConnection | null>(null);
   const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,7 +65,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
     : null;
 
   const connectWhep = React.useCallback(async () => {
-    if (!whepUrl || isPaused || isEnded) return;
+    if (!whepUrl || isPausedRef.current || isEndedRef.current) return;
 
     setIsConnecting(true);
     setConnectionError(null);
@@ -157,7 +161,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         setIsConnecting(false);
       }
     }
-  }, [whepUrl, isPaused, isEnded, iframeEmbedUrl]);
+  }, [whepUrl, iframeEmbedUrl]);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -202,51 +206,58 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         filter: `id=eq.${session.id}`,
       }, (payload: any) => {
         const updated = payload.new;
-        const wasPaused = isPaused;
+        const wasPaused = isPausedRef.current;
         if (updated.is_paused) {
           setIsPaused(true);
+          isPausedRef.current = true;
           if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
-        } else {
+        } else if (wasPaused) {
           setIsPaused(false);
-          if (wasPaused && whepUrl && !isFallbackRef.current) {
+          isPausedRef.current = false;
+          if (whepUrl && !isFallbackRef.current) {
             retryCountRef.current = 0;
-            connectWhep();
+            setTimeout(() => connectWhep(), 2000);
           }
         }
         if (updated.status === 'ended') {
           setIsEnded(true);
+          isEndedRef.current = true;
           if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
         }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [session?.id, isPaused, whepUrl, connectWhep]);
+  }, [session?.id, whepUrl, connectWhep]);
 
   React.useEffect(() => {
-    if (!session || isPaused || isEnded) return;
+    if (!session) return;
     const pollInterval = setInterval(async () => {
+      if (isEndedRef.current) return;
       const { data } = await supabase
         .from('livestream_sessions')
         .select('is_paused, status')
         .eq('id', session.id)
         .maybeSingle();
       if (data) {
-        if (data.is_paused && !isPaused) {
+        if (data.is_paused && !isPausedRef.current) {
           setIsPaused(true);
+          isPausedRef.current = true;
           if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
         }
-        if (!data.is_paused && isPaused) {
+        if (!data.is_paused && isPausedRef.current) {
           setIsPaused(false);
-          if (whepUrl && !isFallbackRef.current) { retryCountRef.current = 0; connectWhep(); }
+          isPausedRef.current = false;
+          if (whepUrl && !isFallbackRef.current) { retryCountRef.current = 0; setTimeout(() => connectWhep(), 2000); }
         }
         if (data.status === 'ended') {
           setIsEnded(true);
+          isEndedRef.current = true;
           if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
         }
       }
     }, 10000);
     return () => clearInterval(pollInterval);
-  }, [session?.id, isPaused, isEnded, whepUrl, connectWhep]);
+  }, [session?.id, whepUrl, connectWhep]);
 
   if (!session) return null;
   if (!session.cloudflare_whip_playback_url && !iframeEmbedUrl) return null;
@@ -257,16 +268,14 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
       )}
 
-      {!isPaused && !isEnded && !usingFallback && (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isMuted}
-          className="absolute inset-0 w-full h-full object-contain bg-black"
-          style={{ zIndex: 1 }}
-        />
-      )}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isMuted}
+        className="absolute inset-0 w-full h-full object-contain bg-black"
+        style={{ zIndex: 1, display: (!isPaused && !isEnded && !usingFallback) ? 'block' : 'none' }}
+      />
 
       {!isPaused && !isEnded && usingFallback && iframeEmbedUrl && (
         <iframe
