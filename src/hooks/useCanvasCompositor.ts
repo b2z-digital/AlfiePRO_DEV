@@ -29,48 +29,61 @@ export function useCanvasCompositor({
 }: UseCanvasCompositorOptions): UseCanvasCompositorReturn {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasStreamRef = useRef<MediaStream | null>(null);
+  const mergedStreamRef = useRef<MediaStream | null>(null);
   const overlaySnapshotRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number>(0);
   const captureIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCapturingRef = useRef(false);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const overlayElRef = useRef<HTMLDivElement | null>(null);
   const [compositedStream, setCompositedStream] = useState<MediaStream | null>(null);
   const [isCompositing, setIsCompositing] = useState(false);
+
+  videoElRef.current = videoElement;
+  overlayElRef.current = overlayElement;
 
   const renderFrame = useCallback(() => {
     const ctx = ctxRef.current;
     const canvas = canvasRef.current;
-    if (!ctx || !canvas || !videoElement) return;
+    const vid = videoElRef.current;
+    if (!ctx || !canvas || !vid) {
+      animFrameRef.current = requestAnimationFrame(renderFrame);
+      return;
+    }
 
     try {
-      if (videoElement.readyState >= 2) {
-        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+      if (vid.readyState >= 2) {
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
       }
       if (overlaySnapshotRef.current) {
         ctx.drawImage(overlaySnapshotRef.current, 0, 0, canvas.width, canvas.height);
       }
-    } catch (e) {
-      // Silently handle draw errors
+    } catch (_e) {
+      // ignore draw errors
     }
 
     animFrameRef.current = requestAnimationFrame(renderFrame);
-  }, [videoElement]);
+  }, []);
 
   const captureOverlay = useCallback(async () => {
-    if (!overlayElement || isCapturingRef.current) return;
+    const el = overlayElRef.current;
+    if (!el || isCapturingRef.current) return;
+    if (el.offsetWidth === 0 || el.offsetHeight === 0) return;
     isCapturingRef.current = true;
     try {
-      const scaleX = width / overlayElement.offsetWidth;
-      const scaleY = height / overlayElement.offsetHeight;
+      const scaleX = width / el.offsetWidth;
+      const scaleY = height / el.offsetHeight;
       const scale = Math.min(scaleX, scaleY);
 
-      const snapshot = await html2canvas(overlayElement, {
+      const snapshot = await html2canvas(el, {
         backgroundColor: null,
         scale,
         useCORS: true,
         allowTaint: true,
         logging: false,
-        width: overlayElement.offsetWidth,
-        height: overlayElement.offsetHeight,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
       });
       overlaySnapshotRef.current = snapshot;
     } catch (e) {
@@ -78,7 +91,7 @@ export function useCanvasCompositor({
     } finally {
       isCapturingRef.current = false;
     }
-  }, [overlayElement, width, height]);
+  }, [width, height]);
 
   useEffect(() => {
     if (!enabled || !videoElement || !sourceStream) {
@@ -90,9 +103,11 @@ export function useCanvasCompositor({
         clearInterval(captureIntervalRef.current);
         captureIntervalRef.current = null;
       }
-      if (compositedStream) {
-        compositedStream.getVideoTracks().forEach(t => t.stop());
+      if (canvasStreamRef.current) {
+        canvasStreamRef.current.getTracks().forEach(t => t.stop());
+        canvasStreamRef.current = null;
       }
+      mergedStreamRef.current = null;
       setCompositedStream(null);
       setIsCompositing(false);
       overlaySnapshotRef.current = null;
@@ -107,49 +122,74 @@ export function useCanvasCompositor({
     canvas.height = height;
     ctxRef.current = canvas.getContext('2d', { alpha: false });
 
+    if (canvasStreamRef.current) {
+      canvasStreamRef.current.getTracks().forEach(t => t.stop());
+    }
     const canvasStream = canvas.captureStream(frameRate);
+    canvasStreamRef.current = canvasStream;
+
     const merged = new MediaStream();
     canvasStream.getVideoTracks().forEach(t => merged.addTrack(t));
     sourceStream.getAudioTracks().forEach(t => merged.addTrack(t));
+    mergedStreamRef.current = merged;
     setCompositedStream(merged);
     setIsCompositing(true);
 
     animFrameRef.current = requestAnimationFrame(renderFrame);
 
-    if (overlayElement) {
-      captureOverlay();
-      captureIntervalRef.current = setInterval(captureOverlay, 1000 / overlayCaptureFps);
-    }
-
-    console.log(`[Compositor] Started: ${width}x${height} @${frameRate}fps, overlay capture @${overlayCaptureFps}fps`);
+    console.log(`[Compositor] Started: ${width}x${height} @${frameRate}fps`);
 
     return () => {
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
         animFrameRef.current = 0;
       }
-      if (captureIntervalRef.current) {
-        clearInterval(captureIntervalRef.current);
-        captureIntervalRef.current = null;
+      if (canvasStreamRef.current) {
+        canvasStreamRef.current.getTracks().forEach(t => t.stop());
+        canvasStreamRef.current = null;
       }
-      canvasStream.getVideoTracks().forEach(t => t.stop());
+      mergedStreamRef.current = null;
       setIsCompositing(false);
       overlaySnapshotRef.current = null;
       console.log('[Compositor] Stopped');
     };
-  }, [enabled, videoElement, sourceStream, overlayElement, width, height, frameRate, overlayCaptureFps, renderFrame, captureOverlay]);
+  }, [enabled, videoElement, sourceStream, width, height, frameRate, renderFrame]);
 
   useEffect(() => {
-    if (!compositedStream || !sourceStream) return;
-    const currentAudioIds = new Set(compositedStream.getAudioTracks().map(t => t.id));
+    if (captureIntervalRef.current) {
+      clearInterval(captureIntervalRef.current);
+      captureIntervalRef.current = null;
+    }
+
+    if (!enabled || !overlayElement) {
+      overlaySnapshotRef.current = null;
+      return;
+    }
+
+    captureOverlay();
+    captureIntervalRef.current = setInterval(captureOverlay, 1000 / overlayCaptureFps);
+    console.log(`[Compositor] Overlay capture started @${overlayCaptureFps}fps`);
+
+    return () => {
+      if (captureIntervalRef.current) {
+        clearInterval(captureIntervalRef.current);
+        captureIntervalRef.current = null;
+      }
+    };
+  }, [enabled, overlayElement, overlayCaptureFps, captureOverlay]);
+
+  useEffect(() => {
+    const merged = mergedStreamRef.current;
+    if (!merged || !sourceStream) return;
+    const currentAudioIds = new Set(merged.getAudioTracks().map(t => t.id));
     const sourceAudioTracks = sourceStream.getAudioTracks();
     const sourceAudioIds = new Set(sourceAudioTracks.map(t => t.id));
 
-    compositedStream.getAudioTracks().forEach(t => {
-      if (!sourceAudioIds.has(t.id)) compositedStream.removeTrack(t);
+    merged.getAudioTracks().forEach(t => {
+      if (!sourceAudioIds.has(t.id)) merged.removeTrack(t);
     });
     sourceAudioTracks.forEach(t => {
-      if (!currentAudioIds.has(t.id)) compositedStream.addTrack(t);
+      if (!currentAudioIds.has(t.id)) merged.addTrack(t);
     });
   }, [compositedStream, sourceStream]);
 

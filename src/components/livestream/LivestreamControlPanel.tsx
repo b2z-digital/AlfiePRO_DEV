@@ -92,7 +92,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     overlayElement: overlayElReady,
     sourceStream: activePreviewStream || mediaStream,
     enabled: activeSession?.enable_overlays === true &&
-             (streamStatus === 'testing' || streamStatus === 'live'),
+             (streamStatus === 'testing' || streamStatus === 'live' || streamStatus === 'connecting'),
     width: 1280,
     height: 720,
     overlayCaptureFps: 2,
@@ -755,8 +755,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         rawStream = newStream;
       }
 
-      if (videoRef.current && rawStream) {
-        videoRef.current.srcObject = rawStream;
+      if (videoRef.current) {
+        if (videoRef.current.srcObject !== rawStream) {
+          videoRef.current.srcObject = rawStream;
+        }
         videoRef.current.play().catch(() => {});
       }
 
@@ -764,9 +766,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const cs = compositedStreamRef.current;
       if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
         streamToSend = cs;
-        console.log('[Resume] Using composited stream');
+        console.log('[Resume] Using composited stream with', cs.getVideoTracks().length, 'video tracks');
       } else {
-        console.log('[Resume] Using raw camera stream');
+        console.log('[Resume] Using raw camera stream (composited has no live tracks)');
       }
 
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
@@ -782,7 +784,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           const pc = whipPeerConnectionRef.current;
           if (!pc) { resolve(); return; }
           if (pc.connectionState === 'connected') { resolve(); return; }
-          const timeout = setTimeout(resolve, 5000);
+          const timeout = setTimeout(resolve, 8000);
           const handler = () => {
             if (pc.connectionState === 'connected' || pc.connectionState === 'failed') {
               clearTimeout(timeout);
@@ -792,6 +794,32 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
           };
           pc.addEventListener('connectionstatechange', handler);
         });
+
+        if (whipPeerConnectionRef.current?.connectionState !== 'connected') {
+          console.warn('[Resume] WHIP did not reach connected state, retrying...');
+          stopWhipStreaming();
+          await new Promise(r => setTimeout(r, 1000));
+          const retrySuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+          if (!retrySuccess) {
+            addNotification('error', 'Failed to reconnect after retry.', 8000);
+            pauseResumeInProgressRef.current = false;
+            return;
+          }
+          await new Promise<void>((resolve) => {
+            const pc = whipPeerConnectionRef.current;
+            if (!pc) { resolve(); return; }
+            if (pc.connectionState === 'connected') { resolve(); return; }
+            const timeout = setTimeout(resolve, 8000);
+            const handler = () => {
+              if (pc.connectionState === 'connected' || pc.connectionState === 'failed') {
+                clearTimeout(timeout);
+                pc.removeEventListener('connectionstatechange', handler);
+                resolve();
+              }
+            };
+            pc.addEventListener('connectionstatechange', handler);
+          });
+        }
 
         console.log('[Resume] WHIP connection state:', whipPeerConnectionRef.current?.connectionState);
       }
@@ -1278,12 +1306,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             <div className={`relative w-full bg-black rounded-lg overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'aspect-video max-h-full'}`}>
               <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
-              {activeSession.enable_overlays && (streamStatus === 'testing' || streamStatus === 'live') && (
+              {activeSession.enable_overlays && streamStatus !== 'offline' && (
                 <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} />
               )}
 
               {isPaused && streamStatus === 'live' && (
-                <div className="absolute inset-0 bg-slate-900/95 flex items-center justify-center z-10">
+                <div className="absolute inset-0 bg-slate-900/95 flex items-center justify-center z-20">
                   {(activeSession as SessionWithVenue).venueImage && (
                     <img
                       src={(activeSession as SessionWithVenue).venueImage}
