@@ -72,10 +72,17 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   whepUrlRef.current = whepUrl;
   iframeEmbedUrlRef.current = iframeEmbedUrl;
 
+  const resumeStallCheckRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const isResumeRef = React.useRef(false);
+
   const cleanupConnection = React.useCallback(() => {
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     if (stallCheckRef.current) { clearTimeout(stallCheckRef.current); stallCheckRef.current = null; }
+    if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
     if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
   }, []);
 
   const connectWhep = React.useCallback(async () => {
@@ -85,6 +92,8 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
     setIsConnecting(true);
     setConnectionError(null);
     cleanupConnection();
+
+    const isResume = isResumeRef.current;
 
     try {
       const pc = new RTCPeerConnection({
@@ -108,16 +117,76 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
           retryCountRef.current = 0;
 
           if (stallCheckRef.current) clearTimeout(stallCheckRef.current);
-          const initialTime = videoRef.current.currentTime;
-          stallCheckRef.current = setTimeout(() => {
-            if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
-            const vid = videoRef.current;
-            if (vid && Math.abs(vid.currentTime - initialTime) < 0.1 && !vid.paused) {
-              console.log('[WHEP] Video stalled after connect, reconnecting...');
-              retryCountRef.current = 0;
-              connectWhep();
+          if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
+
+          if (isResume) {
+            let frameCheckCount = 0;
+            let lastFrameTime = performance.now();
+            const videoTrack = event.streams[0].getVideoTracks()[0];
+
+            if (videoTrack && typeof (videoTrack as any).requestFrame === 'function') {
+              let lastStats: any = null;
+              resumeStallCheckRef.current = setInterval(async () => {
+                if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) {
+                  if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
+                  return;
+                }
+                frameCheckCount++;
+                try {
+                  const stats = await pc.getStats();
+                  let framesDecoded = 0;
+                  stats.forEach((report: any) => {
+                    if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                      framesDecoded = report.framesDecoded || 0;
+                    }
+                  });
+                  if (lastStats !== null && framesDecoded > lastStats) {
+                    lastFrameTime = performance.now();
+                    isResumeRef.current = false;
+                    if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
+                    console.log('[WHEP] Fresh frames confirmed after resume');
+                    return;
+                  }
+                  lastStats = framesDecoded;
+                } catch (_e) { /* ignore */ }
+
+                if (frameCheckCount >= 8) {
+                  if (resumeStallCheckRef.current) { clearInterval(resumeStallCheckRef.current); resumeStallCheckRef.current = null; }
+                  if (performance.now() - lastFrameTime > 3000) {
+                    console.log('[WHEP] Stale stream after resume, reconnecting with delay...');
+                    cleanupConnection();
+                    retryCountRef.current = 0;
+                    retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+                  }
+                }
+              }, 500);
+            } else {
+              const vid = videoRef.current;
+              const initialTime = vid.currentTime;
+              stallCheckRef.current = setTimeout(() => {
+                if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
+                if (vid && Math.abs(vid.currentTime - initialTime) < 0.01 && !vid.paused) {
+                  console.log('[WHEP] Video stalled after resume (currentTime), reconnecting...');
+                  cleanupConnection();
+                  retryCountRef.current = 0;
+                  retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
+                } else {
+                  isResumeRef.current = false;
+                }
+              }, 4000);
             }
-          }, 4000);
+          } else {
+            const initialTime = videoRef.current.currentTime;
+            stallCheckRef.current = setTimeout(() => {
+              if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
+              const vid = videoRef.current;
+              if (vid && Math.abs(vid.currentTime - initialTime) < 0.1 && !vid.paused) {
+                console.log('[WHEP] Video stalled after connect, reconnecting...');
+                retryCountRef.current = 0;
+                connectWhep();
+              }
+            }, 4000);
+          }
         }
       };
 
@@ -130,9 +199,11 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         } else if (state === 'failed' || state === 'disconnected') {
           if (isPausedRef.current || isEndedRef.current) return;
           const fallbackUrl = iframeEmbedUrlRef.current;
-          if (retryCountRef.current < 8) {
+          if (retryCountRef.current < 10) {
             retryCountRef.current += 1;
-            const delay = Math.min(retryCountRef.current * 2000, 10000);
+            const delay = isResume
+              ? Math.min(retryCountRef.current * 1500, 6000)
+              : Math.min(retryCountRef.current * 2000, 10000);
             retryTimerRef.current = setTimeout(() => connectWhep(), delay);
           } else if (!isFallbackRef.current && fallbackUrl) {
             isFallbackRef.current = true;
@@ -179,9 +250,11 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       console.error('[WHEP] Connection error:', err);
       if (isPausedRef.current || isEndedRef.current) return;
       const fallbackUrl = iframeEmbedUrlRef.current;
-      if (retryCountRef.current < 8) {
+      if (retryCountRef.current < 10) {
         retryCountRef.current += 1;
-        const delay = Math.min(retryCountRef.current * 2000, 10000);
+        const delay = isResume
+          ? Math.min(retryCountRef.current * 1500, 6000)
+          : Math.min(retryCountRef.current * 2000, 10000);
         retryTimerRef.current = setTimeout(() => connectWhep(), delay);
       } else if (!isFallbackRef.current && fallbackUrl) {
         isFallbackRef.current = true;
@@ -200,16 +273,19 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       console.log('[Viewer] Session paused - showing hold screen');
       setIsPaused(true);
       isPausedRef.current = true;
+      isResumeRef.current = false;
       cleanupConnection();
     } else if (!paused && wasPaused) {
-      console.log('[Viewer] Session resumed - reconnecting');
+      console.log('[Viewer] Session resumed - will reconnect after broadcaster stabilizes');
       setIsPaused(false);
       isPausedRef.current = false;
       retryCountRef.current = 0;
       isFallbackRef.current = false;
+      isResumeRef.current = true;
       setUsingFallback(false);
       setConnectionError(null);
-      retryTimerRef.current = setTimeout(() => connectWhep(), 2000);
+      setIsConnecting(true);
+      retryTimerRef.current = setTimeout(() => connectWhep(), 3000);
     }
   }, [cleanupConnection, connectWhep]);
 
