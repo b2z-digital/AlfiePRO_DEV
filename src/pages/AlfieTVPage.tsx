@@ -37,19 +37,153 @@ interface Channel {
   category?: string;
 }
 
-const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubName }: {
+const LiveStreamPlayerWrapper = ({ session, onClose, venueImage, clubName }: {
   session: LivestreamSession | null;
   onClose: () => void;
   venueImage?: string;
   clubName?: string;
 }) => {
+  const [playerKey, setPlayerKey] = React.useState(0);
   const [isPaused, setIsPaused] = React.useState(session?.is_paused || false);
   const [isEnded, setIsEnded] = React.useState(session?.status === 'ended');
+  const isPausedRef = React.useRef(session?.is_paused || false);
+  const isEndedRef = React.useRef(session?.status === 'ended');
+
+  React.useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel(`live-player-wrapper-${session.id}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'livestream_sessions',
+        filter: `id=eq.${session.id}`,
+      }, (payload: any) => {
+        const updated = payload.new;
+        const nowPaused = !!updated.is_paused;
+        const nowEnded = updated.status === 'ended';
+        const wasPaused = isPausedRef.current;
+
+        if (nowEnded && !isEndedRef.current) {
+          isEndedRef.current = true;
+          setIsEnded(true);
+        }
+        if (nowPaused !== wasPaused) {
+          isPausedRef.current = nowPaused;
+          setIsPaused(nowPaused);
+          if (!nowPaused && wasPaused) {
+            setTimeout(() => setPlayerKey(k => k + 1), 2000);
+          }
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.id]);
+
+  React.useEffect(() => {
+    if (!session) return;
+    const pollInterval = setInterval(async () => {
+      if (isEndedRef.current) return;
+      try {
+        const { data } = await supabase
+          .from('livestream_sessions')
+          .select('is_paused, status')
+          .eq('id', session.id)
+          .maybeSingle();
+        if (data) {
+          const nowPaused = !!data.is_paused;
+          const nowEnded = data.status === 'ended';
+          const wasPaused = isPausedRef.current;
+
+          if (nowEnded && !isEndedRef.current) {
+            isEndedRef.current = true;
+            setIsEnded(true);
+          }
+          if (nowPaused !== wasPaused) {
+            isPausedRef.current = nowPaused;
+            setIsPaused(nowPaused);
+            if (!nowPaused && wasPaused) {
+              setTimeout(() => setPlayerKey(k => k + 1), 2000);
+            }
+          }
+        }
+      } catch (_e) {}
+    }, 3000);
+    return () => clearInterval(pollInterval);
+  }, [session?.id]);
+
+  if (!session) return null;
+
+  if (isPaused || isEnded) {
+    const iframeEmbedUrl = session.cloudflare_customer_code && session.cloudflare_live_input_id
+      ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe`
+      : null;
+    if (!session.cloudflare_whip_playback_url && !iframeEmbedUrl) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+        {venueImage && <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />}
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
+          {venueImage && <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative z-10 text-center max-w-lg px-8">
+            <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mx-auto mb-6 border border-white/20">
+              {isEnded ? (
+                <Square className="w-8 h-8 text-white/80" />
+              ) : (
+                <Radio className="w-8 h-8 text-amber-400" />
+              )}
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-3">
+              {isEnded ? 'Stream Ended' : 'Event on Hold'}
+            </h2>
+            <p className="text-white/70 text-lg mb-2">
+              {isEnded
+                ? 'This livestream has ended. Thank you for watching!'
+                : 'The broadcast is temporarily paused. Come back soon!'}
+            </p>
+            <p className="text-white font-semibold text-xl mt-6">{session.title}</p>
+            {clubName && <p className="text-white/60 mt-1">Hosted by {clubName}</p>}
+            {isEnded && (
+              <button onClick={onClose} className="mt-8 px-8 py-3 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-all">
+                Back to AlfieTV
+              </button>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
+          style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999, cursor: 'pointer' }}
+          title="Close (ESC)"
+          type="button"
+        >
+          <LogOut className="w-7 h-7 stroke-[2.5]" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <LiveStreamPlayer
+      key={playerKey}
+      session={session}
+      onClose={onClose}
+      venueImage={venueImage}
+      clubName={clubName}
+    />
+  );
+};
+
+const LiveStreamPlayer = React.memo(({ session, onClose, venueImage, clubName }: {
+  session: LivestreamSession;
+  onClose: () => void;
+  venueImage?: string;
+  clubName?: string;
+}) => {
   const [isConnecting, setIsConnecting] = React.useState(true);
   const [connectionError, setConnectionError] = React.useState<string | null>(null);
   const [isMuted, setIsMuted] = React.useState(false);
-  const isPausedRef = React.useRef(session?.is_paused || false);
-  const isEndedRef = React.useRef(session?.status === 'ended');
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const pcRef = React.useRef<RTCPeerConnection | null>(null);
   const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,51 +191,29 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   const retryCountRef = React.useRef(0);
   const isFallbackRef = React.useRef(false);
   const [usingFallback, setUsingFallback] = React.useState(false);
-  const whepUrlRef = React.useRef(session?.cloudflare_whip_playback_url);
-  const iframeEmbedUrlRef = React.useRef(
-    session?.cloudflare_customer_code && session?.cloudflare_live_input_id
-      ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
-      : null
-  );
 
-  const whepUrl = session?.cloudflare_whip_playback_url;
-  const iframeEmbedUrl = session?.cloudflare_customer_code && session?.cloudflare_live_input_id
+  const whepUrl = session.cloudflare_whip_playback_url;
+  const iframeEmbedUrl = session.cloudflare_customer_code && session.cloudflare_live_input_id
     ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
     : null;
-
+  const whepUrlRef = React.useRef(whepUrl);
+  const iframeEmbedUrlRef = React.useRef(iframeEmbedUrl);
   whepUrlRef.current = whepUrl;
   iframeEmbedUrlRef.current = iframeEmbedUrl;
 
-  const cleanupPeerConnection = React.useCallback(() => {
-    if (pcRef.current) {
-      pcRef.current.onconnectionstatechange = null;
-      pcRef.current.ontrack = null;
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-  }, []);
-
-  const cleanupTimers = React.useCallback(() => {
+  const cleanupConnection = React.useCallback(() => {
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
     if (stallCheckRef.current) { clearTimeout(stallCheckRef.current); stallCheckRef.current = null; }
+    if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
   }, []);
-
-  const cleanupConnection = React.useCallback(() => {
-    cleanupTimers();
-    cleanupPeerConnection();
-  }, [cleanupTimers, cleanupPeerConnection]);
 
   const connectWhep = React.useCallback(async () => {
     const url = whepUrlRef.current;
-    if (!url || isPausedRef.current || isEndedRef.current) {
-      console.log('[WHEP] Skip connect - paused:', isPausedRef.current, 'ended:', isEndedRef.current, 'url:', !!url);
-      return;
-    }
+    if (!url) return;
 
-    console.log('[WHEP] Connecting... retry:', retryCountRef.current);
     setIsConnecting(true);
     setConnectionError(null);
-    cleanupPeerConnection();
+    if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
 
     try {
       const pc = new RTCPeerConnection({
@@ -123,43 +235,20 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
           setIsConnecting(false);
           setConnectionError(null);
           retryCountRef.current = 0;
-
-          if (stallCheckRef.current) clearTimeout(stallCheckRef.current);
-          stallCheckRef.current = setTimeout(async () => {
-            if (isPausedRef.current || isEndedRef.current || pc !== pcRef.current) return;
-            try {
-              const stats = await pc.getStats();
-              let framesDecoded = 0;
-              stats.forEach((report: any) => {
-                if (report.type === 'inbound-rtp' && report.kind === 'video') {
-                  framesDecoded = report.framesDecoded || 0;
-                }
-              });
-              if (framesDecoded < 5) {
-                console.log('[WHEP] Low frame count after 5s, reconnecting...');
-                cleanupPeerConnection();
-                retryCountRef.current = 0;
-                retryTimerRef.current = setTimeout(() => connectWhep(), 2000);
-              }
-            } catch (_e) { /* ignore */ }
-          }, 5000);
         }
       };
 
       pc.onconnectionstatechange = () => {
         if (pc !== pcRef.current) return;
         const state = pc.connectionState;
-        console.log('[WHEP] Connection state:', state);
         if (state === 'connected') {
           setIsConnecting(false);
           setConnectionError(null);
         } else if (state === 'failed' || state === 'disconnected') {
-          if (isPausedRef.current || isEndedRef.current) return;
           const fallbackUrl = iframeEmbedUrlRef.current;
           if (retryCountRef.current < 10) {
             retryCountRef.current += 1;
-            const delay = Math.min(retryCountRef.current * 2000, 8000);
-            console.log('[WHEP] Will retry in', delay, 'ms');
+            const delay = Math.min(retryCountRef.current * 2000, 10000);
             retryTimerRef.current = setTimeout(() => connectWhep(), delay);
           } else if (!isFallbackRef.current && fallbackUrl) {
             isFallbackRef.current = true;
@@ -204,11 +293,10 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
     } catch (err: any) {
       console.error('[WHEP] Connection error:', err);
-      if (isPausedRef.current || isEndedRef.current) return;
       const fallbackUrl = iframeEmbedUrlRef.current;
       if (retryCountRef.current < 10) {
         retryCountRef.current += 1;
-        const delay = Math.min(retryCountRef.current * 2000, 8000);
+        const delay = Math.min(retryCountRef.current * 2000, 10000);
         retryTimerRef.current = setTimeout(() => connectWhep(), delay);
       } else if (!isFallbackRef.current && fallbackUrl) {
         isFallbackRef.current = true;
@@ -219,129 +307,26 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         setIsConnecting(false);
       }
     }
-  }, [cleanupPeerConnection]);
-
-  const handlePauseChange = React.useCallback((paused: boolean) => {
-    const wasPaused = isPausedRef.current;
-    if (paused === wasPaused) return;
-
-    if (paused) {
-      console.log('[Viewer] Session paused - showing hold screen');
-      isPausedRef.current = true;
-      setIsPaused(true);
-      cleanupTimers();
-      cleanupPeerConnection();
-      if (videoRef.current) videoRef.current.srcObject = null;
-    } else {
-      console.log('[Viewer] Session resumed - reconnecting');
-      isPausedRef.current = false;
-      setIsPaused(false);
-      retryCountRef.current = 0;
-      isFallbackRef.current = false;
-      setUsingFallback(false);
-      setConnectionError(null);
-      setIsConnecting(true);
-      cleanupTimers();
-      retryTimerRef.current = setTimeout(() => {
-        console.log('[Viewer] Resume timer fired, calling connectWhep');
-        connectWhep();
-      }, 3000);
-    }
-  }, [cleanupTimers, cleanupPeerConnection, connectWhep]);
-
-  const handleEnded = React.useCallback(() => {
-    if (isEndedRef.current) return;
-    console.log('[Viewer] Session ended');
-    setIsEnded(true);
-    isEndedRef.current = true;
-    cleanupConnection();
-  }, [cleanupConnection]);
+  }, []);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    if (session) {
-      window.addEventListener('keydown', handleEscape);
-      return () => window.removeEventListener('keydown', handleEscape);
-    }
-  }, [session, onClose]);
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
 
   React.useEffect(() => {
-    if (!session) return;
-    const paused = session.is_paused || false;
-    const ended = session.status === 'ended';
-    setIsPaused(paused);
-    isPausedRef.current = paused;
-    setIsEnded(ended);
-    isEndedRef.current = ended;
-    retryCountRef.current = 0;
-    isFallbackRef.current = false;
-    setUsingFallback(false);
-    setConnectionError(null);
-    setIsConnecting(true);
-
-    if (whepUrl && !paused && !ended) {
+    if (whepUrl) {
       connectWhep();
-    } else if (iframeEmbedUrl && !paused && !ended) {
+    } else if (iframeEmbedUrl) {
       isFallbackRef.current = true;
       setUsingFallback(true);
       setIsConnecting(false);
     }
-
     return () => { cleanupConnection(); };
-  }, [session?.id]);
+  }, []);
 
-  React.useEffect(() => {
-    if (!session) return;
-    const channel = supabase
-      .channel(`live-player-${session.id}-${Date.now()}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'livestream_sessions',
-        filter: `id=eq.${session.id}`,
-      }, (payload: any) => {
-        const updated = payload.new;
-        console.log('[Viewer RT] Session update received:', { is_paused: updated.is_paused, status: updated.status });
-        if (updated.is_paused === true) {
-          handlePauseChange(true);
-        } else if (updated.is_paused === false) {
-          handlePauseChange(false);
-        }
-        if (updated.status === 'ended') {
-          handleEnded();
-        }
-      })
-      .subscribe((status: string) => {
-        console.log('[Viewer RT] Subscription status:', status);
-      });
-    return () => { supabase.removeChannel(channel); };
-  }, [session?.id, handlePauseChange, handleEnded]);
-
-  React.useEffect(() => {
-    if (!session) return;
-    const pollInterval = setInterval(async () => {
-      if (isEndedRef.current) return;
-      try {
-        const { data } = await supabase
-          .from('livestream_sessions')
-          .select('is_paused, status')
-          .eq('id', session.id)
-          .maybeSingle();
-        if (data) {
-          handlePauseChange(!!data.is_paused);
-          if (data.status === 'ended') {
-            handleEnded();
-          }
-        }
-      } catch (_e) {
-        // ignore poll errors
-      }
-    }, 3000);
-    return () => clearInterval(pollInterval);
-  }, [session?.id, handlePauseChange, handleEnded]);
-
-  if (!session) return null;
-  if (!session.cloudflare_whip_playback_url && !iframeEmbedUrl) return null;
+  if (!whepUrl && !iframeEmbedUrl) return null;
 
   return (
     <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
@@ -355,10 +340,10 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         playsInline
         muted={isMuted}
         className="absolute inset-0 w-full h-full object-contain bg-black"
-        style={{ zIndex: 1, display: (!isPaused && !isEnded && !usingFallback) ? 'block' : 'none' }}
+        style={{ zIndex: 1, display: !usingFallback ? 'block' : 'none' }}
       />
 
-      {!isPaused && !isEnded && usingFallback && iframeEmbedUrl && (
+      {usingFallback && iframeEmbedUrl && (
         <iframe
           src={iframeEmbedUrl}
           className="absolute inset-0 w-full h-full"
@@ -370,7 +355,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         />
       )}
 
-      {isConnecting && !isPaused && !isEnded && (
+      {isConnecting && (
         <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
           <div className="text-center">
             <div className="w-14 h-14 border-4 border-white/20 border-t-red-500 rounded-full animate-spin mx-auto mb-4" />
@@ -380,7 +365,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         </div>
       )}
 
-      {connectionError && !isPaused && !isEnded && (
+      {connectionError && (
         <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
           <div className="text-center max-w-md px-8">
             <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
@@ -397,37 +382,6 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         </div>
       )}
 
-      {(isPaused || isEnded) && (
-        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
-          {venueImage && <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="relative z-10 text-center max-w-lg px-8">
-            <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mx-auto mb-6 border border-white/20">
-              {isEnded ? (
-                <Square className="w-8 h-8 text-white/80" />
-              ) : (
-                <Radio className="w-8 h-8 text-amber-400" />
-              )}
-            </div>
-            <h2 className="text-3xl font-bold text-white mb-3">
-              {isEnded ? 'Stream Ended' : 'Event on Hold'}
-            </h2>
-            <p className="text-white/70 text-lg mb-2">
-              {isEnded
-                ? 'This livestream has ended. Thank you for watching!'
-                : 'The broadcast is temporarily paused. Come back soon!'}
-            </p>
-            <p className="text-white font-semibold text-xl mt-6">{session.title}</p>
-            {clubName && <p className="text-white/60 mt-1">Hosted by {clubName}</p>}
-            {isEnded && (
-              <button onClick={onClose} className="mt-8 px-8 py-3 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-all">
-                Back to AlfieTV
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       <button
         onClick={onClose}
         className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
@@ -438,7 +392,7 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         <LogOut className="w-7 h-7 stroke-[2.5]" />
       </button>
 
-      {!isPaused && !isEnded && !usingFallback && !isConnecting && (
+      {!usingFallback && !isConnecting && (
         <button
           onClick={() => { setIsMuted(m => !m); if (videoRef.current) videoRef.current.muted = !videoRef.current.muted; }}
           className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
@@ -450,18 +404,16 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
         </button>
       )}
 
-      {!isPaused && !isEnded && (
-        <div
-          className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
-          style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
-        >
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-          </span>
-          <span className="text-white font-medium text-sm">{session.title}</span>
-        </div>
-      )}
+      <div
+        className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
+        style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
+      >
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+        </span>
+        <span className="text-white font-medium text-sm">{session.title}</span>
+      </div>
     </div>
   );
 });
@@ -2258,7 +2210,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       <div className="h-32" />
     </div>
     <FullscreenVideoModal video={selectedVideo} onClose={handleCloseVideo} />
-    <LiveStreamPlayerModal
+    <LiveStreamPlayerWrapper
       session={selectedLiveStream}
       onClose={() => setSelectedLiveStream(null)}
       venueImage={selectedLiveStream?.venue_image}
