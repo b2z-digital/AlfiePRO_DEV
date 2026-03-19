@@ -46,6 +46,8 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
   const [isPaused, setIsPaused] = React.useState(session?.is_paused || false);
   const [isEnded, setIsEnded] = React.useState(session?.status === 'ended');
   const [iframeKey, setIframeKey] = React.useState(0);
+  const [isWaitingForStream, setIsWaitingForStream] = React.useState(true);
+  const retryCountRef = React.useRef(0);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -59,7 +61,23 @@ const LiveStreamPlayerModal = React.memo(({ session, onClose, venueImage, clubNa
     if (!session) return;
     setIsPaused(session.is_paused || false);
     setIsEnded(session.status === 'ended');
+    setIsWaitingForStream(true);
+    retryCountRef.current = 0;
   }, [session?.id]);
+
+  React.useEffect(() => {
+    if (!session || isPaused || isEnded || !isWaitingForStream) return;
+    const retryInterval = setInterval(() => {
+      retryCountRef.current += 1;
+      if (retryCountRef.current > 12) {
+        setIsWaitingForStream(false);
+        return;
+      }
+      setIframeKey(prev => prev + 1);
+    }, 8000);
+    const initialTimeout = setTimeout(() => setIsWaitingForStream(false), 5000);
+    return () => { clearInterval(retryInterval); clearTimeout(initialTimeout); };
+  }, [session?.id, isPaused, isEnded, isWaitingForStream]);
 
   React.useEffect(() => {
     if (!session) return;

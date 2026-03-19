@@ -59,6 +59,8 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [streamDuration, setStreamDuration] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastBytesSentRef = useRef<number>(0);
 
   useEffect(() => {
     if (sessionId) {
@@ -74,6 +76,40 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       requestCameraAccess();
     }
   }, [activeSession, streamStatus]);
+
+  useEffect(() => {
+    if (whipHealthRef.current) { clearInterval(whipHealthRef.current); whipHealthRef.current = null; }
+    if (streamStatus === 'live' && whipStatus === 'connected' && whipPeerConnectionRef.current && !isPaused) {
+      whipHealthRef.current = setInterval(async () => {
+        const pc = whipPeerConnectionRef.current;
+        if (!pc || pc.connectionState !== 'connected') return;
+        try {
+          const stats = await pc.getStats();
+          let currentBytesSent = 0;
+          stats.forEach((report) => {
+            if (report.type === 'outbound-rtp' && report.kind === 'video') {
+              currentBytesSent = report.bytesSent || 0;
+            }
+          });
+          if (lastBytesSentRef.current > 0 && currentBytesSent <= lastBytesSentRef.current) {
+            console.warn('[WHIP Health] No video bytes sent in last interval. Connection may be stale.');
+            setWhipStatus('error');
+            addNotification('warning', 'Stream connection stalled. Attempting reconnect...', 5000);
+            if (activeSession?.cloudflare_whip_url) {
+              const stream = activePreviewStream || mediaStream;
+              if (stream) {
+                stopWhipStreaming();
+                await new Promise(r => setTimeout(r, 1000));
+                await startWhipStreaming(activeSession.cloudflare_whip_url, stream);
+              }
+            }
+          }
+          lastBytesSentRef.current = currentBytesSent;
+        } catch {}
+      }, 10000);
+    }
+    return () => { if (whipHealthRef.current) { clearInterval(whipHealthRef.current); whipHealthRef.current = null; } };
+  }, [streamStatus, whipStatus, isPaused]);
 
   useEffect(() => {
     if (activeSession) {
@@ -340,29 +376,52 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     try {
       setWhipStatus('connecting');
       if (whipPeerConnectionRef.current) { whipPeerConnectionRef.current.close(); whipPeerConnectionRef.current = null; }
+
+      const liveTracks = streamToSend.getTracks().filter(t => t.readyState === 'live' && t.enabled);
+      const hasVideo = liveTracks.some(t => t.kind === 'video');
+      const hasAudio = liveTracks.some(t => t.kind === 'audio');
+      if (!hasVideo) {
+        console.error('[WHIP] No live video track available');
+        addNotification('error', 'No video source detected. Please check your camera.', 5000);
+        setWhipStatus('error');
+        return false;
+      }
+      console.log(`[WHIP] Sending ${liveTracks.length} tracks (video: ${hasVideo}, audio: ${hasAudio})`);
+
       const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }, { urls: 'stun:stun.l.google.com:19302' }],
         bundlePolicy: 'max-bundle', rtcpMuxPolicy: 'require'
       });
       whipPeerConnectionRef.current = pc;
+
       pc.onconnectionstatechange = () => {
+        console.log('[WHIP] Connection state:', pc.connectionState);
         if (pc.connectionState === 'connected') { setWhipStatus('connected'); addNotification('success', 'Connected to streaming server', 3000); }
         else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') { setWhipStatus('error'); addNotification('error', 'Lost connection to streaming server', 5000); }
       };
-      streamToSend.getTracks().forEach(track => pc.addTrack(track, streamToSend));
-      try {
-        const transceivers = pc.getTransceivers();
-        for (const transceiver of transceivers) {
-          if (transceiver.sender.track?.kind === 'video') {
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('[WHIP] ICE connection state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'failed') {
+          setWhipStatus('error');
+          addNotification('error', 'ICE connection failed. Check your network.', 5000);
+        }
+      };
+
+      liveTracks.forEach(track => {
+        const transceiver = pc.addTransceiver(track, { direction: 'sendonly', streams: [streamToSend] });
+        if (track.kind === 'video') {
+          try {
             const codecs = RTCRtpSender.getCapabilities('video')?.codecs;
             if (codecs) {
               const h264Codecs = codecs.filter(c => c.mimeType === 'video/H264');
               const otherCodecs = codecs.filter(c => c.mimeType !== 'video/H264');
               if (h264Codecs.length > 0) transceiver.setCodecPreferences([...h264Codecs, ...otherCodecs]);
             }
-          }
+          } catch {}
         }
-      } catch {}
+      });
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await new Promise<void>((resolve) => {
@@ -370,14 +429,20 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         else {
           const checkState = () => { if (pc.iceGatheringState === 'complete') { pc.removeEventListener('icegatheringstatechange', checkState); resolve(); } };
           pc.addEventListener('icegatheringstatechange', checkState);
-          setTimeout(() => { pc.removeEventListener('icegatheringstatechange', checkState); resolve(); }, 3000);
+          setTimeout(() => { pc.removeEventListener('icegatheringstatechange', checkState); resolve(); }, 5000);
         }
       });
       const localDescription = pc.localDescription;
       if (!localDescription) throw new Error('No local description after ICE gathering');
+      console.log('[WHIP] Sending offer to:', whipUrl);
       const response = await fetch(whipUrl, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: localDescription.sdp });
-      if (!response.ok) throw new Error(`WHIP server error: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[WHIP] Server error:', response.status, errorText);
+        throw new Error(`WHIP server error: ${response.status} ${errorText}`);
+      }
       const answerSdp = await response.text();
+      console.log('[WHIP] Received answer SDP, setting remote description');
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
       return true;
     } catch (error) {
@@ -391,6 +456,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const stopWhipStreaming = () => {
     if (whipPeerConnectionRef.current) { whipPeerConnectionRef.current.close(); whipPeerConnectionRef.current = null; }
     setWhipStatus('disconnected');
+    lastBytesSentRef.current = 0;
   };
 
   const reconnectToLiveSession = async (session: LivestreamSession) => {
@@ -557,8 +623,20 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
       const actualStartTime = new Date().toISOString();
-      const streamToSend = activePreviewStream || mediaStream;
+      let streamToSend = activePreviewStream || mediaStream;
       if (!streamToSend) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
+
+      const videoTracks = streamToSend.getVideoTracks().filter(t => t.readyState === 'live');
+      if (videoTracks.length === 0) {
+        console.warn('[GoLive] Active stream has no live video tracks, requesting fresh camera access');
+        const freshStream = await requestCameraAccess();
+        if (!freshStream || freshStream.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
+          addNotification('error', 'Camera not available. Please check permissions.', 5000);
+          setStreamStatus('testing');
+          return;
+        }
+        streamToSend = freshStream;
+      }
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_live_input_id) {
         try {
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
@@ -602,16 +680,15 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const resumeBroadcast = async () => {
     if (!activeSession || streamStatus !== 'live' || !isPaused) return;
     try {
-      const streamToSend = activePreviewStream || mediaStream;
-      if (!streamToSend) {
+      let streamToSend = activePreviewStream || mediaStream;
+      if (!streamToSend || streamToSend.getVideoTracks().filter(t => t.readyState === 'live').length === 0) {
         const newStream = await requestCameraAccess();
         if (!newStream) { addNotification('error', 'No video source available.', 5000); return; }
+        streamToSend = newStream;
       }
-      const currentStream = activePreviewStream || mediaStream;
-      if (!currentStream) return;
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Reconnecting to streaming server...', 3000);
-        const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, currentStream);
+        const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
         if (!whipSuccess) { addNotification('error', 'Failed to reconnect to streaming server.', 8000); return; }
       }
       setIsPaused(false);
