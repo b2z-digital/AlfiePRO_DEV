@@ -21,7 +21,6 @@ export default defineConfig({
         manualChunks: undefined
       }
     },
-    // Temporarily disable public dir copy due to corrupted file
-    copyPublicDir: false
+    copyPublicDir: true
   }
 })
