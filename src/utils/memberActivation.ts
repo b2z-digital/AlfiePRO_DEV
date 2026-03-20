@@ -26,7 +26,8 @@ export interface ActivationResponse {
 export async function activateMembers(
   memberIds: string[],
   clubId: string,
-  clubName: string
+  clubName: string,
+  bccEmail?: string
 ): Promise<ActivationResponse> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -51,6 +52,7 @@ export async function activateMembers(
         member_ids: memberIds,
         club_id: clubId,
         club_name: clubName,
+        ...(bccEmail ? { bcc_email: bccEmail } : {}),
       }),
     });
 

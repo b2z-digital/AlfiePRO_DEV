@@ -13,6 +13,7 @@ interface ActivateRequest {
   club_id: string;
   club_name: string;
   app_deep_link_base?: string;
+  bcc_email?: string;
 }
 
 interface ActivationResult {
@@ -55,7 +56,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { member_ids, club_id, club_name, app_deep_link_base }: ActivateRequest = await req.json();
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email }: ActivateRequest = await req.json();
 
     if (!member_ids?.length || !club_id || !club_name) {
       return new Response(
@@ -228,11 +229,18 @@ Deno.serve(async (req: Request) => {
         const { data: recoveryLink } = await supabase.auth.admin.generateLink({
           type: "recovery",
           email: member.email,
+          options: {
+            redirectTo: `${supabaseUrl.replace('.supabase.co', '')}/reset-password`,
+          },
         });
 
         let recoveryToken = "";
+        let webRecoveryActionLink = "";
         if (recoveryLink?.properties?.hashed_token) {
           recoveryToken = recoveryLink.properties.hashed_token;
+        }
+        if (recoveryLink?.properties?.action_link) {
+          webRecoveryActionLink = recoveryLink.properties.action_link;
         }
 
         if (sendGridApiKey && defaultFromEmail) {
@@ -245,6 +253,8 @@ Deno.serve(async (req: Request) => {
           const appStoreUrl = platformConfig.ios_app_store_url || "";
           const playStoreUrl = platformConfig.android_play_store_url || "";
 
+          const webActivationLink = webRecoveryActionLink || "";
+
           await sendActivationEmail({
             sendGridApiKey,
             fromEmail: defaultFromEmail,
@@ -252,8 +262,10 @@ Deno.serve(async (req: Request) => {
             recipientName: member.first_name,
             clubName: club_name,
             activationDeepLink,
+            webActivationLink,
             appStoreUrl,
             playStoreUrl,
+            bccEmail: bcc_email,
           });
         }
 
@@ -304,8 +316,10 @@ interface EmailParams {
   recipientName: string;
   clubName: string;
   activationDeepLink: string;
+  webActivationLink: string;
   appStoreUrl: string;
   playStoreUrl: string;
+  bccEmail?: string;
 }
 
 async function sendActivationEmail(params: EmailParams) {
@@ -316,8 +330,10 @@ async function sendActivationEmail(params: EmailParams) {
     recipientName,
     clubName,
     activationDeepLink,
+    webActivationLink,
     appStoreUrl,
     playStoreUrl,
+    bccEmail,
   } = params;
 
   const hasAppStoreLinks = !!(appStoreUrl || playStoreUrl);
@@ -443,10 +459,30 @@ async function sendActivationEmail(params: EmailParams) {
                 </tr>
               </table>
 
+              <!-- Web Activation Fallback -->
+              ${webActivationLink ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="border:1px solid #e2e8f0;border-radius:12px;padding:24px;text-align:center;border-left:4px solid #0ea5e9;">
+                    <p style="margin:0 0 4px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Don't have the mobile app?</p>
+                    <p style="margin:0 0 16px;color:#334155;font-size:15px;font-weight:600;">Activate via Web Browser Instead</p>
+                    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                      <tr>
+                        <td style="border:2px solid #0ea5e9;border-radius:8px;">
+                          <a href="${webActivationLink}" style="display:inline-block;color:#0ea5e9;padding:12px 32px;text-decoration:none;font-size:14px;font-weight:600;">Set Password on Web</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:12px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;">This will open in your web browser where you can set your password and access alfiePRO from any device.</p>
+                  </td>
+                </tr>
+              </table>
+              ` : ""}
+
               <!-- Fallback tip -->
               <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border-left:4px solid #0ea5e9;">
-                <p style="margin:0 0 4px;color:#334155;font-size:13px;font-weight:600;">Already have the app?</p>
-                <p style="margin:0;color:#64748b;font-size:13px;line-height:1.5;">Open it and tap "Forgot password?" on the login screen. Enter <strong>${toEmail}</strong> and follow the prompts.</p>
+                <p style="margin:0 0 4px;color:#334155;font-size:13px;font-weight:600;">Need help?</p>
+                <p style="margin:0;color:#64748b;font-size:13px;line-height:1.5;">You can also open the app or website and tap "Forgot password?" on the login screen. Enter <strong>${toEmail}</strong> and follow the prompts.</p>
               </div>
 
               <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;text-align:center;">
@@ -470,13 +506,16 @@ async function sendActivationEmail(params: EmailParams) {
 </body>
 </html>`;
 
+  const personalization: Record<string, unknown> = {
+    to: [{ email: toEmail, name: recipientName }],
+    subject: `Welcome to ${clubName} on AlfiePRO`,
+  };
+  if (bccEmail) {
+    personalization.bcc = [{ email: bccEmail }];
+  }
+
   const emailData = {
-    personalizations: [
-      {
-        to: [{ email: toEmail, name: recipientName }],
-        subject: `Welcome to ${clubName} on AlfiePRO`,
-      },
-    ],
+    personalizations: [personalization],
     from: { email: fromEmail, name: clubName },
     content: [
       {
