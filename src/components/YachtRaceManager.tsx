@@ -906,7 +906,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
       return false;
     }
     
-    const step = 10;
+    const step = 20;
     const ranking = race1Results.map((pos, idx) => ({ idx, pos }))
       .sort((a, b) => (a.pos || 0) - (b.pos || 0));
     
@@ -1369,7 +1369,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     if (race === 1 && race1Complete && raceType === 'handicap') {
       if (!isManualHandicaps && !hasDeterminedInitialHcaps) {
-        const step = 10;
+        const step = 20;
         const ranking = skippers.map((_, idx) => ({
           idx,
           pos: newResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0
@@ -1522,7 +1522,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         setSkippers(resetSkippers);
         setHasDeterminedInitialHcaps(false);
       } else if (remainingRace1Results.length > 0) {
-        const step = 10;
+        const step = 20;
         const ranking = remainingRace1Results
           .sort((a, b) => (a.position || 0) - (b.position || 0))
           .map(r => r.skipperIndex);
@@ -3063,7 +3063,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                         });
 
                         if (race1Complete && !isManualHandicaps && !hasDeterminedInitialHcaps) {
-                          const step = 10;
+                          const step = 20;
                           const ranking = skippers.map((_, idx) => ({
                             idx,
                             pos: latestResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0

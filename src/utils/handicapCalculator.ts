@@ -13,17 +13,54 @@ export const calculateHandicaps = (
   const updatedResults = [...raceResults];
   const lastPlaceStreaks = new Array(skippers.length).fill(0);
 
+  // For Race 1, check if initial handicaps were determined from finishing positions
+  // (i.e. startHcap values are set in increments based on race 1 results)
+  // If so, Race 1's adjustedHcap should simply be the startHcap - no further adjustments
+  const isInitialRaceFromScratch = !isManualHandicaps && (() => {
+    const race1Data = updatedResults.filter(r => r.race === 1);
+    if (race1Data.length === 0) return false;
+    const finishers = race1Data
+      .filter(r => r.position !== null && !r.letterScore)
+      .sort((a, b) => a.position - b.position);
+    if (finishers.length < 2) return false;
+    const firstHcap = skippers[finishers[0]?.skipperIndex]?.startHcap ?? 0;
+    if (firstHcap !== 0) return false;
+    const secondHcap = skippers[finishers[1]?.skipperIndex]?.startHcap ?? 0;
+    return secondHcap > 0;
+  })();
+
   // Process each race sequentially
   for (let race = 1; race <= numRaces; race++) {
     const raceData = updatedResults.filter(r => r.race === race);
     if (raceData.length === 0) continue;
+
+    // For Race 1 when initial handicaps were set from finishing positions,
+    // simply use startHcap as the adjustedHcap (no further adjustments)
+    if (race === 1 && isInitialRaceFromScratch) {
+      raceData.forEach(result => {
+        const idx = result.skipperIndex;
+        const hcap = skippers[idx]?.startHcap ?? 0;
+        result.handicap = 0;
+        const resultIndex = updatedResults.findIndex(
+          r => r.race === 1 && r.skipperIndex === idx
+        );
+        if (resultIndex !== -1) {
+          updatedResults[resultIndex] = {
+            ...result,
+            handicap: 0,
+            adjustedHcap: hcap
+          };
+        }
+      });
+      continue;
+    }
 
     // Get current handicaps for this race
     const currentHcaps = skippers.map((_, idx) => {
       if (race === 1) {
         return skippers[idx].startHcap;
       }
-      
+
       // For subsequent races, use the adjusted handicap from previous race results
       const prevRaceResults = updatedResults.filter(r => r.race === race - 1);
       const prevResult = prevRaceResults.find(r => r.skipperIndex === idx);
@@ -36,7 +73,7 @@ export const calculateHandicaps = (
       .map(r => ({
         position: r.letterScore === 'RDGfix' ? r.position : r.position,
         skipperIndex: r.skipperIndex,
-        isOnScratch: currentHcaps[r.skipperIndex] <= 10 // Treat handicaps ≤10s as scratch boats
+        isOnScratch: currentHcaps[r.skipperIndex] <= 10
       }))
       .sort((a, b) => a.position - b.position);
 
@@ -65,10 +102,10 @@ export const calculateHandicaps = (
     raceData.forEach(result => {
       const idx = result.skipperIndex;
       const pos = result.position;
-      
+
       // Set initial handicap for the race
       result.handicap = currentHcaps[idx];
-      
+
       // Skip letter scores except RDGfix
       if (result.letterScore && result.letterScore !== 'RDGfix') {
         result.adjustedHcap = currentHcaps[idx];
@@ -77,7 +114,7 @@ export const calculateHandicaps = (
 
       if (pos === null) return;
 
-      const isOnScratch = currentHcaps[idx] <= 10; // Treat handicaps ≤10s as scratch boats
+      const isOnScratch = currentHcaps[idx] <= 10;
       let adj = 0;
 
       // Calculate position-based adjustment
@@ -92,7 +129,7 @@ export const calculateHandicaps = (
 
       // For scratch boats in top 3, add bonus to offset the negative adjustment
       if (isOnScratch && pos >= 1 && pos <= 3) {
-        adj += scratchBoatBonus; // Double the bonus for the scratch boat itself
+        adj += scratchBoatBonus;
       }
 
       // Handle last place streak for scratch boats
