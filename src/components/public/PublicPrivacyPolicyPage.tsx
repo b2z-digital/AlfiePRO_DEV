@@ -69,8 +69,21 @@ export const PublicPrivacyPolicyPage: React.FC = () => {
 
         {/* Content */}
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8">
+          <style>{`
+            .legal-content h1 { font-size: 1.875rem; font-weight: 700; color: #111827; margin-bottom: 1rem; }
+            .legal-content h2 { font-size: 1.5rem; font-weight: 700; color: #111827; margin-top: 2rem; margin-bottom: 0.75rem; }
+            .legal-content h3 { font-size: 1.25rem; font-weight: 600; color: #111827; margin-top: 1.75rem; margin-bottom: 0.5rem; }
+            .legal-content h4 { font-size: 1rem; font-weight: 600; color: #111827; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+            .legal-content p { color: #374151; line-height: 1.75; margin-bottom: 1rem; }
+            .legal-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+            .legal-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+            .legal-content li { color: #374151; line-height: 1.75; margin-bottom: 0.375rem; }
+            .legal-content strong { font-weight: 600; color: #111827; }
+            .legal-content a { color: #2563eb; text-decoration: underline; }
+            .legal-content a:hover { color: #1d4ed8; }
+          `}</style>
           <div
-            className="prose max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900"
+            className="legal-content"
             dangerouslySetInnerHTML={{ __html: content }}
           />
         </div>
