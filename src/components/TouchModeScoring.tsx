@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -1267,7 +1267,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                     onTouchEnd={handleLongPressEnd}
                     disabled={isFinished}
                     className={`
-                      relative w-full min-h-[100px] sm:min-h-[120px] lg:min-h-[140px] px-4 py-6
+                      relative w-full aspect-square
                       flex items-center justify-center
                       transition-all duration-200 font-semibold text-2xl sm:text-3xl lg:text-4xl
                       ${isFinished
