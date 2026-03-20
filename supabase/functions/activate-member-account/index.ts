@@ -226,21 +226,23 @@ Deno.serve(async (req: Request) => {
             .eq("id", userId);
         }
 
+        const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
+
         const { data: recoveryLink } = await supabase.auth.admin.generateLink({
           type: "recovery",
           email: member.email,
           options: {
-            redirectTo: `${supabaseUrl.replace('.supabase.co', '')}/reset-password`,
+            redirectTo: `${webAppUrl}/reset-password`,
           },
         });
 
         let recoveryToken = "";
-        let webRecoveryActionLink = "";
+        let webActivationLink = "";
         if (recoveryLink?.properties?.hashed_token) {
           recoveryToken = recoveryLink.properties.hashed_token;
         }
         if (recoveryLink?.properties?.action_link) {
-          webRecoveryActionLink = recoveryLink.properties.action_link;
+          webActivationLink = recoveryLink.properties.action_link;
         }
 
         if (sendGridApiKey && defaultFromEmail) {
@@ -253,16 +255,14 @@ Deno.serve(async (req: Request) => {
           const appStoreUrl = platformConfig.ios_app_store_url || "";
           const playStoreUrl = platformConfig.android_play_store_url || "";
 
-          const webActivationLink = webRecoveryActionLink || "";
-
           await sendActivationEmail({
             sendGridApiKey,
             fromEmail: defaultFromEmail,
             toEmail: member.email,
             recipientName: member.first_name,
             clubName: club_name,
-            activationDeepLink,
             webActivationLink,
+            activationDeepLink,
             appStoreUrl,
             playStoreUrl,
             bccEmail: bcc_email,
@@ -338,24 +338,6 @@ async function sendActivationEmail(params: EmailParams) {
 
   const hasAppStoreLinks = !!(appStoreUrl || playStoreUrl);
 
-  const appStoreButtonsHtml = hasAppStoreLinks
-    ? `<tr>
-        <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:12px;padding:24px;text-align:center;">
-          <p style="margin:0;color:rgba(255,255,255,0.75);font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Step 1</p>
-          <p style="margin:4px 0 16px;color:#ffffff;font-size:20px;font-weight:700;">Download AlfiePRO</p>
-          <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
-            <tr>
-              ${appStoreUrl ? `<td style="padding:0 6px;"><a href="${appStoreUrl}" style="display:inline-block;background:rgba(0,0,0,0.3);color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">App Store</a></td>` : ""}
-              ${playStoreUrl ? `<td style="padding:0 6px;"><a href="${playStoreUrl}" style="display:inline-block;background:rgba(0,0,0,0.3);color:#ffffff;padding:10px 20px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">Google Play</a></td>` : ""}
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr><td style="height:20px;"></td></tr>`
-    : "";
-
-  const stepNumber = hasAppStoreLinks ? "Step 2" : "";
-
   const emailHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -390,32 +372,24 @@ async function sendActivationEmail(params: EmailParams) {
           <!-- Body -->
           <tr>
             <td style="background-color:#ffffff;padding:32px 40px;">
-              <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
-                Hi ${recipientName},
-              </p>
-              <p style="margin:0 0 24px;color:#334155;font-size:15px;line-height:1.6;">
-                Great news! <strong>${clubName}</strong> has set up your AlfiePRO account. ${hasAppStoreLinks ? "Download the app, set your password, and you're in." : "Set your password using the button below and you're in."}
+              <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi ${recipientName},</p>
+              <p style="margin:0 0 28px;color:#334155;font-size:15px;line-height:1.6;">
+                <strong>${clubName}</strong> has set up your AlfiePRO account. Click the button below to set your password &mdash; it works on any device, in any browser.
               </p>
 
-              <!-- App Store Download -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
-                ${appStoreButtonsHtml}
-              </table>
-
-              <!-- Activation Card -->
+              <!-- PRIMARY: Web activation button -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                 <tr>
                   <td style="border:1px solid #e2e8f0;border-radius:12px;padding:28px;text-align:center;">
-                    ${stepNumber ? `<p style="margin:0 0 4px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${stepNumber}</p>` : ""}
                     <p style="margin:0 0 16px;color:#0f172a;font-size:20px;font-weight:700;">Set Your Password</p>
-                    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                    <table cellpadding="0" cellspacing="0" style="margin:0 auto 14px;">
                       <tr>
                         <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;">
-                          <a href="${activationDeepLink}" style="display:inline-block;color:#ffffff;padding:14px 40px;text-decoration:none;font-size:16px;font-weight:600;letter-spacing:0.3px;">Activate My Account</a>
+                          <a href="${webActivationLink}" style="display:inline-block;color:#ffffff;padding:14px 48px;text-decoration:none;font-size:16px;font-weight:600;letter-spacing:0.3px;">Activate My Account</a>
                         </td>
                       </tr>
                     </table>
-                    <p style="margin:14px 0 0;color:#94a3b8;font-size:12px;">${hasAppStoreLinks ? "Opens in the AlfiePRO app" : "Click to set your password and get started"}</p>
+                    <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">Opens in your web browser &mdash; works on any device</p>
                   </td>
                 </tr>
               </table>
@@ -439,19 +413,11 @@ async function sendActivationEmail(params: EmailParams) {
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
-                          <span style="color:#64748b;font-size:13px;">Email</span>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#64748b;font-size:13px;">Email / Username</span>
                         </td>
-                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:12px 20px;">
                           <span style="color:#0f172a;font-size:13px;font-weight:500;">${toEmail}</span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding:12px 20px;">
-                          <span style="color:#64748b;font-size:13px;">Password</span>
-                        </td>
-                        <td style="padding:12px 20px;">
-                          <span style="color:#0f172a;font-size:13px;font-weight:500;">Set via the activation button above</span>
                         </td>
                       </tr>
                     </table>
@@ -459,31 +425,35 @@ async function sendActivationEmail(params: EmailParams) {
                 </tr>
               </table>
 
-              <!-- Web Activation Fallback -->
-              ${webActivationLink ? `
+              <!-- SECONDARY: Mobile app section -->
+              ${hasAppStoreLinks || activationDeepLink ? `
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                 <tr>
-                  <td style="border:1px solid #e2e8f0;border-radius:12px;padding:24px;text-align:center;border-left:4px solid #0ea5e9;">
-                    <p style="margin:0 0 4px;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Don't have the mobile app?</p>
-                    <p style="margin:0 0 16px;color:#334155;font-size:15px;font-weight:600;">Activate via Web Browser Instead</p>
-                    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                  <td style="border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;border-left:4px solid #0ea5e9;">
+                    <p style="margin:0 0 6px;color:#334155;font-size:13px;font-weight:600;">Prefer the mobile app?</p>
+                    <p style="margin:0 0 ${hasAppStoreLinks ? "14px" : "0"};color:#64748b;font-size:13px;line-height:1.5;">
+                      Once you've set your password above, download AlfiePRO and sign in with <strong>${toEmail}</strong>.
+                      ${activationDeepLink ? `Or tap the button below to open directly in the app (only works if the app is already installed on this device).` : ""}
+                    </p>
+                    ${hasAppStoreLinks ? `
+                    <table cellpadding="0" cellspacing="0" style="margin-bottom:${activationDeepLink ? "12px" : "0"};">
                       <tr>
-                        <td style="border:2px solid #0ea5e9;border-radius:8px;">
-                          <a href="${webActivationLink}" style="display:inline-block;color:#0ea5e9;padding:12px 32px;text-decoration:none;font-size:14px;font-weight:600;">Set Password on Web</a>
+                        ${appStoreUrl ? `<td style="padding:0 6px 0 0;"><a href="${appStoreUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;padding:8px 16px;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">App Store</a></td>` : ""}
+                        ${playStoreUrl ? `<td style="padding:0 6px 0 0;"><a href="${playStoreUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;padding:8px 16px;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">Google Play</a></td>` : ""}
+                      </tr>
+                    </table>` : ""}
+                    ${activationDeepLink ? `
+                    <table cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="border:1px solid #cbd5e1;border-radius:6px;">
+                          <a href="${activationDeepLink}" style="display:inline-block;color:#475569;padding:8px 16px;text-decoration:none;font-size:12px;font-weight:600;">Open in AlfiePRO App</a>
                         </td>
                       </tr>
-                    </table>
-                    <p style="margin:12px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;">This will open in your web browser where you can set your password and access alfiePRO from any device.</p>
+                    </table>` : ""}
                   </td>
                 </tr>
               </table>
               ` : ""}
-
-              <!-- Fallback tip -->
-              <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;margin-bottom:24px;border-left:4px solid #0ea5e9;">
-                <p style="margin:0 0 4px;color:#334155;font-size:13px;font-weight:600;">Need help?</p>
-                <p style="margin:0;color:#64748b;font-size:13px;line-height:1.5;">You can also open the app or website and tap "Forgot password?" on the login screen. Enter <strong>${toEmail}</strong> and follow the prompts.</p>
-              </div>
 
               <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;text-align:center;">
                 This activation was sent on behalf of ${clubName}. If you did not expect this email, you can safely ignore it.

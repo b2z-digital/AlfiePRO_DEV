@@ -1530,8 +1530,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                 <>
                   <p className="text-slate-300 mb-4">
                     {membersToActivate.length === 1
-                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to download the AlfiePRO app and set their password.</>
-                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to download the AlfiePRO app and set their password.</>
+                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to set their password.</>
+                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to set their password.</>
                     }
                   </p>
 
@@ -1551,7 +1551,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       </div>
                       <div>
                         <p className="text-sm text-white font-medium">Welcome email sent</p>
-                        <p className="text-xs text-slate-400">Contains app download links and an activation button</p>
+                        <p className="text-xs text-slate-400">Contains a secure link to set their password — works on any device</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
@@ -1559,8 +1559,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                         <span className="text-sky-400 text-xs font-bold">3</span>
                       </div>
                       <div>
-                        <p className="text-sm text-white font-medium">Member sets password in app</p>
-                        <p className="text-xs text-slate-400">One tap, set password, they're in -- no registration needed</p>
+                        <p className="text-sm text-white font-medium">Member sets their password</p>
+                        <p className="text-xs text-slate-400">They click the link, set a password in their browser, then sign in on web or app</p>
                       </div>
                     </div>
                   </div>
