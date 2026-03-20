@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Home, Settings, Users, Hand, Table2, Maximize2, Minimize2 } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Hop as Home, Settings, Users, Hand, Table2, Maximize2, Minimize2 } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -824,7 +824,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         }, 100);
       }
     }
-  }, [raceResults, capLimit, lastPlaceBonus, raceType, heatManagement]);
+  }, [raceResults, skippers, capLimit, lastPlaceBonus, raceType, heatManagement]);
 
   const startNewSession = () => {
     setRaceResults([]);
@@ -3025,72 +3025,99 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 onConfirmResults={() => {
                   console.log('✅ Touch mode: User confirmed results, marking race as complete');
 
-                  let highestConsecutiveRace = 0;
-                  for (let r = 1; r <= currentNumRaces; r++) {
-                    const isComplete = skippers.every((skipper, index) => {
-                      const result = raceResults.find(res => res.race === r && res.skipperIndex === index);
-                      if (result && (result.position !== null || result.letterScore)) {
-                        return true;
-                      }
-                      if (skipper.withdrawnFromRace && r >= skipper.withdrawnFromRace) {
-                        return true;
-                      }
-                      return false;
-                    });
-                    if (isComplete) {
-                      highestConsecutiveRace = r;
-                    } else {
-                      break;
-                    }
-                  }
-
-                  const newLastCompleted = Math.max(highestConsecutiveRace, lastCompletedRace);
-                  if (highestConsecutiveRace > lastCompletedRace) {
-                    setLastCompletedRace(highestConsecutiveRace);
-                    setEditingRace(null);
-
-                    if (highestConsecutiveRace >= currentNumRaces) {
-                      const newNumRaces = currentNumRaces + 1;
-                      setCurrentNumRaces(newNumRaces);
-                    }
-
-                    if (raceType === 'handicap') {
-                      for (let r = lastCompletedRace + 1; r <= highestConsecutiveRace; r++) {
-                        updateMemberHandicaps(r, raceResults);
-                      }
-                    }
-                  }
-
-                  (async () => {
-                    if (currentEvent?.id) {
-                      try {
-                        const nextRace = newLastCompleted + 1;
-                        const actualEventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
-                        const clubId = localStorage.getItem('currentClubId');
-                        console.log('📊 Touch confirm: DB sync - results:', raceResults.length, 'last_completed_race:', newLastCompleted, 'current_day:', nextRace);
-                        const { error } = await supabase
-                          .from('quick_races')
-                          .update({
-                            current_day: nextRace,
-                            race_results: raceResults,
-                            last_completed_race: newLastCompleted,
-                            skippers: skippers
-                          })
-                          .eq('id', actualEventId)
-                          .eq('club_id', clubId);
-
-                        if (error) {
-                          console.error('❌ Error syncing confirmed results:', error);
-                        } else {
-                          console.log('✅ Confirmed results synced to database');
+                  setRaceResults(latestResults => {
+                    let highestConsecutiveRace = 0;
+                    for (let r = 1; r <= currentNumRaces; r++) {
+                      const isComplete = skippers.every((skipper, index) => {
+                        const result = latestResults.find(res => res.race === r && res.skipperIndex === index);
+                        if (result && (result.position !== null || result.letterScore)) {
+                          return true;
                         }
-                      } catch (error) {
-                        console.error('❌ Exception syncing confirmed results:', error);
+                        if (skipper.withdrawnFromRace && r >= skipper.withdrawnFromRace) {
+                          return true;
+                        }
+                        return false;
+                      });
+                      if (isComplete) {
+                        highestConsecutiveRace = r;
+                      } else {
+                        break;
                       }
                     }
-                  })();
 
-                  autoSaveRaceResults(raceResults, newLastCompleted);
+                    const newLastCompleted = Math.max(highestConsecutiveRace, lastCompletedRace);
+
+                    if (highestConsecutiveRace > lastCompletedRace) {
+                      setLastCompletedRace(highestConsecutiveRace);
+                      setEditingRace(null);
+
+                      if (highestConsecutiveRace >= currentNumRaces) {
+                        const newNumRaces = currentNumRaces + 1;
+                        setCurrentNumRaces(newNumRaces);
+                      }
+
+                      if (raceType === 'handicap') {
+                        const race1Complete = highestConsecutiveRace >= 1 && skippers.every((_, index) => {
+                          const result = latestResults.find(r => r.race === 1 && r.skipperIndex === index);
+                          return result && (result.position !== null || result.letterScore);
+                        });
+
+                        if (race1Complete && !isManualHandicaps && !hasDeterminedInitialHcaps) {
+                          const step = 10;
+                          const ranking = skippers.map((_, idx) => ({
+                            idx,
+                            pos: latestResults.find(r => r.race === 1 && r.skipperIndex === idx)?.position || 0
+                          })).sort((a, b) => a.pos - b.pos);
+
+                          const updatedSkippers = [...skippers];
+                          ranking.forEach((r, rank) => {
+                            const handicap = rank * step;
+                            updatedSkippers[r.idx] = { ...updatedSkippers[r.idx], startHcap: handicap };
+                          });
+
+                          setSkippers(updatedSkippers);
+                          setHasDeterminedInitialHcaps(true);
+                        }
+
+                        for (let r = lastCompletedRace + 1; r <= highestConsecutiveRace; r++) {
+                          updateMemberHandicaps(r, latestResults);
+                        }
+                      }
+                    }
+
+                    (async () => {
+                      if (currentEvent?.id) {
+                        try {
+                          const nextRace = newLastCompleted + 1;
+                          const actualEventId = currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id;
+                          const clubId = localStorage.getItem('currentClubId');
+                          console.log('📊 Touch confirm: DB sync - results:', latestResults.length, 'last_completed_race:', newLastCompleted, 'current_day:', nextRace);
+                          const { error } = await supabase
+                            .from('quick_races')
+                            .update({
+                              current_day: nextRace,
+                              race_results: latestResults,
+                              last_completed_race: newLastCompleted,
+                              skippers: skippers
+                            })
+                            .eq('id', actualEventId)
+                            .eq('club_id', clubId);
+
+                          if (error) {
+                            console.error('❌ Error syncing confirmed results:', error);
+                          } else {
+                            console.log('✅ Confirmed results synced to database');
+                          }
+                        } catch (error) {
+                          console.error('❌ Exception syncing confirmed results:', error);
+                        }
+                      }
+                    })();
+
+                    autoSaveRaceResults(latestResults, newLastCompleted);
+
+                    return latestResults;
+                  });
                 }}
                 onRaceChange={(newRace) => {
                   setTouchModeCurrentRace(newRace);
