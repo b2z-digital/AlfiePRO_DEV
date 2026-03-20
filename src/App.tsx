@@ -236,6 +236,10 @@ function App() {
           <Route path="/club/:clubId/public/results" element={<PublicResultsListPage />} />
           <Route path="/club/:clubId/public/results/:eventId" element={<PublicResultsPage />} />
 
+        {/* Global Public Legal Pages - no club context required */}
+        <Route path="/privacy-policy" element={<PublicPrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<PublicTermsOfServicePage />} />
+
         {/* Public Event Website Routes */}
         <Route path="/events/:slug/*" element={<PublicEventWebsitePage />} />
 
