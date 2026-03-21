@@ -127,8 +127,8 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             showClubState: race.show_club_state ?? false,
             showDesign: race.show_design ?? false,
             showCategory: race.show_category ?? false,
-            enable_observers: race.enable_observers || false,
-            observers_per_heat: race.observers_per_heat || undefined,
+            enable_observers: race.enable_observers ?? false,
+            observers_per_heat: race.observers_per_heat ?? undefined,
             enableLiveTracking: race.enable_live_tracking || false,
             enableLiveStream: race.enable_livestream || false
           } as any;
@@ -269,8 +269,8 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           enable_live_tracking: (event as any).enableLiveTracking || false,
           enable_livestream: (event as any).enableLiveStream || false,
           // Observer settings
-          enable_observers: (event as any).enable_observers || false,
-          observers_per_heat: (event as any).observers_per_heat || undefined
+          enable_observers: (event as any).enable_observers ?? false,
+          observers_per_heat: (event as any).observers_per_heat ?? undefined
         });
 
       if (error) {
@@ -1408,16 +1408,13 @@ export const updateEventResults = async (
         updateData['day_results'] = updatedEvent.dayResults;
 
         const updatePayload = {
-          skippers: skippers, // Save skippers for multi-day events
+          skippers: skippers,
           day_results: updatedEvent.dayResults,
           current_day: currentDay,
           completed: updatedEvent.completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
-          // Preserve observer settings
-          enable_observers: updatedEvent.enable_observers,
-          observers_per_heat: updatedEvent.observers_per_heat
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]
         };
 
         console.log('📤 Updating multi-day event in database:', {
@@ -1451,10 +1448,7 @@ export const updateEventResults = async (
           completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
-          // Preserve observer settings
-          enable_observers: updatedEvent.enable_observers,
-          observers_per_heat: updatedEvent.observers_per_heat
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]
         };
 
         console.log('📤 Updating single-day event in database:', {

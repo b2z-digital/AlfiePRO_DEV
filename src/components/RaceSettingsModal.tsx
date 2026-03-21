@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, Edit2, Check, AlertTriangle, Sailboat, Eye } from 'lucide-react';
+import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, CreditCard as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
 import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
@@ -516,7 +516,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     onSaveSettings({
       numRaces: currentNumRaces,
       dropRules: currentDropRules,
-      heatManagement: finalHeatManagement
+      heatManagement: finalHeatManagement,
+      displaySettings: {
+        show_flag: showFlag,
+        show_country: showCountry
+      },
+      observerSettings: {
+        enable_observers: enableObservers,
+        observers_per_heat: observersPerHeat
+      }
     });
 
     setShowManualAssignmentModal(false);
@@ -572,7 +580,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     onSaveSettings({
       numRaces: currentNumRaces,
       dropRules: currentDropRules,
-      heatManagement: finalHeatManagement
+      heatManagement: finalHeatManagement,
+      displaySettings: {
+        show_flag: showFlag,
+        show_country: showCountry
+      },
+      observerSettings: {
+        enable_observers: enableObservers,
+        observers_per_heat: observersPerHeat
+      }
     });
 
     setShowHMSSeedingModal(false);
@@ -2177,6 +2193,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 results: [],
                 completed: false
               }]
+            },
+            displaySettings: {
+              show_flag: showFlag,
+              show_country: showCountry
+            },
+            observerSettings: {
+              enable_observers: enableObservers,
+              observers_per_heat: observersPerHeat
             }
           });
 
