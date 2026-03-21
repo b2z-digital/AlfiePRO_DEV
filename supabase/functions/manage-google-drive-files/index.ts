@@ -69,6 +69,12 @@ Deno.serve(async (req: Request) => {
         });
 
         const tokenData = await tokenResponse.json();
+
+        if (!tokenResponse.ok || !tokenData.access_token) {
+          console.error('Token refresh failed:', JSON.stringify(tokenData));
+          throw new Error(`Google Drive token refresh failed: ${tokenData.error_description || tokenData.error || 'unknown error'}. Please reconnect Google Drive in Integrations.`);
+        }
+
         const newAccessToken = tokenData.access_token;
         const expiresIn = tokenData.expires_in || 3600;
         const newExpiry = new Date(Date.now() + expiresIn * 1000).toISOString();
@@ -237,7 +243,10 @@ Deno.serve(async (req: Request) => {
       if (!listResponse.ok) {
         const error = await listResponse.text();
         console.error('List error:', error);
-        throw new Error('Failed to list files from Google Drive');
+        if (listResponse.status === 401 || listResponse.status === 403) {
+          throw new Error('Google Drive access denied. Your token may have been revoked. Please reconnect Google Drive in Integrations.');
+        }
+        throw new Error(`Failed to list files from Google Drive: ${listResponse.status}`);
       }
 
       const listData = await listResponse.json();
