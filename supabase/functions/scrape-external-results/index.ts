@@ -391,6 +391,172 @@ function extractBestTableHtml(html: string): string | null {
     .replace(/\s+align="[^"]*"/gi, "");
 }
 
+// ─── MySailingResults API integration ─────────────────────────────────────────
+
+const MYSAILINGRESULTS_API = "https://mysailingresults.com/api/results/get_results.php";
+
+interface MSRCompetitor {
+  comppos: number;
+  compname: string;
+  compsailno: string;
+  compclubname: string;
+  compboatdesign: string;
+  grossScore: string;
+  nettScore: string;
+  results: Record<string, string>;
+  compgrp?: string;
+}
+
+interface MSREvent {
+  eventname: string;
+  eventlocation: string;
+  eventstate: string;
+  eventstartdate: string;
+  eventenddate: string;
+  eventclass: string;
+  racescompleted: string;
+  competitors: string;
+}
+
+function extractEventIdFromUrl(url: string): string | null {
+  const m = url.match(/[?&]eventid=(\d+)/i);
+  return m ? m[1] : null;
+}
+
+function isMySailingResultsSite(url: string): boolean {
+  return url.includes("radiosailing.org.au") || url.includes("mysailingresults.com");
+}
+
+function buildResultsTableHtml(event: MSREvent, competitors: MSRCompetitor[]): string {
+  if (!competitors.length) return "";
+
+  const raceKeys = Object.keys(competitors[0]?.results || {})
+    .filter(k => /^r\d+$/i.test(k))
+    .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+  let html = '<table><thead><tr>';
+  html += '<th>Pos</th><th>Name</th><th>Club</th><th>Sail No</th><th>Design</th>';
+  html += '<th>Nett</th><th>Total</th>';
+  for (const rk of raceKeys) html += `<th>${rk.toUpperCase()}</th>`;
+  html += '</tr></thead><tbody>';
+
+  for (const c of competitors) {
+    html += '<tr>';
+    html += `<td>${c.comppos}</td>`;
+    html += `<td>${c.compname || ""}</td>`;
+    html += `<td>${c.compclubname || ""}</td>`;
+    html += `<td>${c.compsailno || ""}</td>`;
+    html += `<td>${c.compboatdesign || ""}</td>`;
+    html += `<td>${c.nettScore || ""}</td>`;
+    html += `<td>${c.grossScore || ""}</td>`;
+    for (const rk of raceKeys) {
+      const val = c.results?.[rk] ?? "";
+      html += `<td>${val}</td>`;
+    }
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+  return html;
+}
+
+function msrCompetitorsToParsed(competitors: MSRCompetitor[]): ParsedResult[] {
+  const raceKeys = Object.keys(competitors[0]?.results || {})
+    .filter(k => /^r\d+$/i.test(k))
+    .sort((a, b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+
+  return competitors.map(c => {
+    const races: (string | null)[] = [];
+    const isDiscard: boolean[] = [];
+    for (const rk of raceKeys) {
+      const raw = c.results?.[rk] ?? null;
+      if (!raw || raw === "-") { races.push(null); isDiscard.push(false); continue; }
+      const d = raw.match(/^\((.+)\)$/);
+      if (d) { races.push(d[1]); isDiscard.push(true); }
+      else { races.push(raw); isDiscard.push(false); }
+    }
+    return {
+      position: c.comppos,
+      name: c.compname || "",
+      club: c.compclubname || "",
+      sailNo: c.compsailno || "",
+      boatDesign: c.compboatdesign || "",
+      nett: c.nettScore ? parseFloat(c.nettScore) || null : null,
+      total: c.grossScore ? parseFloat(c.grossScore) || null : null,
+      races,
+      isDiscard,
+    };
+  });
+}
+
+async function fetchFromMySailingResultsApi(eventId: string): Promise<{
+  rawTableHtml: string | null;
+  competitors: ParsedResult[];
+  raceCount: number;
+  eventName: string;
+  venue: string;
+  eventDate: string | null;
+  eventEndDate: string | null;
+  boatClassRaw: string;
+  boatClassMapped: string | null;
+} | null> {
+  try {
+    const apiUrl = `${MYSAILINGRESULTS_API}?eventid=${eventId}`;
+    const resp = await fetch(apiUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0",
+        "Accept": "application/json",
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
+    if (!resp.ok) return null;
+
+    const data = await resp.json();
+    const eventInfo: MSREvent = data.event || data.Event || {};
+    const rawCompetitors: MSRCompetitor[] = data.results || data.Results || [];
+
+    if (!rawCompetitors.length) return null;
+
+    const raceKeys = Object.keys(rawCompetitors[0]?.results || {})
+      .filter(k => /^r\d+$/i.test(k));
+
+    const eventName = eventInfo.eventname || "";
+    const venue = [eventInfo.eventlocation, eventInfo.eventstate].filter(Boolean).join(", ");
+    const boatClassRaw = eventInfo.eventclass || "";
+    const boatClassMapped = detectBoatClass(boatClassRaw || eventName);
+
+    let eventDate: string | null = null;
+    let eventEndDate: string | null = null;
+    if (eventInfo.eventstartdate) {
+      const d = new Date(eventInfo.eventstartdate);
+      if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
+    }
+    if (eventInfo.eventenddate) {
+      const d = new Date(eventInfo.eventenddate);
+      if (!isNaN(d.getTime())) eventEndDate = d.toISOString().slice(0, 10);
+    }
+
+    const rawTableHtml = buildResultsTableHtml(eventInfo, rawCompetitors);
+    const competitors = msrCompetitorsToParsed(rawCompetitors);
+
+    return {
+      rawTableHtml,
+      competitors,
+      raceCount: raceKeys.length,
+      eventName,
+      venue,
+      eventDate,
+      eventEndDate,
+      boatClassRaw,
+      boatClassMapped,
+    };
+  } catch (e) {
+    console.error("MySailingResults API error:", e);
+    return null;
+  }
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -489,6 +655,59 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // Check if this is a MySailingResults-powered site (radiosailing.org.au)
+      const msrEventId = extractEventIdFromUrl(eventRow.source_url);
+      if (msrEventId && isMySailingResultsSite(eventRow.source_url)) {
+        const apiResult = await fetchFromMySailingResultsApi(msrEventId);
+
+        if (!apiResult || (!apiResult.rawTableHtml && !apiResult.competitors.length)) {
+          return new Response(JSON.stringify({ error: "No results found for this event yet", competitors: [] }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        let boatClassId: string | null = null;
+        const bClass = apiResult.boatClassMapped || eventRow.boat_class_mapped;
+        if (bClass) {
+          const { data: bc } = await supabase
+            .from("boat_classes").select("id").ilike("name", `%${bClass}%`).maybeSingle();
+          boatClassId = bc?.id || null;
+        }
+
+        const updatePayload: Record<string, unknown> = {
+          results_json: apiResult.competitors,
+          competitor_count: apiResult.competitors.length,
+          race_count: apiResult.raceCount,
+          last_scraped_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        if (apiResult.eventDate) updatePayload.event_date = apiResult.eventDate;
+        if (apiResult.eventEndDate) updatePayload.event_end_date = apiResult.eventEndDate;
+        if (apiResult.venue) updatePayload.venue = apiResult.venue;
+        if (apiResult.boatClassRaw || eventRow.boat_class_raw) updatePayload.boat_class_raw = apiResult.boatClassRaw || eventRow.boat_class_raw;
+        if (apiResult.boatClassMapped || eventRow.boat_class_mapped) updatePayload.boat_class_mapped = apiResult.boatClassMapped || eventRow.boat_class_mapped;
+        if (boatClassId) updatePayload.boat_class_id = boatClassId;
+
+        await supabase.from("external_result_events").update(updatePayload).eq("id", event_row_id);
+
+        return new Response(JSON.stringify({
+          success: true,
+          raw_table_html: apiResult.rawTableHtml,
+          competitors: apiResult.competitors,
+          race_count: apiResult.raceCount,
+          competitor_count: apiResult.competitors.length,
+          event_date: apiResult.eventDate,
+          event_end_date: apiResult.eventEndDate,
+          venue: apiResult.venue,
+          boat_class_raw: apiResult.boatClassRaw,
+          boat_class_mapped: apiResult.boatClassMapped,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fallback: fetch HTML page directly for non-API sources
       const fetchResp = await fetch(eventRow.source_url, {
         headers: {
           "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0",
@@ -506,7 +725,6 @@ Deno.serve(async (req: Request) => {
 
       const html = await fetchResp.text();
 
-      // Extract the largest table as raw HTML for faithful rendering
       const rawTableHtml = extractBestTableHtml(html);
       const parsed = parseEventPage(html, eventRow.event_name);
 
