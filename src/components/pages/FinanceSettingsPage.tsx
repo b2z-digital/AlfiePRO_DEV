@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Plus, Edit2, Trash2, Save, X, Settings, Receipt, Tag, Percent, Users, CreditCard, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Plus, CreditCard as Edit2, Trash2, Save, X, Settings, Receipt, Tag, Percent, Users, CreditCard, CircleAlert as AlertCircle, CircleCheck as CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { CircularCheckbox } from '../ui/CircularCheckbox';
@@ -48,7 +48,7 @@ interface FinanceSettingsPageProps {
   associationId?: string;
   associationType?: 'state' | 'national';
   initialTab?: 'taxes' | 'transactions' | 'categories' | 'membership';
-  initialSection?: 'payment';
+  initialSection?: 'payment' | 'opening-balance';
 }
 
 export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMode, associationId, associationType, initialTab = 'taxes', initialSection }) => {
@@ -1274,6 +1274,80 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
               >
                 <Save size={16} />
                 {saving ? 'Saving...' : 'Save Payment Information'}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (initialSection === 'opening-balance') {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Opening Balance</h3>
+            <p className="text-slate-400 text-sm">Set your starting bank balance so financial reports reflect your true position</p>
+          </div>
+
+          <div className="border border-slate-600 rounded-lg p-6">
+            <p className="text-sm text-slate-400 mb-6">
+              If your club had money in the bank before you started tracking finances in the system, enter that amount here. This ensures your Account Balance, Bank Position, and reports show an accurate picture.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Opening Balance Amount
+                </label>
+                <div className="relative">
+                  <span className={`absolute left-3 top-2.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={transactionSettings.opening_balance}
+                    onChange={(e) => setTransactionSettings({
+                      ...transactionSettings,
+                      opening_balance: parseFloat(e.target.value) || 0
+                    })}
+                    className={`
+                      w-full pl-7 pr-3 py-2 rounded-lg border
+                      ${darkMode
+                        ? 'bg-slate-700 border-slate-600 text-white'
+                        : 'bg-white border-slate-300 text-slate-900'}
+                    `}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Balance Date
+                </label>
+                <input
+                  type="date"
+                  value={transactionSettings.opening_balance_date || ''}
+                  onChange={(e) => setTransactionSettings({
+                    ...transactionSettings,
+                    opening_balance_date: e.target.value || null
+                  })}
+                  className={`
+                    w-full px-3 py-2 rounded-lg border
+                    ${darkMode
+                      ? 'bg-slate-700 border-slate-600 text-white [color-scheme:dark]'
+                      : 'bg-white border-slate-300 text-slate-900'}
+                  `}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleSaveTransactionSettings}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50"
+              >
+                <Save size={16} />
+                {saving ? 'Saving...' : 'Save Opening Balance'}
               </button>
             </div>
           </div>
