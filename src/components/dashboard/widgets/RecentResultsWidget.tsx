@@ -595,7 +595,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                                   <img src={winner.avatarUrl} alt={winner.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <div className="w-full h-full bg-slate-700 flex items-center justify-center">
-                                    <span className="text-xs font-bold text-slate-300">{winner.name.charAt(0)}</span>
+                                    <span className="text-xs font-bold text-slate-300">{winner.name.split(' ').filter(Boolean).map((p: string) => p.charAt(0).toUpperCase()).slice(0, 2).join('')}</span>
                                   </div>
                                 )}
                               </div>
