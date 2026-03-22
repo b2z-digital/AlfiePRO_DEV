@@ -192,7 +192,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
 
         const { data: externalEvents } = await supabase
           .from('external_result_events')
-          .select('id, event_name, event_date, venue, boat_class_raw, boat_class_mapped, results_json, competitor_count, display_category')
+          .select('id, event_name, event_date, venue, boat_class_raw, boat_class_mapped, results_json, competitor_count, display_category, source_url')
           .eq('is_visible', true)
           .in('display_category', categoriesToFetch)
           .not('event_date', 'is', null)
@@ -213,6 +213,8 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                   topThree.push({ name: r.name, position: r.position });
                 });
             }
+            const sourceUrl = (ev as any).source_url || '';
+            const eventIdMatch = sourceUrl.match?.(/[?&]eventid=(\d+)/i);
             return {
               id: `${isState ? 'state' : 'national'}-${ev.id}`,
               externalEventId: ev.id,
@@ -226,6 +228,8 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
               stateAssociationName: isState ? (stateAssocName || undefined) : undefined,
               boatClassImage: getBoatClassImage(boatClass),
               topThree,
+              _msrEventId: eventIdMatch ? eventIdMatch[1] : null,
+              _sourceUrl: sourceUrl,
             };
           });
 
@@ -279,8 +283,9 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
               }
             });
 
-            // Extract top 3 from each race using standings calculator
             allRecent = allRecent.map(event => {
+              if (event.topThree && event.topThree.length > 0) return event;
+
               const topThree: Array<{ name: string; avatarUrl?: string; position: number }> = [];
 
               if (event.skippers && event.raceResults && event.raceResults.length > 0) {
@@ -333,10 +338,84 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
       }
 
       setRecentResults(allRecent);
+
+      const eventsNeedingTop3 = allRecent.filter(
+        (e: any) => (e.isNationalEvent || e.isStateEvent) && (!e.topThree || e.topThree.length === 0) && e._msrEventId
+      );
+      if (eventsNeedingTop3.length > 0) {
+        fetchMsrTopThree(eventsNeedingTop3, allRecent);
+      }
     } catch (error) {
       console.error('Error loading recent results:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMsrTopThree = async (eventsToFetch: any[], allResults: any[]) => {
+    const updates: Record<string, Array<{ name: string; position: number }>> = {};
+    const dbUpdates: Array<{ id: string; results_json: any[]; competitor_count: number; race_count: number }> = [];
+
+    await Promise.all(eventsToFetch.map(async (ev) => {
+      try {
+        const apiUrl = `https://mysailingresults.com/api/results/get_results.php?eventid=${ev._msrEventId}`;
+        const resp = await fetch(apiUrl, { signal: AbortSignal.timeout(10000) });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const competitors = data.results || [];
+        if (!competitors.length) return;
+
+        const top3 = competitors
+          .sort((a: any, b: any) => (a.comppos || 999) - (b.comppos || 999))
+          .slice(0, 3)
+          .map((c: any) => ({ name: c.compname || '', position: c.comppos }));
+
+        updates[ev.id] = top3;
+
+        const raceKeys = Object.keys(competitors[0]?.results || {}).filter((k: string) => /^r\d+$/i.test(k));
+        const parsedResults = competitors.map((c: any) => {
+          const races = raceKeys.sort((a: string, b: string) => parseInt(a.slice(1)) - parseInt(b.slice(1))).map((rk: string) => {
+            const raw = c.results?.[rk] ?? null;
+            if (!raw || raw === '-') return null;
+            const d = raw.match(/^\((.+)\)$/);
+            return d ? d[1] : raw;
+          });
+          return {
+            position: c.comppos,
+            name: c.compname || '',
+            club: c.compclubname || '',
+            sailNo: c.compsailno || '',
+            boatDesign: c.compboatdesign || '',
+            nett: c.nettScore ? parseFloat(c.nettScore) || null : null,
+            total: c.grossScore ? parseFloat(c.grossScore) || null : null,
+            races,
+            isDiscard: raceKeys.map((rk: string) => /^\(/.test(c.results?.[rk] || '')),
+          };
+        });
+
+        dbUpdates.push({
+          id: ev.externalEventId,
+          results_json: parsedResults,
+          competitor_count: competitors.length,
+          race_count: raceKeys.length,
+        });
+      } catch {
+        // Silently skip failed fetches
+      }
+    }));
+
+    if (Object.keys(updates).length > 0) {
+      setRecentResults(prev => prev.map(r => updates[r.id] ? { ...r, topThree: updates[r.id] } : r));
+    }
+
+    for (const upd of dbUpdates) {
+      supabase.from('external_result_events').update({
+        results_json: upd.results_json,
+        competitor_count: upd.competitor_count,
+        race_count: upd.race_count,
+        last_scraped_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', upd.id).then(() => {});
     }
   };
 
