@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Hop as Home, Settings, Users, Hand, Table2, Maximize2, Minimize2 } from 'lucide-react';
+import { Trophy, Calendar, CalendarRange, Flag, X, TrendingUp, ArrowUpDown, Settings, Users, Hand, Table2, Maximize2, Minimize2 } from 'lucide-react';
 import { RaceType, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { OneOffRace } from './OneOffRace';
@@ -2928,7 +2928,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   `}
                   title="Return to Dashboard"
                 >
-                  <Home size={18} />
+                  <Logo className="w-5 h-5" />
                 </button>
                 <button
                   type="button"
