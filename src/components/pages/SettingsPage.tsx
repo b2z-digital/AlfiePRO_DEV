@@ -941,7 +941,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
-                {/* Association Fees Card */}
+                {/* Bank Details Card */}
                 <button
                   onClick={() => setActiveTab('finance-payment')}
                   className={`
@@ -955,12 +955,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <DollarSign size={20} className="text-amber-400" />
+                      <CreditCard size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association Fees</h3>
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Bank Details</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Set membership fees and payment methods
+                        Set bank name, BSB, and account number for payments
                       </p>
                     </div>
                   </div>

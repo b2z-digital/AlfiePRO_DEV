@@ -89,6 +89,8 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
     { code: 'RUB', name: 'Russian Ruble' }
   ];
 
+  const [bankDetails, setBankDetails] = useState({ bank_name: '', bsb: '', account_number: '' });
+
   // Transaction settings state
   const [transactionSettings, setTransactionSettings] = useState<TransactionSettings>({
     invoice_title: 'INVOICE',
@@ -425,16 +427,21 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
           });
         }
 
-        // Load membership integration config from clubs table
+        // Load membership integration config and bank details from clubs table
         const { data: clubData, error: clubError } = await supabase
           .from('clubs')
-          .select('default_membership_category_id, stripe_enabled, stripe_account_id, stripe_account_name')
+          .select('default_membership_category_id, stripe_enabled, stripe_account_id, stripe_account_name, bank_name, bsb, account_number')
           .eq('id', currentClub.clubId)
           .single();
 
         if (clubError) throw clubError;
 
         if (clubData) {
+          setBankDetails({
+            bank_name: clubData.bank_name || '',
+            bsb: clubData.bsb || '',
+            account_number: clubData.account_number || '',
+          });
           setMembershipConfig({
             default_membership_category_id: clubData.default_membership_category_id || '',
             stripe_enabled: clubData.stripe_enabled || !!clubData.stripe_account_id,
@@ -719,6 +726,48 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
     } catch (err) {
       console.error('Error saving transaction settings:', err);
       setError(err instanceof Error ? err.message : 'Failed to save transaction settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveBankDetails = async () => {
+    if (!currentClub?.clubId) return;
+    try {
+      setSaving(true);
+      setError(null);
+
+      const { error } = await supabase
+        .from('clubs')
+        .update({
+          bank_name: bankDetails.bank_name,
+          bsb: bankDetails.bsb,
+          account_number: bankDetails.account_number,
+        })
+        .eq('id', currentClub.clubId);
+
+      if (error) throw error;
+
+      const formatted = [
+        bankDetails.bank_name,
+        bankDetails.bsb ? `BSB: ${bankDetails.bsb}` : '',
+        bankDetails.account_number ? `Account: ${bankDetails.account_number}` : '',
+      ].filter(Boolean).join('\n');
+
+      const updatedPaymentInfo = formatted;
+      setTransactionSettings(prev => ({ ...prev, payment_information: updatedPaymentInfo }));
+
+      await supabase
+        .from('club_finance_settings')
+        .upsert({
+          club_id: currentClub.clubId,
+          payment_information: updatedPaymentInfo,
+        }, { onConflict: 'club_id' });
+
+      addNotification('success', 'Bank details saved successfully');
+    } catch (err) {
+      console.error('Error saving bank details:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save bank details');
     } finally {
       setSaving(false);
     }
@@ -1231,34 +1280,70 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
       return (
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-semibold text-white mb-2">Payment Information</h3>
-            <p className="text-slate-400 text-sm">Configure payment details for invoices and documents</p>
+            <h3 className="text-lg font-semibold text-white mb-2">Bank Details</h3>
+            <p className="text-slate-400 text-sm">Configure your bank details for invoices, documents, and membership payments</p>
           </div>
 
           <div className="grid gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Payment Information
-              </label>
-              <textarea
-                value={transactionSettings.payment_information}
-                onChange={(e) => setTransactionSettings({
-                  ...transactionSettings,
-                  payment_information: e.target.value
-                })}
-                rows={6}
-                className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'}
-                `}
-                placeholder="Enter your payment details here (e.g., bank name, BSB, account number)"
-              />
-              <p className="text-xs text-slate-400 mt-1">
-                This information will appear on all invoices and documents being sent to your contacts.
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Bank Name
+                </label>
+                <input
+                  type="text"
+                  value={bankDetails.bank_name}
+                  onChange={(e) => setBankDetails({ ...bankDetails, bank_name: e.target.value })}
+                  className={`
+                    w-full px-3 py-2 rounded-lg border
+                    ${darkMode
+                      ? 'bg-slate-700 border-slate-600 text-white'
+                      : 'bg-white border-slate-300 text-slate-900'}
+                  `}
+                  placeholder="e.g. Commonwealth Bank"
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  BSB No.
+                </label>
+                <input
+                  type="text"
+                  value={bankDetails.bsb}
+                  onChange={(e) => setBankDetails({ ...bankDetails, bsb: e.target.value })}
+                  className={`
+                    w-full px-3 py-2 rounded-lg border
+                    ${darkMode
+                      ? 'bg-slate-700 border-slate-600 text-white'
+                      : 'bg-white border-slate-300 text-slate-900'}
+                  `}
+                  placeholder="e.g. 062-000"
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Account Number
+                </label>
+                <input
+                  type="text"
+                  value={bankDetails.account_number}
+                  onChange={(e) => setBankDetails({ ...bankDetails, account_number: e.target.value })}
+                  className={`
+                    w-full px-3 py-2 rounded-lg border
+                    ${darkMode
+                      ? 'bg-slate-700 border-slate-600 text-white'
+                      : 'bg-white border-slate-300 text-slate-900'}
+                  `}
+                  placeholder="e.g. 1234 5678"
+                />
+              </div>
             </div>
+
+            <p className="text-xs text-slate-400">
+              These details will appear on invoices, documents, and during membership sign-up so members know where to make payments.
+            </p>
 
             <div className="p-4 rounded-lg bg-blue-900/20 border border-blue-600/30">
               <p className="text-blue-400 text-sm">
@@ -1268,12 +1353,12 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
 
             <div className="flex justify-end">
               <button
-                onClick={handleSaveTransactionSettings}
+                onClick={handleSaveBankDetails}
                 disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50"
               >
                 <Save size={16} />
-                {saving ? 'Saving...' : 'Save Payment Information'}
+                {saving ? 'Saving...' : 'Save Bank Details'}
               </button>
             </div>
           </div>
