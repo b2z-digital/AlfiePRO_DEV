@@ -393,7 +393,10 @@ function extractBestTableHtml(html: string): string | null {
 
 // ─── MySailingResults API integration ─────────────────────────────────────────
 
-const MYSAILINGRESULTS_API = "https://mysailingresults.com/api/results/get_results.php";
+const MYSAILINGRESULTS_API_URLS = [
+  "https://mysailingresults.com/api/results/get_results.php",
+  "http://mysailingresults.com/api/results/get_results.php",
+];
 
 interface MSRCompetitor {
   comppos: number;
@@ -501,20 +504,58 @@ async function fetchFromMySailingResultsApi(eventId: string): Promise<{
   boatClassMapped: string | null;
 } | null> {
   try {
-    const apiUrl = `${MYSAILINGRESULTS_API}?eventid=${eventId}`;
-    const resp = await fetch(apiUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0",
-        "Accept": "application/json",
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    let text = "";
+    let fetchSuccess = false;
 
-    if (!resp.ok) return null;
+    for (const baseUrl of MYSAILINGRESULTS_API_URLS) {
+      const apiUrl = `${baseUrl}?eventid=${eventId}`;
+      console.log("Trying MySailingResults API:", apiUrl);
 
-    const data = await resp.json();
-    const eventInfo: MSREvent = data.event || data.Event || {};
-    const rawCompetitors: MSRCompetitor[] = data.results || data.Results || [];
+      try {
+        const resp = await fetch(apiUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://radiosailing.org.au",
+            "Referer": "https://radiosailing.org.au/",
+          },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          redirect: "follow",
+        });
+
+        console.log("MySailingResults API response status:", resp.status, "url:", resp.url);
+        if (!resp.ok) {
+          console.error("MySailingResults API HTTP error:", resp.status, resp.statusText);
+          continue;
+        }
+
+        text = await resp.text();
+        console.log("MySailingResults API response length:", text.length, "first 200 chars:", text.slice(0, 200));
+        fetchSuccess = true;
+        break;
+      } catch (fetchErr) {
+        console.error("MySailingResults API fetch error for", apiUrl, ":", fetchErr instanceof Error ? fetchErr.message : String(fetchErr));
+        continue;
+      }
+    }
+
+    if (!fetchSuccess || !text) {
+      console.error("All MySailingResults API URLs failed for event:", eventId);
+      return null;
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("MySailingResults API: failed to parse JSON, response starts with:", text.slice(0, 300));
+      return null;
+    }
+
+    const eventInfo: MSREvent = (data.event || data.Event || {}) as MSREvent;
+    const rawCompetitors: MSRCompetitor[] = (data.results || data.Results || []) as MSRCompetitor[];
+
+    console.log("MySailingResults API: event name:", eventInfo.eventname, "competitors:", rawCompetitors.length);
 
     if (!rawCompetitors.length) return null;
 
@@ -523,7 +564,7 @@ async function fetchFromMySailingResultsApi(eventId: string): Promise<{
 
     const eventName = eventInfo.eventname || "";
     const venue = [eventInfo.eventlocation, eventInfo.eventstate].filter(Boolean).join(", ");
-    const boatClassRaw = eventInfo.eventclass || "";
+    const boatClassRaw = String(eventInfo.eventclass || "");
     const boatClassMapped = detectBoatClass(boatClassRaw || eventName);
 
     let eventDate: string | null = null;
@@ -552,7 +593,7 @@ async function fetchFromMySailingResultsApi(eventId: string): Promise<{
       boatClassMapped,
     };
   } catch (e) {
-    console.error("MySailingResults API error:", e);
+    console.error("MySailingResults API error:", e instanceof Error ? e.message : String(e));
     return null;
   }
 }
@@ -658,51 +699,77 @@ Deno.serve(async (req: Request) => {
       // Check if this is a MySailingResults-powered site (radiosailing.org.au)
       const msrEventId = extractEventIdFromUrl(eventRow.source_url);
       if (msrEventId && isMySailingResultsSite(eventRow.source_url)) {
-        const apiResult = await fetchFromMySailingResultsApi(msrEventId);
+        // First fetch the HTML page to discover the actual API event ID
+        // (the page JS may reference a different event ID than the URL param)
+        let resolvedApiEventId = msrEventId;
+        const pageResp = await fetch(eventRow.source_url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        }).catch(() => null);
 
-        if (!apiResult || (!apiResult.rawTableHtml && !apiResult.competitors.length)) {
-          return new Response(JSON.stringify({ error: "No results found for this event yet", competitors: [] }), {
-            status: 200,
+        if (pageResp?.ok) {
+          const pageHtml = await pageResp.text();
+          // Look for the mysailingresults API call in the page JS
+          const apiMatch = pageHtml.match(/mysailingresults\.com\/api\/results\/get_results\.php\?eventid=(\d+)/i) ||
+                           pageHtml.match(/get_results\.php\?eventid=(\d+)/i) ||
+                           pageHtml.match(/eventid['"]\s*[:=]\s*['"]?(\d+)/i);
+          if (apiMatch) resolvedApiEventId = apiMatch[1];
+        }
+
+        console.log("Resolved MSR event ID:", resolvedApiEventId, "from URL event ID:", msrEventId);
+
+        const apiResult = await fetchFromMySailingResultsApi(resolvedApiEventId);
+
+        if (apiResult && (apiResult.rawTableHtml || apiResult.competitors.length)) {
+          let boatClassId: string | null = null;
+          const bClass = apiResult.boatClassMapped || eventRow.boat_class_mapped;
+          if (bClass) {
+            const { data: bc } = await supabase
+              .from("boat_classes").select("id").ilike("name", `%${bClass}%`).maybeSingle();
+            boatClassId = bc?.id || null;
+          }
+
+          const updatePayload: Record<string, unknown> = {
+            results_json: apiResult.competitors,
+            competitor_count: apiResult.competitors.length,
+            race_count: apiResult.raceCount,
+            last_scraped_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          if (apiResult.eventDate) updatePayload.event_date = apiResult.eventDate;
+          if (apiResult.eventEndDate) updatePayload.event_end_date = apiResult.eventEndDate;
+          if (apiResult.venue) updatePayload.venue = apiResult.venue;
+          if (apiResult.boatClassRaw || eventRow.boat_class_raw) updatePayload.boat_class_raw = apiResult.boatClassRaw || eventRow.boat_class_raw;
+          if (apiResult.boatClassMapped || eventRow.boat_class_mapped) updatePayload.boat_class_mapped = apiResult.boatClassMapped || eventRow.boat_class_mapped;
+          if (boatClassId) updatePayload.boat_class_id = boatClassId;
+
+          await supabase.from("external_result_events").update(updatePayload).eq("id", event_row_id);
+
+          return new Response(JSON.stringify({
+            success: true,
+            raw_table_html: apiResult.rawTableHtml,
+            competitors: apiResult.competitors,
+            race_count: apiResult.raceCount,
+            competitor_count: apiResult.competitors.length,
+            event_date: apiResult.eventDate,
+            event_end_date: apiResult.eventEndDate,
+            venue: apiResult.venue,
+            boat_class_raw: apiResult.boatClassRaw,
+            boat_class_mapped: apiResult.boatClassMapped,
+          }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        let boatClassId: string | null = null;
-        const bClass = apiResult.boatClassMapped || eventRow.boat_class_mapped;
-        if (bClass) {
-          const { data: bc } = await supabase
-            .from("boat_classes").select("id").ilike("name", `%${bClass}%`).maybeSingle();
-          boatClassId = bc?.id || null;
-        }
-
-        const updatePayload: Record<string, unknown> = {
-          results_json: apiResult.competitors,
-          competitor_count: apiResult.competitors.length,
-          race_count: apiResult.raceCount,
-          last_scraped_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        if (apiResult.eventDate) updatePayload.event_date = apiResult.eventDate;
-        if (apiResult.eventEndDate) updatePayload.event_end_date = apiResult.eventEndDate;
-        if (apiResult.venue) updatePayload.venue = apiResult.venue;
-        if (apiResult.boatClassRaw || eventRow.boat_class_raw) updatePayload.boat_class_raw = apiResult.boatClassRaw || eventRow.boat_class_raw;
-        if (apiResult.boatClassMapped || eventRow.boat_class_mapped) updatePayload.boat_class_mapped = apiResult.boatClassMapped || eventRow.boat_class_mapped;
-        if (boatClassId) updatePayload.boat_class_id = boatClassId;
-
-        await supabase.from("external_result_events").update(updatePayload).eq("id", event_row_id);
-
+        // API failed - return with a message
         return new Response(JSON.stringify({
-          success: true,
-          raw_table_html: apiResult.rawTableHtml,
-          competitors: apiResult.competitors,
-          race_count: apiResult.raceCount,
-          competitor_count: apiResult.competitors.length,
-          event_date: apiResult.eventDate,
-          event_end_date: apiResult.eventEndDate,
-          venue: apiResult.venue,
-          boat_class_raw: apiResult.boatClassRaw,
-          boat_class_mapped: apiResult.boatClassMapped,
+          error: "No results available for this event yet. The event may not have started or results haven't been published.",
+          competitors: [],
         }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
