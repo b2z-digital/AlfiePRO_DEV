@@ -41,6 +41,7 @@ interface RaceEvent {
   meetingAttendingCount?: number;
   meetingAttendees?: { first_name: string; last_name: string; avatar_url: string | null }[];
   organizationName?: string;
+  meetingType?: 'in_person' | 'online' | 'hybrid';
   rawMeeting?: any;
 }
 
@@ -79,7 +80,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       if (isAssociation) {
         let query = supabase
           .from('meetings')
-          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
+          .select('id, name, date, start_time, location, meeting_type, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
           .gte('date', todayStr)
           .eq('status', 'upcoming')
           .order('date', { ascending: true });
@@ -96,7 +97,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       } else if (clubId) {
         const { data: clubMeetings, error: clubErr } = await supabase
           .from('meetings')
-          .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
+          .select('id, name, date, start_time, location, meeting_type, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
           .gte('date', todayStr)
           .eq('status', 'upcoming')
           .eq('club_id', clubId)
@@ -115,7 +116,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         if (clubData?.state_association_id) {
           const { data: assocMeetings } = await supabase
             .from('meetings')
-            .select('id, name, date, start_time, location, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
+            .select('id, name, date, start_time, location, meeting_type, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
             .gte('date', todayStr)
             .eq('status', 'upcoming')
             .eq('state_association_id', clubData.state_association_id)
@@ -216,6 +217,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         isClubMeeting: !!m.club_id && !m.state_association_id && !m.national_association_id,
         meetingCategory: m.meeting_category as 'general' | 'committee',
         meetingTime: m.start_time ? m.start_time.substring(0, 5) : undefined,
+        meetingType: m.meeting_type as 'in_person' | 'online' | 'hybrid' | undefined,
         meetingAttendingCount: (attendanceByMeeting[m.id] || []).length,
         meetingAttendees: attendanceByMeeting[m.id] || [],
         organizationName: m.organization_name || '',
@@ -576,6 +578,15 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     setSelectedMeeting(calMeeting);
   };
 
+  const formatMeetingTime = (time: string): string => {
+    const [hourStr, minStr] = time.split(':');
+    const hour = parseInt(hourStr, 10);
+    const min = minStr || '00';
+    const suffix = hour >= 12 ? 'pm' : 'am';
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${displayHour}:${min} ${suffix}`;
+  };
+
   const renderMeetingCard = (event: RaceEvent) => (
     <div
       key={event.id}
@@ -609,15 +620,34 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
               {event.meetingTime && (
                 <span className="flex items-center gap-1">
                   <Clock size={14} />
-                  {event.meetingTime}
+                  {formatMeetingTime(event.meetingTime)}
                 </span>
               )}
-              {event.venue && (
+              {event.meetingType === 'online' ? (
+                <span className="flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.382v7.236a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                  </svg>
+                  <span>Online Meeting</span>
+                </span>
+              ) : event.meetingType === 'hybrid' ? (
+                <>
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.382v7.236a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                  </svg>
+                  {event.venue && (
+                    <span className="flex items-center gap-1 truncate">
+                      <MapPin size={14} />
+                      <span className="truncate">{event.venue}</span>
+                    </span>
+                  )}
+                </>
+              ) : event.venue ? (
                 <span className="flex items-center gap-1 truncate">
                   <MapPin size={14} />
                   <span className="truncate">{event.venue}</span>
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
