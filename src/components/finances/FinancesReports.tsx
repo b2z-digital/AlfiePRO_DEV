@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Download, Filter, TrendingUp, TrendingDown, DollarSign, FileText, PieChart as PieChartIcon, BarChart3, LineChart as LineChartIcon, ArrowUpRight, ArrowDownRight, Sparkles, Target, Wallet, CreditCard, MousePointerClick } from 'lucide-react';
+import { Calendar, Download, ListFilter as Filter, TrendingUp, TrendingDown, DollarSign, FileText, ChartPie as PieChartIcon, ChartBar as BarChart3, ChartLine as LineChartIcon, ArrowUpRight, ArrowDownRight, Sparkles, Target, Wallet, CreditCard, MousePointerClick, Landmark } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import jsPDF from 'jspdf';
@@ -75,6 +75,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     expenses: []
   });
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [bankPosition, setBankPosition] = useState({ openingBalance: 0, currentBalance: 0 });
   const [selectedReport, setSelectedReport] = useState<{
     type: 'income' | 'expenses' | 'cash-flow' | 'profit-margin' | 'burn-rate' | 'ytd';
     title: string;
@@ -283,6 +284,36 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         }))
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 5);
+
+      let openingBalance = 0;
+      if (isAssociation) {
+        const { data: assocSettings } = await supabase
+          .from('association_finance_settings')
+          .select('opening_balance')
+          .eq('association_id', associationId)
+          .eq('association_type', associationType)
+          .maybeSingle();
+        openingBalance = Number(assocSettings?.opening_balance || 0);
+      } else {
+        const { data: clubSettings } = await supabase
+          .from('club_finance_settings')
+          .select('opening_balance')
+          .eq('club_id', currentClub!.clubId)
+          .maybeSingle();
+        openingBalance = Number(clubSettings?.opening_balance || 0);
+      }
+
+      const allTimeIncome = (transactions || [])
+        .filter(tx => tx.type === 'income' || tx.type === 'deposit')
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const allTimeExpenses = (transactions || [])
+        .filter(tx => tx.type === 'expense')
+        .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
+      setBankPosition({
+        openingBalance,
+        currentBalance: openingBalance + allTimeIncome - allTimeExpenses,
+      });
 
       setReportData({
         thisPeriod: calculatePeriodTotals(start, end),
@@ -850,34 +881,43 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
           </div>
         </button>
 
-        {/* YTD Summary Card */}
-        <button
-          onClick={() => openDetailedReport('ytd', 'Year to Date Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-violet-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-violet-500/20 p-6 hover:border-violet-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-violet-500/10 cursor-pointer text-left w-full hover:scale-105"
+        {/* Bank Position Card */}
+        <div
+          className={`group relative overflow-hidden rounded-2xl border p-6 text-left w-full ${
+            bankPosition.currentBalance >= 0
+              ? 'bg-gradient-to-br from-blue-500/10 via-slate-800/50 to-slate-800/30 border-blue-500/20'
+              : 'bg-gradient-to-br from-red-500/10 via-slate-800/50 to-slate-800/30 border-red-500/20'
+          }`}
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <MousePointerClick size={20} className="text-violet-400" />
-          </div>
+          <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 ${
+            bankPosition.currentBalance >= 0 ? 'bg-blue-500/5' : 'bg-red-500/5'
+          }`}></div>
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-violet-500/10 rounded-xl">
-                <Target className="text-violet-400" size={24} />
+              <div className={`p-3 rounded-xl ${
+                bankPosition.currentBalance >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'
+              }`}>
+                <Landmark className={bankPosition.currentBalance >= 0 ? 'text-blue-400' : 'text-red-400'} size={24} />
               </div>
-              <div className="flex items-center gap-1 text-sm font-medium text-violet-400">
-                <Sparkles size={16} />
-              </div>
+              {bankPosition.openingBalance > 0 && (
+                <div className="flex items-center gap-1 text-sm font-medium text-slate-400">
+                  <Sparkles size={16} />
+                </div>
+              )}
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-slate-400 font-medium">Profit Margin</p>
-              <p className={`text-3xl font-bold ${profitMargin >= 0 ? 'text-violet-400' : 'text-red-400'}`}>
-                {profitMargin.toFixed(1)}%
+              <p className="text-sm text-slate-400 font-medium">Bank Position</p>
+              <p className={`text-3xl font-bold ${bankPosition.currentBalance >= 0 ? 'text-white' : 'text-red-400'}`}>
+                {formatCurrency(bankPosition.currentBalance)}
               </p>
-              <p className="text-xs text-slate-500">of total income</p>
-              <p className="text-xs text-violet-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click for detailed report →</p>
+              {bankPosition.openingBalance > 0 ? (
+                <p className="text-xs text-slate-500">Opening bal: {formatCurrency(bankPosition.openingBalance)}</p>
+              ) : (
+                <p className="text-xs text-slate-500">No opening balance set</p>
+              )}
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       {/* Charts Grid */}

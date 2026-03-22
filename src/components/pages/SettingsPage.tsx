@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
@@ -36,7 +36,7 @@ interface SettingsPageProps {
 }
 
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
-  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' |
+  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-opening-balance' |
   'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system';
 
@@ -941,7 +941,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
-                {/* Association Fees Card */}
+                {/* Bank Details Card */}
                 <button
                   onClick={() => setActiveTab('finance-payment')}
                   className={`
@@ -955,12 +955,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <DollarSign size={20} className="text-amber-400" />
+                      <CreditCard size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association Fees</h3>
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Bank Details</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Set membership fees and payment methods
+                        Set bank name, BSB, and account number for payments
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Opening Balance Card */}
+                <button
+                  onClick={() => setActiveTab('finance-opening-balance')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'finance-opening-balance'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
+                      <Landmark size={20} className="text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Opening Balance</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Set your starting bank balance for accurate reporting
                       </p>
                     </div>
                   </div>
@@ -1764,6 +1789,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'finance-payment' && (
             <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+          )}
+
+          {activeTab === 'finance-opening-balance' && (
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="opening-balance" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'membership-types' && (
