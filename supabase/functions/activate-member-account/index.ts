@@ -292,16 +292,7 @@ Deno.serve(async (req: Request) => {
           recoveryToken = recoveryLink.properties.hashed_token;
         }
         if (recoveryLink?.properties?.action_link) {
-          let rawLink = recoveryLink.properties.action_link;
-          try {
-            const linkUrl = new URL(rawLink);
-            const appUrl = new URL(webAppUrl);
-            linkUrl.protocol = appUrl.protocol;
-            linkUrl.host = appUrl.host;
-            linkUrl.port = appUrl.port;
-            rawLink = linkUrl.toString();
-          } catch (_) {}
-          webActivationLink = rawLink;
+          webActivationLink = recoveryLink.properties.action_link;
         }
 
         if (sendGridApiKey && defaultFromEmail) {
