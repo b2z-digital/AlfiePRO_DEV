@@ -187,7 +187,7 @@ const HEADER_SUBTITLES: Record<string, string> = {
   'membership_expired': 'Membership Expired',
 }
 
-function replacePlaceholders(template: string, data: EmailRequest['member_data']): string {
+function replacePlaceholders(template: string, data: EmailRequest['member_data'], clubInfo?: ClubInfo): string {
   let result = template
 
   result = result.replace(/\{\{member_name\}\}/g, `${data.first_name} ${data.last_name}`)
@@ -198,6 +198,13 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
   result = result.replace(/\{\{lastName\}\}/g, data.last_name || '')
   result = result.replace(/\{\{club_name\}\}/g, data.club_name || '')
   result = result.replace(/\{\{clubName\}\}/g, data.club_name || '')
+
+  const secName = clubInfo?.secretary_name || 'Club Secretary'
+  const secEmail = clubInfo?.secretary_email || ''
+  result = result.replace(/\{\{secretary_name\}\}/g, secName)
+  result = result.replace(/\{\{secretaryName\}\}/g, secName)
+  result = result.replace(/\{\{secretary_email\}\}/g, secEmail)
+  result = result.replace(/\{\{secretaryEmail\}\}/g, secEmail)
 
   if (data.membership_type) {
     result = result.replace(/\{\{membership_type\}\}/g, data.membership_type)
@@ -409,8 +416,8 @@ async function sendMembershipEmail(
 
     emailData.member_data.club_name = clubInfo.name
 
-    const subject = replacePlaceholders(template.subject, emailData.member_data)
-    const bodyContent = replacePlaceholders(template.body, emailData.member_data)
+    const subject = replacePlaceholders(template.subject, emailData.member_data, clubInfo)
+    const bodyContent = replacePlaceholders(template.body, emailData.member_data, clubInfo)
 
     const headerSubtitle = HEADER_SUBTITLES[emailData.email_type] || HEADER_SUBTITLES[resolvedType] || 'Club Notification'
     const senderDisplayName = clubInfo.secretary_name

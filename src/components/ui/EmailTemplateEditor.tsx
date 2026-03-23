@@ -199,6 +199,8 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{membershipType}}'}</code> - Membership type name</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{renewalDate}}'}</code> - Membership renewal date</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400 font-semibold">{'{{renewalLink}}'}</code> - Direct link to renewal page (for buttons)</li>
+                <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{secretaryName}}'}</code> - Club secretary's name</li>
+                <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{secretaryEmail}}'}</code> - Club secretary's email address</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{eventName}}'}</code> - Event name (for event invitations)</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{eventDate}}'}</code> - Event date (for event invitations)</li>
               </ul>
