@@ -268,6 +268,7 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
 
 function convertQuillClassesToInlineStyles(html: string): string {
   let result = html
+
   result = result.replace(/<(\w+)\s+class="ql-align-center"([^>]*)>/g, (_, tag, rest) => {
     return `<${tag} style="text-align:center;"${rest}>`
   })
@@ -281,6 +282,14 @@ function convertQuillClassesToInlineStyles(html: string): string {
     const px = parseInt(level) * 30
     return `<${tag}${before} style="padding-left:${px}px;"${after}>`
   })
+
+  result = result.replace(/<p(\s?)>/g, '<p style="margin:0 0 2px;line-height:1.6;"$1>')
+  result = result.replace(/<p style="text-align:(center|right|justify);">/g,
+    (_, align) => `<p style="margin:0 0 2px;line-height:1.6;text-align:${align};">`)
+
+  result = result.replace(/<p style="margin:0 0 2px;line-height:1\.6;"><br><\/p>/g,
+    '<p style="margin:0 0 12px;line-height:1.6;"><br></p>')
+
   return result
 }
 
