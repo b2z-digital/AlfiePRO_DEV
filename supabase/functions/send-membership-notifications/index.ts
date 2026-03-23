@@ -266,6 +266,24 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
   return result
 }
 
+function convertQuillClassesToInlineStyles(html: string): string {
+  let result = html
+  result = result.replace(/<(\w+)\s+class="ql-align-center"([^>]*)>/g, (_, tag, rest) => {
+    return `<${tag} style="text-align:center;"${rest}>`
+  })
+  result = result.replace(/<(\w+)\s+class="ql-align-right"([^>]*)>/g, (_, tag, rest) => {
+    return `<${tag} style="text-align:right;"${rest}>`
+  })
+  result = result.replace(/<(\w+)\s+class="ql-align-justify"([^>]*)>/g, (_, tag, rest) => {
+    return `<${tag} style="text-align:justify;"${rest}>`
+  })
+  result = result.replace(/<(\w+)([^>]*)\s+class="ql-indent-(\d+)"([^>]*)>/g, (_, tag, before, level, after) => {
+    const px = parseInt(level) * 30
+    return `<${tag}${before} style="padding-left:${px}px;"${after}>`
+  })
+  return result
+}
+
 function buildEmailHtml(content: string, clubName: string, headerSubtitle: string, clubLogoUrl: string | null, senderName: string): string {
   if (content.trim().startsWith('<!DOCTYPE html>') || content.trim().startsWith('<html')) {
     return content
@@ -417,7 +435,9 @@ async function sendMembershipEmail(
     emailData.member_data.club_name = clubInfo.name
 
     const subject = replacePlaceholders(template.subject, emailData.member_data, clubInfo)
-    const bodyContent = replacePlaceholders(template.body, emailData.member_data, clubInfo)
+    const bodyContent = convertQuillClassesToInlineStyles(
+      replacePlaceholders(template.body, emailData.member_data, clubInfo)
+    )
 
     const headerSubtitle = HEADER_SUBTITLES[emailData.email_type] || HEADER_SUBTITLES[resolvedType] || 'Club Notification'
     const senderDisplayName = clubInfo.secretary_name
