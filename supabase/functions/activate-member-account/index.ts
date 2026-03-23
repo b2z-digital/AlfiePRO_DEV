@@ -116,8 +116,8 @@ Deno.serve(async (req: Request) => {
         platformConfig[s.key] = s.value;
       });
 
-      const webAppUrl = supabaseUrl.replace(".supabase.co", ".app");
-      const sampleWebLink = `${webAppUrl}/reset-password?token=SAMPLE_TOKEN_FOR_PREVIEW`;
+      const testWebAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
+      const sampleWebLink = `${testWebAppUrl}/reset-password?token=SAMPLE_TOKEN_FOR_PREVIEW`;
       const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?token=SAMPLE_TOKEN_FOR_PREVIEW` : undefined;
 
       await sendActivationEmail({
@@ -292,7 +292,16 @@ Deno.serve(async (req: Request) => {
           recoveryToken = recoveryLink.properties.hashed_token;
         }
         if (recoveryLink?.properties?.action_link) {
-          webActivationLink = recoveryLink.properties.action_link;
+          let rawLink = recoveryLink.properties.action_link;
+          try {
+            const linkUrl = new URL(rawLink);
+            const appUrl = new URL(webAppUrl);
+            linkUrl.protocol = appUrl.protocol;
+            linkUrl.host = appUrl.host;
+            linkUrl.port = appUrl.port;
+            rawLink = linkUrl.toString();
+          } catch (_) {}
+          webActivationLink = rawLink;
         }
 
         if (sendGridApiKey && defaultFromEmail) {
