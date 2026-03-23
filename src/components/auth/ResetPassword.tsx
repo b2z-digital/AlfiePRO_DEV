@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
-import { CheckCircle, Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { CircleCheck as CheckCircle, Lock, Eye, EyeOff, TriangleAlert as AlertTriangle } from 'lucide-react';
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -19,42 +19,80 @@ export const ResetPassword: React.FC = () => {
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
+    let pollIntervalId: ReturnType<typeof setInterval>;
+
+    const markReady = () => {
+      if (!sessionReadyRef.current) {
+        sessionReadyRef.current = true;
+        setSessionReady(true);
+      }
+    };
+
+    const markExpired = () => {
+      if (!sessionReadyRef.current) {
+        setExpired(true);
+      }
+    };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        sessionReadyRef.current = true;
-        setSessionReady(true);
-      } else if (event === 'SIGNED_IN' && !sessionReadyRef.current) {
-        const hash = window.location.hash;
-        if (hash && hash.includes('type=recovery')) {
-          sessionReadyRef.current = true;
-          setSessionReady(true);
-        }
+        markReady();
+      } else if (event === 'SIGNED_IN' && session) {
+        markReady();
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !sessionReadyRef.current) {
-        const hash = window.location.hash;
-        if (hash && hash.includes('type=recovery')) {
-          sessionReadyRef.current = true;
-          setSessionReady(true);
-        } else if (session) {
-          sessionReadyRef.current = true;
-          setSessionReady(true);
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('token');
+    const email = url.searchParams.get('email');
+    const hasCode = url.searchParams.has('code');
+    const hasHashRecovery = window.location.hash.includes('type=recovery');
+
+    if (token && email) {
+      supabase.auth.verifyOtp({
+        token_hash: token,
+        type: 'recovery',
+      }).then(({ data, error: verifyError }) => {
+        if (verifyError || !data.session) {
+          markExpired();
+        } else {
+          markReady();
         }
+      }).catch(() => {
+        markExpired();
+      });
+    } else if (hasCode || hasHashRecovery) {
+      pollIntervalId = setInterval(async () => {
+        if (sessionReadyRef.current) {
+          clearInterval(pollIntervalId);
+          return;
+        }
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            markReady();
+            clearInterval(pollIntervalId);
+          }
+        } catch (_) {}
+      }, 500);
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        markReady();
       }
     });
 
     timeoutId = setTimeout(() => {
       if (!sessionReadyRef.current) {
-        setExpired(true);
+        markExpired();
       }
-    }, 10000);
+    }, 15000);
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(timeoutId);
+      if (pollIntervalId) clearInterval(pollIntervalId);
     };
   }, []);
 
