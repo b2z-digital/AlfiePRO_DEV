@@ -391,7 +391,11 @@ async function sendMembershipEmail(
   emailData: EmailRequest
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    let template = defaultTemplates[emailData.email_type]
+    const typeAliases: Record<string, string> = {
+      'renewal': 'renewal_reminder',
+    }
+    const resolvedType = typeAliases[emailData.email_type] || emailData.email_type
+    let template = defaultTemplates[resolvedType as keyof typeof defaultTemplates] || defaultTemplates[emailData.email_type as keyof typeof defaultTemplates]
 
     if (emailData.custom_template) {
       template = emailData.custom_template

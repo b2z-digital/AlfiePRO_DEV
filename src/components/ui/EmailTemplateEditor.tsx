@@ -10,7 +10,7 @@ interface EmailTemplateEditorProps {
   initialBody: string;
   onSave: (templateKey: string, subject: string, body: string) => void;
   onRestoreDefault?: (templateKey: string) => void;
-  onSendTest?: (templateKey: string, subject: string, body: string) => Promise<void>;
+  onSendTest?: (templateKey: string, subject: string, body: string, recipientEmail?: string) => Promise<void>;
   darkMode: boolean;
 }
 
@@ -30,6 +30,9 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
   const [saving, setSaving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [showTestEmailPrompt, setShowTestEmailPrompt] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [testEmailError, setTestEmailError] = useState('');
 
   if (!isOpen) return null;
 
@@ -92,9 +95,23 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
   const handleSendTest = async () => {
     if (!onSendTest) return;
 
+    if (!showTestEmailPrompt) {
+      setShowTestEmailPrompt(true);
+      setTestEmailError('');
+      return;
+    }
+
+    if (!testEmail || !testEmail.includes('@')) {
+      setTestEmailError('Please enter a valid email address');
+      return;
+    }
+
     setSendingTest(true);
+    setTestEmailError('');
     try {
-      await onSendTest(templateKey, subject, body);
+      await onSendTest(templateKey, subject, body, testEmail);
+      setShowTestEmailPrompt(false);
+      setTestEmail('');
     } catch (error) {
       console.error('Error sending test email:', error);
     } finally {
@@ -220,29 +237,61 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
               </button>
             )}
             {onSendTest && (
-              <button
-                onClick={handleSendTest}
-                disabled={saving || restoring || sendingTest}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border
-                  ${darkMode
-                    ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 border-blue-800/50'
-                    : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200'}
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                `}
-              >
-                {sendingTest ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                    <span>Sending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mail size={16} />
-                    <span>Test Email</span>
-                  </>
+              <div className="flex items-center gap-2">
+                {showTestEmailPrompt && (
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <input
+                        type="email"
+                        value={testEmail}
+                        onChange={(e) => { setTestEmail(e.target.value); setTestEmailError(''); }}
+                        placeholder="Enter email address"
+                        className={`
+                          px-3 py-2 rounded-lg text-sm w-56 border
+                          ${darkMode
+                            ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
+                            : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'}
+                          ${testEmailError ? 'border-red-500' : ''}
+                        `}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSendTest(); }}
+                        autoFocus
+                      />
+                      {testEmailError && (
+                        <p className="text-red-400 text-xs mt-1">{testEmailError}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setShowTestEmailPrompt(false); setTestEmail(''); setTestEmailError(''); }}
+                      className={`p-2 rounded-lg text-sm ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 )}
-              </button>
+                <button
+                  onClick={handleSendTest}
+                  disabled={saving || restoring || sendingTest}
+                  className={`
+                    flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border
+                    ${darkMode
+                      ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 border-blue-800/50'
+                      : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200'}
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  `}
+                >
+                  {sendingTest ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail size={16} />
+                      <span>{showTestEmailPrompt ? 'Send Test' : 'Test Email'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
           <div className="flex gap-3">

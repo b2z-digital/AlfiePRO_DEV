@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  DollarSign, 
-  Calendar, 
-  Save, 
-  AlertTriangle,
-  Check,
-  CalendarDays,
-  X,
-  FileText
-} from 'lucide-react';
+import { Plus, Trash2, CreditCard as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { MembershipType, MembershipSettings, RenewalMode } from '../../types/membership';
@@ -754,34 +742,23 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     }
   };
 
-  // Handle send test email
-  const handleSendTestEmail = async (templateKey: string, subject: string, body: string) => {
+  const handleSendTestEmail = async (templateKey: string, subject: string, body: string, recipientEmail?: string) => {
     if (!currentClub?.clubId) return;
 
     try {
-      // Get current user's profile for email
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', user.id)
-        .single();
+      const targetEmail = recipientEmail || user.email;
+      if (!targetEmail) throw new Error('No email address provided');
 
-      if (profileError) throw profileError;
-      if (!profile?.email) throw new Error('No email address found for user');
-
-      // Send test email via edge function
-      // Note: We don't pass custom_template here so it uses the beautiful default templates
-      // from the edge function, which have proper HTML structure and inline CSS
       const { error: sendError } = await supabase.functions.invoke('send-membership-notifications', {
         body: {
           email_type: templateKey,
-          recipient_email: profile.email,
+          recipient_email: targetEmail,
           member_data: {
-            first_name: profile.first_name || 'John',
-            last_name: profile.last_name || 'Doe',
+            first_name: 'Test',
+            last_name: 'User',
             club_name: currentClub.club?.name || 'Your Club',
             membership_type: 'Full Member',
             renewal_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -793,7 +770,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
 
       if (sendError) throw sendError;
 
-      setSuccess(`Test email sent to ${profile.email}`);
+      setSuccess(`Test email sent to ${targetEmail}`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (error) {
       console.error('Error sending test email:', error);
