@@ -232,6 +232,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
       ['bold', 'italic', 'underline', 'strike'],
       [{ list: 'ordered' }, { list: 'bullet' }],
       [{ indent: '-1' }, { indent: '+1' }],
+      [{ align: '' }, { align: 'center' }, { align: 'right' }],
       ['link'],
       ...(hasImageUpload ? [['image']] : []),
       ['clean'],
@@ -259,7 +260,7 @@ export const WysiwygEditor: React.FC<WysiwygEditorProps> = ({
 
   const formats = useMemo(() => [
     'header', 'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet', 'indent', 'link', 'image',
+    'list', 'bullet', 'indent', 'align', 'link', 'image',
   ], []);
 
   // ── Styles ────────────────────────────────────────────────────────────────

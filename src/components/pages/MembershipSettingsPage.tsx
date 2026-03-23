@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  DollarSign, 
-  Calendar, 
-  Save, 
-  AlertTriangle,
-  Check,
-  CalendarDays,
-  X,
-  FileText
-} from 'lucide-react';
+import { Plus, Trash2, CreditCard as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { MembershipType, MembershipSettings, RenewalMode } from '../../types/membership';
@@ -47,182 +35,15 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
   const defaultTemplates = {
     welcome: {
       subject: 'Welcome to {{clubName}}!',
-      body: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to {{clubName}}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 40px 30px;text-align:center">
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">{{clubName}}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">Welcome to the Club!</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Dear {{firstName}} {{lastName}},</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">We're thrilled to welcome you as a new member of {{clubName}}!</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">Your membership is now active, and you can start enjoying all the benefits of being a member, including participating in our racing events and club activities.</p>
-              <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #bfdbfe">
-                <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1e40af">Getting Started</h2>
-                <ul style="margin:0;padding:0 0 0 20px;color:#374151;line-height:1.8">
-                  <li>Access your dashboard to manage your profile</li>
-                  <li>View upcoming events and register for races</li>
-                  <li>Connect with other club members</li>
-                  <li>Stay updated with club news and announcements</li>
-                </ul>
-              </div>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">If you have any questions or need assistance getting started, please don't hesitate to reach out to us.</p>
-              <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#374151">Welcome aboard!</p>
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">{{clubName}} Committee</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by {{clubName}}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+      body: `<p>Dear {{firstName}},</p><p>We're thrilled to welcome you as a new member of {{clubName}}!</p><p>Your membership is now active, and you can start enjoying all the benefits of being a member, including participating in our racing events and club activities.</p><h2>Getting Started</h2><ul><li>Access your dashboard to manage your profile</li><li>View upcoming events and register for races</li><li>Connect with other club members</li><li>Stay updated with club news and announcements</li></ul><p>If you have any questions or need assistance getting started, please don't hesitate to reach out to us.</p><p>Welcome aboard!</p>`
     },
     renewal: {
       subject: 'Time to renew your {{clubName}} membership',
-      body: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Membership Renewal - {{clubName}}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 40px 30px;text-align:center">
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">{{clubName}}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">Membership Renewal Reminder</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Hi {{firstName}},</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">Your {{membershipType}} membership with {{clubName}} is due for renewal.</p>
-              <div style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #fbbf24">
-                <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#92400e">Membership Details</h2>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#78350f;width:45%">Membership Type</td>
-                    <td style="padding:8px 0;font-size:15px;color:#1f2937;font-weight:600">{{membershipType}}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#78350f">Renewal Date</td>
-                    <td style="padding:8px 0;font-size:15px;color:#dc2626;font-weight:600">{{renewalDate}}</td>
-                  </tr>
-                </table>
-              </div>
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.7;color:#374151">To continue enjoying all the benefits of membership and participating in club racing, please renew your membership as soon as possible.</p>
-              <div style="text-align:center;margin:32px 0">
-                <a href="{{renewalLink}}" style="display:inline-block;padding:14px 40px;background-color:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 4px 6px rgba(22,163,74,.2)">Renew My Membership</a>
-              </div>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">If you have any questions about your membership or need assistance with renewal, please don't hesitate to contact us.</p>
-              <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#374151">Thank you for being a valued member of {{clubName}}!</p>
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">{{clubName}} Committee</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by {{clubName}}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+      body: `<p>Hi {{firstName}},</p><p>Your {{membershipType}} membership with {{clubName}} is due for renewal.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Renewal Date</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p class="ql-align-center">To keep racing and enjoying all club benefits without interruption,</p><p class="ql-align-center">you can renew your membership in just a few minutes:</p><p class="ql-align-center"><br></p><p class="ql-align-center">\u{1F449} <strong>Renew via AlfiePRO App</strong></p><p class="ql-align-center"><em>Open AlfiePRO \u2192 Tap your profile \u2192 Membership</em></p><p class="ql-align-center"><strong>OR</strong></p><p class="ql-align-center">\u{1F449} <strong>Renew Online</strong></p><p class="ql-align-center"><a href="{{renewalLink}}" rel="noopener noreferrer" target="_blank">Renew My Membership</a></p><h3><br></h3><h3><strong>\u26A0\uFE0F Why renew now?</strong></h3><p>Renewing before your expiry ensures:</p><ul><li>You stay eligible to race</li><li>Your results and rankings continue uninterrupted</li><li>You remain covered under association insurance</li><li>If you have any questions or need help, just email<strong> {{secretaryName}}</strong> - {{secretaryEmail}}</li></ul><p>Thank you for being a valued member of {{clubName}}!</p>`
     },
     event: {
       subject: 'New Event: {{eventName}}',
-      body: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Event Invitation - {{clubName}}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 40px 30px;text-align:center">
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">{{clubName}}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">You're Invited!</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Hi {{firstName}},</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">We're excited to announce a new upcoming event at {{clubName}}!</p>
-              <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #bfdbfe">
-                <h2 style="margin:0 0 20px;font-size:20px;font-weight:600;color:#1e40af;text-align:center">{{eventName}}</h2>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#64748b;width:35%">📅 Date</td>
-                    <td style="padding:8px 0;font-size:15px;color:#1f2937;font-weight:600">{{eventDate}}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#64748b">📍 Location</td>
-                    <td style="padding:8px 0;font-size:15px;color:#1f2937;font-weight:600">{{eventLocation}}</td>
-                  </tr>
-                </table>
-              </div>
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.7;color:#374151">We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p>
-              <div style="text-align:center;margin:32px 0">
-                <a href="{{eventLink}}" style="display:inline-block;padding:14px 40px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 4px 6px rgba(37,99,235,.2)">View Event Details</a>
-              </div>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">For more information and to RSVP, please log in to your account or contact us directly.</p>
-              <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#374151">See you on the water!</p>
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">{{clubName}} Committee</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by {{clubName}}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+      body: `<p>Hi {{firstName}},</p><p>We're excited to announce a new upcoming event at {{clubName}}!</p><h2>{{eventName}}</h2><p>\u{1F4C5} Date{{eventDate}}\u{1F4CD} Location{{eventLocation}}</p><p>We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p><p><a href="{{eventLink}}" rel="noopener noreferrer" target="_blank">View Event Details</a></p><p>For more information and to RSVP, please log in to your account or contact us directly.</p><p>See you on the water!</p><p><br></p><p>Best regards,</p>`
     }
   };
 
@@ -754,34 +575,23 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     }
   };
 
-  // Handle send test email
-  const handleSendTestEmail = async (templateKey: string, subject: string, body: string) => {
+  const handleSendTestEmail = async (templateKey: string, subject: string, body: string, recipientEmail?: string) => {
     if (!currentClub?.clubId) return;
 
     try {
-      // Get current user's profile for email
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', user.id)
-        .single();
+      const targetEmail = recipientEmail || user.email;
+      if (!targetEmail) throw new Error('No email address provided');
 
-      if (profileError) throw profileError;
-      if (!profile?.email) throw new Error('No email address found for user');
-
-      // Send test email via edge function
-      // Note: We don't pass custom_template here so it uses the beautiful default templates
-      // from the edge function, which have proper HTML structure and inline CSS
       const { error: sendError } = await supabase.functions.invoke('send-membership-notifications', {
         body: {
           email_type: templateKey,
-          recipient_email: profile.email,
+          recipient_email: targetEmail,
           member_data: {
-            first_name: profile.first_name || 'John',
-            last_name: profile.last_name || 'Doe',
+            first_name: 'Test',
+            last_name: 'User',
             club_name: currentClub.club?.name || 'Your Club',
             membership_type: 'Full Member',
             renewal_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -793,7 +603,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
 
       if (sendError) throw sendError;
 
-      setSuccess(`Test email sent to ${profile.email}`);
+      setSuccess(`Test email sent to ${targetEmail}`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (error) {
       console.error('Error sending test email:', error);
