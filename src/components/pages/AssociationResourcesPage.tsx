@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FolderOpen, Plus, CreditCard as Edit2, Trash2, FileText, Search, Grid2x2 as Grid, List, HardDrive, RefreshCw, ChevronRight, Hop as Home, Upload, File, Image as ImageIcon, Music, Film, Archive, FolderPlus, CloudUpload as UploadCloud, Eye, Download, ExternalLink, MoveVertical as MoreVertical, X, Building2, Users } from 'lucide-react';
+import { FolderOpen, Plus, CreditCard as Edit2, Trash2, FileText, Search, Grid2x2 as Grid, List, HardDrive, RefreshCw, ChevronRight, Hop as Home, Upload, File, Image as ImageIcon, Music, Film, Archive, FolderPlus, CloudUpload as UploadCloud, Eye, Download, ExternalLink, MoveVertical as MoreVertical, X, Building2, Users, Cloud } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import * as ResourceStorage from '../../utils/associationResourceStorage';
@@ -9,7 +9,7 @@ interface ResourcesPageProps {
   darkMode: boolean;
 }
 
-type SectionType = 'all' | 'drive' | 'shared' | string;
+type SectionType = 'all' | 'drive' | 'dropbox' | 'shared' | string;
 
 interface DriveItem {
   id: string;
@@ -56,6 +56,16 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   const [currentDriveFolderId, setCurrentDriveFolderId] = useState<string | null>(null);
   const [driveOrgId, setDriveOrgId] = useState<string | null>(null);
   const [driveOrgType, setDriveOrgType] = useState<string>('club');
+
+  // Dropbox
+  const [hasDropbox, setHasDropbox] = useState(false);
+  const [dropboxRootPath, setDropboxRootPath] = useState<string>('/AlfiePRO Resources');
+  const [dropboxItems, setDropboxItems] = useState<DriveItem[]>([]);
+  const [loadingDropbox, setLoadingDropbox] = useState(false);
+  const [dropboxBreadcrumbs, setDropboxBreadcrumbs] = useState<BreadcrumbItem[]>([]);
+  const [currentDropboxPath, setCurrentDropboxPath] = useState<string | null>(null);
+  const [dropboxOrgId, setDropboxOrgId] = useState<string | null>(null);
+  const [dropboxOrgType, setDropboxOrgType] = useState<string>('club');
 
   // Drag & drop
   const [isDragging, setIsDragging] = useState(false);
@@ -159,7 +169,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (!document.hidden) checkGoogleDrive();
+      if (!document.hidden) {
+        checkGoogleDrive();
+        checkDropbox();
+      }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
@@ -171,6 +184,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       browseDriveFolder(rootId, undefined, true);
     }
   }, [activeSection, hasGoogleDrive]);
+
+  useEffect(() => {
+    if (activeSection === 'dropbox' && hasDropbox && dropboxItems.length === 0) {
+      browseDropboxFolder(dropboxRootPath, undefined, true);
+    }
+  }, [activeSection, hasDropbox]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -202,6 +221,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       }
 
       await checkGoogleDrive();
+      await checkDropbox();
     } catch (err) {
       console.error('Error loading resources:', err);
     } finally {
@@ -281,6 +301,276 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
       throw new Error(err.error || 'Drive API error');
     }
     return res.json();
+  };
+
+  const checkDropbox = async (): Promise<boolean> => {
+    const lookups: { column: string; id: string; type: string }[] = [];
+
+    if (organizationType === 'club' && organizationId) {
+      lookups.push({ column: 'club_id', id: organizationId, type: 'club' });
+    } else if (organizationId) {
+      const assocColumn = organizationType === 'state' ? 'state_association_id' : 'national_association_id';
+      lookups.push({ column: assocColumn, id: organizationId, type: organizationType });
+      if (currentClub?.clubId) {
+        lookups.push({ column: 'club_id', id: currentClub.clubId, type: 'club' });
+      }
+    } else if (currentClub?.clubId) {
+      lookups.push({ column: 'club_id', id: currentClub.clubId, type: 'club' });
+    }
+
+    if (lookups.length === 0) {
+      setHasDropbox(false);
+      return false;
+    }
+
+    try {
+      for (const lookup of lookups) {
+        const { data: allIntegrations, error } = await supabase
+          .from('integrations')
+          .select('id, platform, is_active, credentials')
+          .eq(lookup.column, lookup.id);
+
+        if (error) continue;
+
+        const dropboxIntegration = (allIntegrations || []).find(
+          i => i.platform === 'dropbox' && i.is_active && i.credentials?.refresh_token
+        );
+
+        if (dropboxIntegration) {
+          setHasDropbox(true);
+          setDropboxOrgId(lookup.id);
+          setDropboxOrgType(lookup.type);
+          if (dropboxIntegration.credentials?.root_folder_path) {
+            setDropboxRootPath(dropboxIntegration.credentials.root_folder_path);
+          }
+          return true;
+        }
+      }
+
+      setHasDropbox(false);
+      return false;
+    } catch (err) {
+      console.warn('checkDropbox error:', err);
+      setHasDropbox(false);
+      return false;
+    }
+  };
+
+  const callDropboxApi = async (body: object) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-dropbox-files`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Dropbox API error');
+    }
+    return res.json();
+  };
+
+  const browseDropboxFolder = async (folderPath: string, folderName?: string, resetBreadcrumbs = false) => {
+    setLoadingDropbox(true);
+    try {
+      const data = await callDropboxApi({
+        action: 'list_folder',
+        organizationId: dropboxOrgId || organizationId,
+        organizationType: dropboxOrgType || organizationType,
+        folderPath,
+      });
+      const items: DriveItem[] = (data.files || []).map((f: any) => ({
+        id: f.path || f.id,
+        name: f.name,
+        mimeType: f.mimeType || (f.isFolder ? 'application/vnd.dropbox.folder' : 'application/octet-stream'),
+        modifiedTime: f.modifiedTime,
+        size: f.size ? String(f.size) : undefined,
+        isFolder: f.isFolder,
+      }));
+      setDropboxItems(items);
+      setCurrentDropboxPath(folderPath);
+      if (resetBreadcrumbs) {
+        setDropboxBreadcrumbs([]);
+      } else if (folderName) {
+        setDropboxBreadcrumbs(prev => [...prev, { id: folderPath, name: folderName }]);
+      }
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to load Dropbox folder', 'error');
+    } finally {
+      setLoadingDropbox(false);
+    }
+  };
+
+  const navigateDropboxTo = async (index: number) => {
+    const newCrumbs = dropboxBreadcrumbs.slice(0, index);
+    setDropboxBreadcrumbs(newCrumbs);
+    const targetPath = index === 0
+      ? dropboxRootPath
+      : dropboxBreadcrumbs[index - 1].id;
+    setLoadingDropbox(true);
+    try {
+      const data = await callDropboxApi({
+        action: 'list_folder',
+        organizationId: dropboxOrgId || organizationId,
+        organizationType: dropboxOrgType || organizationType,
+        folderPath: targetPath,
+      });
+      setDropboxItems((data.files || []).map((f: any) => ({
+        id: f.path || f.id,
+        name: f.name,
+        mimeType: f.mimeType || (f.isFolder ? 'application/vnd.dropbox.folder' : 'application/octet-stream'),
+        modifiedTime: f.modifiedTime,
+        size: f.size ? String(f.size) : undefined,
+        isFolder: f.isFolder,
+      })));
+      setCurrentDropboxPath(targetPath);
+    } finally {
+      setLoadingDropbox(false);
+    }
+  };
+
+  const handleDropboxItemClick = async (item: DriveItem) => {
+    if (item.isFolder) {
+      browseDropboxFolder(item.id, item.name);
+    } else {
+      try {
+        const data = await callDropboxApi({
+          action: 'get_download_link',
+          organizationId: dropboxOrgId || organizationId,
+          organizationType: dropboxOrgType || organizationType,
+          filePath: item.id,
+        });
+        if (data.link) window.open(data.link, '_blank');
+      } catch (err: any) {
+        addNotification(err.message || 'Failed to open file', 'error');
+      }
+    }
+  };
+
+  const handleDropboxDownload = async (item: DriveItem) => {
+    try {
+      const data = await callDropboxApi({
+        action: 'get_download_link',
+        organizationId: dropboxOrgId || organizationId,
+        organizationType: dropboxOrgType || organizationType,
+        filePath: item.id,
+      });
+      if (data.link) window.open(data.link, '_blank');
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to download file', 'error');
+    }
+  };
+
+  const handleDropboxDelete = (item: DriveItem) => {
+    showConfirm(
+      `Delete "${item.name}" from Dropbox?`,
+      async () => {
+        try {
+          await callDropboxApi({
+            action: item.isFolder ? 'delete_folder' : 'delete_file',
+            organizationId: dropboxOrgId || organizationId,
+            organizationType: dropboxOrgType || organizationType,
+            filePath: item.id,
+            folderPath: item.isFolder ? item.id : undefined,
+          });
+          addNotification(`"${item.name}" deleted`, 'success');
+          if (currentDropboxPath) browseDropboxFolder(currentDropboxPath);
+        } catch (err: any) {
+          addNotification(err.message || 'Failed to delete file', 'error');
+        }
+      }
+    );
+  };
+
+  const handleDropboxRename = async (item: DriveItem, newName: string) => {
+    try {
+      await callDropboxApi({
+        action: 'rename_file',
+        organizationId: dropboxOrgId || organizationId,
+        organizationType: dropboxOrgType || organizationType,
+        filePath: item.id,
+        newName: newName.trim(),
+      });
+      addNotification(`Renamed to "${newName.trim()}"`, 'success');
+      if (currentDropboxPath) browseDropboxFolder(currentDropboxPath);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to rename', 'error');
+    }
+  };
+
+  const handleDropboxMove = async (item: DriveItem, targetFolderPath: string) => {
+    try {
+      await callDropboxApi({
+        action: 'move_file',
+        organizationId: dropboxOrgId || organizationId,
+        organizationType: dropboxOrgType || organizationType,
+        filePath: item.id,
+        targetFolderPath,
+      });
+      addNotification(`"${item.name}" moved`, 'success');
+      if (currentDropboxPath) browseDropboxFolder(currentDropboxPath);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to move file', 'error');
+    }
+  };
+
+  const handleCreateDropboxFolder = async (folderName: string) => {
+    if (!folderName.trim() || !currentDropboxPath) return;
+    try {
+      await callDropboxApi({
+        action: 'create_folder',
+        organizationId: dropboxOrgId || organizationId,
+        organizationType: dropboxOrgType || organizationType,
+        folderName: folderName.trim(),
+        parentPath: currentDropboxPath,
+      });
+      addNotification(`Folder "${folderName.trim()}" created in Dropbox`, 'success');
+      browseDropboxFolder(currentDropboxPath);
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to create folder', 'error');
+    }
+  };
+
+  const uploadFilesToDropbox = async (files: File[], folderPath: string) => {
+    setUploading(true);
+    let uploaded = 0;
+    for (const file of files) {
+      try {
+        const reader = new FileReader();
+        const fileData = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        await callDropboxApi({
+          action: 'upload_file',
+          organizationId: dropboxOrgId || organizationId,
+          organizationType: dropboxOrgType || organizationType,
+          fileName: file.name,
+          fileData: fileData.split(',')[1],
+          folderPath,
+        });
+        uploaded++;
+      } catch (err: any) {
+        addNotification(`Failed to upload ${file.name}: ${err.message}`, 'error');
+      }
+    }
+    setUploading(false);
+    if (uploaded > 0) {
+      addNotification(`Uploaded ${uploaded} file${uploaded > 1 ? 's' : ''} to Dropbox`, 'success');
+      browseDropboxFolder(folderPath);
+    }
+  };
+
+  const handleOpenDropbox = () => {
+    setActiveSection('dropbox');
   };
 
   const browseDriveFolder = async (folderId: string, folderName?: string, resetBreadcrumbs = false) => {
@@ -451,7 +741,9 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     if (files.length === 0) return;
     if (activeSection === 'drive' && hasGoogleDrive && currentDriveFolderId) {
       await uploadFilesToDrive(files, currentDriveFolderId);
-    } else if (activeSection !== 'drive' && activeSection !== 'all' && activeSection !== 'shared') {
+    } else if (activeSection === 'dropbox' && hasDropbox && currentDropboxPath) {
+      await uploadFilesToDropbox(files, currentDropboxPath);
+    } else if (activeSection !== 'drive' && activeSection !== 'dropbox' && activeSection !== 'all' && activeSection !== 'shared') {
       await uploadFilesToCategory(files, activeSection);
     } else {
       addNotification('Select a folder to upload files into', 'info');
@@ -583,7 +875,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   };
 
   const handleSaveResource = async () => {
-    if (!resourceTitle.trim() || activeSection === 'all' || activeSection === 'drive' || activeSection === 'shared') return;
+    if (!resourceTitle.trim() || activeSection === 'all' || activeSection === 'drive' || activeSection === 'dropbox' || activeSection === 'shared') return;
     setResourceSaving(true);
     try {
       let fileUrl: string | null = null;
@@ -663,13 +955,13 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
     if (mimeType.startsWith('video/')) return Film;
     if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) return FileText;
     if (mimeType.includes('zip') || mimeType.includes('archive')) return Archive;
-    if (mimeType === 'application/vnd.google-apps.folder') return FolderOpen;
+    if (mimeType === 'application/vnd.google-apps.folder' || mimeType === 'application/vnd.dropbox.folder') return FolderOpen;
     if (mimeType.startsWith('application/vnd.google-apps.')) return FileText;
     return File;
   };
 
   const getFileIconColor = (mimeType?: string, isFolder?: boolean) => {
-    if (isFolder || mimeType === 'application/vnd.google-apps.folder') return 'text-amber-400';
+    if (isFolder || mimeType === 'application/vnd.google-apps.folder' || mimeType === 'application/vnd.dropbox.folder') return 'text-amber-400';
     if (!mimeType) return 'text-slate-400';
     if (mimeType.startsWith('image/')) return 'text-green-400';
     if (mimeType.startsWith('audio/')) return 'text-purple-400';
@@ -683,7 +975,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   };
 
   const getFileBgColor = (mimeType?: string, isFolder?: boolean) => {
-    if (isFolder || mimeType === 'application/vnd.google-apps.folder') return 'bg-amber-500/15';
+    if (isFolder || mimeType === 'application/vnd.google-apps.folder' || mimeType === 'application/vnd.dropbox.folder') return 'bg-amber-500/15';
     if (!mimeType) return 'bg-slate-700/50';
     if (mimeType.startsWith('image/')) return 'bg-green-500/15';
     if (mimeType.startsWith('audio/')) return 'bg-purple-500/15';
@@ -707,13 +999,15 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   };
 
   const isDriveSection = activeSection === 'drive';
+  const isDropboxSection = activeSection === 'dropbox';
   const isAllSection = activeSection === 'all';
   const isSharedSection = activeSection === 'shared';
+  const isCloudSection = isDriveSection || isDropboxSection;
   const currentCategory = categories.find(c => c.id === activeSection);
 
   const categoryResources = isAllSection
     ? resources
-    : (!isDriveSection && !isSharedSection)
+    : (!isCloudSection && !isSharedSection)
     ? resources.filter(r => r.category_id === activeSection)
     : [];
 
@@ -723,6 +1017,10 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
   );
 
   const filteredDriveItems = driveItems.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredDropboxItems = dropboxItems.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -748,7 +1046,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {!isDriveSection && !isAllSection && !isSharedSection && (
+            {!isCloudSection && !isAllSection && !isSharedSection && (
               <button
                 onClick={() => { resetResourceForm(); setShowResourceModal(true); }}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm"
@@ -775,6 +1073,24 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 />
               </label>
             )}
+            {isDropboxSection && currentDropboxPath && (
+              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm cursor-pointer">
+                <Upload size={15} />
+                Upload
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={async e => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length && currentDropboxPath) {
+                      await uploadFilesToDropbox(files, currentDropboxPath);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            )}
             {isDriveSection && currentDriveFolderId ? (
               <button
                 onClick={() => { setDriveNewFolderName(''); setShowDriveNewFolderModal(true); }}
@@ -783,7 +1099,15 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 <FolderPlus size={15} />
                 New Folder
               </button>
-            ) : !isDriveSection && (
+            ) : isDropboxSection && currentDropboxPath ? (
+              <button
+                onClick={() => { setDriveNewFolderName(''); setShowDriveNewFolderModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
+              >
+                <FolderPlus size={15} />
+                New Folder
+              </button>
+            ) : !isCloudSection && (
               <button
                 onClick={() => { resetCategoryForm(); setShowCategoryModal(true); }}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700/80 hover:bg-slate-700 border border-slate-600/50 text-slate-300 hover:text-white rounded-lg transition-all text-sm"
@@ -818,6 +1142,17 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 active={isDriveSection}
                 onClick={handleOpenDrive}
                 accent="green"
+              />
+            )}
+
+            {/* Dropbox */}
+            {hasDropbox && (
+              <SidebarItem
+                icon={Cloud}
+                label="Dropbox"
+                active={isDropboxSection}
+                onClick={handleOpenDropbox}
+                accent="blue"
               />
             )}
 
@@ -929,18 +1264,46 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                     </React.Fragment>
                   ))}
                 </>
+              ) : isDropboxSection ? (
+                <>
+                  <button
+                    onClick={() => navigateDropboxTo(0)}
+                    className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <Cloud size={13} className="text-blue-400" />
+                    <span className={dropboxBreadcrumbs.length === 0 ? 'text-white font-medium' : ''}>Dropbox</span>
+                  </button>
+                  {dropboxBreadcrumbs.map((crumb, i) => (
+                    <React.Fragment key={crumb.id}>
+                      <ChevronRight size={13} className="text-slate-600 flex-shrink-0" />
+                      <button
+                        onClick={() => navigateDropboxTo(i + 1)}
+                        className={`truncate max-w-[140px] transition-colors ${
+                          i === dropboxBreadcrumbs.length - 1
+                            ? 'text-white font-medium'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {crumb.name}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </>
               ) : (
                 <span className="font-medium text-white">
                   {isAllSection ? 'All Files' : isSharedSection ? 'Shared with Club' : (currentCategory?.name || 'Resources')}
                 </span>
               )}
-              {!isDriveSection && (
+              {!isCloudSection && (
                 <span className="text-xs text-slate-500 ml-2">
                   {isSharedSection ? filteredSharedResources.length : filteredResources.length} items
                 </span>
               )}
               {isDriveSection && !loadingDrive && (
                 <span className="text-xs text-slate-500 ml-2">{filteredDriveItems.length} items</span>
+              )}
+              {isDropboxSection && !loadingDropbox && (
+                <span className="text-xs text-slate-500 ml-2">{filteredDropboxItems.length} items</span>
               )}
             </div>
 
@@ -982,6 +1345,16 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 <RefreshCw size={13} className={loadingDrive ? 'animate-spin' : ''} />
               </button>
             )}
+            {isDropboxSection && (
+              <button
+                onClick={() => currentDropboxPath && browseDropboxFolder(currentDropboxPath)}
+                disabled={loadingDropbox}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+                title="Refresh"
+              >
+                <RefreshCw size={13} className={loadingDropbox ? 'animate-spin' : ''} />
+              </button>
+            )}
           </div>
 
           {/* Drag overlay */}
@@ -992,7 +1365,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   <UploadCloud size={48} className="mx-auto mb-3 text-blue-400" />
                   <p className="text-blue-300 font-semibold text-lg">Drop files here to upload</p>
                   <p className="text-blue-400/70 text-sm mt-1">
-                    {activeSection === 'drive' ? 'Upload to Google Drive' : 'Upload to folder'}
+                    {activeSection === 'drive' ? 'Upload to Google Drive' : activeSection === 'dropbox' ? 'Upload to Dropbox' : 'Upload to folder'}
                   </p>
                 </div>
               </div>
@@ -1041,6 +1414,43 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 onDropOnDriveFolder={handleDriveDropOnFolder}
                 onDragOverDriveFolder={setDropTargetDriveFolderId}
               />
+            ) : isDropboxSection ? (
+              <DriveView
+                items={filteredDropboxItems}
+                loading={loadingDropbox}
+                viewMode={viewMode}
+                hasGoogleDrive={hasDropbox}
+                driveRootFolderId={dropboxRootPath}
+                onItemClick={handleDropboxItemClick}
+                onDownload={handleDropboxDownload}
+                onDelete={handleDropboxDelete}
+                onRename={(item) => {
+                  setDriveRenameItem(item);
+                  setDriveRenameName(item.name);
+                }}
+                getFileIcon={getFileIcon}
+                getFileIconColor={getFileIconColor}
+                getFileBgColor={getFileBgColor}
+                formatFileSize={formatFileSize}
+                formatDate={formatDate}
+                contextMenu={contextMenu}
+                setContextMenu={setContextMenu}
+                draggedDriveItem={draggedDriveItem}
+                onDragStartDriveItem={setDraggedDriveItem}
+                onDragEndDriveItem={() => { setDraggedDriveItem(null); setDropTargetDriveFolderId(null); }}
+                dropTargetDriveFolderId={dropTargetDriveFolderId}
+                onDropOnDriveFolder={async (targetPath) => {
+                  if (draggedDriveItem && draggedDriveItem.id !== targetPath) {
+                    await handleDropboxMove(draggedDriveItem, targetPath);
+                  }
+                  setDraggedDriveItem(null);
+                  setDropTargetDriveFolderId(null);
+                }}
+                onDragOverDriveFolder={setDropTargetDriveFolderId}
+                providerLabel="Dropbox"
+                providerIcon={Cloud}
+                providerAccentColor="blue"
+              />
             ) : isSharedSection ? (
               <SharedResourcesView
                 resources={filteredSharedResources}
@@ -1058,10 +1468,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 filteredResources={filteredResources}
                 viewMode={viewMode}
                 hasGoogleDrive={hasGoogleDrive}
+                hasDropbox={hasDropbox}
                 sharedCount={sharedResources.length}
                 isClubContext={isClubContext}
                 onSetSection={setActiveSection}
                 onOpenDrive={handleOpenDrive}
+                onOpenDropbox={handleOpenDropbox}
                 onNewFolder={() => { resetCategoryForm(); setShowCategoryModal(true); }}
                 getFileIcon={getFileIcon}
                 getFileIconColor={getFileIconColor}
@@ -1307,12 +1719,12 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
         </div>
       )}
 
-      {/* Drive New Folder Modal */}
+      {/* Drive/Dropbox New Folder Modal */}
       {showDriveNewFolderModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-800 border border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between p-5 border-b border-slate-700/50">
-              <h3 className="text-lg font-semibold text-white">New Folder in Google Drive</h3>
+              <h3 className="text-lg font-semibold text-white">New Folder in {isDropboxSection ? 'Dropbox' : 'Google Drive'}</h3>
               <button onClick={() => { setShowDriveNewFolderModal(false); setDriveNewFolderName(''); }} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors">
                 <X size={16} />
               </button>
@@ -1326,10 +1738,20 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 placeholder="e.g. Race Documents 2026"
                 className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
                 autoFocus
-                onKeyDown={e => e.key === 'Enter' && handleCreateDriveFolder()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    if (isDropboxSection) {
+                      handleCreateDropboxFolder(driveNewFolderName);
+                      setShowDriveNewFolderModal(false);
+                      setDriveNewFolderName('');
+                    } else {
+                      handleCreateDriveFolder();
+                    }
+                  }
+                }}
               />
               <p className="mt-2 text-xs text-slate-500">
-                This folder will be created inside the current Google Drive location.
+                This folder will be created inside the current {isDropboxSection ? 'Dropbox' : 'Google Drive'} location.
               </p>
             </div>
             <div className="p-5 pt-0 flex justify-end gap-3">
@@ -1337,9 +1759,17 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 Cancel
               </button>
               <button
-                onClick={handleCreateDriveFolder}
+                onClick={() => {
+                  if (isDropboxSection) {
+                    handleCreateDropboxFolder(driveNewFolderName);
+                    setShowDriveNewFolderModal(false);
+                    setDriveNewFolderName('');
+                  } else {
+                    handleCreateDriveFolder();
+                  }
+                }}
                 disabled={driveNewFolderCreating || !driveNewFolderName.trim()}
-                className="px-4 py-2 text-sm bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className={`px-4 py-2 text-sm ${isDropboxSection ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800' : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'} text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium`}
               >
                 {driveNewFolderCreating ? 'Creating...' : 'Create Folder'}
               </button>
@@ -1366,7 +1796,20 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 onChange={e => setDriveRenameName(e.target.value)}
                 className="w-full bg-slate-700/50 border border-slate-600/60 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/60 transition-colors"
                 autoFocus
-                onKeyDown={e => e.key === 'Enter' && handleDriveRename()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    if (isDropboxSection && driveRenameItem) {
+                      setDriveRenaming(true);
+                      handleDropboxRename(driveRenameItem, driveRenameName).finally(() => {
+                        setDriveRenaming(false);
+                        setDriveRenameItem(null);
+                        setDriveRenameName('');
+                      });
+                    } else {
+                      handleDriveRename();
+                    }
+                  }
+                }}
               />
             </div>
             <div className="p-5 pt-0 flex justify-end gap-3">
@@ -1374,7 +1817,18 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                 Cancel
               </button>
               <button
-                onClick={handleDriveRename}
+                onClick={() => {
+                  if (isDropboxSection && driveRenameItem) {
+                    setDriveRenaming(true);
+                    handleDropboxRename(driveRenameItem, driveRenameName).finally(() => {
+                      setDriveRenaming(false);
+                      setDriveRenameItem(null);
+                      setDriveRenameName('');
+                    });
+                  } else {
+                    handleDriveRename();
+                  }
+                }}
                 disabled={driveRenaming || !driveRenameName.trim()}
                 className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
@@ -1424,10 +1878,12 @@ const AllFilesView: React.FC<{
   filteredResources: ResourceStorage.AssociationResource[];
   viewMode: 'grid' | 'list';
   hasGoogleDrive: boolean;
+  hasDropbox?: boolean;
   sharedCount: number;
   isClubContext: boolean;
   onSetSection: (s: string) => void;
   onOpenDrive: () => void;
+  onOpenDropbox?: () => void;
   onNewFolder: () => void;
   getFileIcon: (m?: string, f?: boolean) => React.ElementType;
   getFileIconColor: (m?: string, f?: boolean) => string;
@@ -1442,11 +1898,11 @@ const AllFilesView: React.FC<{
   dropTargetCatId: string | null;
   onDropOnCategory: (catId: string) => void;
   onDragOverCategory: (catId: string | null) => void;
-}> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, sharedCount, isClubContext, onSetSection, onOpenDrive, onNewFolder, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, draggedResource, onDragStartResource, onDragEndResource, dropTargetCatId, onDropOnCategory, onDragOverCategory }) => {
+}> = ({ categories, resources, filteredResources, viewMode, hasGoogleDrive, hasDropbox, sharedCount, isClubContext, onSetSection, onOpenDrive, onOpenDropbox, onNewFolder, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, onEditResource, onDeleteResource, draggedResource, onDragStartResource, onDragEndResource, dropTargetCatId, onDropOnCategory, onDragOverCategory }) => {
   return (
     <div className="space-y-6">
       {/* Storage sources */}
-      {(hasGoogleDrive || (isClubContext && sharedCount > 0)) && (
+      {(hasGoogleDrive || hasDropbox || (isClubContext && sharedCount > 0)) && (
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Connected Storage</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1461,6 +1917,21 @@ const AllFilesView: React.FC<{
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-200 group-hover:text-white">Google Drive</p>
                   <p className="text-xs text-slate-500">Browse connected Drive</p>
+                </div>
+                <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+              </button>
+            )}
+            {hasDropbox && onOpenDropbox && (
+              <button
+                onClick={onOpenDropbox}
+                className="flex items-center gap-3 p-4 bg-gradient-to-br from-slate-800/80 to-slate-700/40 border border-slate-700/50 hover:border-blue-500/40 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/10 group text-left"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center flex-shrink-0">
+                  <Cloud size={20} className="text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-200 group-hover:text-white">Dropbox</p>
+                  <p className="text-xs text-slate-500">Browse connected Dropbox</p>
                 </div>
                 <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
               </button>
@@ -1562,7 +2033,7 @@ const AllFilesView: React.FC<{
       )}
 
       {/* Empty */}
-      {categories.length === 0 && !hasGoogleDrive && (
+      {categories.length === 0 && !hasGoogleDrive && !hasDropbox && (
         <div className="flex flex-col items-center justify-center h-64 text-center">
           <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
             <FolderOpen size={28} className="text-slate-600" />
@@ -1804,7 +2275,7 @@ const SharedResourcesView: React.FC<{
   );
 };
 
-// Drive view with context menu
+// Drive/Dropbox view with context menu
 const DriveView: React.FC<{
   items: DriveItem[];
   loading: boolean;
@@ -1828,15 +2299,22 @@ const DriveView: React.FC<{
   dropTargetDriveFolderId: string | null;
   onDropOnDriveFolder: (folderId: string) => void;
   onDragOverDriveFolder: (folderId: string | null) => void;
-}> = ({ items, loading, viewMode, hasGoogleDrive, driveRootFolderId, onItemClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, contextMenu, setContextMenu, draggedDriveItem, onDragStartDriveItem, onDragEndDriveItem, dropTargetDriveFolderId, onDropOnDriveFolder, onDragOverDriveFolder }) => {
+  providerLabel?: string;
+  providerIcon?: React.ElementType;
+  providerAccentColor?: string;
+}> = ({ items, loading, viewMode, hasGoogleDrive, driveRootFolderId, onItemClick, onDownload, onDelete, onRename, getFileIcon, getFileIconColor, getFileBgColor, formatFileSize, formatDate, contextMenu, setContextMenu, draggedDriveItem, onDragStartDriveItem, onDragEndDriveItem, dropTargetDriveFolderId, onDropOnDriveFolder, onDragOverDriveFolder, providerLabel, providerIcon, providerAccentColor }) => {
+  const label = providerLabel || 'Google Drive';
+  const ProviderIcon = providerIcon || HardDrive;
+  const accentBorder = providerAccentColor === 'blue' ? 'border-b-2 border-blue-500' : 'border-b-2 border-green-500';
+
   if (!hasGoogleDrive) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center mb-4">
-          <HardDrive size={28} className="text-slate-600" />
+          <ProviderIcon size={28} className="text-slate-600" />
         </div>
-        <p className="text-slate-300 font-semibold mb-1">Google Drive not connected</p>
-        <p className="text-slate-500 text-sm">Connect Google Drive in Settings → Integrations</p>
+        <p className="text-slate-300 font-semibold mb-1">{label} not connected</p>
+        <p className="text-slate-500 text-sm">Connect {label} in Settings &rarr; Integrations</p>
       </div>
     );
   }
@@ -1845,8 +2323,8 @@ const DriveView: React.FC<{
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">Loading Drive...</p>
+          <div className={`animate-spin rounded-full h-8 w-8 ${accentBorder} mx-auto mb-3`} />
+          <p className="text-slate-400 text-sm">Loading {label}...</p>
         </div>
       </div>
     );
