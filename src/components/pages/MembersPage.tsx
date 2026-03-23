@@ -659,12 +659,13 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   };
 
   const handleConfirmActivation = async () => {
-    if (!currentClub?.clubId || !currentClub?.clubName || membersToActivate.length === 0) return;
+    const clubName = currentClub?.club?.name || '';
+    if (!currentClub?.clubId || !clubName || membersToActivate.length === 0) return;
 
     setActivating(true);
     const memberIds = membersToActivate.map(m => m.id);
 
-    const result = await activateMembers(memberIds, currentClub.clubId, currentClub.clubName);
+    const result = await activateMembers(memberIds, currentClub.clubId, clubName);
 
     setActivating(false);
     setActivationResults(result);
@@ -692,7 +693,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       return;
     }
 
-    if (!currentClub?.clubId || !currentClub?.clubName) return;
+    const clubName = currentClub?.club?.name || '';
+    if (!currentClub?.clubId || !clubName) {
+      addNotification('Club information not available', 'error');
+      return;
+    }
 
     setSendingActivationTest(true);
     try {
@@ -709,7 +714,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         body: JSON.stringify({
           member_ids: [],
           club_id: currentClub.clubId,
-          club_name: currentClub.clubName,
+          club_name: clubName,
           test_email_only: true,
           test_email_recipient: activationTestEmail,
         }),

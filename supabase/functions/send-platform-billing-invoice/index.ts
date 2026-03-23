@@ -295,7 +295,7 @@ Deno.serve(async (req: Request) => {
     );
 
     const sendgridKey = Deno.env.get("SENDGRID_API_KEY");
-    const fromEmail = Deno.env.get("DEFAULT_FROM_EMAIL") || "noreply@alfiepro.com";
+    const fromEmail = Deno.env.get("DEFAULT_FROM_EMAIL") || "noreply@alfiepro.com.au";
 
     if (!sendgridKey) {
       return jsonResponse({ error: "Email service not configured" }, 500);
