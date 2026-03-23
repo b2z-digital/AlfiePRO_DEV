@@ -48,19 +48,40 @@ export const ResetPassword: React.FC = () => {
     const hasCode = url.searchParams.has('code');
     const hasHashRecovery = window.location.hash.includes('type=recovery');
 
-    if (token && email) {
-      supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'recovery',
-      }).then(({ data, error: verifyError }) => {
-        if (verifyError || !data.session) {
+    if (token) {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      fetch(`${supabaseUrl}/auth/v1/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          token_hash: token,
+          type: 'recovery',
+        }),
+      })
+        .then(res => res.json())
+        .then(async (data) => {
+          if (data.access_token && data.refresh_token) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+            });
+            if (setErr) {
+              markExpired();
+            } else {
+              markReady();
+            }
+          } else {
+            markExpired();
+          }
+        })
+        .catch(() => {
           markExpired();
-        } else {
-          markReady();
-        }
-      }).catch(() => {
-        markExpired();
-      });
+        });
     } else if (hasCode || hasHashRecovery) {
       pollIntervalId = setInterval(async () => {
         if (sessionReadyRef.current) {
