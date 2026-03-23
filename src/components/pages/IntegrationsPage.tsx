@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, Facebook, Check, AlertTriangle, RefreshCw, ExternalLink, Loader, Instagram, CreditCard, DollarSign, BarChart3, X, Save, HardDrive, MessageSquare, ArrowLeft, Settings } from 'lucide-react';
+import { Globe, Facebook, Check, TriangleAlert as AlertTriangle, RefreshCw, ExternalLink, Loader, Instagram, CreditCard, DollarSign, ChartBar as BarChart3, X, Save, HardDrive, MessageSquare, ArrowLeft, Settings, Cloud } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { PublishToMetaModal } from '../PublishToMetaModal';
@@ -110,6 +110,24 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
       ],
     },
     {
+      id: 'dropbox',
+      name: 'Dropbox',
+      description: 'Connect Dropbox for cloud document storage and file sharing.',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 43 40" fill="none">
+          <path d="M12.5 0L0 8.14l8.5 6.87 12.5-8.14L12.5 0z" fill="#0061FF"/>
+          <path d="M0 21.88l12.5 8.14 8.5-6.87-12.5-8.14L0 21.88z" fill="#0061FF"/>
+          <path d="M21 23.15l8.5 6.87 12.5-8.14-8.5-6.87L21 23.15z" fill="#0061FF"/>
+          <path d="M42 8.14L29.5 0 21 6.87l12.5 8.14L42 8.14z" fill="#0061FF"/>
+          <path d="M21.03 24.79L12.5 31.68l-4.03-2.64v2.96L21.03 40l12.56-8v-2.96l-4.03 2.64-8.53-6.89z" fill="#0061FF"/>
+        </svg>
+      ),
+      iconBg: 'bg-slate-700/50',
+      iconColor: 'text-white',
+      connected: false,
+      enabled: false,
+    },
+    {
       id: 'stripe',
       name: 'Stripe',
       description: 'Accept credit card payments for memberships and event entries.',
@@ -212,6 +230,8 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
           await handleYoutubeCallback(code, clubId);
         } else if (integration === 'google_drive') {
           await handleGoogleDriveCallback(code, clubId, associationId, associationType);
+        } else if (integration === 'dropbox') {
+          await handleDropboxCallback(code, clubId, associationId, associationType);
         }
 
         window.history.replaceState({}, '', window.location.pathname);
@@ -370,6 +390,19 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
           };
         }
 
+        if (integration.id === 'dropbox') {
+          const dropboxData = data?.find(i => i.platform === 'dropbox' && i.is_active);
+          return {
+            ...integration,
+            connected: !!dropboxData,
+            enabled: !!dropboxData,
+            connectedInfo: dropboxData ? {
+              label: 'Dropbox Account:',
+              value: dropboxData.credentials?.dropbox_account_email || 'Connected',
+            } : undefined,
+          };
+        }
+
         const dbIntegration = data?.find(i => i.platform === integration.id);
 
         if (dbIntegration && dbIntegration.is_active) {
@@ -436,7 +469,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     const integration = integrations.find(i => i.id === integrationId);
     if (!integration) return;
 
-    if (integrationId === 'google_suite' || integrationId === 'meta_suite') {
+    if (integrationId === 'google_suite' || integrationId === 'meta_suite' || integrationId === 'dropbox') {
       return;
     }
 
@@ -589,6 +622,44 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     }
   };
 
+  const handleConnectDropbox = async () => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const appKeyRes = await fetch(`${supabaseUrl}/functions/v1/dropbox-oauth-callback`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${anonKey}` },
+      });
+      const appKeyData = await appKeyRes.json();
+      if (!appKeyData.appKey) {
+        throw new Error('Dropbox is not configured. Please contact support.');
+      }
+      const appKey = appKeyData.appKey;
+
+      const redirectUri = `${window.location.origin}/settings`;
+
+      const stateData: any = { integration: 'dropbox' };
+      if (currentOrganization?.id) {
+        stateData.associationId = currentOrganization.id;
+        stateData.associationType = currentOrganization.type;
+      } else if (currentClub?.clubId) {
+        stateData.clubId = currentClub.clubId;
+      }
+
+      const authUrl = `https://www.dropbox.com/oauth2/authorize?` +
+        `client_id=${encodeURIComponent(appKey)}&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `response_type=code&` +
+        `token_access_type=offline&` +
+        `state=${encodeURIComponent(JSON.stringify(stateData))}`;
+
+      window.location.href = authUrl;
+    } catch (err) {
+      console.error('Error initiating Dropbox OAuth:', err);
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Dropbox');
+    }
+  };
+
   const handleConnectGoogle = async () => {
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '230273275079-723coi1ukfg2vngapur5djnug1cer6hd.apps.googleusercontent.com';
@@ -737,6 +808,35 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     } catch (err) {
       console.error('Error disconnecting Google Drive:', err);
       setError(err instanceof Error ? err.message : 'Failed to disconnect Google Drive');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDisconnectDropbox = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+
+      let query = supabase.from('integrations').delete().eq('platform', 'dropbox');
+
+      if (currentClub?.clubId) {
+        query = query.eq('club_id', currentClub.clubId);
+      } else if (currentOrganization?.id) {
+        const idColumn = currentOrganization.type === 'national' ? 'national_association_id' : 'state_association_id';
+        query = query.eq(idColumn, currentOrganization.id);
+      } else {
+        throw new Error('No organisation found');
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+
+      await fetchIntegrationStatus();
+      addNotification('success', 'Dropbox disconnected successfully');
+    } catch (err) {
+      console.error('Error disconnecting Dropbox:', err);
+      setError(err instanceof Error ? err.message : 'Failed to disconnect Dropbox');
     } finally {
       setSaving(false);
     }
@@ -1238,6 +1338,59 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
     }
   };
 
+  const handleDropboxCallback = async (code: string, clubId?: string, associationId?: string, associationType?: string) => {
+    try {
+      setSaving(true);
+      setError(null);
+      addNotification('info', 'Connecting to Dropbox...');
+
+      const organizationId = clubId || associationId;
+      const orgType = clubId ? 'club' : associationType;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const redirectUri = `${window.location.origin}/settings`;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/dropbox-oauth-callback`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            code,
+            redirectUri,
+            organizationId,
+            organizationType: orgType,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to connect Dropbox');
+      }
+
+      await fetchIntegrationStatus();
+      setSuccess('Dropbox connected successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+      addNotification('success', `Connected to Dropbox: ${data.userEmail}`);
+
+      setTimeout(() => {
+        window.location.href = '/resources';
+      }, 1500);
+    } catch (err) {
+      console.error('Error in Dropbox callback:', err);
+      addNotification('error', err instanceof Error ? err.message : 'Failed to connect Dropbox');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveFacebookPage = async () => {
     if (!selectedFacebookPage) {
       addNotification('error', 'Please select a Facebook page');
@@ -1356,7 +1509,7 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                   </div>
                 </div>
 
-                {(integration.id === 'google_suite' || integration.id === 'meta_suite') ? (
+                {(integration.id === 'google_suite' || integration.id === 'meta_suite' || integration.id === 'dropbox') ? (
                   integration.connected ? (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       <Check size={12} />
@@ -1538,7 +1691,47 @@ export const IntegrationsPage: React.FC<IntegrationsPageProps> = ({ darkMode }) 
                 </div>
               )}
 
-              {integration.id !== 'google_suite' && integration.id !== 'meta_suite' && integration.connectedInfo && (
+              {integration.id === 'dropbox' && (
+                <div className="mt-3">
+                  {!integration.connected ? (
+                    <button
+                      onClick={handleConnectDropbox}
+                      disabled={saving}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 font-medium transition-colors disabled:opacity-50"
+                    >
+                      {saving ? <RefreshCw size={16} className="animate-spin" /> : null}
+                      Connect Dropbox Account
+                    </button>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Check size={14} className="text-emerald-400" />
+                          <span className="text-sm text-emerald-300 font-medium">
+                            {integration.connectedInfo?.value || 'Connected'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleDisconnectDropbox}
+                          disabled={saving}
+                          className="text-xs px-2.5 py-1 rounded-md font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-700/30">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <HardDrive size={14} className="text-slate-400" />
+                          <span className="text-sm text-slate-300">File Storage</span>
+                        </div>
+                        <span className="text-xs text-emerald-400 font-medium">Active</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {integration.id !== 'google_suite' && integration.id !== 'meta_suite' && integration.id !== 'dropbox' && integration.connectedInfo && (
                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                   <div className="flex items-center justify-between">
                     <div>
