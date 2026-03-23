@@ -78,6 +78,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [activating, setActivating] = useState(false);
   const [activationResults, setActivationResults] = useState<ActivationResponse | null>(null);
   const [activatingMemberId, setActivatingMemberId] = useState<string | null>(null);
+  const [showActivationTestEmail, setShowActivationTestEmail] = useState(false);
+  const [activationTestEmail, setActivationTestEmail] = useState('');
+  const [sendingActivationTest, setSendingActivationTest] = useState(false);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -674,6 +677,54 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       fetchMembers();
     } else if (!result.success) {
       addNotification(result.error || 'Activation failed', 'error');
+    }
+  };
+
+  const handleSendActivationTestEmail = async () => {
+    if (!showActivationTestEmail) {
+      setShowActivationTestEmail(true);
+      setActivationTestEmail('');
+      return;
+    }
+
+    if (!activationTestEmail || !activationTestEmail.includes('@')) {
+      addNotification('Please enter a valid email address', 'error');
+      return;
+    }
+
+    if (!currentClub?.clubId || !currentClub?.clubName) return;
+
+    setSendingActivationTest(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-member-account`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_ids: [],
+          club_id: currentClub.clubId,
+          club_name: currentClub.clubName,
+          test_email_only: true,
+          test_email_recipient: activationTestEmail,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to send test email');
+
+      addNotification(`Test activation email sent to ${activationTestEmail}`, 'success');
+      setShowActivationTestEmail(false);
+      setActivationTestEmail('');
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to send test email', 'error');
+    } finally {
+      setSendingActivationTest(false);
     }
   };
 
@@ -1637,48 +1688,91 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
-              {!activationResults ? (
-                <>
+            <div className="p-6 border-t border-slate-700">
+              {!activationResults && (
+                <div className="mb-4">
+                  {showActivationTestEmail ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="email"
+                        value={activationTestEmail}
+                        onChange={(e) => setActivationTestEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendActivationTestEmail()}
+                        placeholder="Enter email address..."
+                        className="flex-1 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSendActivationTestEmail}
+                        disabled={sendingActivationTest}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-500 transition-colors disabled:opacity-50"
+                      >
+                        {sendingActivationTest ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        Send
+                      </button>
+                      <button
+                        onClick={() => { setShowActivationTestEmail(false); setActivationTestEmail(''); }}
+                        className="text-slate-500 hover:text-slate-400 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleSendActivationTestEmail}
+                      className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-sky-400 transition-colors"
+                    >
+                      <Mail size={14} />
+                      Send test email to preview
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                {!activationResults ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowActivateConfirmModal(false);
+                        setMembersToActivate([]);
+                        setShowActivationTestEmail(false);
+                      }}
+                      className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmActivation}
+                      disabled={activating}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {activating ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Activating...
+                        </>
+                      ) : (
+                        <>
+                          <Smartphone size={16} />
+                          Activate {membersToActivate.filter(m => m.email).length} Member{membersToActivate.filter(m => m.email).length === 1 ? '' : 's'}
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
                   <button
                     onClick={() => {
                       setShowActivateConfirmModal(false);
                       setMembersToActivate([]);
+                      setActivationResults(null);
+                      setShowActivationTestEmail(false);
                     }}
-                    className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                    className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
                   >
-                    Cancel
+                    Done
                   </button>
-                  <button
-                    onClick={handleConfirmActivation}
-                    disabled={activating}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {activating ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Activating...
-                      </>
-                    ) : (
-                      <>
-                        <Smartphone size={16} />
-                        Activate {membersToActivate.filter(m => m.email).length} Member{membersToActivate.filter(m => m.email).length === 1 ? '' : 's'}
-                      </>
-                    )}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    setShowActivateConfirmModal(false);
-                    setMembersToActivate([]);
-                    setActivationResults(null);
-                  }}
-                  className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
-                >
-                  Done
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

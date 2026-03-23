@@ -14,6 +14,8 @@ interface ActivateRequest {
   club_name: string;
   app_deep_link_base?: string;
   bcc_email?: string;
+  test_email_only?: boolean;
+  test_email_recipient?: string;
 }
 
 interface ActivationResult {
@@ -56,11 +58,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email }: ActivateRequest = await req.json();
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient }: ActivateRequest = await req.json();
 
-    if (!member_ids?.length || !club_id || !club_name) {
+    if ((!test_email_only && (!member_ids?.length || !club_id || !club_name)) || (test_email_only && (!club_id || !club_name))) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: member_ids, club_id, club_name" }),
+        JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -85,6 +87,54 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Insufficient permissions. Must be a club admin." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (test_email_only) {
+      const recipientEmail = test_email_recipient || callingUser.email;
+      if (!recipientEmail) {
+        return new Response(
+          JSON.stringify({ error: "No email address for test" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!sendGridApiKey) {
+        return new Response(
+          JSON.stringify({ error: "Email service not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: appSettings } = await supabase
+        .from("platform_settings")
+        .select("key, value")
+        .eq("category", "mobile_app");
+
+      const platformConfig: Record<string, string> = {};
+      (appSettings || []).forEach((s: { key: string; value: string }) => {
+        platformConfig[s.key] = s.value;
+      });
+
+      const webAppUrl = supabaseUrl.replace(".supabase.co", ".app");
+      const sampleWebLink = `${webAppUrl}/reset-password?token=SAMPLE_TOKEN_FOR_PREVIEW`;
+      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?token=SAMPLE_TOKEN_FOR_PREVIEW` : undefined;
+
+      await sendActivationEmail({
+        sendGridApiKey,
+        fromEmail: defaultFromEmail || "noreply@alfiepro.com",
+        toEmail: recipientEmail,
+        recipientName: "Test User",
+        clubName: club_name,
+        activationDeepLink: sampleDeepLink || "",
+        webActivationLink: sampleWebLink,
+        appStoreUrl: platformConfig["ios_app_store_url"] || "",
+        playStoreUrl: platformConfig["android_play_store_url"] || "",
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, message: `Test email sent to ${recipientEmail}` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
