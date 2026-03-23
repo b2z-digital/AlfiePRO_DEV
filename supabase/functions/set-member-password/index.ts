@@ -21,11 +21,11 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { token_hash, email, password } = await req.json();
+    const { activation_token, email, password } = await req.json();
 
-    if (!token_hash || !email || !password) {
+    if (!activation_token || !email || !password) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: token_hash, email, password" }),
+        JSON.stringify({ error: "Missing required fields: activation_token, email, password" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -37,46 +37,41 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const verifyRes = await fetch(`${supabaseUrl}/auth/v1/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": serviceRoleKey,
-        "Authorization": `Bearer ${serviceRoleKey}`,
-      },
-      body: JSON.stringify({
-        token_hash,
-        type: "recovery",
-      }),
-    });
+    const { data: tokenRecord, error: tokenError } = await supabase
+      .from("member_activation_tokens")
+      .select("*")
+      .eq("token", activation_token)
+      .maybeSingle();
 
-    const verifyData = await verifyRes.json();
-
-    if (!verifyRes.ok || !verifyData.access_token) {
-      console.error("Token verification failed:", verifyRes.status, JSON.stringify(verifyData));
+    if (tokenError || !tokenRecord) {
       return new Response(
-        JSON.stringify({ error: "Recovery link has expired or is invalid. Please request a new one." }),
+        JSON.stringify({ error: "Invalid activation link. Please request a new one from your club administrator." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const verifiedEmail = verifyData.email || verifyData.user?.email;
-    if (verifiedEmail && verifiedEmail.toLowerCase() !== email.toLowerCase()) {
+    if (tokenRecord.used_at) {
       return new Response(
-        JSON.stringify({ error: "Token does not match the provided email" }),
+        JSON.stringify({ error: "This activation link has already been used. Please sign in with your password, or request a new link." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const userId = verifyData.user?.id || verifyData.id;
-    if (!userId) {
+    if (new Date(tokenRecord.expires_at) < new Date()) {
       return new Response(
-        JSON.stringify({ error: "Could not determine user from recovery token" }),
+        JSON.stringify({ error: "This activation link has expired. Please request a new one from your club administrator." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+    if (tokenRecord.email.toLowerCase() !== email.toLowerCase()) {
+      return new Response(
+        JSON.stringify({ error: "Token does not match the provided email." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(tokenRecord.user_id, {
       password,
     });
 
@@ -89,12 +84,17 @@ Deno.serve(async (req: Request) => {
     }
 
     await supabase
+      .from("member_activation_tokens")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", tokenRecord.id);
+
+    await supabase
       .from("members")
       .update({
         activation_status: "activated",
         activated_at: new Date().toISOString(),
       })
-      .eq("user_id", userId);
+      .eq("user_id", tokenRecord.user_id);
 
     return new Response(
       JSON.stringify({ success: true, message: "Password has been set successfully" }),

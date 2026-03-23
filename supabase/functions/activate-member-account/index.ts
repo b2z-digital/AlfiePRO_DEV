@@ -278,31 +278,24 @@ Deno.serve(async (req: Request) => {
 
         const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
 
-        const { data: recoveryLink } = await supabase.auth.admin.generateLink({
-          type: "recovery",
-          email: member.email,
-          options: {
-            redirectTo: `${webAppUrl}/reset-password`,
-          },
-        });
+        const activationToken = crypto.randomUUID() + "-" + crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        let recoveryToken = "";
-        let webActivationLink = "";
-        if (recoveryLink?.properties?.hashed_token) {
-          recoveryToken = recoveryLink.properties.hashed_token;
-        }
-        if (recoveryToken) {
-          webActivationLink = `${webAppUrl}/reset-password?token=${encodeURIComponent(recoveryToken)}&email=${encodeURIComponent(member.email)}`;
-        } else if (recoveryLink?.properties?.action_link) {
-          webActivationLink = recoveryLink.properties.action_link;
-        }
+        await supabase
+          .from("member_activation_tokens")
+          .insert({
+            user_id: userId,
+            email: member.email,
+            token: activationToken,
+            expires_at: expiresAt,
+          });
+
+        const webActivationLink = `${webAppUrl}/reset-password?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
 
         if (sendGridApiKey && defaultFromEmail) {
           const deepLinkBase = (app_deep_link_base || platformConfig.app_deep_link_base || "alfiepro://").replace(/\/+$/, "");
           const separator = deepLinkBase.endsWith("://") ? "" : "/";
-          const activationDeepLink = recoveryToken
-            ? `${deepLinkBase}${separator}activate?token=${encodeURIComponent(recoveryToken)}&email=${encodeURIComponent(member.email)}`
-            : `${deepLinkBase}${separator}activate?email=${encodeURIComponent(member.email)}`;
+          const activationDeepLink = `${deepLinkBase}${separator}activate?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
 
           const appStoreUrl = platformConfig.ios_app_store_url || "";
           const playStoreUrl = platformConfig.android_play_store_url || "";

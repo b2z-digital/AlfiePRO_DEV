@@ -18,7 +18,7 @@ export const ResetPassword: React.FC = () => {
   const sessionReadyRef = useRef(false);
 
   const url = new URL(window.location.href);
-  const activationToken = url.searchParams.get('token');
+  const activationToken = url.searchParams.get('activation') || url.searchParams.get('token');
   const activationEmail = url.searchParams.get('email');
   const isActivationFlow = !!(activationToken && activationEmail);
 
@@ -120,7 +120,7 @@ export const ResetPassword: React.FC = () => {
             'apikey': supabaseAnonKey,
           },
           body: JSON.stringify({
-            token_hash: activationToken,
+            activation_token: activationToken,
             email: activationEmail,
             password,
           }),
