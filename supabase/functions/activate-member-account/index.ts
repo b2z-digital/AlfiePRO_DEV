@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
 
       await sendActivationEmail({
         sendGridApiKey,
-        fromEmail: defaultFromEmail || "noreply@alfiepro.com",
+        fromEmail: defaultFromEmail || "noreply@alfiepro.com.au",
         toEmail: recipientEmail,
         recipientName: "Test User",
         clubName: club_name,
