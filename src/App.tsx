@@ -115,7 +115,7 @@ function App() {
   // Detect if we're on a subdomain or custom domain (for public club websites)
   const hostname = window.location.hostname;
   const isAlfieproDomain = hostname.includes('.alfiepro.com.au') || hostname === 'alfiepro.com.au';
-  const isMainDomain = hostname === 'alfiepro.com.au' || hostname === 'www.alfiepro.com.au';
+  const isMainDomain = hostname === 'alfiepro.com.au' || hostname === 'www.alfiepro.com.au' || hostname === 'app.alfiepro.com.au';
   const isSubdomain = isAlfieproDomain &&
                       !isMainDomain &&
                       !hostname.startsWith('www.');
