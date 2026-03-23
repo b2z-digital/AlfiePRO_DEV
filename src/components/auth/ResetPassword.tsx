@@ -17,7 +17,18 @@ export const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
   const sessionReadyRef = useRef(false);
 
+  const url = new URL(window.location.href);
+  const activationToken = url.searchParams.get('token');
+  const activationEmail = url.searchParams.get('email');
+  const isActivationFlow = !!(activationToken && activationEmail);
+
   useEffect(() => {
+    if (isActivationFlow) {
+      sessionReadyRef.current = true;
+      setSessionReady(true);
+      return;
+    }
+
     let timeoutId: ReturnType<typeof setTimeout>;
     let pollIntervalId: ReturnType<typeof setInterval>;
 
@@ -42,47 +53,10 @@ export const ResetPassword: React.FC = () => {
       }
     });
 
-    const url = new URL(window.location.href);
-    const token = url.searchParams.get('token');
-    const email = url.searchParams.get('email');
     const hasCode = url.searchParams.has('code');
     const hasHashRecovery = window.location.hash.includes('type=recovery');
 
-    if (token) {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      fetch(`${supabaseUrl}/auth/v1/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseAnonKey,
-        },
-        body: JSON.stringify({
-          token_hash: token,
-          type: 'recovery',
-        }),
-      })
-        .then(res => res.json())
-        .then(async (data) => {
-          if (data.access_token && data.refresh_token) {
-            const { error: setErr } = await supabase.auth.setSession({
-              access_token: data.access_token,
-              refresh_token: data.refresh_token,
-            });
-            if (setErr) {
-              markExpired();
-            } else {
-              markReady();
-            }
-          } else {
-            markExpired();
-          }
-        })
-        .catch(() => {
-          markExpired();
-        });
-    } else if (hasCode || hasHashRecovery) {
+    if (hasCode || hasHashRecovery) {
       pollIntervalId = setInterval(async () => {
         if (sessionReadyRef.current) {
           clearInterval(pollIntervalId);
@@ -135,19 +109,46 @@ export const ResetPassword: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      if (isActivationFlow) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      setSuccess(true);
-      setLoading(false);
+        const res = await fetch(`${supabaseUrl}/functions/v1/set-member-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseAnonKey,
+          },
+          body: JSON.stringify({
+            token_hash: activationToken,
+            email: activationEmail,
+            password,
+          }),
+        });
 
-      try {
-        await supabase.auth.signOut();
-      } catch (_) {}
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Failed to set password');
+        }
+
+        setSuccess(true);
+        setLoading(false);
+      } else {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+
+        setSuccess(true);
+        setLoading(false);
+
+        try {
+          await supabase.auth.signOut();
+        } catch (_) {}
+      }
     } catch (err: any) {
       setLoading(false);
-      if (err.message?.includes('session') || err.message?.includes('token')) {
-        setError('Your reset link has expired. Please request a new one.');
+      if (err.message?.includes('expired') || err.message?.includes('invalid') || err.message?.includes('session') || err.message?.includes('token')) {
+        setError('Your reset link has expired. Please request a new activation email from your club administrator.');
       } else {
         setError(err.message || 'Failed to update password');
       }
