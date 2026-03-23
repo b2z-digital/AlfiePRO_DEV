@@ -291,7 +291,9 @@ Deno.serve(async (req: Request) => {
         if (recoveryLink?.properties?.hashed_token) {
           recoveryToken = recoveryLink.properties.hashed_token;
         }
-        if (recoveryLink?.properties?.action_link) {
+        if (recoveryToken) {
+          webActivationLink = `${webAppUrl}/reset-password?token=${encodeURIComponent(recoveryToken)}&email=${encodeURIComponent(member.email)}`;
+        } else if (recoveryLink?.properties?.action_link) {
           webActivationLink = recoveryLink.properties.action_link;
         }
 

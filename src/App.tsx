@@ -156,7 +156,9 @@ function App() {
   const isPublicRoute = window.location.pathname.startsWith('/stripe-oauth-callback') ||
                         window.location.pathname.startsWith('/auth/callback/youtube') ||
                         window.location.pathname.startsWith('/mobile-stream') ||
-                        window.location.pathname.startsWith('/play/');
+                        window.location.pathname.startsWith('/play/') ||
+                        window.location.pathname.startsWith('/reset-password') ||
+                        window.location.pathname.startsWith('/forgot-password');
 
   console.log('🔍 App.tsx auth check:', {
     loading,
