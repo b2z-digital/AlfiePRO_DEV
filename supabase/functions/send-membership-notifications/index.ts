@@ -48,74 +48,15 @@ const TYPE_ALIASES: Record<string, string> = {
 const defaultTemplates: Record<string, { subject: string; body: string }> = {
   welcome: {
     subject: 'Welcome to {{clubName}}!',
-    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Dear {{firstName}} {{lastName}},</p>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">We're thrilled to welcome you as a new member of <strong>{{clubName}}</strong>!</p>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your membership is now active, and you can start enjoying all the benefits of being a member, including participating in our racing events and club activities.</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-  <tr><td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;"><p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Getting Started</p></td></tr>
-  <tr><td style="padding:16px 20px;">
-    <ul style="margin:0;padding:0 0 0 20px;color:#374151;line-height:2;">
-      <li>Access your dashboard to manage your profile</li>
-      <li>View upcoming events and register for races</li>
-      <li>Connect with other club members</li>
-      <li>Stay updated with club news and announcements</li>
-    </ul>
-  </td></tr>
-</table>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you have any questions or need assistance getting started, please don't hesitate to reach out to us.</p>
-<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Welcome aboard!</p>`
+    body: `<p>Dear {{firstName}},</p><p>We're thrilled to welcome you as a new member of {{clubName}}!</p><p>Your membership is now active, and you can start enjoying all the benefits of being a member, including participating in our racing events and club activities.</p><h2>Getting Started</h2><ul><li>Access your dashboard to manage your profile</li><li>View upcoming events and register for races</li><li>Connect with other club members</li><li>Stay updated with club news and announcements</li></ul><p>If you have any questions or need assistance getting started, please don't hesitate to reach out to us.</p><p>Welcome aboard!</p>`
   },
   renewal_reminder: {
     subject: 'Time to renew your {{clubName}} membership',
-    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">Your <strong>{{membershipType}}</strong> membership with <strong>{{clubName}}</strong> is due for renewal.</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-  <tr><td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;"><p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Membership Details</p></td></tr>
-  <tr><td style="padding:0;">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:40%;"><span style="color:#64748b;font-size:13px;">Membership Type</span></td>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{membershipType}}</span></td>
-      </tr>
-      <tr>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#64748b;font-size:13px;">Renewal Date</span></td>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#ef4444;font-size:13px;font-weight:600;">{{renewalDate}}</span></td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-<p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.7;">To continue enjoying all the benefits of membership and participating in club racing, please renew your membership as soon as possible.</p>
-<div style="text-align:center;margin:28px 0;">
-  <a href="{{renewalLink}}" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Renew My Membership</a>
-</div>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">If you have any questions about your membership or need assistance with renewal, please don't hesitate to contact us.</p>
-<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">Thank you for being a valued member of {{clubName}}!</p>`
+    body: `<p>Hi {{firstName}},</p><p>Your {{membershipType}} membership with {{clubName}} is due for renewal.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Renewal Date</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p class="ql-align-center">To keep racing and enjoying all club benefits without interruption,</p><p class="ql-align-center">you can renew your membership in just a few minutes:</p><p class="ql-align-center"><br></p><p class="ql-align-center">\u{1F449} <strong>Renew via AlfiePRO App</strong></p><p class="ql-align-center"><em>Open AlfiePRO \u2192 Tap your profile \u2192 Membership</em></p><p class="ql-align-center"><strong>OR</strong></p><p class="ql-align-center">\u{1F449} <strong>Renew Online</strong></p><p class="ql-align-center"><a href="{{renewalLink}}" rel="noopener noreferrer" target="_blank">Renew My Membership</a></p><h3><br></h3><h3><strong>\u26A0\uFE0F Why renew now?</strong></h3><p>Renewing before your expiry ensures:</p><ul><li>You stay eligible to race</li><li>Your results and rankings continue uninterrupted</li><li>You remain covered under association insurance</li><li>If you have any questions or need help, just email<strong> {{secretaryName}}</strong> - {{secretaryEmail}}</li></ul><p>Thank you for being a valued member of {{clubName}}!</p>`
   },
   event: {
     subject: 'New Event: {{eventName}}',
-    body: `<p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi {{firstName}},</p>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">We're excited to announce a new upcoming event at <strong>{{clubName}}</strong>!</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
-  <tr><td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);padding:20px;text-align:center;"><h2 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">{{eventName}}</h2></td></tr>
-  <tr><td style="padding:0;">
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:35%;"><span style="color:#64748b;font-size:13px;">Date</span></td>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{eventDate}}</span></td>
-      </tr>
-      <tr>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#64748b;font-size:13px;">Location</span></td>
-        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;"><span style="color:#0f172a;font-size:13px;font-weight:600;">{{eventLocation}}</span></td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-<p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.7;">We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p>
-<div style="text-align:center;margin:28px 0;">
-  <a href="{{eventLink}}" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">View Event Details</a>
-</div>
-<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">For more information and to RSVP, please log in to your account or contact us directly.</p>
-<p style="margin:0;color:#374151;font-size:15px;line-height:1.7;">See you on the water!</p>`
+    body: `<p>Hi {{firstName}},</p><p>We're excited to announce a new upcoming event at {{clubName}}!</p><h2>{{eventName}}</h2><p>\u{1F4C5} Date{{eventDate}}\u{1F4CD} Location{{eventLocation}}</p><p>We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p><p><a href="{{eventLink}}" rel="noopener noreferrer" target="_blank">View Event Details</a></p><p>For more information and to RSVP, please log in to your account or contact us directly.</p><p>See you on the water!</p><p><br></p><p>Best regards,</p>`
   },
   application_approved: {
     subject: 'Your membership application has been approved!',
