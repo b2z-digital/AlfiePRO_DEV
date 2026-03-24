@@ -39,18 +39,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: userResult } = await supabase.rpc("get_user_id_by_email", {
-      p_email: email.toLowerCase(),
+    const { data: userList, error: listError } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
     });
 
-    if (!userResult) {
+    if (listError) {
+      console.error("Failed to list users:", listError);
       return new Response(
         JSON.stringify({ success: true, message: "If an account exists, a reset link has been sent." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const userId = userResult;
+    const foundUser = userList?.users?.find(
+      (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (!foundUser) {
+      return new Response(
+        JSON.stringify({ success: true, message: "If an account exists, a reset link has been sent." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = foundUser.id;
 
     const resetToken = crypto.randomUUID() + "-" + crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();

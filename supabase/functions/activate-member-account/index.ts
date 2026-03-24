@@ -117,8 +117,10 @@ Deno.serve(async (req: Request) => {
       });
 
       const testWebAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
-      const sampleWebLink = `${testWebAppUrl}/reset-password?token=SAMPLE_TOKEN_FOR_PREVIEW`;
-      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?token=SAMPLE_TOKEN_FOR_PREVIEW` : undefined;
+      const sampleToken = "SAMPLE_TOKEN_FOR_PREVIEW";
+      const sampleEmail = test_email_recipient || callingUser.email || "test@example.com";
+      const sampleWebLink = `${testWebAppUrl}/reset-password?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleEmail)}`;
+      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleEmail)}` : undefined;
 
       await sendActivationEmail({
         sendGridApiKey,
