@@ -21,11 +21,12 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { activation_token, email, password } = await req.json();
+    const { activation_token, reset_token, email, password } = await req.json();
 
-    if (!activation_token || !email || !password) {
+    const token = activation_token || reset_token;
+    if (!token || !email || !password) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: activation_token, email, password" }),
+        JSON.stringify({ error: "Missing required fields: token, email, password" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -40,7 +41,7 @@ Deno.serve(async (req: Request) => {
     const { data: tokenRecord, error: tokenError } = await supabase
       .from("member_activation_tokens")
       .select("*")
-      .eq("token", activation_token)
+      .eq("token", token)
       .maybeSingle();
 
     if (tokenError || !tokenRecord) {
@@ -88,13 +89,15 @@ Deno.serve(async (req: Request) => {
       .update({ used_at: new Date().toISOString() })
       .eq("id", tokenRecord.id);
 
-    await supabase
-      .from("members")
-      .update({
-        activation_status: "activated",
-        activated_at: new Date().toISOString(),
-      })
-      .eq("user_id", tokenRecord.user_id);
+    if (activation_token) {
+      await supabase
+        .from("members")
+        .update({
+          activation_status: "activated",
+          activated_at: new Date().toISOString(),
+        })
+        .eq("user_id", tokenRecord.user_id);
+    }
 
     return new Response(
       JSON.stringify({ success: true, message: "Password has been set successfully" }),
