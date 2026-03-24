@@ -16,6 +16,8 @@ interface ActivateRequest {
   bcc_email?: string;
   test_email_only?: boolean;
   test_email_recipient?: string;
+  preview_member_email?: string;
+  preview_member_name?: string;
 }
 
 interface ActivationResult {
@@ -58,7 +60,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient }: ActivateRequest = await req.json();
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name }: ActivateRequest = await req.json();
 
     if ((!test_email_only && (!member_ids?.length || !club_id || !club_name)) || (test_email_only && (!club_id || !club_name))) {
       return new Response(
@@ -126,15 +128,16 @@ Deno.serve(async (req: Request) => {
 
       const testWebAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
       const sampleToken = "SAMPLE_TOKEN_FOR_PREVIEW";
-      const sampleMemberEmail = "member@example.com";
-      const sampleWebLink = `${testWebAppUrl}/reset-password?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleMemberEmail)}`;
-      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleMemberEmail)}` : undefined;
+      const memberEmail = preview_member_email || "member@example.com";
+      const memberName = preview_member_name || "New Member";
+      const sampleWebLink = `${testWebAppUrl}/reset-password?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(memberEmail)}`;
+      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(memberEmail)}` : undefined;
 
       await sendActivationEmail({
         sendGridApiKey,
         fromEmail: defaultFromEmail || "noreply@alfiepro.com.au",
         toEmail: recipientEmail,
-        recipientName: "New Member",
+        recipientName: memberName,
         clubName: club_name,
         clubLogoUrl,
         activationDeepLink: sampleDeepLink || "",
