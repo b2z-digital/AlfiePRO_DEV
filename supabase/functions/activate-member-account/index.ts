@@ -90,6 +90,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: clubInfo } = await supabase
+      .from("clubs")
+      .select("logo")
+      .eq("id", club_id)
+      .maybeSingle();
+
+    const clubLogoUrl = clubInfo?.logo || "";
+
     if (test_email_only) {
       const recipientEmail = test_email_recipient || callingUser.email;
       if (!recipientEmail) {
@@ -118,16 +126,17 @@ Deno.serve(async (req: Request) => {
 
       const testWebAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
       const sampleToken = "SAMPLE_TOKEN_FOR_PREVIEW";
-      const sampleEmail = test_email_recipient || callingUser.email || "test@example.com";
-      const sampleWebLink = `${testWebAppUrl}/reset-password?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleEmail)}`;
-      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleEmail)}` : undefined;
+      const sampleMemberEmail = "member@example.com";
+      const sampleWebLink = `${testWebAppUrl}/reset-password?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleMemberEmail)}`;
+      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(sampleMemberEmail)}` : undefined;
 
       await sendActivationEmail({
         sendGridApiKey,
         fromEmail: defaultFromEmail || "noreply@alfiepro.com.au",
         toEmail: recipientEmail,
-        recipientName: "Test User",
+        recipientName: "New Member",
         clubName: club_name,
+        clubLogoUrl,
         activationDeepLink: sampleDeepLink || "",
         webActivationLink: sampleWebLink,
         appStoreUrl: platformConfig["ios_app_store_url"] || "",
@@ -135,7 +144,7 @@ Deno.serve(async (req: Request) => {
       });
 
       return new Response(
-        JSON.stringify({ success: true, message: `Test email sent to ${recipientEmail}` }),
+        JSON.stringify({ success: true, message: `Preview email sent to ${recipientEmail}` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -308,6 +317,7 @@ Deno.serve(async (req: Request) => {
             toEmail: member.email,
             recipientName: member.first_name,
             clubName: club_name,
+            clubLogoUrl,
             webActivationLink,
             activationDeepLink,
             appStoreUrl,
@@ -362,6 +372,7 @@ interface EmailParams {
   toEmail: string;
   recipientName: string;
   clubName: string;
+  clubLogoUrl: string;
   activationDeepLink: string;
   webActivationLink: string;
   appStoreUrl: string;
@@ -376,6 +387,7 @@ async function sendActivationEmail(params: EmailParams) {
     toEmail,
     recipientName,
     clubName,
+    clubLogoUrl,
     activationDeepLink,
     webActivationLink,
     appStoreUrl,
@@ -384,6 +396,10 @@ async function sendActivationEmail(params: EmailParams) {
   } = params;
 
   const hasAppStoreLinks = !!(appStoreUrl || playStoreUrl);
+
+  const logoHtml = clubLogoUrl
+    ? `<img src="${clubLogoUrl}" alt="${clubName}" style="max-width:80px;height:auto;margin:0 0 12px;border-radius:8px;background:rgba(255,255,255,0.15);padding:6px" /><br/>`
+    : '';
 
   const emailHtml = `<!DOCTYPE html>
 <html>
@@ -403,12 +419,13 @@ async function sendActivationEmail(params: EmailParams) {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
+                    ${logoHtml}
                     <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Welcome to ${clubName}</h1>
                     <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Your AlfiePRO membership account is ready</p>
                   </td>
                   <td align="right" valign="top">
                     <div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;display:inline-block;">
-                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">NEW ACCOUNT</span>
+                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Alfie PRO</span>
                     </div>
                   </td>
                 </tr>

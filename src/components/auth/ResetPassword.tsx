@@ -291,9 +291,9 @@ export const ResetPassword: React.FC = () => {
                     <p className="text-slate-400 text-sm">
                       {subtitleText}
                     </p>
-                    {isActivation && tokenEmail && (
+                    {tokenEmail && (
                       <p className="text-slate-500 text-xs mt-2">
-                        Account: <span className="text-slate-300">{tokenEmail}</span>
+                        <span className="text-slate-300">{tokenEmail}</span>
                       </p>
                     )}
                   </div>
