@@ -18,6 +18,8 @@ interface ActivateRequest {
   test_email_recipient?: string;
   preview_member_email?: string;
   preview_member_name?: string;
+  activate_on_behalf?: boolean;
+  behalf_email_recipient?: string;
 }
 
 interface ActivationResult {
@@ -60,7 +62,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name }: ActivateRequest = await req.json();
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name, activate_on_behalf, behalf_email_recipient }: ActivateRequest = await req.json();
 
     if ((!test_email_only && (!member_ids?.length || !club_id || !club_name)) || (test_email_only && (!club_id || !club_name))) {
       return new Response(
@@ -314,10 +316,12 @@ Deno.serve(async (req: Request) => {
           const appStoreUrl = platformConfig.ios_app_store_url || "";
           const playStoreUrl = platformConfig.android_play_store_url || "";
 
+          const emailRecipient = (activate_on_behalf && behalf_email_recipient) ? behalf_email_recipient : member.email;
+
           await sendActivationEmail({
             sendGridApiKey,
             fromEmail: defaultFromEmail,
-            toEmail: member.email,
+            toEmail: emailRecipient,
             recipientName: member.first_name,
             clubName: club_name,
             clubLogoUrl,
@@ -325,7 +329,7 @@ Deno.serve(async (req: Request) => {
             activationDeepLink,
             appStoreUrl,
             playStoreUrl,
-            bccEmail: bcc_email,
+            bccEmail: activate_on_behalf ? undefined : bcc_email,
           });
         }
 

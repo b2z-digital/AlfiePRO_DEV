@@ -712,13 +712,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          member_ids: [],
+          member_ids: membersToActivate.map(m => m.id),
           club_id: currentClub.clubId,
           club_name: clubName,
-          test_email_only: true,
-          test_email_recipient: activationTestEmail,
-          preview_member_email: membersToActivate[0]?.email || '',
-          preview_member_name: membersToActivate[0] ? `${membersToActivate[0].first_name} ${membersToActivate[0].last_name}` : '',
+          activate_on_behalf: true,
+          behalf_email_recipient: activationTestEmail,
         }),
       });
 
