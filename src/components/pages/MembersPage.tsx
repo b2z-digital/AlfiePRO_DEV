@@ -1728,7 +1728,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-sky-400 transition-colors"
                     >
                       <Mail size={14} />
-                      Send test email to preview
+                      Preview activation email
                     </button>
                   )}
                 </div>
