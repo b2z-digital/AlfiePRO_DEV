@@ -717,6 +717,8 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           club_name: clubName,
           test_email_only: true,
           test_email_recipient: activationTestEmail,
+          preview_member_email: membersToActivate[0]?.email || '',
+          preview_member_name: membersToActivate[0] ? `${membersToActivate[0].first_name} ${membersToActivate[0].last_name}` : '',
         }),
       });
 
@@ -1728,7 +1730,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-sky-400 transition-colors"
                     >
                       <Mail size={14} />
-                      Preview activation email
+                      Activate on behalf of member
                     </button>
                   )}
                 </div>
