@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
-import { CircleCheck as CheckCircle, Lock, Eye, EyeOff, TriangleAlert as AlertTriangle } from 'lucide-react';
+import { CircleCheck as CheckCircle, Lock, Eye, EyeOff, TriangleAlert as AlertTriangle, UserPlus } from 'lucide-react';
+
+type FlowType = 'activation' | 'reset' | 'legacy';
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -18,12 +20,22 @@ export const ResetPassword: React.FC = () => {
   const sessionReadyRef = useRef(false);
 
   const url = new URL(window.location.href);
-  const activationToken = url.searchParams.get('activation') || url.searchParams.get('token');
-  const activationEmail = url.searchParams.get('email');
-  const isActivationFlow = !!(activationToken && activationEmail);
+
+  const activationToken = url.searchParams.get('activation');
+  const resetToken = url.searchParams.get('reset');
+  const tokenEmail = url.searchParams.get('email');
+
+  let flowType: FlowType = 'legacy';
+  if (activationToken && tokenEmail) {
+    flowType = 'activation';
+  } else if (resetToken && tokenEmail) {
+    flowType = 'reset';
+  }
+
+  const isCustomTokenFlow = flowType === 'activation' || flowType === 'reset';
 
   useEffect(() => {
-    if (isActivationFlow) {
+    if (isCustomTokenFlow) {
       sessionReadyRef.current = true;
       setSessionReady(true);
       return;
@@ -91,7 +103,7 @@ export const ResetPassword: React.FC = () => {
     };
   }, []);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -109,9 +121,20 @@ export const ResetPassword: React.FC = () => {
     }
 
     try {
-      if (isActivationFlow) {
+      if (isCustomTokenFlow) {
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const body: Record<string, string> = {
+          email: tokenEmail!,
+          password,
+        };
+
+        if (flowType === 'activation') {
+          body.activation_token = activationToken!;
+        } else {
+          body.reset_token = resetToken!;
+        }
 
         const res = await fetch(`${supabaseUrl}/functions/v1/set-member-password`, {
           method: 'POST',
@@ -119,11 +142,7 @@ export const ResetPassword: React.FC = () => {
             'Content-Type': 'application/json',
             'apikey': supabaseAnonKey,
           },
-          body: JSON.stringify({
-            activation_token: activationToken,
-            email: activationEmail,
-            password,
-          }),
+          body: JSON.stringify(body),
         });
 
         const data = await res.json();
@@ -148,12 +167,37 @@ export const ResetPassword: React.FC = () => {
     } catch (err: any) {
       setLoading(false);
       if (err.message?.includes('expired') || err.message?.includes('invalid') || err.message?.includes('session') || err.message?.includes('token')) {
-        setError('Your reset link has expired. Please request a new activation email from your club administrator.');
+        if (flowType === 'activation') {
+          setError('Your activation link has expired or is invalid. Please contact your club administrator to resend the activation email.');
+        } else {
+          setError('Your reset link has expired or is invalid. Please request a new one.');
+        }
       } else {
-        setError(err.message || 'Failed to update password');
+        setError(err.message || 'Failed to set password');
       }
     }
   };
+
+  const isActivation = flowType === 'activation';
+
+  const headingText = isActivation ? 'Set Up Your Password' : 'Set New Password';
+  const subtitleText = isActivation
+    ? 'Create a password to access your club account.'
+    : 'Choose a strong password for your account.';
+  const buttonText = isActivation ? 'Create Password' : 'Update Password';
+  const loadingText = isActivation ? 'Creating...' : 'Updating...';
+  const successHeading = isActivation ? 'Account activated' : 'Password updated';
+  const successMessage = isActivation
+    ? 'Your password has been set and your account is now active. You can sign in to access your club.'
+    : 'Your password has been successfully updated. You can now sign in with your new password.';
+  const expiredHeading = isActivation ? 'Activation link expired' : 'Link expired or invalid';
+  const expiredMessage = isActivation
+    ? 'This activation link has expired or is invalid. Please contact your club administrator to resend the activation email.'
+    : 'This password reset link has expired or is invalid. Please request a new one.';
+  const verifyingHeading = isActivation ? 'Verifying activation link...' : 'Verifying reset link...';
+  const verifyingMessage = isActivation
+    ? 'Please wait while we verify your activation link.'
+    : 'Please wait while we verify your password reset link.';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center px-4 py-8">
@@ -177,9 +221,9 @@ export const ResetPassword: React.FC = () => {
                       <CheckCircle size={32} className="text-green-400" />
                     </div>
                   </div>
-                  <h2 className="text-xl font-semibold text-white">Password updated</h2>
+                  <h2 className="text-xl font-semibold text-white">{successHeading}</h2>
                   <p className="text-slate-400 text-sm">
-                    Your password has been successfully updated. You can now sign in with your new password.
+                    {successMessage}
                   </p>
                   <button
                     onClick={() => navigate('/login')}
@@ -195,17 +239,19 @@ export const ResetPassword: React.FC = () => {
                       <AlertTriangle size={32} className="text-amber-400" />
                     </div>
                   </div>
-                  <h2 className="text-xl font-semibold text-white">Link expired or invalid</h2>
+                  <h2 className="text-xl font-semibold text-white">{expiredHeading}</h2>
                   <p className="text-slate-400 text-sm">
-                    This password reset link has expired or is invalid. Please request a new one.
+                    {expiredMessage}
                   </p>
                   <div className="flex gap-3 justify-center mt-4">
-                    <button
-                      onClick={() => navigate('/forgot-password')}
-                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200"
-                    >
-                      Request New Link
-                    </button>
+                    {!isActivation && (
+                      <button
+                        onClick={() => navigate('/forgot-password')}
+                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-200"
+                      >
+                        Request New Link
+                      </button>
+                    )}
                     <button
                       onClick={() => navigate('/login')}
                       className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl transition-all duration-200"
@@ -221,9 +267,9 @@ export const ResetPassword: React.FC = () => {
                       <Lock size={28} className="text-blue-400" />
                     </div>
                   </div>
-                  <h2 className="text-xl font-semibold text-white">Verifying reset link...</h2>
+                  <h2 className="text-xl font-semibold text-white">{verifyingHeading}</h2>
                   <p className="text-slate-400 text-sm">
-                    Please wait while we verify your password reset link.
+                    {verifyingMessage}
                   </p>
                   <div className="flex justify-center">
                     <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
@@ -234,13 +280,22 @@ export const ResetPassword: React.FC = () => {
                   <div className="text-center mb-6">
                     <div className="flex justify-center mb-4">
                       <div className="w-14 h-14 bg-blue-500/10 rounded-full flex items-center justify-center">
-                        <Lock size={28} className="text-blue-400" />
+                        {isActivation ? (
+                          <UserPlus size={28} className="text-blue-400" />
+                        ) : (
+                          <Lock size={28} className="text-blue-400" />
+                        )}
                       </div>
                     </div>
-                    <h2 className="text-xl font-semibold text-white mb-2">Set new password</h2>
+                    <h2 className="text-xl font-semibold text-white mb-2">{headingText}</h2>
                     <p className="text-slate-400 text-sm">
-                      Choose a strong password for your account.
+                      {subtitleText}
                     </p>
+                    {isActivation && tokenEmail && (
+                      <p className="text-slate-500 text-xs mt-2">
+                        Account: <span className="text-slate-300">{tokenEmail}</span>
+                      </p>
+                    )}
                   </div>
 
                   {error && (
@@ -249,10 +304,10 @@ export const ResetPassword: React.FC = () => {
                     </div>
                   )}
 
-                  <form onSubmit={handleResetPassword} className="space-y-5">
+                  <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
                       <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
-                        New password
+                        {isActivation ? 'Password' : 'New password'}
                       </label>
                       <div className="relative">
                         <input
@@ -278,7 +333,7 @@ export const ResetPassword: React.FC = () => {
 
                     <div>
                       <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
-                        Confirm new password
+                        Confirm password
                       </label>
                       <div className="relative">
                         <input
@@ -289,7 +344,7 @@ export const ResetPassword: React.FC = () => {
                           required
                           minLength={6}
                           className="w-full px-4 py-3 pr-12 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                          placeholder="Confirm your new password"
+                          placeholder="Confirm your password"
                         />
                         <button
                           type="button"
@@ -306,7 +361,7 @@ export const ResetPassword: React.FC = () => {
                       disabled={loading}
                       className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/15 hover:shadow-xl hover:shadow-blue-500/25 disabled:shadow-none"
                     >
-                      {loading ? 'Updating...' : 'Update Password'}
+                      {loading ? loadingText : buttonText}
                     </button>
                   </form>
                 </>
