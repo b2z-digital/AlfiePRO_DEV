@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader2, CheckCircle, Radio, Upload } from 'lucide-react';
+import { Calendar, MapPin, Users, Trophy, FileText, X, Plus, ExternalLink, Youtube, Play, Trash2, ThumbsUp, ThumbsDown, Circle as HelpCircle, Video, DollarSign, QrCode, Info, Image, Cloud, Globe, MessageSquare, Loader as Loader2, CircleCheck as CheckCircle, Radio, Upload } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
 import { setCurrentEvent } from '../utils/raceStorage';
@@ -1642,614 +1642,364 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
     return `Score Day ${nextDay}`;
   };
 
-  const renderDetailsTab = () => (
-    <div className="space-y-6">
-      {/* Event Information Card */}
-      <div className={`
-        p-4 rounded-xl border shadow-sm
-        ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}
-      `}>
-        <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-          Event Information
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Date Card */}
-          <div className={`flex items-start gap-3 p-3 rounded-lg border transition-all hover:shadow-md ${
-            darkMode ? 'bg-slate-900/50 border-slate-700 hover:border-blue-500/50' : 'bg-slate-50 border-slate-200 hover:border-blue-400/50'
-          }`}>
-            <div className={`p-2 rounded-lg shadow-sm ${
-              darkMode ? 'bg-gradient-to-br from-blue-500/20 to-blue-600/10' : 'bg-gradient-to-br from-blue-50 to-blue-100'
-            }`}>
-              <Calendar className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={20} />
-            </div>
-            <div className="flex-1">
-              <p className={`text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Date
-              </p>
-              <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {new Date(event.date).toLocaleDateString('en-GB')}
-                {event.multiDay && event.endDate && event.date !== event.endDate && (
-                  <> - {new Date(event.endDate).toLocaleDateString('en-GB')}</>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Venue Card */}
-          <div className={`flex items-start gap-3 p-3 rounded-lg border transition-all hover:shadow-md ${
-            darkMode ? 'bg-slate-900/50 border-slate-700 hover:border-emerald-500/50' : 'bg-slate-50 border-slate-200 hover:border-emerald-400/50'
-          }`}>
-            <div className={`p-2 rounded-lg shadow-sm ${
-              darkMode ? 'bg-gradient-to-br from-emerald-500/20 to-emerald-600/10' : 'bg-gradient-to-br from-emerald-50 to-emerald-100'
-            }`}>
-              <MapPin className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} size={20} />
-            </div>
-            <div className="flex-1">
-              <p className={`text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Venue
-              </p>
-              <button
-                onClick={() => onViewVenue && onViewVenue(event.venue)}
-                className={`font-medium ${darkMode ? 'text-white hover:text-blue-400' : 'text-slate-900 hover:text-blue-600'} transition-colors text-left`}
-              >
-                {event.venue}
-              </button>
-            </div>
-          </div>
-
-          {/* Race Format Card */}
-          <div className={`flex items-start gap-3 p-3 rounded-lg border transition-all hover:shadow-md ${
-            darkMode ? 'bg-slate-900/50 border-slate-700 hover:border-amber-500/50' : 'bg-slate-50 border-slate-200 hover:border-amber-400/50'
-          }`}>
-            <div className={`p-2 rounded-lg shadow-sm ${
-              darkMode ? 'bg-gradient-to-br from-amber-500/20 to-amber-600/10' : 'bg-gradient-to-br from-amber-50 to-amber-100'
-            }`}>
-              <Trophy className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={20} />
-            </div>
-            <div className="flex-1">
-              <p className={`text-xs font-medium uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Race Format
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {!event.isExternalEvent && (
-                  <div className={`
-                    px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm
-                    ${event.raceFormat === 'handicap'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-blue-600 text-white'}
-                  `}>
-                    {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                  </div>
-                )}
-                <div className="px-3 py-1.5 rounded-lg text-sm font-medium bg-rose-600 text-white shadow-sm">
-                  {event.raceClass}
-                </div>
-                {event.isInterclub && (
-                  <div className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600 text-white shadow-sm">
-                    Interclub
-                  </div>
-                )}
-                {event.multiDay && (
-                  <div className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 text-white shadow-sm">
-                    {event.numberOfDays} Days
-                  </div>
-                )}
-                {event.multiDay && event.dayResults && (
-                  <div className="px-3 py-1.5 rounded-lg text-sm font-medium bg-cyan-600 text-white shadow-sm">
-                    {Object.keys(event.dayResults).filter(day => {
-                      const dayData = event.dayResults[day];
-                      return dayData && dayData.lastCompletedRace > 0;
-                    }).length} of {event.numberOfDays} days completed
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Entry Fee Card */}
-          {event.isPaid && (
-            <div className={`flex items-start gap-3 p-3 rounded-lg border transition-all hover:shadow-md ${
-              darkMode ? 'bg-slate-900/50 border-slate-700 hover:border-green-500/50' : 'bg-slate-50 border-slate-200 hover:border-green-400/50'
-            }`}>
-              <div className={`p-2 rounded-lg shadow-sm ${
-                darkMode ? 'bg-gradient-to-br from-green-500/20 to-green-600/10' : 'bg-gradient-to-br from-green-50 to-green-100'
-              }`}>
-                <DollarSign className={darkMode ? 'text-green-400' : 'text-green-600'} size={20} />
-              </div>
-              <div className="flex-1">
-                <p className={`text-xs font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Entry Fee
-                </p>
-                <p className={`font-semibold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  ${event.entryFee?.toFixed(2)} AUD
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* External Event Registration Link */}
-      {event.isExternalEvent && event.registrationUrl && (
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}`}>
-          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-            Event Registration
-          </h3>
-          <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <p className={`text-sm mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-              This event is managed externally. Click below to register on the event organiser's website.
-            </p>
-            <a
-              href={event.registrationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
-            >
-              <ExternalLink size={16} />
-              Register for Event
-            </a>
-          </div>
-        </div>
-      )}
-
-      {/* Event Registration Section (before skippers are added) */}
-      {!skippersAdded && !event.isExternalEvent && (
-        <div className={`
-          p-4 rounded-lg
-          ${darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}
-        `}>
-          <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-            Event Registration
-          </h3>
-
-          <div className="space-y-4">
-            <div className={`
-              p-4 rounded-lg border
-              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-            `}>
-              <div className="flex items-center justify-between gap-4">
-                <h4 className={`text-base font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                  Will you attend?
-                </h4>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => updateAttendance('yes')}
-                    disabled={updatingAttendance}
-                    className={`
-                      flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all font-medium text-sm
-                      ${attendanceStatus === 'yes'
-                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
-                        : darkMode
-                          ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}
-                      ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                  >
-                    <ThumbsUp size={16} />
-                    <span>Yes</span>
-                  </button>
-
-                  <button
-                    onClick={() => updateAttendance('maybe')}
-                    disabled={updatingAttendance}
-                    className={`
-                      flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all font-medium text-sm
-                      ${attendanceStatus === 'maybe'
-                        ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-                        : darkMode
-                          ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}
-                      ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                  >
-                    <HelpCircle size={16} />
-                    <span>Maybe</span>
-                  </button>
-
-                  <button
-                    onClick={() => updateAttendance('no')}
-                    disabled={updatingAttendance}
-                    className={`
-                      flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all font-medium text-sm
-                      ${attendanceStatus === 'no'
-                        ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
-                        : darkMode
-                          ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}
-                      ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                  >
-                    <ThumbsDown size={16} />
-                    <span>No</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Registration Status Display for Paid Events */}
-            {event.isPaid && event.entryFee && event.entryFee > 0 && userRegistration && (
-              <div className={`
-                p-4 rounded-lg border-2
-                ${userRegistration.payment_status === 'paid'
-                  ? darkMode ? 'bg-green-900/20 border-green-500/50' : 'bg-green-50 border-green-400'
-                  : userRegistration.payment_status === 'pay_at_event'
-                    ? darkMode ? 'bg-green-900/20 border-green-500/50' : 'bg-green-50 border-green-400'
-                    : darkMode ? 'bg-red-900/20 border-red-500/50' : 'bg-red-50 border-red-400'
-                }
-              `}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${
-                      userRegistration.payment_status === 'paid'
-                        ? darkMode ? 'text-green-300' : 'text-green-700'
-                        : userRegistration.payment_status === 'pay_at_event'
-                          ? darkMode ? 'text-green-300' : 'text-green-700'
-                          : darkMode ? 'text-red-300' : 'text-red-700'
-                    }`}>
-                      {userRegistration.payment_status === 'paid' && 'Registered & Paid'}
-                      {userRegistration.payment_status === 'pay_at_event' && 'Registration Confirmed'}
-                      {userRegistration.payment_status === 'unpaid' && 'Registration Pending Payment'}
-                    </h4>
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {userRegistration.payment_status === 'paid' && `Paid $${userRegistration.amount_paid?.toFixed(2) || event.entryFee.toFixed(2)}`}
-                      {userRegistration.payment_status === 'pay_at_event' && 'Payment due at registration desk'}
-                      {userRegistration.payment_status === 'unpaid' && 'Please complete your payment'}
-                    </p>
-                    {userRegistration.boat_name && (
-                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                        {userRegistration.boat_name} - Sail #{userRegistration.sail_number}
-                      </p>
-                    )}
-                  </div>
-                  {userRegistration.payment_status === 'unpaid' && (
-                    <button
-                      onClick={() => setShowRegistrationModal(true)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm"
-                    >
-                      Complete Payment
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Show Register button for paid events if not registered */}
-            {event.isPaid && event.entryFee && event.entryFee > 0 && !userRegistration && !loadingRegistration && (
-              <div className={`
-                p-4 rounded-lg border
-                ${darkMode ? 'bg-blue-900/20 border-blue-500/50' : 'bg-blue-50 border-blue-400'}
-              `}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className={`font-semibold mb-1 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                      Entry Fee Required
-                    </h4>
-                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Register and pay ${event.entryFee.toFixed(2)} AUD to participate
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowRegistrationModal(true)}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
-                  >
-                    Register Now
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className={`
-              p-4 rounded-lg border
-              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-            `}>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className={`text-base font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                  Who's attending?
-                </h4>
-                <span className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {attendees.filter(a => a.status === 'yes').length} confirmed
-                </span>
-              </div>
-
-              {attendees.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Attending */}
-                  {attendees.filter(a => a.status === 'yes').length > 0 && (
-                    <div>
-                      <h5 className={`text-sm font-medium mb-2 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                        Attending
-                      </h5>
-                      <div className="flex flex-wrap gap-4">
-                        {attendees
-                          .filter(a => a.status === 'yes')
-                          .map(attendee => {
-                            const nameParts = attendee.name.split(' ');
-                            const initials = nameParts.map(part => part[0]).join('');
-
-                            return (
-                              <div
-                                key={attendee.id}
-                                className="flex flex-col items-center"
-                              >
-                                <div className={`
-                                  w-12 h-12 rounded-full flex items-center justify-center mb-1 overflow-hidden
-                                  ${darkMode ? 'bg-green-900/30' : 'bg-green-100'}
-                                `}>
-                                  {attendee.avatarUrl ? (
-                                    <img
-                                      src={attendee.avatarUrl}
-                                      alt={attendee.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className={`text-lg font-semibold ${darkMode ? 'text-green-400' : 'text-green-700'}`}>
-                                      {initials}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                  {attendee.name}
-                                </span>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Maybe */}
-                  {attendees.filter(a => a.status === 'maybe').length > 0 && (
-                    <div>
-                      <h5 className={`text-sm font-medium mb-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
-                        Maybe
-                      </h5>
-                      <div className="flex flex-wrap gap-4">
-                        {attendees
-                          .filter(a => a.status === 'maybe')
-                          .map(attendee => {
-                            const nameParts = attendee.name.split(' ');
-                            const initials = nameParts.map(part => part[0]).join('');
-
-                            return (
-                              <div
-                                key={attendee.id}
-                                className="flex flex-col items-center"
-                              >
-                                <div className={`
-                                  w-12 h-12 rounded-full flex items-center justify-center mb-1 overflow-hidden
-                                  ${darkMode ? 'bg-amber-900/30' : 'bg-amber-100'}
-                                `}>
-                                  {attendee.avatarUrl ? (
-                                    <img
-                                      src={attendee.avatarUrl}
-                                      alt={attendee.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className={`text-lg font-semibold ${darkMode ? 'text-amber-400' : 'text-amber-700'}`}>
-                                      {initials}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                  {attendee.name}
-                                </span>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Not Attending */}
-                  {attendees.filter(a => a.status === 'no').length > 0 && (
-                    <div>
-                      <h5 className={`text-sm font-medium mb-2 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
-                        Not Attending
-                      </h5>
-                      <div className="flex flex-wrap gap-4">
-                        {attendees
-                          .filter(a => a.status === 'no')
-                          .map(attendee => {
-                            const nameParts = attendee.name.split(' ');
-                            const initials = nameParts.map(part => part[0]).join('');
-
-                            return (
-                              <div
-                                key={attendee.id}
-                                className="flex flex-col items-center"
-                              >
-                                <div className={`
-                                  w-12 h-12 rounded-full flex items-center justify-center mb-1 overflow-hidden
-                                  ${darkMode ? 'bg-red-900/30' : 'bg-red-100'}
-                                `}>
-                                  {attendee.avatarUrl ? (
-                                    <img
-                                      src={attendee.avatarUrl}
-                                      alt={attendee.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className={`text-lg font-semibold ${darkMode ? 'text-red-400' : 'text-red-700'}`}>
-                                      {initials}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                  {attendee.name}
-                                </span>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+  const renderAttendeeAvatars = (filteredAttendees: typeof attendees, colorScheme: { bg: string; text: string }) => (
+    <div className="flex flex-wrap gap-3">
+      {filteredAttendees.map(attendee => {
+        const nameParts = attendee.name.split(' ');
+        const initials = nameParts.map(part => part[0]).join('');
+        return (
+          <div key={attendee.id} className="flex flex-col items-center">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-0.5 overflow-hidden ${colorScheme.bg}`}>
+              {attendee.avatarUrl ? (
+                <img src={attendee.avatarUrl} alt={attendee.name} className="w-full h-full object-cover" />
               ) : (
-                <div className={`text-center py-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  No responses yet
-                </div>
+                <span className={`text-sm font-semibold ${colorScheme.text}`}>{initials}</span>
               )}
             </div>
+            <span className={`text-[10px] leading-tight text-center max-w-[56px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              {attendee.name.split(' ')[0]}
+            </span>
           </div>
+        );
+      })}
+    </div>
+  );
 
-          {smsEnabled && can('manage', 'events') && (
-            <div className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MessageSquare size={18} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
-                  <div>
-                    <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                      SMS Attendance
-                    </h4>
-                    <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {smsAlreadySent
-                        ? `${smsSent?.sent || 0} messages sent`
-                        : 'Send SMS to members with phone numbers'}
-                    </p>
-                  </div>
-                </div>
-                {smsAlreadySent ? (
-                  <div className="flex items-center gap-2 text-green-400">
-                    <CheckCircle size={16} />
-                    <span className="text-xs font-medium">Sent</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleSendSms}
-                    disabled={smsSending}
-                    className="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors disabled:opacity-50"
-                  >
-                    {smsSending ? (
-                      <><Loader2 size={14} className="animate-spin" /> Sending...</>
-                    ) : (
-                      <><MessageSquare size={14} /> Notify Members</>
-                    )}
-                  </button>
-                )}
+  const renderDetailsTab = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* LEFT COLUMN - Event Information */}
+        <div className={`p-4 rounded-xl border shadow-sm ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+          <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+            Event Information
+          </h3>
+          <div className="space-y-3">
+            <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-blue-500/20' : 'bg-blue-50'}`}>
+                <Calendar className={darkMode ? 'text-blue-400' : 'text-blue-600'} size={16} />
+              </div>
+              <div className="flex-1">
+                <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Date</p>
+                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  {new Date(event.date).toLocaleDateString('en-GB')}
+                  {event.multiDay && event.endDate && event.date !== event.endDate && (
+                    <> - {new Date(event.endDate).toLocaleDateString('en-GB')}</>
+                  )}
+                </p>
               </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Show competing skippers (after skippers are added) */}
-      {/* Competing Skippers Section - Enhanced */}
-      {skippersAdded && event.skippers && event.skippers.length > 0 && (
-        <div className={`
-          p-6 rounded-xl border shadow-sm
-          ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Competing Skippers
-            </h3>
-            <div className="flex items-center gap-4">
-              {/* Avatar Stack */}
-              <div className="flex items-center -space-x-3">
-                {event.skippers.slice(0, Math.min(9, event.skippers.length)).map((skipper, index) => {
+            <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-emerald-500/20' : 'bg-emerald-50'}`}>
+                <MapPin className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} size={16} />
+              </div>
+              <div className="flex-1">
+                <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Venue</p>
+                <button
+                  onClick={() => onViewVenue && onViewVenue(event.venue)}
+                  className={`text-sm font-medium ${darkMode ? 'text-white hover:text-blue-400' : 'text-slate-900 hover:text-blue-600'} transition-colors text-left`}
+                >
+                  {event.venue}
+                </button>
+              </div>
+            </div>
+
+            <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-amber-500/20' : 'bg-amber-50'}`}>
+                <Trophy className={darkMode ? 'text-amber-400' : 'text-amber-600'} size={16} />
+              </div>
+              <div className="flex-1">
+                <p className={`text-[10px] font-medium uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Race Format</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {!event.isExternalEvent && (
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${event.raceFormat === 'handicap' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white'}`}>
+                      {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-600 text-white">{event.raceClass}</span>
+                  {event.isInterclub && <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">Interclub</span>}
+                  {event.multiDay && <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">{event.numberOfDays} Days</span>}
+                  {event.multiDay && event.dayResults && (
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-600 text-white">
+                      {Object.keys(event.dayResults).filter(day => {
+                        const dayData = event.dayResults[day];
+                        return dayData && dayData.lastCompletedRace > 0;
+                      }).length}/{event.numberOfDays} done
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {event.isPaid && (
+              <div className={`flex items-center gap-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`p-1.5 rounded-lg ${darkMode ? 'bg-green-500/20' : 'bg-green-50'}`}>
+                  <DollarSign className={darkMode ? 'text-green-400' : 'text-green-600'} size={16} />
+                </div>
+                <div className="flex-1">
+                  <p className={`text-[10px] font-medium uppercase tracking-wider ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Entry Fee</p>
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>${event.entryFee?.toFixed(2)} AUD</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN - Registration/Attendance OR Competing Skippers */}
+        <div className={`p-4 rounded-xl border shadow-sm ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+          {/* External Event Registration */}
+          {event.isExternalEvent && event.registrationUrl && (
+            <>
+              <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                Registration
+              </h3>
+              <p className={`text-sm mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                This event is managed externally.
+              </p>
+              <a
+                href={event.registrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              >
+                <ExternalLink size={16} />
+                Register for Event
+              </a>
+            </>
+          )}
+
+          {/* Competing Skippers (when skippers have been added) */}
+          {skippersAdded && event.skippers && event.skippers.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-sm font-bold uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  Competing Skippers
+                </h3>
+                <div className={`px-3 py-1 rounded-lg font-semibold text-xs ${darkMode ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white' : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'}`}>
+                  {event.skippers.length} competitor{event.skippers.length === 1 ? '' : 's'}
+                </div>
+              </div>
+              <div className="flex items-center -space-x-2.5 flex-wrap gap-y-2">
+                {event.skippers.slice(0, Math.min(12, event.skippers.length)).map((skipper, index) => {
                   const nameParts = skipper.name.split(' ');
                   const initials = nameParts.map(part => part[0]).join('');
                   const avatarUrl = skipperAvatars[skipper.name];
-
                   return (
                     <div
                       key={index}
-                      className={`
-                        w-10 h-10 rounded-full flex items-center justify-center overflow-hidden border-3 ring-2 transform hover:scale-110 hover:z-10 transition-all cursor-pointer
-                        ${darkMode
-                          ? 'bg-gradient-to-br from-slate-700 to-slate-600 border-slate-800 ring-slate-800/50'
-                          : 'bg-gradient-to-br from-slate-200 to-slate-100 border-white ring-white/50'
-                        }
-                      `}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden ring-2 transform hover:scale-110 hover:z-10 transition-all cursor-pointer ${darkMode ? 'bg-gradient-to-br from-slate-700 to-slate-600 ring-slate-800' : 'bg-gradient-to-br from-slate-200 to-slate-100 ring-white'}`}
                       title={skipper.name}
                     >
                       {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt={skipper.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={avatarUrl} alt={skipper.name} className="w-full h-full object-cover" />
                       ) : (
-                        <span className={`text-sm font-bold ${darkMode ? 'text-white' : 'text-slate-700'}`}>
-                          {initials}
-                        </span>
+                        <span className={`text-xs font-bold ${darkMode ? 'text-white' : 'text-slate-700'}`}>{initials}</span>
                       )}
                     </div>
                   );
                 })}
+                {event.skippers.length > 12 && (
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center ring-2 ${darkMode ? 'bg-slate-600 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-600'}`}>
+                    <span className="text-[10px] font-bold">+{event.skippers.length - 12}</span>
+                  </div>
+                )}
+              </div>
+              {showAllSkippers && event.skippers.length > 12 && (
+                <div className="mt-3 pt-3 border-t border-slate-600/30">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {event.skippers.map((skipper, index) => {
+                      const nameParts = skipper.name.split(' ');
+                      const initials = nameParts.map(part => part[0]).join('');
+                      const avatarUrl = skipperAvatars[skipper.name];
+                      return (
+                        <div key={index} className={`flex items-center gap-2 p-1.5 rounded-lg ${darkMode ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-white hover:bg-slate-50'} transition-colors`}>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${darkMode ? 'bg-slate-600' : 'bg-slate-200'}`}>
+                            {avatarUrl ? (
+                              <img src={avatarUrl} alt={skipper.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className={`text-[10px] font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>{initials}</span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className={`text-xs font-medium truncate ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>{skipper.name}</div>
+                            <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>#{skipper.sailNo}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setShowAllSkippers(false)}
+                    className={`mt-2 w-full py-1.5 text-xs font-medium rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                  >
+                    Show Less
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Event Registration (before skippers are added, non-external) */}
+          {!skippersAdded && !event.isExternalEvent && (
+            <>
+              <h3 className={`text-sm font-bold uppercase tracking-wider mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                Registration
+              </h3>
+
+              <div className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border mb-3 ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>Will you attend?</span>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => updateAttendance('yes')}
+                    disabled={updatingAttendance}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all font-medium text-xs ${attendanceStatus === 'yes' ? 'bg-green-600 text-white shadow-lg shadow-green-600/30' : darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ThumbsUp size={13} />
+                    <span>Yes</span>
+                  </button>
+                  <button
+                    onClick={() => updateAttendance('maybe')}
+                    disabled={updatingAttendance}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all font-medium text-xs ${attendanceStatus === 'maybe' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30' : darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <HelpCircle size={13} />
+                    <span>Maybe</span>
+                  </button>
+                  <button
+                    onClick={() => updateAttendance('no')}
+                    disabled={updatingAttendance}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all font-medium text-xs ${attendanceStatus === 'no' ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' : darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'} ${updatingAttendance ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ThumbsDown size={13} />
+                    <span>No</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Competitor Count Badge */}
-              <div className={`
-                px-4 py-2 rounded-xl font-semibold text-sm shadow-sm
-                ${darkMode
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white'
-                  : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                }
-              `}>
-                {event.skippers.length} competitor{event.skippers.length === 1 ? '' : 's'}
-              </div>
-            </div>
-          </div>
+              {event.isPaid && event.entryFee && event.entryFee > 0 && userRegistration && (
+                <div className={`p-3 rounded-lg border-2 mb-3 ${userRegistration.payment_status === 'paid' || userRegistration.payment_status === 'pay_at_event' ? darkMode ? 'bg-green-900/20 border-green-500/50' : 'bg-green-50 border-green-400' : darkMode ? 'bg-red-900/20 border-red-500/50' : 'bg-red-50 border-red-400'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className={`text-sm font-semibold ${userRegistration.payment_status === 'paid' || userRegistration.payment_status === 'pay_at_event' ? darkMode ? 'text-green-300' : 'text-green-700' : darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                        {userRegistration.payment_status === 'paid' && 'Registered & Paid'}
+                        {userRegistration.payment_status === 'pay_at_event' && 'Registration Confirmed'}
+                        {userRegistration.payment_status === 'unpaid' && 'Pending Payment'}
+                      </h4>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {userRegistration.payment_status === 'paid' && `Paid $${userRegistration.amount_paid?.toFixed(2) || event.entryFee.toFixed(2)}`}
+                        {userRegistration.payment_status === 'pay_at_event' && 'Payment due at desk'}
+                        {userRegistration.payment_status === 'unpaid' && 'Complete your payment'}
+                      </p>
+                    </div>
+                    {userRegistration.payment_status === 'unpaid' && (
+                      <button onClick={() => setShowRegistrationModal(true)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-xs">
+                        Pay Now
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
-          {showAllSkippers && event.skippers.length > 12 && (
-            <div className="mt-3 pt-3 border-t border-slate-600/30">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                {event.skippers.map((skipper, index) => {
-                  const nameParts = skipper.name.split(' ');
-                  const initials = nameParts.map(part => part[0]).join('');
-                  const avatarUrl = skipperAvatars[skipper.name];
+              {event.isPaid && event.entryFee && event.entryFee > 0 && !userRegistration && !loadingRegistration && (
+                <div className={`p-3 rounded-lg border mb-3 ${darkMode ? 'bg-blue-900/20 border-blue-500/50' : 'bg-blue-50 border-blue-400'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className={`text-sm font-semibold ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>Entry Fee Required</h4>
+                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>${event.entryFee.toFixed(2)} AUD</p>
+                    </div>
+                    <button onClick={() => setShowRegistrationModal(true)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs">
+                      Register
+                    </button>
+                  </div>
+                </div>
+              )}
 
-                  return (
-                    <div
-                      key={index}
-                      className={`flex items-center gap-2 p-2 rounded-lg ${darkMode ? 'bg-slate-700/50 hover:bg-slate-700' : 'bg-white hover:bg-slate-50'} transition-colors`}
-                    >
-                      <div className={`
-                        w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden
-                        ${darkMode ? 'bg-slate-600' : 'bg-slate-200'}
-                      `}>
-                        {avatarUrl ? (
-                          <img
-                            src={avatarUrl}
-                            alt={skipper.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className={`text-xs font-semibold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                            {initials}
-                          </span>
+              <div className={`p-3 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Who's attending?</span>
+                  <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {attendees.filter(a => a.status === 'yes').length} confirmed
+                  </span>
+                </div>
+
+                {attendees.length > 0 ? (
+                  <div className="space-y-3">
+                    {attendees.filter(a => a.status === 'yes').length > 0 && (
+                      <div>
+                        <h5 className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>Attending</h5>
+                        {renderAttendeeAvatars(
+                          attendees.filter(a => a.status === 'yes'),
+                          { bg: darkMode ? 'bg-green-900/30' : 'bg-green-100', text: darkMode ? 'text-green-400' : 'text-green-700' }
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-xs font-medium truncate ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}>
-                          {skipper.name}
-                        </div>
-                        <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          #{skipper.sailNo}
-                        </div>
+                    )}
+                    {attendees.filter(a => a.status === 'maybe').length > 0 && (
+                      <div>
+                        <h5 className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>Maybe</h5>
+                        {renderAttendeeAvatars(
+                          attendees.filter(a => a.status === 'maybe'),
+                          { bg: darkMode ? 'bg-amber-900/30' : 'bg-amber-100', text: darkMode ? 'text-amber-400' : 'text-amber-700' }
+                        )}
+                      </div>
+                    )}
+                    {attendees.filter(a => a.status === 'no').length > 0 && (
+                      <div>
+                        <h5 className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>Not Attending</h5>
+                        {renderAttendeeAvatars(
+                          attendees.filter(a => a.status === 'no'),
+                          { bg: darkMode ? 'bg-red-900/30' : 'bg-red-100', text: darkMode ? 'text-red-400' : 'text-red-700' }
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className={`text-center py-3 text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    No responses yet
+                  </div>
+                )}
+              </div>
+
+              {smsEnabled && can('manage', 'events') && (
+                <div className={`mt-3 p-2.5 rounded-lg border ${darkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare size={14} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
+                      <div>
+                        <h4 className={`text-xs font-medium ${darkMode ? 'text-white' : 'text-slate-800'}`}>SMS Attendance</h4>
+                        <p className={`text-[10px] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {smsAlreadySent ? `${smsSent?.sent || 0} sent` : 'Notify members'}
+                        </p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => setShowAllSkippers(false)}
-                className={`mt-3 w-full py-2 text-sm font-medium rounded-lg transition-colors ${
-                  darkMode
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                }`}
-              >
-                Show Less
-              </button>
+                    {smsAlreadySent ? (
+                      <div className="flex items-center gap-1 text-green-400">
+                        <CheckCircle size={14} />
+                        <span className="text-[10px] font-medium">Sent</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleSendSms}
+                        disabled={smsSending}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500 text-white rounded-lg text-xs font-medium hover:bg-teal-600 transition-colors disabled:opacity-50"
+                      >
+                        {smsSending ? <><Loader2 size={12} className="animate-spin" /> Sending...</> : <><MessageSquare size={12} /> Notify</>}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Empty state when no registration and no skippers */}
+          {!skippersAdded && event.isExternalEvent && !event.registrationUrl && (
+            <div className={`text-center py-6 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              <Users size={24} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No registration details available</p>
             </div>
           )}
         </div>
-      )}
+      </div>
       
       {onStartScoring && !event.completed && !event.cancelled && can('races.score') && (
         <div className="flex flex-col gap-3">
