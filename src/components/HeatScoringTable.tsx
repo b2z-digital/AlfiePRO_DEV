@@ -1117,90 +1117,101 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           </div>
         </div>
 
-        {rollCallActive && touchMode && selectedHeat && (() => {
+        {rollCallActive && selectedHeat ? (() => {
           const observerSailNumbers = new Set(currentHeatObservers.map(o => String(o.skipper_sail_number)));
-          const racingSkippers = heatSkippers.filter(s => !observerSailNumbers.has(String(s.sailNumber || s.sailNo)));
+          const racingSkippers = heatSkipperIndices.filter(idx => {
+            const s = skippers[idx];
+            return s && !observerSailNumbers.has(String(s.sailNumber || s.sailNo));
+          });
           const totalRacing = racingSkippers.length;
           const readyCount = rollCallReady.size;
           const absentCount = rollCallAbsent.size;
           const unmarkedCount = totalRacing - readyCount - absentCount;
+          const allAccountedFor = readyCount + absentCount >= totalRacing;
 
           return (
-            <div className={`${isFullscreen ? 'fixed inset-0 z-20' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-b-xl'} ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
-              <div className={`px-6 py-4 border-b flex-shrink-0 ${darkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <div className={`${isFullscreen ? 'fixed inset-0 z-20' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-b-xl'} ${
+              darkMode ? 'bg-amber-950/20' : 'bg-amber-50/40'
+            }`}>
+              <div className={`px-5 py-3 border-b flex-shrink-0 ${
+                darkMode ? 'bg-amber-900/30 border-amber-800/30' : 'bg-amber-100/60 border-amber-200/60'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/15' : 'bg-amber-50'}`}>
-                      <ClipboardCheck size={22} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/20 ring-1 ring-amber-500/30' : 'bg-amber-100 ring-1 ring-amber-300/60'}`}>
+                      <ClipboardCheck size={20} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
                     </div>
                     <div>
-                      <h3 className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      <h3 className={`font-bold text-base ${darkMode ? 'text-amber-200' : 'text-amber-900'}`}>
                         Heat {selectedHeat} - Roll Call
                       </h3>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        Tap skippers to mark as ready. Long-press to mark absent.
+                      <p className={`text-xs ${darkMode ? 'text-amber-400/70' : 'text-amber-700/70'}`}>
+                        Tap to mark ready. Right-click to mark absent.
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className={`flex items-center gap-1.5 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
-                        <UserCheck size={16} /> {readyCount} ready
-                      </span>
+                    <div className="flex items-center gap-3 text-sm">
+                      {readyCount > 0 && (
+                        <span className={`flex items-center gap-1 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                          <UserCheck size={14} /> {readyCount}
+                        </span>
+                      )}
                       {absentCount > 0 && (
-                        <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
-                          <UserX size={16} /> {absentCount} absent
+                        <span className={`flex items-center gap-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                          <UserX size={14} /> {absentCount}
                         </span>
                       )}
                       {unmarkedCount > 0 && (
-                        <span className={`flex items-center gap-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} text-xs`}>
                           {unmarkedCount} waiting
                         </span>
                       )}
                     </div>
                     <button
                       onClick={() => {
-                        const allIndices = new Set(heatSkipperIndices.filter(idx => {
-                          const s = skippers[idx];
-                          return s && !observerSailNumbers.has(String(s.sailNumber || s.sailNo));
-                        }));
-                        setRollCallReady(allIndices);
+                        setRollCallReady(new Set(racingSkippers));
                         setRollCallAbsent(new Set());
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                         darkMode
                           ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                       }`}
                     >
                       All Ready
                     </button>
                     <button
                       onClick={() => setRollCallActive(false)}
-                      className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+                      className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                        allAccountedFor
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : darkMode
+                            ? 'bg-amber-600 text-white hover:bg-amber-500'
+                            : 'bg-amber-600 text-white hover:bg-amber-500'
+                      }`}
                     >
-                      {readyCount > 0 ? 'Start Scoring' : 'Skip Roll Call'}
+                      {allAccountedFor ? 'Start Scoring' : 'Skip Roll Call'}
                     </button>
                   </div>
                 </div>
-                <div className="mt-3 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+                <div className={`mt-2.5 w-full rounded-full h-1 ${darkMode ? 'bg-slate-700/60' : 'bg-amber-200/60'}`}>
                   <div
-                    className="h-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-300"
+                    className="h-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-300"
                     style={{ width: `${totalRacing > 0 ? ((readyCount + absentCount) / totalRacing) * 100 : 0}%` }}
                   />
                 </div>
               </div>
 
-              <div className={`flex-1 overflow-y-auto p-6 ${darkMode ? 'bg-slate-900/50' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {heatSkipperIndices.map(originalIdx => {
+              <div className={`flex-1 overflow-y-auto p-4 sm:p-5 ${darkMode ? 'bg-amber-950/10' : 'bg-amber-50/30'}`}>
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+                  {racingSkippers.map(originalIdx => {
                     const skipper = skippers[originalIdx];
                     if (!skipper) return null;
                     const sailNo = String(skipper.sailNumber || skipper.sailNo);
-                    if (observerSailNumbers.has(sailNo)) return null;
-
                     const isReady = rollCallReady.has(originalIdx);
                     const isAbsent = rollCallAbsent.has(originalIdx);
+                    const initials = skipper.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
                     return (
                       <button
@@ -1225,43 +1236,76 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                           }
                         }}
                         className={`
-                          relative w-full aspect-square flex flex-col items-center justify-center rounded-xl
-                          transition-all duration-200 font-semibold text-xl sm:text-2xl lg:text-3xl
+                          relative flex flex-col items-center gap-1 py-2.5 px-1.5 rounded-lg
+                          transition-all duration-200 active:scale-95
                           ${isReady
                             ? darkMode
-                              ? 'bg-green-500/20 border-2 border-green-500/60 text-green-300 shadow-lg shadow-green-500/10'
-                              : 'bg-green-50 border-2 border-green-400 text-green-700 shadow-lg shadow-green-500/10'
+                              ? 'bg-green-500/15 border border-green-500/50 shadow-sm shadow-green-500/10'
+                              : 'bg-green-50 border border-green-400/60 shadow-sm shadow-green-500/10'
                             : isAbsent
                               ? darkMode
-                                ? 'bg-red-500/15 border-2 border-red-500/40 text-red-400 opacity-60'
-                                : 'bg-red-50 border-2 border-red-300 text-red-500 opacity-60'
+                                ? 'bg-red-500/10 border border-red-500/30 opacity-50'
+                                : 'bg-red-50 border border-red-300/50 opacity-50'
                               : darkMode
-                                ? 'border-2 border-slate-700/50 text-slate-300 hover:border-amber-400/60 hover:text-amber-300 hover:scale-105'
-                                : 'border-2 border-slate-300/50 text-slate-600 hover:border-amber-400/60 hover:text-amber-600 hover:scale-105'
+                                ? 'bg-slate-800/60 border border-slate-700/40 hover:border-amber-500/50 hover:bg-slate-800'
+                                : 'bg-white border border-slate-200 hover:border-amber-400/60 hover:shadow-sm'
                           }
                         `}
                       >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden ${
+                          isReady
+                            ? 'ring-2 ring-green-500/50'
+                            : isAbsent
+                              ? 'ring-2 ring-red-500/30 grayscale'
+                              : ''
+                        }`}>
+                          {skipper.avatarUrl ? (
+                            <img src={skipper.avatarUrl} alt={skipper.name} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center rounded-full ${
+                              isReady
+                                ? 'bg-green-600 text-white'
+                                : isAbsent
+                                  ? 'bg-red-500/60 text-white'
+                                  : darkMode
+                                    ? 'bg-slate-600 text-slate-300'
+                                    : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {initials}
+                            </div>
+                          )}
+                        </div>
                         {currentEvent?.show_country && skipper?.country_code && (
-                          <span className="text-xs sm:text-sm opacity-70 mb-0.5">
+                          <span className={`text-[9px] font-medium leading-none ${
+                            isReady ? (darkMode ? 'text-green-400/70' : 'text-green-600/70')
+                              : isAbsent ? (darkMode ? 'text-red-400/50' : 'text-red-500/50')
+                              : darkMode ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
                             {getIOCCode(skipper.country_code)}
                           </span>
                         )}
-                        <span>{sailNo}</span>
-                        <span className={`text-[10px] sm:text-xs mt-1 font-normal truncate max-w-[90%] ${
-                          isReady ? (darkMode ? 'text-green-400/80' : 'text-green-600/80')
-                            : isAbsent ? (darkMode ? 'text-red-400/60' : 'text-red-400/80')
+                        <span className={`text-sm font-bold leading-none ${
+                          isReady ? (darkMode ? 'text-green-300' : 'text-green-700')
+                            : isAbsent ? (darkMode ? 'text-red-400' : 'text-red-500')
+                            : darkMode ? 'text-slate-200' : 'text-slate-700'
+                        }`}>
+                          {sailNo}
+                        </span>
+                        <span className={`text-[9px] leading-none font-medium truncate max-w-full ${
+                          isReady ? (darkMode ? 'text-green-400/60' : 'text-green-600/60')
+                            : isAbsent ? (darkMode ? 'text-red-400/40' : 'text-red-400/60')
                             : darkMode ? 'text-slate-500' : 'text-slate-400'
                         }`}>
-                          {skipper.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3)}
+                          {skipper.name.split(' ')[0]}
                         </span>
                         {isReady && (
-                          <div className="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-md">
-                            <UserCheck size={14} className="text-white" strokeWidth={3} />
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow">
+                            <UserCheck size={10} className="text-white" strokeWidth={3} />
                           </div>
                         )}
                         {isAbsent && (
-                          <div className="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-md">
-                            <UserX size={14} className="text-white" strokeWidth={3} />
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow">
+                            <UserX size={10} className="text-white" strokeWidth={3} />
                           </div>
                         )}
                       </button>
@@ -1271,53 +1315,50 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </div>
 
               {currentHeatObservers.length > 0 && (
-                <div className={`px-6 py-2 border-t ${darkMode ? 'bg-slate-800/20 border-slate-700/50' : 'bg-slate-50/50 border-slate-200'} flex-shrink-0`}>
+                <div className={`px-5 py-2 border-t ${darkMode ? 'bg-slate-800/30 border-amber-800/20' : 'bg-amber-50/50 border-amber-200/40'} flex-shrink-0`}>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
-                      <Eye size={14} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                      <Eye size={13} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
                       <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Observers ({currentHeatObservers.length}):
+                        Observers:
                       </span>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       {currentHeatObservers.map((obs, idx) => (
-                        <div key={idx} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs ${
-                          darkMode ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50' : 'bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}>
-                          <span className="font-medium">{obs.skipper_name}</span>
-                          <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>#{obs.skipper_sail_number}</span>
-                        </div>
+                        <span key={idx} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {obs.skipper_name} #{obs.skipper_sail_number}
+                        </span>
                       ))}
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className={`px-6 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+              <div className={`px-5 py-2.5 border-t flex-shrink-0 ${darkMode ? 'bg-amber-900/20 border-amber-800/20' : 'bg-amber-100/40 border-amber-200/40'}`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Tap = Ready | Right-click/Long-press = Absent
+                  <span className={`text-[10px] ${darkMode ? 'text-amber-500/50' : 'text-amber-600/50'}`}>
+                    ROLL CALL MODE - Not scoring
                   </span>
                   <button
                     onClick={() => setRollCallActive(false)}
-                    className={`px-5 py-2 rounded-lg font-semibold transition-colors ${
-                      readyCount + absentCount >= totalRacing
-                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                      allAccountedFor
+                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-md'
+                        : darkMode
+                          ? 'bg-amber-600 text-white hover:bg-amber-500'
+                          : 'bg-amber-600 text-white hover:bg-amber-500'
                     }`}
                   >
-                    {readyCount + absentCount >= totalRacing
+                    {allAccountedFor
                       ? `Start Scoring (${readyCount} racing${absentCount > 0 ? `, ${absentCount} absent` : ''})`
-                      : `Start Scoring`
+                      : 'Start Scoring'
                     }
                   </button>
                 </div>
               </div>
             </div>
           );
-        })()}
-
-        {(!rollCallActive || !touchMode) && touchMode ? (
+        })() : touchMode ? (
           <TouchModeScoring
             skippers={heatSkippers}
             currentRace={heatManagement.currentRound}
