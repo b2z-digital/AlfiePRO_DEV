@@ -687,13 +687,15 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setActivating(false);
     setActivationResults(result);
 
-    if (result.success && result.summary.created > 0) {
-      addNotification(
-        `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
-        'success'
-      );
+    if (result.success) {
+      if (result.summary.created > 0) {
+        addNotification(
+          `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
+          'success'
+        );
+      }
       fetchMembers();
-    } else if (!result.success) {
+    } else {
       addNotification(result.error || 'Activation failed', 'error');
     }
   };
@@ -831,7 +833,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
   const getActivationIcon = (member: Member) => {
     const hasUserId = !!member.user_id;
-    const activationStatus = (member as any).activation_status;
+    const activationStatus = member.activation_status;
 
     if (hasUserId && activationStatus === 'activated') {
       return { icon: 'activated', label: 'Account active - click for options', color: 'text-green-500 bg-green-900/20' };
@@ -1320,9 +1322,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                            iconState.icon === 'connected' ? 'Connected' :
                                            'Pending Activation'}
                                         </p>
-                                        {(member as any).activation_sent_at && (
+                                        {member.activation_sent_at && (
                                           <p className="text-xs text-slate-500 mt-0.5">
-                                            Sent {new Date((member as any).activation_sent_at).toLocaleDateString()}
+                                            Sent {new Date(member.activation_sent_at).toLocaleDateString()}
                                           </p>
                                         )}
                                       </div>
