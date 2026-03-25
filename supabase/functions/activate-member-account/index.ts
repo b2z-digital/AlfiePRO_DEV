@@ -20,6 +20,7 @@ interface ActivateRequest {
   preview_member_name?: string;
   activate_on_behalf?: boolean;
   behalf_email_recipient?: string;
+  resend?: boolean;
 }
 
 interface ActivationResult {
@@ -62,7 +63,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name, activate_on_behalf, behalf_email_recipient }: ActivateRequest = await req.json();
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name, activate_on_behalf, behalf_email_recipient, resend }: ActivateRequest = await req.json();
 
     if ((!test_email_only && (!member_ids?.length || !club_id || !club_name)) || (test_email_only && (!club_id || !club_name))) {
       return new Response(
@@ -192,7 +193,7 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
-        if (member.user_id) {
+        if (member.user_id && !resend) {
           results.push({
             member_id: member.id,
             email: member.email,
@@ -202,60 +203,64 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const { data: existingUsers } = await supabase.auth.admin.listUsers({
-          page: 1,
-          perPage: 1,
-        });
-
-        let existingUser = null;
-        if (existingUsers?.users) {
-          const { data: searchResult } = await supabase
-            .from("profiles")
-            .select("id")
-            .eq("id", (
-              await supabase.rpc("get_user_id_by_email", { p_email: member.email })
-            ).data)
-            .maybeSingle();
-
-          if (searchResult) {
-            existingUser = { id: searchResult.id };
-          }
-        }
-
         let userId: string;
 
-        if (existingUser) {
-          userId = existingUser.id;
+        if (member.user_id && resend) {
+          userId = member.user_id;
         } else {
-          const tempPassword = crypto.randomUUID() + "Aa1!";
-          const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-            email: member.email,
-            password: tempPassword,
-            email_confirm: true,
-            user_metadata: {
-              first_name: member.first_name,
-              last_name: member.last_name,
-              activation_source: "admin_activation",
-            },
+          const { data: existingUsers } = await supabase.auth.admin.listUsers({
+            page: 1,
+            perPage: 1,
           });
 
-          if (createError) {
-            if (createError.message?.includes("already been registered") ||
-                createError.message?.includes("already exists")) {
-              const { data: userList } = await supabase.auth.admin.listUsers();
-              const found = userList?.users?.find(
-                (u: any) => u.email?.toLowerCase() === member.email.toLowerCase()
-              );
-              if (found) {
-                userId = found.id;
+          let existingUser = null;
+          if (existingUsers?.users) {
+            const { data: searchResult } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("id", (
+                await supabase.rpc("get_user_id_by_email", { p_email: member.email })
+              ).data)
+              .maybeSingle();
+
+            if (searchResult) {
+              existingUser = { id: searchResult.id };
+            }
+          }
+
+          if (existingUser) {
+            userId = existingUser.id;
+          } else {
+            const tempPassword = crypto.randomUUID() + "Aa1!";
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+              email: member.email,
+              password: tempPassword,
+              email_confirm: true,
+              user_metadata: {
+                first_name: member.first_name,
+                last_name: member.last_name,
+                activation_source: "admin_activation",
+              },
+            });
+
+            if (createError) {
+              if (createError.message?.includes("already been registered") ||
+                  createError.message?.includes("already exists")) {
+                const { data: userList } = await supabase.auth.admin.listUsers();
+                const found = userList?.users?.find(
+                  (u: any) => u.email?.toLowerCase() === member.email.toLowerCase()
+                );
+                if (found) {
+                  userId = found.id;
+                } else {
+                  throw new Error(`User exists but could not be found: ${createError.message}`);
+                }
               } else {
-                throw new Error(`User exists but could not be found: ${createError.message}`);
+                throw createError;
               }
             } else {
-              throw createError;
+              userId = newUser.user!.id;
             }
-          } else {
-            userId = newUser.user!.id;
           }
         }
 
@@ -268,28 +273,30 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", member.id);
 
-        await supabase
-          .from("user_clubs")
-          .upsert(
-            { user_id: userId, club_id: member.club_id, role: "member" },
-            { onConflict: "user_id,club_id" }
-          );
-
-        const { data: existingProfile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", userId)
-          .maybeSingle();
-
-        if (existingProfile) {
+        if (!resend) {
           await supabase
+            .from("user_clubs")
+            .upsert(
+              { user_id: userId, club_id: member.club_id, role: "member" },
+              { onConflict: "user_id,club_id" }
+            );
+
+          const { data: existingProfile } = await supabase
             .from("profiles")
-            .update({
-              onboarding_completed: true,
-              default_club_id: member.club_id,
-              primary_club_id: member.club_id,
-            })
-            .eq("id", userId);
+            .select("id")
+            .eq("id", userId)
+            .maybeSingle();
+
+          if (existingProfile) {
+            await supabase
+              .from("profiles")
+              .update({
+                onboarding_completed: true,
+                default_club_id: member.club_id,
+                primary_club_id: member.club_id,
+              })
+              .eq("id", userId);
+          }
         }
 
         const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
