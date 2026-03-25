@@ -1284,19 +1284,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                             {getIOCCode(skipper.country_code)}
                           </span>
                         )}
-                        <span className={`text-base font-bold leading-none ${
+                        <span className={`text-lg font-bold leading-none ${
                           isReady ? (darkMode ? 'text-green-300' : 'text-green-700')
                             : isAbsent ? (darkMode ? 'text-red-400' : 'text-red-500')
-                            : darkMode ? 'text-slate-200' : 'text-slate-700'
+                            : darkMode ? 'text-slate-100' : 'text-slate-700'
                         }`}>
                           {sailNo}
-                        </span>
-                        <span className={`text-[10px] leading-none font-medium truncate max-w-full ${
-                          isReady ? (darkMode ? 'text-green-400/60' : 'text-green-600/60')
-                            : isAbsent ? (darkMode ? 'text-red-400/40' : 'text-red-400/60')
-                            : darkMode ? 'text-slate-500' : 'text-slate-400'
-                        }`}>
-                          {skipper.name.split(' ')[0]}
                         </span>
                         {isReady && (
                           <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow">
@@ -1315,19 +1308,28 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </div>
 
               {currentHeatObservers.length > 0 && (
-                <div className={`px-5 py-2 border-t ${darkMode ? 'bg-slate-800/40 border-slate-700/40' : 'bg-slate-50 border-slate-200'} flex-shrink-0`}>
+                <div className={`px-5 py-3 border-t flex-shrink-0 ${
+                  darkMode ? 'bg-purple-900/15 border-purple-800/25' : 'bg-purple-50/50 border-purple-200/50'
+                }`}>
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <Eye size={13} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
-                      <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Observers:
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md ${
+                      darkMode ? 'bg-purple-500/15' : 'bg-purple-100/60'
+                    }`}>
+                      <Eye size={13} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
+                      <span className={`text-xs font-semibold ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                        Observers
                       </span>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       {currentHeatObservers.map((obs, idx) => (
-                        <span key={idx} className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {obs.skipper_name} #{obs.skipper_sail_number}
-                        </span>
+                        <div key={idx} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+                          darkMode
+                            ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
+                            : 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                        }`}>
+                          <span>{obs.skipper_name}</span>
+                          <span className={darkMode ? 'text-purple-400/60' : 'text-purple-500/60'}>#{obs.skipper_sail_number}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
