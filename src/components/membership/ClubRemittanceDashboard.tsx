@@ -258,14 +258,13 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
       const totalAmount = stateTotal; // Club only pays state fee, which includes national portion
       const memberCount = selectedRemittances.length;
 
-      // Update remittances as paid with bulk_payment flag to prevent trigger from creating individual transactions
       const { error: remittanceError } = await supabase
         .from('membership_remittances')
         .update({
           club_to_state_status: 'paid',
           club_to_state_paid_date: bulkPaymentDetails.paymentDate,
           club_to_state_payment_reference: bulkPaymentDetails.reference || `Bulk payment - ${memberCount} members`,
-          bulk_payment: true
+          bulk_payment: bulkPaymentDetails.skipFinanceTransactions ? false : true
         })
         .in('id', Array.from(selectedIds));
 
