@@ -1131,21 +1131,21 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
           return (
             <div className={`${isFullscreen ? 'fixed inset-0 z-20' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-b-xl'} ${
-              darkMode ? 'bg-amber-950/20' : 'bg-amber-50/40'
+              darkMode ? 'bg-slate-900' : 'bg-slate-50'
             }`}>
               <div className={`px-5 py-3 border-b flex-shrink-0 ${
-                darkMode ? 'bg-amber-900/30 border-amber-800/30' : 'bg-amber-100/60 border-amber-200/60'
+                darkMode ? 'bg-teal-900/20 border-teal-800/30' : 'bg-teal-50/60 border-teal-200/60'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/20 ring-1 ring-amber-500/30' : 'bg-amber-100 ring-1 ring-amber-300/60'}`}>
-                      <ClipboardCheck size={20} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-teal-500/15 ring-1 ring-teal-500/25' : 'bg-teal-100 ring-1 ring-teal-300/50'}`}>
+                      <ClipboardCheck size={20} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
                     </div>
                     <div>
-                      <h3 className={`font-bold text-base ${darkMode ? 'text-amber-200' : 'text-amber-900'}`}>
+                      <h3 className={`font-bold text-base ${darkMode ? 'text-teal-200' : 'text-teal-900'}`}>
                         Heat {selectedHeat} - Roll Call
                       </h3>
-                      <p className={`text-xs ${darkMode ? 'text-amber-400/70' : 'text-amber-700/70'}`}>
+                      <p className={`text-xs ${darkMode ? 'text-teal-400/60' : 'text-teal-700/60'}`}>
                         Tap to mark ready. Right-click to mark absent.
                       </p>
                     </div>
@@ -1187,24 +1187,24 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                         allAccountedFor
                           ? 'bg-green-600 text-white hover:bg-green-700'
                           : darkMode
-                            ? 'bg-amber-600 text-white hover:bg-amber-500'
-                            : 'bg-amber-600 text-white hover:bg-amber-500'
+                            ? 'bg-teal-600 text-white hover:bg-teal-500'
+                            : 'bg-teal-600 text-white hover:bg-teal-500'
                       }`}
                     >
                       {allAccountedFor ? 'Start Scoring' : 'Skip Roll Call'}
                     </button>
                   </div>
                 </div>
-                <div className={`mt-2.5 w-full rounded-full h-1 ${darkMode ? 'bg-slate-700/60' : 'bg-amber-200/60'}`}>
+                <div className={`mt-2.5 w-full rounded-full h-1 ${darkMode ? 'bg-slate-700/60' : 'bg-teal-200/60'}`}>
                   <div
-                    className="h-1 rounded-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-300"
+                    className="h-1 rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-300"
                     style={{ width: `${totalRacing > 0 ? ((readyCount + absentCount) / totalRacing) * 100 : 0}%` }}
                   />
                 </div>
               </div>
 
-              <div className={`flex-1 overflow-y-auto p-4 sm:p-5 ${darkMode ? 'bg-amber-950/10' : 'bg-amber-50/30'}`}>
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3">
+              <div className={`flex-1 overflow-y-auto p-4 sm:p-5 ${darkMode ? 'bg-slate-900/80' : 'bg-slate-50'}`}>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8 gap-3">
                   {racingSkippers.map(originalIdx => {
                     const skipper = skippers[originalIdx];
                     if (!skipper) return null;
@@ -1236,23 +1236,23 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                           }
                         }}
                         className={`
-                          relative flex flex-col items-center gap-1 py-2.5 px-1.5 rounded-lg
+                          relative flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl
                           transition-all duration-200 active:scale-95
                           ${isReady
                             ? darkMode
-                              ? 'bg-green-500/15 border border-green-500/50 shadow-sm shadow-green-500/10'
-                              : 'bg-green-50 border border-green-400/60 shadow-sm shadow-green-500/10'
+                              ? 'bg-green-500/12 border border-green-500/40 shadow-sm shadow-green-500/10'
+                              : 'bg-green-50 border border-green-400/50 shadow-sm shadow-green-500/10'
                             : isAbsent
                               ? darkMode
-                                ? 'bg-red-500/10 border border-red-500/30 opacity-50'
-                                : 'bg-red-50 border border-red-300/50 opacity-50'
+                                ? 'bg-red-500/8 border border-red-500/25 opacity-50'
+                                : 'bg-red-50 border border-red-300/40 opacity-50'
                               : darkMode
-                                ? 'bg-slate-800/60 border border-slate-700/40 hover:border-amber-500/50 hover:bg-slate-800'
-                                : 'bg-white border border-slate-200 hover:border-amber-400/60 hover:shadow-sm'
+                                ? 'bg-slate-800/80 border border-slate-700/50 hover:border-teal-500/40 hover:bg-slate-800'
+                                : 'bg-white border border-slate-200 hover:border-teal-400/50 hover:shadow-sm'
                           }
                         `}
                       >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden ${
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden mb-1 ${
                           isReady
                             ? 'ring-2 ring-green-500/50'
                             : isAbsent
@@ -1276,7 +1276,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                           )}
                         </div>
                         {currentEvent?.show_country && skipper?.country_code && (
-                          <span className={`text-[9px] font-medium leading-none ${
+                          <span className={`text-[10px] font-medium leading-none ${
                             isReady ? (darkMode ? 'text-green-400/70' : 'text-green-600/70')
                               : isAbsent ? (darkMode ? 'text-red-400/50' : 'text-red-500/50')
                               : darkMode ? 'text-slate-500' : 'text-slate-400'
@@ -1284,14 +1284,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                             {getIOCCode(skipper.country_code)}
                           </span>
                         )}
-                        <span className={`text-sm font-bold leading-none ${
+                        <span className={`text-base font-bold leading-none ${
                           isReady ? (darkMode ? 'text-green-300' : 'text-green-700')
                             : isAbsent ? (darkMode ? 'text-red-400' : 'text-red-500')
                             : darkMode ? 'text-slate-200' : 'text-slate-700'
                         }`}>
                           {sailNo}
                         </span>
-                        <span className={`text-[9px] leading-none font-medium truncate max-w-full ${
+                        <span className={`text-[10px] leading-none font-medium truncate max-w-full ${
                           isReady ? (darkMode ? 'text-green-400/60' : 'text-green-600/60')
                             : isAbsent ? (darkMode ? 'text-red-400/40' : 'text-red-400/60')
                             : darkMode ? 'text-slate-500' : 'text-slate-400'
@@ -1315,7 +1315,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </div>
 
               {currentHeatObservers.length > 0 && (
-                <div className={`px-5 py-2 border-t ${darkMode ? 'bg-slate-800/30 border-amber-800/20' : 'bg-amber-50/50 border-amber-200/40'} flex-shrink-0`}>
+                <div className={`px-5 py-2 border-t ${darkMode ? 'bg-slate-800/40 border-slate-700/40' : 'bg-slate-50 border-slate-200'} flex-shrink-0`}>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
                       <Eye size={13} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
@@ -1334,10 +1334,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 </div>
               )}
 
-              <div className={`px-5 py-2.5 border-t flex-shrink-0 ${darkMode ? 'bg-amber-900/20 border-amber-800/20' : 'bg-amber-100/40 border-amber-200/40'}`}>
+              <div className={`px-5 py-2.5 border-t flex-shrink-0 ${darkMode ? 'bg-teal-900/15 border-teal-800/20' : 'bg-teal-50/40 border-teal-200/40'}`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-[10px] ${darkMode ? 'text-amber-500/50' : 'text-amber-600/50'}`}>
-                    ROLL CALL MODE - Not scoring
+                  <span className={`text-[10px] font-medium tracking-wider uppercase ${darkMode ? 'text-teal-500/50' : 'text-teal-600/50'}`}>
+                    Roll Call Mode
                   </span>
                   <button
                     onClick={() => setRollCallActive(false)}
@@ -1345,8 +1345,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       allAccountedFor
                         ? 'bg-green-600 text-white hover:bg-green-700 shadow-md'
                         : darkMode
-                          ? 'bg-amber-600 text-white hover:bg-amber-500'
-                          : 'bg-amber-600 text-white hover:bg-amber-500'
+                          ? 'bg-teal-600 text-white hover:bg-teal-500'
+                          : 'bg-teal-600 text-white hover:bg-teal-500'
                     }`}
                   >
                     {allAccountedFor
