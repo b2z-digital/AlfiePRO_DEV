@@ -10,9 +10,10 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX } from 'lucide-react';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment } from '../utils/observerUtils';
+import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -124,14 +125,19 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [touchModeResultsConfirmed, setTouchModeResultsConfirmed] = useState(false); // Track if touch mode results are confirmed
   const [currentHeatObservers, setCurrentHeatObservers] = useState<ObserverAssignment[]>([]);
   const manualSelectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [rollCallActive, setRollCallActive] = useState(false);
+  const [rollCallReady, setRollCallReady] = useState<Set<number>>(new Set());
+  const [rollCallAbsent, setRollCallAbsent] = useState<Set<number>>(new Set());
 
   // Track the round number to detect actual round changes (not just object reference changes)
   const lastRoundNumber = React.useRef<number | null>(null);
 
-  // Reset touch mode confirmation when heat or round changes
+  // Reset touch mode confirmation and roll call when heat or round changes
   React.useEffect(() => {
     console.log('🔄 Resetting touch mode confirmation for Round', heatManagement.currentRound, 'Heat', selectedHeat);
     setTouchModeResultsConfirmed(false);
+    setRollCallReady(new Set());
+    setRollCallAbsent(new Set());
   }, [selectedHeat, heatManagement.currentRound]);
 
   // Track which heat was last auto-advanced to prevent loops
@@ -1111,7 +1117,207 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           </div>
         </div>
 
-        {touchMode ? (
+        {rollCallActive && touchMode && selectedHeat && (() => {
+          const observerSailNumbers = new Set(currentHeatObservers.map(o => String(o.skipper_sail_number)));
+          const racingSkippers = heatSkippers.filter(s => !observerSailNumbers.has(String(s.sailNumber || s.sailNo)));
+          const totalRacing = racingSkippers.length;
+          const readyCount = rollCallReady.size;
+          const absentCount = rollCallAbsent.size;
+          const unmarkedCount = totalRacing - readyCount - absentCount;
+
+          return (
+            <div className={`${isFullscreen ? 'fixed inset-0 z-20' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-b-xl'} ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
+              <div className={`px-6 py-4 border-b flex-shrink-0 ${darkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-amber-500/15' : 'bg-amber-50'}`}>
+                      <ClipboardCheck size={22} className={darkMode ? 'text-amber-400' : 'text-amber-600'} />
+                    </div>
+                    <div>
+                      <h3 className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Heat {selectedHeat} - Roll Call
+                      </h3>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Tap skippers to mark as ready. Long-press to mark absent.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className={`flex items-center gap-1.5 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                        <UserCheck size={16} /> {readyCount} ready
+                      </span>
+                      {absentCount > 0 && (
+                        <span className={`flex items-center gap-1.5 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                          <UserX size={16} /> {absentCount} absent
+                        </span>
+                      )}
+                      {unmarkedCount > 0 && (
+                        <span className={`flex items-center gap-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {unmarkedCount} waiting
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        const allIndices = new Set(heatSkipperIndices.filter(idx => {
+                          const s = skippers[idx];
+                          return s && !observerSailNumbers.has(String(s.sailNumber || s.sailNo));
+                        }));
+                        setRollCallReady(allIndices);
+                        setRollCallAbsent(new Set());
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      }`}
+                    >
+                      All Ready
+                    </button>
+                    <button
+                      onClick={() => setRollCallActive(false)}
+                      className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+                    >
+                      {readyCount > 0 ? 'Start Scoring' : 'Skip Roll Call'}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-3 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+                  <div
+                    className="h-1.5 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-300"
+                    style={{ width: `${totalRacing > 0 ? ((readyCount + absentCount) / totalRacing) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className={`flex-1 overflow-y-auto p-6 ${darkMode ? 'bg-slate-900/50' : 'bg-gradient-to-br from-slate-50 to-slate-100'}`}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {heatSkipperIndices.map(originalIdx => {
+                    const skipper = skippers[originalIdx];
+                    if (!skipper) return null;
+                    const sailNo = String(skipper.sailNumber || skipper.sailNo);
+                    if (observerSailNumbers.has(sailNo)) return null;
+
+                    const isReady = rollCallReady.has(originalIdx);
+                    const isAbsent = rollCallAbsent.has(originalIdx);
+
+                    return (
+                      <button
+                        key={originalIdx}
+                        onClick={() => {
+                          if (isAbsent) {
+                            setRollCallAbsent(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                            setRollCallReady(prev => new Set(prev).add(originalIdx));
+                          } else if (isReady) {
+                            setRollCallReady(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                          } else {
+                            setRollCallReady(prev => new Set(prev).add(originalIdx));
+                          }
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          if (isAbsent) {
+                            setRollCallAbsent(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                          } else {
+                            setRollCallReady(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                            setRollCallAbsent(prev => new Set(prev).add(originalIdx));
+                          }
+                        }}
+                        className={`
+                          relative w-full aspect-square flex flex-col items-center justify-center rounded-xl
+                          transition-all duration-200 font-semibold text-xl sm:text-2xl lg:text-3xl
+                          ${isReady
+                            ? darkMode
+                              ? 'bg-green-500/20 border-2 border-green-500/60 text-green-300 shadow-lg shadow-green-500/10'
+                              : 'bg-green-50 border-2 border-green-400 text-green-700 shadow-lg shadow-green-500/10'
+                            : isAbsent
+                              ? darkMode
+                                ? 'bg-red-500/15 border-2 border-red-500/40 text-red-400 opacity-60'
+                                : 'bg-red-50 border-2 border-red-300 text-red-500 opacity-60'
+                              : darkMode
+                                ? 'border-2 border-slate-700/50 text-slate-300 hover:border-amber-400/60 hover:text-amber-300 hover:scale-105'
+                                : 'border-2 border-slate-300/50 text-slate-600 hover:border-amber-400/60 hover:text-amber-600 hover:scale-105'
+                          }
+                        `}
+                      >
+                        {currentEvent?.show_country && skipper?.country_code && (
+                          <span className="text-xs sm:text-sm opacity-70 mb-0.5">
+                            {getIOCCode(skipper.country_code)}
+                          </span>
+                        )}
+                        <span>{sailNo}</span>
+                        <span className={`text-[10px] sm:text-xs mt-1 font-normal truncate max-w-[90%] ${
+                          isReady ? (darkMode ? 'text-green-400/80' : 'text-green-600/80')
+                            : isAbsent ? (darkMode ? 'text-red-400/60' : 'text-red-400/80')
+                            : darkMode ? 'text-slate-500' : 'text-slate-400'
+                        }`}>
+                          {skipper.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 3)}
+                        </span>
+                        {isReady && (
+                          <div className="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center shadow-md">
+                            <UserCheck size={14} className="text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                        {isAbsent && (
+                          <div className="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-md">
+                            <UserX size={14} className="text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {currentHeatObservers.length > 0 && (
+                <div className={`px-6 py-2 border-t ${darkMode ? 'bg-slate-800/20 border-slate-700/50' : 'bg-slate-50/50 border-slate-200'} flex-shrink-0`}>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <Eye size={14} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                      <span className={`text-xs font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Observers ({currentHeatObservers.length}):
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {currentHeatObservers.map((obs, idx) => (
+                        <div key={idx} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs ${
+                          darkMode ? 'bg-slate-700/50 text-slate-300 border border-slate-600/50' : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          <span className="font-medium">{obs.skipper_name}</span>
+                          <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>#{obs.skipper_sail_number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className={`px-6 py-3 border-t flex-shrink-0 ${darkMode ? 'bg-slate-800/40 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Tap = Ready | Right-click/Long-press = Absent
+                  </span>
+                  <button
+                    onClick={() => setRollCallActive(false)}
+                    className={`px-5 py-2 rounded-lg font-semibold transition-colors ${
+                      readyCount + absentCount >= totalRacing
+                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    {readyCount + absentCount >= totalRacing
+                      ? `Start Scoring (${readyCount} racing${absentCount > 0 ? `, ${absentCount} absent` : ''})`
+                      : `Start Scoring`
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {(!rollCallActive || !touchMode) && touchMode ? (
           <TouchModeScoring
             skippers={heatSkippers}
             currentRace={heatManagement.currentRound}
@@ -1226,14 +1432,19 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (heatManagement.roundJustCompleted) {
             delete heatManagement.roundJustCompleted;
           }
-          // Ensure touch mode confirmation is reset when modal closes
-          // This allows scoring to continue for the newly selected heat
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
-          // CRITICAL: Force observer reload when modal closes to ensure fresh observers for scoring
-          // This ensures observers are reloaded from the database, not stale modal state
           setObserverReloadTrigger(prev => prev + 1);
+          if (touchMode && selectedHeat) {
+            const progress = getHeatProgress(selectedHeat);
+            const isComplete = progress.scored >= progress.total && progress.total > 0;
+            if (!isComplete) {
+              setRollCallActive(true);
+              setRollCallReady(new Set());
+              setRollCallAbsent(new Set());
+            }
+          }
         }}
         heatManagement={heatManagement}
         skippers={skippers}
