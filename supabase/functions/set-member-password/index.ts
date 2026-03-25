@@ -21,19 +21,99 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { activation_token, reset_token, email, password } = await req.json();
+    const { activation_token, reset_token, email, password, admin_set, member_id } = await req.json();
+
+    if (password && password.length < 6) {
+      return new Response(
+        JSON.stringify({ error: "Password must be at least 6 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (admin_set && member_id && email && password) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: "Missing authorization header" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const jwtToken = authHeader.replace("Bearer ", "");
+      const { data: { user: callingUser }, error: authError } = await supabase.auth.getUser(jwtToken);
+      if (authError || !callingUser) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: memberRecord } = await supabase
+        .from("members")
+        .select("id, user_id, club_id")
+        .eq("id", member_id)
+        .maybeSingle();
+
+      if (!memberRecord || !memberRecord.user_id) {
+        return new Response(
+          JSON.stringify({ error: "Member not found or has no linked account" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: roleCheck } = await supabase
+        .from("user_clubs")
+        .select("role")
+        .eq("user_id", callingUser.id)
+        .eq("club_id", memberRecord.club_id)
+        .maybeSingle();
+
+      const { data: profileCheck } = await supabase
+        .from("profiles")
+        .select("is_super_admin")
+        .eq("id", callingUser.id)
+        .maybeSingle();
+
+      const isSuperAdmin = profileCheck?.is_super_admin === true;
+      const isClubAdmin = roleCheck && ["admin", "super_admin", "editor"].includes(roleCheck.role);
+
+      if (!isSuperAdmin && !isClubAdmin) {
+        return new Response(
+          JSON.stringify({ error: "Insufficient permissions" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: updateError } = await supabase.auth.admin.updateUserById(memberRecord.user_id, {
+        password,
+      });
+
+      if (updateError) {
+        console.error("Admin password set failed:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to set password. Please try again." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      await supabase
+        .from("members")
+        .update({
+          activation_status: "activated",
+          activated_at: new Date().toISOString(),
+        })
+        .eq("id", member_id);
+
+      return new Response(
+        JSON.stringify({ success: true, message: "Password has been set successfully" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const token = activation_token || reset_token;
     if (!token || !email || !password) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: token, email, password" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (password.length < 6) {
-      return new Response(
-        JSON.stringify({ error: "Password must be at least 6 characters" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

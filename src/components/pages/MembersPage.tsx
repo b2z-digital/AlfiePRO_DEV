@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Pencil, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2 } from 'lucide-react';
+import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Pencil, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2, KeyRound, RefreshCw, MoveVertical as MoreVertical } from 'lucide-react';
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -81,6 +81,23 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [showActivationTestEmail, setShowActivationTestEmail] = useState(false);
   const [activationTestEmail, setActivationTestEmail] = useState('');
   const [sendingActivationTest, setSendingActivationTest] = useState(false);
+  const [activationMenuMemberId, setActivationMenuMemberId] = useState<string | null>(null);
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+  const [setPasswordMember, setSetPasswordMember] = useState<Member | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [resendingActivation, setResendingActivation] = useState<string | null>(null);
+  const activationMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (activationMenuRef.current && !activationMenuRef.current.contains(e.target as Node)) {
+        setActivationMenuMemberId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -733,6 +750,104 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     }
   };
 
+  const handleResendActivation = async (member: Member) => {
+    const clubName = currentClub?.club?.name || '';
+    if (!currentClub?.clubId || !clubName || !member.email) return;
+
+    setResendingActivation(member.id);
+    setActivationMenuMemberId(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-member-account`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_ids: [member.id],
+          club_id: currentClub.clubId,
+          club_name: clubName,
+          resend: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to resend activation');
+
+      addNotification(`Activation email resent to ${member.first_name} ${member.last_name}`, 'success');
+      fetchMembers();
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to resend activation email', 'error');
+    } finally {
+      setResendingActivation(null);
+    }
+  };
+
+  const handleSetPasswordForMember = async () => {
+    if (!setPasswordMember || !newPassword || newPassword.length < 6) {
+      addNotification('Password must be at least 6 characters', 'error');
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/set-member-password`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_id: setPasswordMember.id,
+          email: setPasswordMember.email,
+          password: newPassword,
+          admin_set: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to set password');
+
+      addNotification(`Password set for ${setPasswordMember.first_name} ${setPasswordMember.last_name}`, 'success');
+      setShowSetPasswordModal(false);
+      setSetPasswordMember(null);
+      setNewPassword('');
+      fetchMembers();
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to set password', 'error');
+    } finally {
+      setSettingPassword(false);
+    }
+  };
+
+  const getActivationIcon = (member: Member) => {
+    const hasUserId = !!member.user_id;
+    const activationStatus = (member as any).activation_status;
+
+    if (hasUserId && activationStatus === 'activated') {
+      return { icon: 'activated', label: 'Account active - click for options', color: 'text-green-500 bg-green-900/20' };
+    }
+    if (hasUserId && activationStatus === 'pending') {
+      return { icon: 'pending-linked', label: 'Account created, awaiting password setup - click for options', color: 'text-sky-400 bg-sky-900/20' };
+    }
+    if (hasUserId) {
+      return { icon: 'connected', label: 'Connected - click for options', color: 'text-green-500 bg-green-900/20' };
+    }
+    if (activationStatus === 'pending') {
+      return { icon: 'pending', label: 'Activation sent - click for options', color: 'text-sky-400 bg-sky-900/20' };
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -1172,77 +1287,154 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          {!member.user_id ? (
-                            emailMatches[member.id] ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleLinkSingleMember(member.id);
-                                }}
-                                disabled={linkingMemberId === member.id}
-                                className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
-                                title="Account found - click to link"
-                              >
-                                {linkingMemberId === member.id ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
-                                ) : (
-                                  <Link size={16} />
-                                )}
-                              </button>
-                            ) : (member as any).activation_status === 'pending' ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleActivateSingle(member);
-                                }}
-                                className="p-1.5 rounded-lg text-sky-400 hover:bg-sky-900/30 transition-colors"
-                                title="App activation sent - click to resend"
-                              >
-                                <Smartphone size={16} />
-                              </button>
-                            ) : memberInvitations[member.id] && memberInvitations[member.id].status === 'pending' ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewInvitation(member.id);
-                                }}
-                                className="p-1.5 rounded-lg text-orange-400 hover:bg-orange-900/30 transition-colors"
-                                title="Invitation pending"
-                              >
-                                <Clock size={16} />
-                              </button>
-                            ) : member.email ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleActivateSingle(member);
-                                }}
-                                disabled={activatingMemberId === member.id}
-                                className="p-1.5 rounded-lg text-sky-400 hover:bg-sky-900/30 transition-colors disabled:opacity-50"
-                                title="Activate for AlfiePRO App"
-                              >
-                                {activatingMemberId === member.id ? (
-                                  <Loader2 size={16} className="animate-spin" />
-                                ) : (
-                                  <Smartphone size={16} />
-                                )}
-                              </button>
-                            ) : (
+                          {(() => {
+                            const iconState = getActivationIcon(member);
+                            if (iconState) {
+                              return (
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActivationMenuMemberId(activationMenuMemberId === member.id ? null : member.id);
+                                    }}
+                                    className={`p-1.5 rounded-lg ${iconState.color} transition-colors hover:ring-1 hover:ring-slate-500`}
+                                    title={iconState.label}
+                                  >
+                                    {resendingActivation === member.id ? (
+                                      <Loader2 size={16} className="animate-spin" />
+                                    ) : iconState.icon === 'activated' || iconState.icon === 'connected' ? (
+                                      <UserCheck size={16} />
+                                    ) : (
+                                      <Smartphone size={16} />
+                                    )}
+                                  </button>
+                                  {activationMenuMemberId === member.id && (
+                                    <div
+                                      ref={activationMenuRef}
+                                      className="absolute right-0 top-full mt-1 w-56 bg-slate-700 border border-slate-600 rounded-lg shadow-xl z-50 py-1"
+                                    >
+                                      <div className="px-3 py-2 border-b border-slate-600">
+                                        <p className="text-xs text-slate-400 font-medium">Account Status</p>
+                                        <p className="text-sm text-white">
+                                          {iconState.icon === 'activated' ? 'Active' :
+                                           iconState.icon === 'connected' ? 'Connected' :
+                                           'Pending Activation'}
+                                        </p>
+                                        {(member as any).activation_sent_at && (
+                                          <p className="text-xs text-slate-500 mt-0.5">
+                                            Sent {new Date((member as any).activation_sent_at).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                      </div>
+                                      {member.email && (iconState.icon === 'pending' || iconState.icon === 'pending-linked') && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResendActivation(member);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
+                                        >
+                                          <RefreshCw size={14} className="text-sky-400" />
+                                          Resend activation email
+                                        </button>
+                                      )}
+                                      {member.email && (iconState.icon === 'activated' || iconState.icon === 'connected') && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResendActivation(member);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
+                                        >
+                                          <RefreshCw size={14} className="text-sky-400" />
+                                          Send password reset email
+                                        </button>
+                                      )}
+                                      {member.user_id && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActivationMenuMemberId(null);
+                                            setSetPasswordMember(member);
+                                            setNewPassword('');
+                                            setShowSetPasswordModal(true);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
+                                        >
+                                          <KeyRound size={14} className="text-amber-400" />
+                                          Set password manually
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            if (!member.user_id && emailMatches[member.id]) {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLinkSingleMember(member.id);
+                                  }}
+                                  disabled={linkingMemberId === member.id}
+                                  className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
+                                  title="Account found - click to link"
+                                >
+                                  {linkingMemberId === member.id ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+                                  ) : (
+                                    <Link size={16} />
+                                  )}
+                                </button>
+                              );
+                            }
+
+                            if (!member.user_id && memberInvitations[member.id]?.status === 'pending') {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewInvitation(member.id);
+                                  }}
+                                  className="p-1.5 rounded-lg text-orange-400 hover:bg-orange-900/30 transition-colors"
+                                  title="Invitation pending"
+                                >
+                                  <Clock size={16} />
+                                </button>
+                              );
+                            }
+
+                            if (!member.user_id && member.email) {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleActivateSingle(member);
+                                  }}
+                                  disabled={activatingMemberId === member.id}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-sky-400 transition-colors disabled:opacity-50"
+                                  title="Activate for AlfiePRO App"
+                                >
+                                  {activatingMemberId === member.id ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                  ) : (
+                                    <Smartphone size={16} />
+                                  )}
+                                </button>
+                              );
+                            }
+
+                            return (
                               <div
                                 className="p-1.5 rounded-lg text-slate-600"
                                 title="No email address - cannot activate"
                               >
                                 <Smartphone size={16} />
                               </div>
-                            )
-                          ) : (
-                            <div
-                              className="p-1.5 rounded-lg text-green-500 bg-green-900/20"
-                              title="Connected - has login account"
-                            >
-                              <UserCheck size={16} />
-                            </div>
-                          )}
+                            );
+                          })()}
                           {isExpired && (
                             <button
                               onClick={(e) => {
@@ -1778,6 +1970,94 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Password Modal */}
+      {showSetPasswordModal && setPasswordMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                    <KeyRound size={20} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Set Password</h3>
+                    <p className="text-sm text-slate-400">
+                      {setPasswordMember.first_name} {setPasswordMember.last_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSetPasswordModal(false);
+                    setSetPasswordMember(null);
+                    setNewPassword('');
+                  }}
+                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-300 mb-4">
+                Set a password on behalf of <span className="font-semibold text-white">{setPasswordMember.first_name} {setPasswordMember.last_name}</span>.
+                You will need to communicate this password to the member directly.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm text-slate-400 mb-1.5">New Password</label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSetPasswordForMember()}
+                  placeholder="Enter password (min 6 characters)"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  autoFocus
+                />
+                {newPassword.length > 0 && newPassword.length < 6 && (
+                  <p className="text-xs text-red-400 mt-1">Password must be at least 6 characters</p>
+                )}
+              </div>
+              <div className="p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
+                <p className="text-xs text-amber-400">
+                  The password is shown in plain text so you can share it with the member. They can change it later from their profile settings.
+                </p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowSetPasswordModal(false);
+                  setSetPasswordMember(null);
+                  setNewPassword('');
+                }}
+                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSetPasswordForMember}
+                disabled={settingPassword || newPassword.length < 6}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {settingPassword ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Setting...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound size={16} />
+                    Set Password
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
