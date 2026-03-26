@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, DollarSign, FileText, User, CreditCard, Tag, MessageSquare, Users } from 'lucide-react';
+import { X, Calendar, DollarSign, FileText, User, CreditCard, Tag, MessageSquare, Users, Receipt } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -244,29 +244,27 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         ${darkMode ? 'bg-slate-800' : 'bg-white'}
       `}>
         {/* Header */}
-        <div className={`
-          sticky top-0 z-10 p-6 border-b
-          ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-        `}>
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
+              <Receipt className="text-white drop-shadow-lg" size={24} />
+            </div>
             <div>
-              <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
                 Transaction Details
-              </h3>
-              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              </h2>
+              <p className="text-cyan-100 text-sm mt-0.5">
                 {isEditing ? 'Edit transaction information' : 'View transaction details'}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className={`
-                p-2 rounded-lg transition-colors
-                ${darkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-600'}
-              `}
-            >
-              <X size={20} />
-            </button>
           </div>
+          <button
+            onClick={onClose}
+            className="text-white/80 hover:text-white rounded-xl p-2.5 hover:bg-white/10 transition-all hover:rotate-90 transform duration-300 relative z-10"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Content */}
@@ -330,9 +328,9 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                     value={formData.amount}
                     onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) }))}
                     className={`
-                      text-2xl font-bold mt-1 px-2 py-1 rounded
+                      text-2xl font-bold mt-1 px-2 py-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
                       ${(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'text-green-400' : 'text-red-400'}
-                      ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300'}
+                      ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-300'}
                       border
                     `}
                   />
@@ -357,8 +355,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               />
             ) : (
@@ -378,8 +376,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 value={formData.date}
                 onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               />
             ) : (
@@ -398,8 +396,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 value={formData.category_id}
                 onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               >
                 <option value="">Select category</option>
@@ -427,8 +425,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                   [(initialTransaction.type === 'deposit' || initialTransaction.type === 'income') ? 'payer' : 'payee']: e.target.value
                 }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               />
             ) : (
@@ -449,8 +447,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 value={formData.payment_method}
                 onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               >
                 <option value="cash">Cash</option>
@@ -488,8 +486,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 rows={3}
                 className={`
-                  w-full px-3 py-2 rounded-lg border
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               />
             ) : (
@@ -599,7 +597,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 disabled={loading}
                 className={`
                   px-4 py-2 rounded-lg font-medium transition-colors
-                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}
+                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}
                   disabled:opacity-50 disabled:cursor-not-allowed
                 `}
               >
@@ -608,7 +606,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
               <button
                 onClick={handleSave}
                 disabled={loading}
-                className="px-4 py-2 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Saving...' : 'Save Changes'}
               </button>
@@ -619,14 +617,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 onClick={onClose}
                 className={`
                   px-4 py-2 rounded-lg font-medium transition-colors
-                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}
+                  ${darkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-900'}
                 `}
               >
                 Close
               </button>
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-4 py-2 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-all font-semibold"
               >
                 Edit Transaction
               </button>
