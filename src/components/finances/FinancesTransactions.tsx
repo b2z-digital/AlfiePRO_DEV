@@ -628,10 +628,10 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
         </div>
 
         <div className="relative" ref={dropdownRef}>
-          <div className="flex btn-primary-green rounded-lg overflow-hidden">
+          <div className="flex rounded-lg overflow-hidden shadow-md cursor-pointer" style={{ background: 'linear-gradient(to right, #16a34a, #059669)' }}>
             <button
               onClick={() => setShowNewTransactionModal(true)}
-              className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 text-white text-sm font-medium whitespace-nowrap hover:brightness-110 transition-all"
             >
               <Plus size={16} />
               New Transaction
@@ -639,7 +639,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
             <div className="w-px bg-white/20 self-stretch my-1" />
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="px-3 py-2 text-white hover:bg-white/10 transition-colors"
+              className="px-2.5 py-2 text-white hover:brightness-110 transition-all"
             >
               <ChevronDown size={16} />
             </button>
