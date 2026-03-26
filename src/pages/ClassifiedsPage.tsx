@@ -189,7 +189,22 @@ export default function ClassifiedsPage() {
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number, classified?: { is_external?: boolean; title?: string }) => {
+    if (price === 0 && classified?.is_external) {
+      const titleMatch = classified.title?.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (titleMatch) {
+        const extracted = parseFloat(titleMatch[1].replace(/,/g, ''));
+        if (extracted > 0) {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(extracted);
+        }
+      }
+      return 'Contact Seller';
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -572,7 +587,7 @@ export default function ClassifiedsPage() {
                   </div>
 
                   <div className="text-2xl font-bold text-blue-400 mb-3">
-                    {formatPrice(classified.price)}
+                    {formatPrice(classified.price, classified)}
                   </div>
 
                   <p className="text-slate-300 text-sm mb-4 line-clamp-2">
@@ -656,7 +671,7 @@ export default function ClassifiedsPage() {
                     <div className="flex items-start justify-between gap-4 mb-2">
                       <div className="flex-1">
                         <h3 className="text-xl font-bold text-white mb-1">{classified.title}</h3>
-                        <p className="text-2xl font-bold text-green-400">{formatPrice(classified.price)}</p>
+                        <p className="text-2xl font-bold text-green-400">{formatPrice(classified.price, classified)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {canManageListing(classified) && (

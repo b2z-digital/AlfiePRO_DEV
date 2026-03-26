@@ -215,6 +215,7 @@ interface ParsedListing {
   images: string[];
   boatClass: string | null;
   category: string;
+  isErrorPage?: boolean;
 }
 
 function extractTextAfterH5(html: string, label: string): string {
@@ -277,8 +278,39 @@ function extractDescriptionBetweenSections(html: string, title: string): string 
   return lines.join("\n").trim();
 }
 
+function isErrorPage(html: string): boolean {
+  return /Oops!.*error has occurred/i.test(html) ||
+    /CMS Made Simple.*Error Console/i.test(html) ||
+    (/500\s+Internal\s+Server\s+Error/i.test(html) && html.length < 2000);
+}
+
+function extractPriceFromText(text: string): number {
+  const priceMatch = text.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+  if (priceMatch) {
+    return parseFloat(priceMatch[1].replace(/,/g, "")) || 0;
+  }
+  return 0;
+}
+
 function parseDetailPage(html: string, fallbackTitle: string): ParsedListing | null {
   try {
+    if (isErrorPage(html)) {
+      const titlePrice = extractPriceFromText(fallbackTitle);
+      return {
+        title: fallbackTitle,
+        description: "",
+        price: titlePrice,
+        location: "",
+        contactName: "",
+        contactEmail: "",
+        contactPhone: "",
+        images: [],
+        boatClass: detectBoatClassFromText(fallbackTitle),
+        category: detectBoatClassFromText(fallbackTitle) ? "yachts" : "other",
+        isErrorPage: true,
+      };
+    }
+
     let title = fallbackTitle;
     const h3Match = html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i);
     const h5Matches: string[] = [];
@@ -308,6 +340,9 @@ function parseDetailPage(html: string, fallbackTitle: string): ParsedListing | n
       if (priceMatch) {
         price = parseFloat(priceMatch[1].replace(/,/g, "")) || 0;
       }
+    }
+    if (price === 0) {
+      price = extractPriceFromText(title);
     }
 
     let location = "";
@@ -559,30 +594,46 @@ Deno.serve(async (req: Request) => {
           const finalImages = storedImages.length > 0 ? storedImages : parsed.images;
 
           if (existing) {
-            const hasChanges =
-              existing.title !== parsed.title ||
-              existing.price !== parsed.price ||
-              existing.description !== parsed.description;
+            if (parsed.isErrorPage) {
+              const updateFields: Record<string, unknown> = {
+                updated_at: new Date().toISOString(),
+              };
+              if (parsed.price > 0 && existing.price === 0) {
+                updateFields.price = parsed.price;
+              }
+              if (Object.keys(updateFields).length > 1) {
+                await supabase
+                  .from("classifieds")
+                  .update(updateFields)
+                  .eq("id", existing.id);
+                listingsUpdated++;
+              }
+            } else {
+              const hasChanges =
+                existing.title !== parsed.title ||
+                existing.price !== parsed.price ||
+                existing.description !== parsed.description;
 
-            if (hasChanges || storedImages.length > 0) {
-              await supabase
-                .from("classifieds")
-                .update({
-                  title: parsed.title,
-                  description: parsed.description,
-                  price: parsed.price,
-                  location: parsed.location || existing.title,
-                  images: finalImages.length > 0 ? finalImages : existing.images,
-                  external_contact_name: parsed.contactName || undefined,
-                  external_contact_email: parsed.contactEmail || undefined,
-                  external_contact_phone: parsed.contactPhone || undefined,
-                  contact_email: parsed.contactEmail || "scraped@alfiepro.com",
-                  boat_class: parsed.boatClass || undefined,
-                  category: parsed.category,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", existing.id);
-              listingsUpdated++;
+              if (hasChanges || storedImages.length > 0) {
+                await supabase
+                  .from("classifieds")
+                  .update({
+                    title: parsed.title,
+                    description: parsed.description,
+                    price: parsed.price > 0 ? parsed.price : existing.price,
+                    location: parsed.location || existing.title,
+                    images: finalImages.length > 0 ? finalImages : existing.images,
+                    external_contact_name: parsed.contactName || undefined,
+                    external_contact_email: parsed.contactEmail || undefined,
+                    external_contact_phone: parsed.contactPhone || undefined,
+                    contact_email: parsed.contactEmail || "scraped@alfiepro.com",
+                    boat_class: parsed.boatClass || undefined,
+                    category: parsed.category,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", existing.id);
+                listingsUpdated++;
+              }
             }
           } else {
             await supabase.from("classifieds").insert({
