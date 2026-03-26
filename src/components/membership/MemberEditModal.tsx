@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Hop as Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus } from 'lucide-react';
+import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -623,7 +623,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                 {/* Address */}
                 <div>
                   <h3 className={sectionHeaderClass}>
-                    <Home size={20} className="text-blue-400" />
+                    <House size={20} className="text-blue-400" />
                     Address
                   </h3>
                   <div className="grid grid-cols-1 gap-4">
@@ -1230,7 +1230,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>

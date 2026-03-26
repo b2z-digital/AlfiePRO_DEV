@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, User, Mail, Phone, Home, Sailboat, Plus, Trash2, AlertTriangle, Check, Search, UserPlus, Globe, Award, Upload, FileUp, Loader, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, User, Mail, Phone, Hop as Home, Sailboat, Plus, Trash2, TriangleAlert as AlertTriangle, Check, Search, UserPlus, Globe, Award, Upload, FileUp, Loader, ChevronDown, ChevronUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle } from 'lucide-react';
 import { BoatType, MemberFormData, Member } from '../types/member';
 import { addAdminMember } from '../utils/storage';
 import { supabase } from '../utils/supabase';
@@ -1032,7 +1032,7 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
                 Cancel
               </button>
               <button type="submit" disabled={submitting || success}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                 {submitting ? 'Adding Member...' : 'Add Member'}
               </button>
             </div>
