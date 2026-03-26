@@ -389,7 +389,7 @@ async function createTransactionForImportedMember(
         amount: baseAmount,
         tax_amount: taxAmount,
         total_amount: totalAmount,
-        payment_method: 'bank',
+        payment_method: 'bank_transfer',
         payment_status: 'paid',
       })
       .select()
