@@ -141,11 +141,20 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
       await markMembersAsPaid(memberIds);
 
+      let financeErrors = 0;
       for (const memberId of memberIds) {
-        await updateMembershipTransactionStatus(memberId, 'paid');
+        const result = await updateMembershipTransactionStatus(memberId, 'paid');
+        if (!result.success) {
+          console.error('Finance transaction failed for member:', memberId, result.error);
+          financeErrors++;
+        }
       }
 
-      addNotification('success', `${memberIds.length} payment(s) confirmed and recorded in finances`);
+      if (financeErrors > 0) {
+        addNotification('warning', `${memberIds.length} payment(s) confirmed but ${financeErrors} finance record(s) could not be created`);
+      } else {
+        addNotification('success', `${memberIds.length} payment(s) confirmed and recorded in finances`);
+      }
       await fetchAllMembers();
       setSelectedMembers(new Set());
       onUpdate?.();

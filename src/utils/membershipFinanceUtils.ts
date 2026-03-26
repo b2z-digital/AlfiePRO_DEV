@@ -49,6 +49,52 @@ export function calculateTaxAmount(amount: number, taxRate: number, taxInclusive
   }
 }
 
+function toTxPaymentMethod(method: string): string {
+  const map: Record<string, string> = {
+    'bank_transfer': 'bank',
+    'credit_card': 'card',
+    'cash': 'cash',
+    'cheque': 'cheque',
+    'other': 'other',
+    'bank': 'bank',
+    'card': 'card',
+  };
+  return map[method] || 'bank';
+}
+
+function toTxPaymentStatus(status: string): string {
+  const map: Record<string, string> = {
+    'pending': 'awaiting_payment',
+    'paid': 'paid',
+    'failed': 'awaiting_payment',
+    'refunded': 'awaiting_payment',
+    'awaiting_payment': 'awaiting_payment',
+  };
+  return map[status] || 'awaiting_payment';
+}
+
+function toMtxPaymentMethod(method: string): string {
+  const map: Record<string, string> = {
+    'bank_transfer': 'bank_transfer',
+    'credit_card': 'credit_card',
+    'cash': 'cash',
+    'bank': 'bank_transfer',
+    'card': 'credit_card',
+  };
+  return map[method] || 'bank_transfer';
+}
+
+function toMtxPaymentStatus(status: string): string {
+  const map: Record<string, string> = {
+    'pending': 'pending',
+    'paid': 'paid',
+    'failed': 'failed',
+    'refunded': 'refunded',
+    'awaiting_payment': 'pending',
+  };
+  return map[status] || 'pending';
+}
+
 export async function getClubFinanceConfig(clubId: string): Promise<ClubFinanceConfig | null> {
   try {
     const { data, error } = await supabase
@@ -93,16 +139,19 @@ export async function createMembershipTransaction(
       totalAmount = taxCalc.totalAmount;
     }
 
+    const isCard = paymentData.paymentMethod === 'credit_card';
     let stripeFee = 0;
     let netAmount = totalAmount;
 
-    if (paymentData.paymentMethod === 'credit_card' && status === 'paid') {
+    if (isCard && status === 'paid') {
       stripeFee = calculateStripeFee(totalAmount);
       netAmount = totalAmount - stripeFee;
     }
 
     const transactionDate = new Date().toISOString().split('T')[0];
     const description = `Membership: ${paymentData.memberName} - ${paymentData.membershipTypeName}`;
+    const dbPaymentMethod = toTxPaymentMethod(paymentData.paymentMethod);
+    const dbPaymentStatus = toTxPaymentStatus(status);
 
     const transactionData = {
       club_id: paymentData.clubId,
@@ -113,9 +162,9 @@ export async function createMembershipTransaction(
       tax_amount: taxAmount,
       net_amount: netAmount,
       date: transactionDate,
-      payment_method: paymentData.paymentMethod,
-      payment_status: status,
-      payment_gateway: paymentData.paymentMethod === 'credit_card' ? 'stripe' : 'manual',
+      payment_method: dbPaymentMethod,
+      payment_status: dbPaymentStatus,
+      payment_gateway: isCard ? 'stripe' : 'manual',
       gateway_transaction_id: paymentData.stripePaymentIntentId,
       gateway_fee: stripeFee,
       linked_entity_type: 'membership',
@@ -123,8 +172,6 @@ export async function createMembershipTransaction(
       payer: paymentData.memberName,
       reference: paymentData.memberId,
     };
-
-    console.log('Creating membership finance transaction:', transactionData);
 
     const { data: transaction, error: transactionError } = await supabase
       .from('transactions')
@@ -137,8 +184,6 @@ export async function createMembershipTransaction(
       throw transactionError;
     }
 
-    console.log('Transaction created successfully:', transaction.id);
-
     const membershipTransactionData = {
       club_id: paymentData.clubId,
       member_id: paymentData.memberId,
@@ -147,8 +192,8 @@ export async function createMembershipTransaction(
       amount: baseAmount,
       tax_amount: taxAmount,
       total_amount: totalAmount,
-      payment_method: paymentData.paymentMethod,
-      payment_status: status,
+      payment_method: toMtxPaymentMethod(paymentData.paymentMethod),
+      payment_status: toMtxPaymentStatus(status),
       stripe_payment_intent_id: paymentData.stripePaymentIntentId,
       stripe_fee: stripeFee,
     };
@@ -185,7 +230,7 @@ export async function updateMembershipTransactionStatus(
       .from('membership_transactions')
       .select('id, transaction_id, total_amount, payment_method')
       .eq('member_id', memberId)
-      .eq('payment_status', 'pending')
+      .or('payment_status.eq.awaiting_payment,payment_status.eq.pending')
       .order('created_at', { ascending: false })
       .limit(1);
 
@@ -204,17 +249,18 @@ export async function updateMembershipTransactionStatus(
     let stripeFee = 0;
     let netAmount = membershipTransaction.total_amount;
 
-    if (membershipTransaction.payment_method === 'credit_card' && status === 'paid') {
+    if (membershipTransaction.payment_method === 'card' && status === 'paid') {
       stripeFee = calculateStripeFee(membershipTransaction.total_amount);
       netAmount = membershipTransaction.total_amount - stripeFee;
     }
 
     const updateDate = paymentDate || new Date().toISOString().split('T')[0];
+    const dbPaymentStatus = toTxPaymentStatus(status);
 
     const { error: transactionUpdateError } = await supabase
       .from('transactions')
       .update({
-        payment_status: status,
+        payment_status: dbPaymentStatus,
         date: updateDate,
         gateway_fee: stripeFee,
         net_amount: netAmount,
@@ -227,7 +273,7 @@ export async function updateMembershipTransactionStatus(
     const { error: membershipTransactionUpdateError } = await supabase
       .from('membership_transactions')
       .update({
-        payment_status: status,
+        payment_status: toMtxPaymentStatus(status),
         stripe_fee: stripeFee,
         updated_at: new Date().toISOString()
       })
@@ -321,7 +367,7 @@ async function createTransactionForImportedMember(
         tax_amount: taxAmount,
         net_amount: totalAmount,
         date: transactionDate,
-        payment_method: 'bank_transfer',
+        payment_method: 'bank',
         payment_status: 'paid',
         payment_gateway: 'manual',
         linked_entity_type: 'membership',
@@ -343,7 +389,7 @@ async function createTransactionForImportedMember(
         amount: baseAmount,
         tax_amount: taxAmount,
         total_amount: totalAmount,
-        payment_method: 'bank_transfer',
+        payment_method: 'bank',
         payment_status: 'paid',
       })
       .select()
