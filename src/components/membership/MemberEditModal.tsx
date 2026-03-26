@@ -439,7 +439,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
         darkMode ? 'bg-slate-800' : 'bg-white'
       }`}>
         {/* Header - matches Add Member gradient style */}
-        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
+        <div className="bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-4 relative z-10">
             {memberData ? (
