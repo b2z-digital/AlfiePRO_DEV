@@ -437,7 +437,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
     const totalCellBg = isIncome ? 'bg-emerald-950/30' : 'bg-red-950/30';
 
     return (
-      <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
+      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
         <button
           onClick={onToggle}
           className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-700/20 transition-colors"
@@ -547,7 +547,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           <p className="text-sm text-slate-400 mt-1">Plan and track your financial budget for {selectedYear}</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-br from-slate-800/60 to-slate-800/40 border border-slate-700/50 rounded-xl backdrop-blur-sm">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl backdrop-blur-sm">
             <Calendar size={16} className="text-slate-400" />
             <select
               value={selectedYear}
@@ -572,7 +572,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       {categories.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg">
+            <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-slate-800/40 rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg">
               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
@@ -586,7 +586,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-gradient-to-br from-red-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/5">
+            <div className="group relative overflow-hidden bg-gradient-to-br from-red-500/10 to-slate-800/40 rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/5">
               <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
@@ -600,7 +600,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-gradient-to-br from-cyan-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5">
+            <div className="group relative overflow-hidden bg-gradient-to-br from-cyan-500/10 to-slate-800/40 rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5">
               <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
@@ -616,7 +616,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-gradient-to-br from-amber-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/5">
+            <div className="group relative overflow-hidden bg-gradient-to-br from-amber-500/10 to-slate-800/40 rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/5">
               <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
@@ -634,7 +634,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+            <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-6">
                 <BarChart3 size={20} className="text-cyan-400" />
                 <div>
@@ -647,7 +647,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+            <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-6">
                 <PieChartIcon size={20} className="text-cyan-400" />
                 <div>
@@ -667,7 +667,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+          <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <DollarSign size={20} className="text-cyan-400" />
@@ -731,7 +731,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           </div>
         </>
       ) : (
-        <div className="text-center py-20 rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800/60 to-slate-800/40 backdrop-blur-sm">
+        <div className="text-center py-20 rounded-2xl border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-700/50 mb-4">
             <DollarSign size={32} className="text-slate-400" />
           </div>
