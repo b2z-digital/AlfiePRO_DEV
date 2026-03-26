@@ -254,54 +254,38 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   };
 
   const exportToCSV = () => {
-    const exportData = members.flatMap(member => {
-      if (member.boats && member.boats.length > 0) {
-        return member.boats.map(boat => ({
-          'First Name': member.first_name,
-          'Last Name': member.last_name,
-          'Email': member.email || '',
-          'Phone': member.phone || '',
-          'Street': member.street || '',
-          'City': member.city || '',
-          'State': member.state || '',
-          'Postcode': member.postcode || '',
-          'Date Joined': member.date_joined || '',
-          'Membership Level': member.membership_level || member.membership_level_custom || '',
-          'Financial': member.is_financial ? 'Yes' : 'No',
-          'Amount Paid': member.amount_paid || '',
-          'Renewal Date': member.renewal_date || '',
-          'Boat Type': boat.boat_type || '',
-          'Sail Number': boat.sail_number || '',
-          'Hull': boat.hull || '',
-          'Handicap': boat.handicap || '',
-          'Emergency Contact Name': member.emergency_contact_name || '',
-          'Emergency Contact Phone': member.emergency_contact_phone || '',
-          'Emergency Contact Relationship': member.emergency_contact_relationship || ''
-        }));
-      } else {
-        return [{
-          'First Name': member.first_name,
-          'Last Name': member.last_name,
-          'Email': member.email || '',
-          'Phone': member.phone || '',
-          'Street': member.street || '',
-          'City': member.city || '',
-          'State': member.state || '',
-          'Postcode': member.postcode || '',
-          'Date Joined': member.date_joined || '',
-          'Membership Level': member.membership_level || member.membership_level_custom || '',
-          'Financial': member.is_financial ? 'Yes' : 'No',
-          'Amount Paid': member.amount_paid || '',
-          'Renewal Date': member.renewal_date || '',
-          'Boat Type': '',
-          'Sail Number': '',
-          'Hull': '',
-          'Handicap': '',
-          'Emergency Contact Name': member.emergency_contact_name || '',
-          'Emergency Contact Phone': member.emergency_contact_phone || '',
-          'Emergency Contact Relationship': member.emergency_contact_relationship || ''
-        }];
+    const maxBoats = Math.max(1, ...members.map(m => m.boats?.length || 0));
+
+    const exportData = members.map(member => {
+      const row: Record<string, string | number> = {
+        'First Name': member.first_name,
+        'Last Name': member.last_name,
+        'Email': member.email || '',
+        'Phone': member.phone || '',
+        'Street': member.street || '',
+        'City': member.city || '',
+        'State': member.state || '',
+        'Postcode': member.postcode || '',
+        'Date Joined': member.date_joined || '',
+        'Membership Level': member.membership_level || member.membership_level_custom || '',
+        'Financial': member.is_financial ? 'Yes' : 'No',
+        'Amount Paid': member.amount_paid || '',
+        'Renewal Date': member.renewal_date || '',
+        'Emergency Contact Name': member.emergency_contact_name || '',
+        'Emergency Contact Phone': member.emergency_contact_phone || '',
+        'Emergency Contact Relationship': member.emergency_contact_relationship || ''
+      };
+
+      for (let i = 0; i < maxBoats; i++) {
+        const boat = member.boats?.[i];
+        const suffix = maxBoats === 1 ? '' : ` ${i + 1}`;
+        row[`Boat Type${suffix}`] = boat?.boat_type || '';
+        row[`Sail Number${suffix}`] = boat?.sail_number || '';
+        row[`Hull${suffix}`] = boat?.hull || '';
+        row[`Handicap${suffix}`] = boat?.handicap || '';
       }
+
+      return row;
     });
 
     const csv = Papa.unparse(exportData);
