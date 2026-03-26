@@ -572,8 +572,8 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       {categories.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-emerald-500/[0.08] rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-emerald-500/10 rounded-xl">
@@ -586,8 +586,8 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-red-500/[0.08] rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-red-500/10 rounded-xl">
@@ -600,8 +600,8 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-cyan-500/[0.08] rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-cyan-500/10 rounded-xl">
@@ -616,8 +616,8 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-amber-500/[0.08] rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-amber-500/10 rounded-xl">

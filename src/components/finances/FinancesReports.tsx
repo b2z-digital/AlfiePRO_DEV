@@ -61,8 +61,16 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'cash-flow' | 'shared'>('cash-flow');
   const [dateRange, setDateRange] = useState('this-year');
-  const [startDate, setStartDate] = useState('2025-01-01');
-  const [endDate, setEndDate] = useState('2025-12-31');
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    const fyStartYear = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+    return `${fyStartYear}-07-01`;
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const today = new Date();
+    const fyEndYear = today.getMonth() >= 6 ? today.getFullYear() + 1 : today.getFullYear();
+    return `${fyEndYear}-06-30`;
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [reportData, setReportData] = useState<ReportData>({
     thisPeriod: { income: 0, expenses: 0, taxCollected: 0, taxPaid: 0, netCash: 0 },
@@ -82,16 +90,19 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
   } | null>(null);
 
   useEffect(() => {
-    // Set default date range based on selection
     const today = new Date();
-    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
 
     if (dateRange === 'this-year') {
-      setStartDate(`${currentYear}-01-01`);
-      setEndDate(`${currentYear}-12-31`);
+      const fyStartYear = currentMonth >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+      const fyEndYear = fyStartYear + 1;
+      setStartDate(`${fyStartYear}-07-01`);
+      setEndDate(`${fyEndYear}-06-30`);
     } else if (dateRange === 'last-year') {
-      setStartDate(`${currentYear - 1}-01-01`);
-      setEndDate(`${currentYear - 1}-12-31`);
+      const fyStartYear = currentMonth >= 6 ? today.getFullYear() - 1 : today.getFullYear() - 2;
+      const fyEndYear = fyStartYear + 1;
+      setStartDate(`${fyStartYear}-07-01`);
+      setEndDate(`${fyEndYear}-06-30`);
     }
   }, [dateRange]);
 
@@ -119,10 +130,11 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
       const previousEnd = new Date(start);
       previousEnd.setDate(previousEnd.getDate() - 1);
 
-      // Year to date calculation
-      const yearStart = new Date(end.getFullYear(), 0, 1);
+      const today = new Date();
+      const fyStartYear = today.getMonth() >= 6 ? today.getFullYear() : today.getFullYear() - 1;
+      const yearStart = new Date(fyStartYear, 6, 1);
       const ytdStart = yearStart.toISOString().split('T')[0];
-      const ytdEnd = new Date().toISOString().split('T')[0];
+      const ytdEnd = today.toISOString().split('T')[0];
 
       // Fetch transactions with categories
       let transactions, invoices, categories;
@@ -213,18 +225,19 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         return { income, expenses, taxCollected, taxPaid, netCash };
       };
 
-      // Calculate monthly data for trend charts
       const monthlyDataArray: MonthlyData[] = [];
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const fyMonthOrder = [6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5];
 
-      for (let i = 0; i < 12; i++) {
-        const monthStart = new Date(start.getFullYear(), i, 1);
-        const monthEnd = new Date(start.getFullYear(), i + 1, 0);
+      for (const monthIdx of fyMonthOrder) {
+        const year = monthIdx >= 6 ? start.getFullYear() : start.getFullYear() + 1;
+        const monthStart = new Date(year, monthIdx, 1);
+        const monthEnd = new Date(year, monthIdx + 1, 0);
 
         if (monthEnd >= start && monthStart <= end) {
           const monthTotals = calculatePeriodTotals(monthStart, monthEnd);
           monthlyDataArray.push({
-            month: months[i],
+            month: months[monthIdx],
             income: monthTotals.income,
             expenses: monthTotals.expenses,
             netCash: monthTotals.netCash
@@ -551,7 +564,9 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     previousStart.setDate(previousStart.getDate() - periodLength);
     const previousEnd = new Date(start);
     previousEnd.setDate(previousEnd.getDate() - 1);
-    const yearStart = new Date(end.getFullYear(), 0, 1);
+    const nowForYtd = new Date();
+    const fyYtdStartYear = nowForYtd.getMonth() >= 6 ? nowForYtd.getFullYear() : nowForYtd.getFullYear() - 1;
+    const yearStart = new Date(fyYtdStartYear, 6, 1);
 
     let filteredTransactions = allTransactions;
     let summary: any = {
@@ -736,8 +751,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                   onChange={(e) => setDateRange(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-slate-700/70 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
                 >
-                  <option value="this-year">This Financial Year</option>
-                  <option value="last-year">Last Financial Year</option>
+                  <option value="this-year">This Financial Year (Jul-Jun)</option>
+                  <option value="last-year">Last Financial Year (Jul-Jun)</option>
                   <option value="custom">Custom Range</option>
                 </select>
               </div>
@@ -783,9 +798,9 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Income Card */}
         <button
           onClick={() => openDetailedReport('income', 'Income Report')}
-          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-emerald-500/[0.08] rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/10 cursor-pointer text-left w-full hover:scale-105 backdrop-blur-sm"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
             <MousePointerClick size={20} className="text-emerald-400" />
           </div>
@@ -816,9 +831,9 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Expenses Card */}
         <button
           onClick={() => openDetailedReport('expenses', 'Expenses Report')}
-          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-red-500/[0.08] rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105 backdrop-blur-sm"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
             <MousePointerClick size={20} className="text-red-400" />
           </div>
@@ -849,9 +864,9 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Net Cash Flow Card */}
         <button
           onClick={() => openDetailedReport('cash-flow', 'Cash Flow Report')}
-          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-cyan-500/[0.08] rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105 backdrop-blur-sm"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
             <MousePointerClick size={20} className="text-cyan-400" />
           </div>
@@ -883,14 +898,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
 
         {/* Bank Position Card */}
         <div
-          className={`group relative overflow-hidden rounded-2xl border p-6 text-left w-full ${
+          className={`group relative overflow-hidden rounded-2xl border p-6 text-left w-full backdrop-blur-sm ${
             bankPosition.currentBalance >= 0
-              ? 'bg-slate-800/40 border-blue-500/20'
-              : 'bg-slate-800/40 border-red-500/20'
+              ? 'bg-blue-500/[0.08] border-blue-500/20'
+              : 'bg-red-500/[0.08] border-red-500/20'
           }`}
         >
           <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 ${
-            bankPosition.currentBalance >= 0 ? 'bg-blue-500/5' : 'bg-red-500/5'
+            bankPosition.currentBalance >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'
           }`}></div>
           <div className="relative">
             <div className="flex items-center justify-between mb-4">
@@ -1022,7 +1037,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">Year to Date Summary</h3>
-              <p className="text-sm text-slate-400">{new Date().getFullYear()}</p>
+              <p className="text-sm text-slate-400">FY {(() => { const t = new Date(); const s = t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1; return `${s}/${s + 1}`; })()}</p>
             </div>
           </div>
           <div className="space-y-3 mt-4">
