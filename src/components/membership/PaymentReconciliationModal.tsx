@@ -39,7 +39,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 }) => {
   const { addNotification } = useNotifications();
   const [loading, setLoading] = useState(true);
-  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
+  const [allMembers, setAllMembers] = useState<PendingPayment[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'pending' | 'financial'>('pending');
@@ -47,27 +47,19 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
   useEffect(() => {
     if (isOpen) {
-      fetchPendingPayments();
+      fetchAllMembers();
     }
-  }, [isOpen, clubId, filterType]);
+  }, [isOpen, clubId]);
 
-  const fetchPendingPayments = async () => {
+  const fetchAllMembers = async () => {
     try {
       setLoading(true);
 
-      let query = supabase
+      const { data: members, error: membersError } = await supabase
         .from('members')
         .select('*')
         .eq('club_id', clubId)
         .order('date_joined', { ascending: false });
-
-      if (filterType === 'pending') {
-        query = query.eq('payment_status', 'pending');
-      } else if (filterType === 'financial') {
-        query = query.eq('payment_status', 'paid');
-      }
-
-      const { data: members, error: membersError } = await query;
 
       if (membersError) throw membersError;
 
@@ -103,9 +95,9 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
         };
       });
 
-      setPendingPayments(membersWithData);
+      setAllMembers(membersWithData);
     } catch (error: any) {
-      console.error('Error fetching pending payments:', error);
+      console.error('Error fetching members:', error);
       addNotification('error', 'Failed to load payments');
     } finally {
       setLoading(false);
@@ -145,7 +137,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
       }
 
       addNotification('success', isPaid ? 'Marked as unpaid' : 'Payment confirmed');
-      fetchPendingPayments();
+      await fetchAllMembers();
       setSelectedMembers(new Set());
       onUpdate?.();
     } catch (error: any) {
@@ -178,14 +170,13 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
       if (error) throw error;
 
-      // Update finance transactions for each member
       const memberIds = Array.from(selectedMembers);
       for (const memberId of memberIds) {
         await updateMembershipTransactionStatus(memberId, 'paid');
       }
 
       addNotification('success', `${selectedMembers.size} payment(s) confirmed`);
-      fetchPendingPayments();
+      await fetchAllMembers();
       setSelectedMembers(new Set());
       onUpdate?.();
     } catch (error: any) {
@@ -215,16 +206,18 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
     setSelectedMembers(new Set());
   };
 
-  const filteredMembers = pendingPayments.filter(member => {
+  const pendingCount = allMembers.filter(m => m.payment_status === 'pending').length;
+  const financialCount = allMembers.filter(m => m.payment_status === 'paid').length;
+
+  const filteredMembers = allMembers.filter(member => {
     const matchesSearch =
       `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
+    if (filterType === 'pending') return matchesSearch && member.payment_status === 'pending';
+    if (filterType === 'financial') return matchesSearch && member.payment_status === 'paid';
     return matchesSearch;
   });
-
-  const pendingCount = pendingPayments.filter(m => m.payment_status === 'pending').length;
-  const financialCount = pendingPayments.filter(m => m.payment_status === 'paid').length;
 
   if (!isOpen) return null;
 
@@ -278,7 +271,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                     : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                All ({pendingPayments.length})
+                All ({allMembers.length})
               </button>
               <button
                 onClick={() => setFilterType('pending')}

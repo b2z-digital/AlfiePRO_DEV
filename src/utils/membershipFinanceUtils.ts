@@ -192,6 +192,10 @@ export async function updateMembershipTransactionStatus(
     if (fetchError) throw fetchError;
 
     if (!membershipTransactions || membershipTransactions.length === 0) {
+      if (status === 'paid') {
+        const result = await createTransactionForImportedMember(memberId, paymentDate);
+        return result;
+      }
       return { success: false, error: 'No pending transaction found' };
     }
 
@@ -237,6 +241,92 @@ export async function updateMembershipTransactionStatus(
     return {
       success: false,
       error: error.message || 'Failed to update transaction status'
+    };
+  }
+}
+
+async function createTransactionForImportedMember(
+  memberId: string,
+  paymentDate?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('id, club_id, first_name, last_name, membership_level, application_data')
+      .eq('id', memberId)
+      .maybeSingle();
+
+    if (memberError || !member) {
+      return { success: false, error: 'Member not found' };
+    }
+
+    const memberName = `${member.first_name} ${member.last_name}`;
+    const membershipType = member.membership_level || 'Membership';
+    const amount = member.application_data?.membership_amount || 0;
+    const transactionDate = paymentDate || new Date().toISOString().split('T')[0];
+
+    const config = await getClubFinanceConfig(member.club_id);
+
+    let taxAmount = 0;
+    let baseAmount = amount;
+    let totalAmount = amount;
+
+    if (config && config.taxEnabled && config.taxRate > 0 && amount > 0) {
+      const taxCalc = calculateTaxAmount(amount, config.taxRate, true);
+      taxAmount = taxCalc.taxAmount;
+      baseAmount = taxCalc.baseAmount;
+      totalAmount = taxCalc.totalAmount;
+    }
+
+    const description = `Membership: ${memberName} - ${membershipType}`;
+
+    const { data: transaction, error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        club_id: member.club_id,
+        type: 'deposit',
+        category_id: config?.defaultMembershipCategoryId || null,
+        description,
+        amount: totalAmount,
+        tax_amount: taxAmount,
+        net_amount: totalAmount,
+        date: transactionDate,
+        payment_method: 'bank_transfer',
+        payment_status: 'paid',
+        payment_gateway: 'manual',
+        linked_entity_type: 'membership',
+        linked_entity_id: memberId,
+        payer: memberName,
+        reference: memberId,
+      })
+      .select()
+      .single();
+
+    if (txError) throw txError;
+
+    const { error: mtxError } = await supabase
+      .from('membership_transactions')
+      .insert({
+        club_id: member.club_id,
+        member_id: memberId,
+        transaction_id: transaction.id,
+        amount: baseAmount,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        payment_method: 'bank_transfer',
+        payment_status: 'paid',
+      })
+      .select()
+      .single();
+
+    if (mtxError) throw mtxError;
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error creating transaction for imported member:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to create finance transaction'
     };
   }
 }
