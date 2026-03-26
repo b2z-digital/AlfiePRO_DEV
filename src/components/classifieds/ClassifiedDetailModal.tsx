@@ -145,6 +145,21 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
   };
 
   const formatPrice = (price: number) => {
+    if (price === 0 && classified?.is_external) {
+      const titleMatch = classified.title?.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (titleMatch) {
+        const extracted = parseFloat(titleMatch[1].replace(/,/g, ''));
+        if (extracted > 0) {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(extracted);
+        }
+      }
+      return 'Contact Seller';
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',

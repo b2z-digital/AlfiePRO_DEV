@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Video, Search, ListFilter as Filter, Grid2x2 as Grid, List, Play, Calendar, Trophy, Eye, Download, ExternalLink, Youtube, CreditCard as Edit2, Trash2, X, Save, Share2, SquareCheck as CheckSquare, Square, Building, Check, ArrowUpDown, ChevronDown, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,6 +50,7 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
   const [showImageUploadModal, setShowImageUploadModal] = useState(false);
   const [showYouTubeUrlModal, setShowYouTubeUrlModal] = useState(false);
   const [showUploadMenu, setShowUploadMenu] = useState(false);
+  const uploadMenuRef = useRef<HTMLDivElement>(null);
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'event'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -71,6 +72,16 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
       fetchAvailableEvents();
     }
   }, [contextId]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
+        setShowUploadMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     filterMedia();
@@ -1124,57 +1135,63 @@ const MediaPage: React.FC<MediaPageProps> = ({ darkMode }) => {
             )}
 
             {/* Upload Media Split Button */}
-            <div className="relative">
+            <div className="relative" ref={uploadMenuRef}>
               <div className="flex">
                 <button
                   onClick={() => setShowImageUploadModal(true)}
-                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-l-lg transition-all shadow-lg hover:shadow-xl animate-pulse"
-                  style={{ color: '#ffffff' }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-l-lg transition-colors bg-emerald-600 hover:bg-emerald-500 text-white"
                 >
-                  <UploadIcon size={18} className="text-white" style={{ color: '#ffffff' }} />
-                  <span className="text-white" style={{ color: '#ffffff' }}>Upload Media</span>
+                  <UploadIcon size={18} />
+                  Upload Media
                 </button>
                 <button
                   onClick={() => setShowUploadMenu(!showUploadMenu)}
-                  className="btn-primary-green px-2 rounded-r-lg transition-all shadow-lg hover:shadow-xl border-l border-green-700/50"
-                  style={{ color: '#ffffff' }}
+                  className="px-2 py-2 rounded-r-lg border-l transition-colors bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500"
                 >
-                  <ChevronDown size={18} className="text-white" style={{ color: '#ffffff' }} />
+                  <ChevronDown size={18} />
                 </button>
               </div>
 
               {showUploadMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
+                <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg z-50 bg-slate-800 border border-slate-700">
                   <button
                     onClick={() => {
                       setShowImageUploadModal(true);
                       setShowUploadMenu(false);
                     }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300 flex items-center gap-2"
+                    className="w-full text-left px-4 py-3 rounded-t-lg transition-colors flex items-center gap-3 hover:bg-slate-700 text-white"
                   >
-                    <ImageIcon size={16} />
-                    Upload Images
+                    <ImageIcon size={18} />
+                    <div>
+                      <div className="font-medium">Upload Images</div>
+                      <div className="text-xs text-slate-400">Add photos from your device</div>
+                    </div>
                   </button>
                   <button
                     onClick={() => {
                       setShowUploadModal(true);
                       setShowUploadMenu(false);
                     }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300 flex items-center gap-2"
+                    className="w-full text-left px-4 py-3 transition-colors flex items-center gap-3 hover:bg-slate-700 text-white"
                   >
-                    <Youtube size={16} />
-                    Upload Video (YouTube)
+                    <Youtube size={18} />
+                    <div>
+                      <div className="font-medium">Upload Video</div>
+                      <div className="text-xs text-slate-400">Upload directly to YouTube</div>
+                    </div>
                   </button>
-                  <div className="border-t border-slate-700 my-2"></div>
                   <button
                     onClick={() => {
                       setShowYouTubeUrlModal(true);
                       setShowUploadMenu(false);
                     }}
-                    className="w-full px-4 py-2 text-left text-sm hover:bg-slate-700 text-slate-300 flex items-center gap-2"
+                    className="w-full text-left px-4 py-3 rounded-b-lg transition-colors flex items-center gap-3 hover:bg-slate-700 text-white"
                   >
-                    <ExternalLink size={16} />
-                    Add YouTube URL
+                    <ExternalLink size={18} />
+                    <div>
+                      <div className="font-medium">Add YouTube URL</div>
+                      <div className="text-xs text-slate-400">Link an existing YouTube video</div>
+                    </div>
                   </button>
                 </div>
               )}

@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import {
-  X, Save, Send, Eye, Users, Calendar, Mail, SendHorizonal,
-  Settings, Layout, CheckCircle
-} from 'lucide-react';
+import { X, Save, Send, Eye, Users, Calendar, Mail, SendHorizontal as SendHorizonal, Settings, LayoutGrid as Layout, CircleCheck as CheckCircle } from 'lucide-react';
 import {
   getMarketingCampaign,
   updateMarketingCampaign,
@@ -707,192 +704,152 @@ export default function MarketingCampaignEditorPage({ darkMode = true }: Marketi
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'design' && (
-          <div className="h-full">
-            <EnhancedEmailPageBuilder
-              content={emailContent}
-              onChange={setEmailContent}
-              darkMode={darkMode}
-            />
-          </div>
-        )}
-
-        {activeTab === 'recipients' && (
-          <div className="p-6 overflow-auto h-full">
-            <div className={`max-w-4xl mx-auto rounded-xl p-6 ${
-              darkMode
-                ? 'bg-slate-800/50 border border-slate-700/50'
-                : 'bg-white shadow-sm border border-gray-200'
-            }`}>
-              <h2 className={`text-xl font-bold mb-4 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-                Select Subscriber Lists
-              </h2>
-              <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                Choose which subscriber lists will receive this campaign
-              </p>
-
-              <div className="space-y-3">
-                {lists.map((list) => (
-                  <label
-                    key={list.id}
-                    className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-colors ${
-                      darkMode
-                        ? 'bg-slate-900/50 hover:bg-slate-900/70 border border-slate-700'
-                        : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedLists.includes(list.id)}
-                      onChange={() => toggleList(list.id)}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-                        {list.name}
-                      </div>
-                      {list.description && (
-                        <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                          {list.description}
-                        </div>
-                      )}
-                    </div>
-                    <div className={`text-sm ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                      {(list as any).subscriber_count || list.active_subscriber_count || list.total_contacts} subscribers
-                    </div>
-                  </label>
-                ))}
-
-                {lists.length === 0 && (
-                  <div className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                    <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p className="mb-4">No subscriber lists found</p>
-                    <Link
-                      to="/marketing/subscribers"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        <div className="h-full">
+          <EnhancedEmailPageBuilder
+            content={emailContent}
+            onChange={setEmailContent}
+            darkMode={darkMode}
+            outerTab={activeTab}
+            recipientsPanel={
+              <div>
+                <h3 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-slate-200' : 'text-gray-900'}`}>
+                  Select Subscriber Lists
+                </h3>
+                <p className={`text-xs mb-4 ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                  Choose which lists will receive this campaign
+                </p>
+                <div className="space-y-2">
+                  {lists.map((list) => (
+                    <label
+                      key={list.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedLists.includes(list.id)
+                          ? darkMode ? 'bg-blue-900/30 border border-blue-700/50' : 'bg-blue-50 border border-blue-200'
+                          : darkMode ? 'bg-slate-700/50 hover:bg-slate-700 border border-slate-600' : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                      }`}
                     >
-                      Create Subscriber List
-                    </Link>
+                      <input
+                        type="checkbox"
+                        checked={selectedLists.includes(list.id)}
+                        onChange={() => toggleList(list.id)}
+                        className="w-4 h-4 mt-0.5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-medium ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
+                          {list.name}
+                        </div>
+                        <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                          {(list as any).subscriber_count || list.active_subscriber_count || list.total_contacts} subscribers
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                  {lists.length === 0 && (
+                    <div className={`text-center py-6 ${darkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                      <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm mb-3">No subscriber lists found</p>
+                      <Link
+                        to="/marketing/subscribers"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Create List
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            }
+            settingsPanel={
+              <div>
+                <h3 className={`text-sm font-semibold mb-4 ${darkMode ? 'text-slate-200' : 'text-gray-900'}`}>
+                  Campaign Settings
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      Campaign Name
+                    </label>
+                    <input
+                      type="text"
+                      value={campaign.name}
+                      onChange={(e) => setCampaign({ ...campaign, name: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode ? 'bg-slate-900/50 border-slate-600 text-slate-100' : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="p-6 overflow-auto h-full">
-            <div className={`max-w-4xl mx-auto rounded-xl p-6 ${
-              darkMode
-                ? 'bg-slate-800/50 border border-slate-700/50'
-                : 'bg-white shadow-sm border border-gray-200'
-            }`}>
-              <h2 className={`text-xl font-bold mb-6 ${darkMode ? 'text-slate-100' : 'text-gray-900'}`}>
-                Campaign Settings
-              </h2>
-
-              <div className="space-y-6">
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                    Campaign Name
-                  </label>
-                  <input
-                    type="text"
-                    value={campaign.name}
-                    onChange={(e) => setCampaign({ ...campaign, name: e.target.value })}
-                    className={`w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode
-                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                    Email Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={campaign.subject}
-                    onChange={(e) => setCampaign({ ...campaign, subject: e.target.value })}
-                    className={`w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode
-                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                    Preview Text
-                  </label>
-                  <input
-                    type="text"
-                    value={campaign.preview_text || ''}
-                    onChange={(e) => setCampaign({ ...campaign, preview_text: e.target.value })}
-                    placeholder="Text shown in email client preview"
-                    className={`w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode
-                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                    From Name
-                  </label>
-                  <input
-                    type="text"
-                    value={campaign.from_name}
-                    onChange={(e) => setCampaign({ ...campaign, from_name: e.target.value })}
-                    className={`w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode
-                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                    From Email
-                  </label>
-                  <input
-                    type="email"
-                    value={campaign.from_email}
-                    onChange={(e) => setCampaign({ ...campaign, from_email: e.target.value })}
-                    className={`w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode
-                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-                    Reply To Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={campaign.reply_to || ''}
-                    onChange={(e) => setCampaign({ ...campaign, reply_to: e.target.value })}
-                    placeholder="Email address for replies"
-                    className={`w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      darkMode
-                        ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-                    }`}
-                  />
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      Email Subject
+                    </label>
+                    <input
+                      type="text"
+                      value={campaign.subject}
+                      onChange={(e) => setCampaign({ ...campaign, subject: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode ? 'bg-slate-900/50 border-slate-600 text-slate-100' : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      Preview Text
+                    </label>
+                    <input
+                      type="text"
+                      value={campaign.preview_text || ''}
+                      onChange={(e) => setCampaign({ ...campaign, preview_text: e.target.value })}
+                      placeholder="Shown in email client preview"
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      From Name
+                    </label>
+                    <input
+                      type="text"
+                      value={campaign.from_name}
+                      onChange={(e) => setCampaign({ ...campaign, from_name: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode ? 'bg-slate-900/50 border-slate-600 text-slate-100' : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      From Email
+                    </label>
+                    <input
+                      type="email"
+                      value={campaign.from_email}
+                      onChange={(e) => setCampaign({ ...campaign, from_email: e.target.value })}
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode ? 'bg-slate-900/50 border-slate-600 text-slate-100' : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+                      Reply To (Optional)
+                    </label>
+                    <input
+                      type="email"
+                      value={campaign.reply_to || ''}
+                      onChange={(e) => setCampaign({ ...campaign, reply_to: e.target.value })}
+                      placeholder="Email address for replies"
+                      className={`w-full px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        darkMode ? 'bg-slate-900/50 border-slate-600 text-slate-100 placeholder-slate-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            }
+          />
+        </div>
       </div>
 
       {/* Send Test Modal */}
