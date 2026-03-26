@@ -286,6 +286,28 @@ input[type="color"]::-moz-color-swatch {
   color: #ffffff !important;
 }
 
+/* Modern select dropdown styling for dark theme finance forms */
+select[class*="bg-slate-700"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.5rem !important;
+}
+
+/* Light date picker icons for dark theme */
+input[type="date"][class*="bg-slate-700"] {
+  color-scheme: dark;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+  opacity: 1;
+}
+
 /* Force white text on blue status badges */
 .bg-blue-500 .text-white,
 .bg-green-500 .text-white,

@@ -1072,7 +1072,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
               >
                 {loading ? 'Saving...' : (editingInvoice ? 'Update Invoice' : 'Save Invoice')}
               </button>

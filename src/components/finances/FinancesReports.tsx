@@ -58,6 +58,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
   const { currentClub } = useAuth();
   const isAssociation = !!associationId && !!associationType;
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'cash-flow' | 'shared'>('cash-flow');
   const [dateRange, setDateRange] = useState('this-year');
@@ -341,6 +342,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
       setError('Failed to load financial reports');
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   };
 
@@ -399,10 +401,10 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     doc.save(`financial-report-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
-  if (loading) {
+  if (loading && initialLoad) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
       </div>
     );
   }
@@ -749,7 +751,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                 <select
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/70 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-10 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all appearance-none"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1rem' }}
                 >
                   <option value="this-year">This Financial Year (Jul-Jun)</option>
                   <option value="last-year">Last Financial Year (Jul-Jun)</option>
@@ -769,7 +772,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                     setStartDate(e.target.value);
                     setDateRange('custom');
                   }}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/70 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+                  style={{ colorScheme: 'dark' }}
                 />
               </div>
             </div>
@@ -785,7 +789,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                     setEndDate(e.target.value);
                     setDateRange('custom');
                   }}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700/70 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
+                  style={{ colorScheme: 'dark' }}
                 />
               </div>
             </div>
