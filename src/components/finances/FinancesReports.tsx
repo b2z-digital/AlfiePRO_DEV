@@ -783,7 +783,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Income Card */}
         <button
           onClick={() => openDetailedReport('income', 'Income Report')}
-          className="btn-primary-green group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -955,40 +955,44 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Income Breakdown */}
-        {categoryBreakdown.income.length > 0 && (
-          <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <PieChartIcon size={20} className="text-emerald-400" />
-                  Income by Category
-                </h3>
-                <p className="text-sm text-slate-400 mt-1">Top 5 sources</p>
-              </div>
-            </div>
-            <div className="h-[300px]">
-              <Doughnut data={incomePieData} options={pieOptions} />
+        <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/30 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <PieChartIcon size={20} className="text-emerald-400" />
+                Income by Category
+              </h3>
+              <p className="text-sm text-slate-400 mt-1">Top 5 sources</p>
             </div>
           </div>
-        )}
+          <div className="h-[300px]">
+            {categoryBreakdown.income.length > 0 ? (
+              <Doughnut data={incomePieData} options={pieOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-500 text-sm">No income data for this period</div>
+            )}
+          </div>
+        </div>
 
         {/* Expenses Breakdown */}
-        {categoryBreakdown.expenses.length > 0 && (
-          <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <PieChartIcon size={20} className="text-red-400" />
-                  Expenses by Category
-                </h3>
-                <p className="text-sm text-slate-400 mt-1">Top 5 categories</p>
-              </div>
-            </div>
-            <div className="h-[300px]">
-              <Doughnut data={expensesPieData} options={pieOptions} />
+        <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/30 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <PieChartIcon size={20} className="text-red-400" />
+                Expenses by Category
+              </h3>
+              <p className="text-sm text-slate-400 mt-1">Top 5 categories</p>
             </div>
           </div>
-        )}
+          <div className="h-[300px]">
+            {categoryBreakdown.expenses.length > 0 ? (
+              <Doughnut data={expensesPieData} options={pieOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-500 text-sm">No expense data for this period</div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Financial Health Cards */}
