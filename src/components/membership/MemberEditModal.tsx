@@ -439,8 +439,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
         darkMode ? 'bg-slate-800' : 'bg-white'
       }`}>
         {/* Header - matches Add Member gradient style */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
+        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-4 relative z-10">
             {memberData ? (
               <div className="relative group">
@@ -471,7 +471,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
             <div>
               <h2 className="text-2xl font-bold text-white drop-shadow-lg">Edit Member</h2>
               {memberData && (
-                <p className="text-blue-100 text-sm mt-0.5">{memberData.first_name} {memberData.last_name}</p>
+                <p className="text-cyan-100 text-sm mt-0.5">{memberData.first_name} {memberData.last_name}</p>
               )}
             </div>
           </div>
