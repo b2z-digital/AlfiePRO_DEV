@@ -452,7 +452,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     labels: categoryBreakdown.income.map(c => c.name),
     datasets: [{
       data: categoryBreakdown.income.map(c => c.amount),
-      backgroundColor: categoryBreakdown.income.map(c => c.color),
+      backgroundColor: categoryBreakdown.income.map(c => c.color + 'aa'),
       borderColor: 'rgb(15, 23, 42)',
       borderWidth: 2
     }]
@@ -462,7 +462,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     labels: categoryBreakdown.expenses.map(c => c.name),
     datasets: [{
       data: categoryBreakdown.expenses.map(c => c.amount),
-      backgroundColor: categoryBreakdown.expenses.map(c => c.color),
+      backgroundColor: categoryBreakdown.expenses.map(c => c.color + 'aa'),
       borderColor: 'rgb(15, 23, 42)',
       borderWidth: 2
     }]
