@@ -783,7 +783,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Income Card */}
         <button
           onClick={() => openDetailedReport('income', 'Income Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 to-slate-800/40 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -816,7 +816,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Expenses Card */}
         <button
           onClick={() => openDetailedReport('expenses', 'Expenses Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-red-500/10 to-slate-800/40 rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -849,7 +849,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Net Cash Flow Card */}
         <button
           onClick={() => openDetailedReport('cash-flow', 'Cash Flow Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-cyan-500/10 to-slate-800/40 rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -885,8 +885,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         <div
           className={`group relative overflow-hidden rounded-2xl border p-6 text-left w-full ${
             bankPosition.currentBalance >= 0
-              ? 'bg-gradient-to-br from-blue-500/10 to-slate-800/40 border-blue-500/20'
-              : 'bg-gradient-to-br from-red-500/10 to-slate-800/40 border-red-500/20'
+              ? 'bg-slate-800/40 border-blue-500/20'
+              : 'bg-slate-800/40 border-red-500/20'
           }`}
         >
           <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 ${

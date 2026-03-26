@@ -377,7 +377,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                 className={`
                   w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
+                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200 [color-scheme:dark]' : 'bg-white border-slate-300 text-slate-900'}
                 `}
               />
             ) : (
@@ -396,8 +396,11 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 value={formData.category_id}
                 onChange={(e) => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_12px_center] cursor-pointer
+                  ${darkMode
+                    ? 'bg-slate-700 border-slate-600 text-slate-200 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2394a3b8%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'
+                    : 'bg-white border-slate-300 text-slate-900 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2364748b%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'}
+                  pr-10
                 `}
               >
                 <option value="">Select category</option>
@@ -447,8 +450,11 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                 value={formData.payment_method}
                 onChange={(e) => setFormData(prev => ({ ...prev, payment_method: e.target.value }))}
                 className={`
-                  w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500
-                  ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-300 text-slate-900'}
+                  w-full px-3 py-2.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-no-repeat bg-[length:16px_16px] bg-[position:right_12px_center] cursor-pointer
+                  ${darkMode
+                    ? 'bg-slate-700 border-slate-600 text-slate-200 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2394a3b8%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'
+                    : 'bg-white border-slate-300 text-slate-900 bg-[image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2716%27%20height%3D%2716%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%2364748b%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27m6%209%206%206%206-6%27/%3E%3C/svg%3E")]'}
+                  pr-10
                 `}
               >
                 <option value="cash">Cash</option>
