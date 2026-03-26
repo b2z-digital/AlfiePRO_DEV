@@ -1,24 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Users,
-  Search,
-  Filter,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Eye,
-  Mail,
-  Phone,
-  MapPin,
-  Anchor,
-  AlertCircle,
-  CreditCard,
-  Award,
-  X,
-  Check,
-  MessageSquare,
-  Trash2,
-} from 'lucide-react';
+import { Users, Search, ListFilter as Filter, CircleCheck as CheckCircle, Circle as XCircle, Clock, Eye, Mail, Phone, MapPin, Anchor, CircleAlert as AlertCircle, CreditCard, Award, X, Check, MessageSquare, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -441,7 +422,7 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
 
       <div className="grid gap-4">
         {filteredApplications.length === 0 ? (
-          <div className={`p-12 rounded-xl text-center ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+          <div className={`p-12 rounded-xl text-center border backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}`}>
             <Users className={`mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} size={48} />
             <p className={`text-lg font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
               No applications found
