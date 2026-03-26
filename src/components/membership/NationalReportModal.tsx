@@ -840,7 +840,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
               <button
                 onClick={() => setStep('preview')}
                 disabled={reportMembers.length === 0}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-teal-600/20"
+                className="btn-primary-green px-5 py-2.5 rounded-xl hover:from-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-teal-600/20"
               >
                 Preview Report
                 <ChevronRight size={16} />
@@ -849,7 +849,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
             {step === 'preview' && (
               <button
                 onClick={() => setStep('delivery')}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-teal-600/20"
+                className="btn-primary-green px-5 py-2.5 rounded-xl hover:from-teal-500 text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-teal-600/20"
               >
                 Choose Delivery
                 <ChevronRight size={16} />
@@ -859,7 +859,7 @@ export const NationalReportModal: React.FC<NationalReportModalProps> = ({
               <button
                 onClick={deliveryMethod === 'email' ? handleSendEmail : handleDownload}
                 disabled={submitting || (deliveryMethod === 'email' && !recipientEmail)}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-teal-600/20"
+                className="btn-primary-green px-5 py-2.5 rounded-xl hover:from-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-teal-600/20"
               >
                 {submitting ? (
                   <>

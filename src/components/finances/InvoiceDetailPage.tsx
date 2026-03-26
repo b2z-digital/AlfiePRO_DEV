@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Send, Plus, Edit2, Trash2, DollarSign, Calendar, User, FileText, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Download, Send, Plus, CreditCard as Edit2, Trash2, DollarSign, Calendar, User, FileText, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
@@ -308,7 +308,7 @@ export const InvoiceDetailPage: React.FC = () => {
               <Download size={16} />
               Download PDF
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+            <button className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors">
               <Send size={16} />
               Send Invoice
             </button>
@@ -459,7 +459,7 @@ export const InvoiceDetailPage: React.FC = () => {
               {(invoice.status === 'sent' || invoice.status === 'overdue') && (
                 <button
                   onClick={() => updateInvoiceStatus('paid')}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="btn-primary-green w-full px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   Mark as Paid
                 </button>

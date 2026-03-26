@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid, X, ChevronDown, ChevronRight, ChevronLeft, Filter, Map, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, MapIcon, Clock } from 'lucide-react';
+import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid2x2 as Grid, X, ChevronDown, ChevronRight, ChevronLeft, ListFilter as Filter, Map, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, Map as MapIcon, Clock } from 'lucide-react';
 import { RaceType } from '../types';
 import { RaceEvent, RaceSeries } from '../types/race';
 import { formatDate } from '../utils/date';
@@ -21,7 +21,7 @@ import { generateICalFile, downloadICalFile } from '../utils/calendarSync';
 import { LocationExplorer } from './LocationExplorer';
 import { getCalendarMeetings, CalendarMeeting } from '../utils/calendarMeetingStorage';
 import { CalendarMeetingDetailsModal } from './meetings/CalendarMeetingDetailsModal';
-import { Users, Shield, Building2, Globe2, Flag } from 'lucide-react';
+import { Users, Shield, Building2, Globe as Globe2, Flag } from 'lucide-react';
 
 type CalendarView = 'list' | 'grid' | 'month' | 'year';
 type EventScope = 'all' | 'club' | 'my_state' | 'national' | 'all_states';
@@ -1280,7 +1280,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {displayTitle}
                             </h4>
                             {isNextEvent && (
-                              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white whitespace-nowrap animate-pulse">
+                              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap animate-pulse">
                                 <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                                 Up Next
                               </div>
@@ -1543,7 +1543,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {event.raceClass}
                             </div>
                             {isNextEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Next
                               </div>
                             )}
@@ -1748,7 +1748,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                         {isNextEvent && (
-                          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500 text-white animate-pulse">
+                          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white animate-pulse">
                             <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
                             Up Next
                           </div>
@@ -2018,7 +2018,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {event.raceClass}
                             </div>
                             {isNextEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Next
                               </div>
                             )}

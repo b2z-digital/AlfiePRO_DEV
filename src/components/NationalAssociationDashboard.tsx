@@ -159,7 +159,7 @@ export const NationalAssociationDashboard: React.FC<NationalAssociationDashboard
             <div className="absolute inset-0 bg-black opacity-10" />
           </>
         ) : (
-          <div className="w-full h-full bg-gradient-to-r from-slate-800 to-slate-700" />
+          <div className="w-full h-full from-slate-800 to-slate-700" />
         )}
 
         <div className="absolute top-4 right-4 flex items-center gap-2">

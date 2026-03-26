@@ -1049,14 +1049,14 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
             {!isCloudSection && !isAllSection && !isSharedSection && (
               <button
                 onClick={() => { resetResourceForm(); setShowResourceModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm"
               >
                 <Plus size={15} />
                 Add Resource
               </button>
             )}
             {isDriveSection && currentDriveFolderId && (
-              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20 font-medium text-sm cursor-pointer">
+              <label className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg font-medium text-sm cursor-pointer">
                 <Upload size={15} />
                 Upload
                 <input
@@ -1074,7 +1074,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               </label>
             )}
             {isDropboxSection && currentDropboxPath && (
-              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm cursor-pointer">
+              <label className="flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium text-sm cursor-pointer">
                 <Upload size={15} />
                 Upload
                 <input
@@ -1570,7 +1570,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               <button
                 onClick={handleSaveCategory}
                 disabled={categorySaving || !categoryName.trim()}
-                className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className="btn-primary-green px-4 py-2 text-sm from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
                 {categorySaving ? 'Saving...' : editingCategory ? 'Rename' : 'Create Folder'}
               </button>
@@ -1682,7 +1682,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
               <button
                 onClick={handleSaveResource}
                 disabled={resourceSaving || !resourceTitle.trim()}
-                className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className="btn-primary-green px-4 py-2 text-sm from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
                 {resourceSaving ? 'Saving...' : editingResource ? 'Update' : 'Add Resource'}
               </button>
@@ -1830,7 +1830,7 @@ export const AssociationResourcesPage: React.FC<ResourcesPageProps> = ({ darkMod
                   }
                 }}
                 disabled={driveRenaming || !driveRenameName.trim()}
-                className="px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
+                className="px-4 py-2 text-sm from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 font-medium"
               >
                 {driveRenaming ? 'Renaming...' : 'Rename'}
               </button>
@@ -2042,7 +2042,7 @@ const AllFilesView: React.FC<{
           <p className="text-slate-500 text-sm mb-5">Create a folder to start organising your resources</p>
           <button
             onClick={onNewFolder}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
           >
             <FolderPlus size={14} />
             New Folder
@@ -2078,7 +2078,7 @@ const FolderView: React.FC<{
         <p className="text-slate-500 text-sm mb-5">Add files, links, or pages to this folder</p>
         <button
           onClick={onAddResource}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
+          className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl text-sm font-medium transition-all hover:scale-105"
         >
           <Plus size={14} />
           Add Resource

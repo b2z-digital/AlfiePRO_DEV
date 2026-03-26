@@ -243,7 +243,7 @@ export const SmsActivityDashboard: React.FC<SmsActivityDashboardProps> = ({ dark
                   <div className="mt-3 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
                     {log.yes_count > 0 && (
                       <div
-                        className="bg-green-500 rounded-l-full"
+                        className="rounded-l-full"
                         style={{ width: `${(log.yes_count / log.total_sent) * 100}%` }}
                       ></div>
                     )}

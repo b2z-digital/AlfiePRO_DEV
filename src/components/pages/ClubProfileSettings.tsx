@@ -630,7 +630,7 @@ export const ClubProfileSettings: React.FC<ClubProfileSettingsProps> = ({ darkMo
               </p>
               <button
                 onClick={() => setShowCoverImageModal(true)}
-                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium"
+                className="btn-primary-green px-6 py-2.5 text-white rounded-lg transition-colors font-medium"
               >
                 Browse Files
               </button>

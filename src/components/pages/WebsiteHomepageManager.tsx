@@ -256,7 +256,7 @@ export const WebsiteHomepageManager: React.FC = () => {
                   setEditingSlide(null);
                   setShowSlideModal(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors"
+                className="btn-primary-green inline-flex items-center gap-2 px-4 py-2 text-white font-medium rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add Slide

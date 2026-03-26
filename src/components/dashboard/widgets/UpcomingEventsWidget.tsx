@@ -603,7 +603,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             <Users size={40} className="text-emerald-400/60" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           </div>
-          <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b from-emerald-400 via-emerald-500 to-emerald-400" />
+          <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b via-emerald-500" />
           <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
             <div className="text-center">
               <div className="text-xs font-semibold text-slate-900">{new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>

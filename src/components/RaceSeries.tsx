@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Edit2, Trash2, MapPin, Calendar, Trophy, AlertTriangle, Upload } from 'lucide-react';
+import { X, Plus, CreditCard as Edit2, Trash2, MapPin, Calendar, Trophy, TriangleAlert as AlertTriangle, Upload } from 'lucide-react';
 import { ImportRoundResultsModal } from './ImportRoundResultsModal';
 import { RaceType, BoatType } from '../types';
 import { RaceSeries as RaceSeriesType, RaceEvent } from '../types/race';
@@ -875,7 +875,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
                                         {round.venue}
                                       </span>
                                       {isNextRound && (
-                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
                                           Next
                                         </span>
                                       )}

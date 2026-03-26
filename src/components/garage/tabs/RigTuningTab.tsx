@@ -313,7 +313,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
         </p>
         <button
           onClick={() => setShowNewRigModal(true)}
-          className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200"
+          className="btn-primary-green px-6 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200"
         >
           <Plus className="w-5 h-5 inline mr-2" />
           Create First Rig
@@ -351,7 +351,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
                 <button
                   onClick={createNewRig}
                   disabled={!newRigName.trim() || saving}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
+                  className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
                 >
                   Create
                 </button>
@@ -443,7 +443,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
               </h3>
               <button
                 onClick={() => setShowNewRigModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 text-sm"
+                className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 text-sm"
               >
                 <Plus className="w-4 h-4 inline mr-1" />
                 New Rig
@@ -689,7 +689,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
           <button
             onClick={saveRigCondition}
             disabled={saving}
-            className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
+            className="btn-primary-green w-full px-6 py-4 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
           >
             <Save className="w-5 h-5 inline mr-2" />
             {saving ? 'Saving...' : selectedCondition ? 'Update Settings' : 'Save Settings'}
@@ -730,7 +730,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
               <button
                 onClick={createNewRig}
                 disabled={!newRigName.trim() || saving}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
+                className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
               >
                 Create
               </button>

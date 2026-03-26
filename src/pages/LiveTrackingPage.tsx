@@ -547,7 +547,7 @@ export default function LiveTrackingPage() {
             </div>
 
             {/* Info Card */}
-            <div className="mt-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
+            <div className="mt-6 from-slate-700 via-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
               <h3 className="text-2xl font-bold mb-4">Live Tracking Features</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -687,7 +687,7 @@ export default function LiveTrackingPage() {
             </div>
 
             {/* Info Card */}
-            <div className="mt-6 bg-gradient-to-r from-cyan-500 via-blue-500 to-blue-600 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
+            <div className="mt-6 from-cyan-500 via-blue-500 to-blue-600 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
               <h3 className="text-2xl font-bold mb-4">What You'll Get</h3>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">

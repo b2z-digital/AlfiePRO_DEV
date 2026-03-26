@@ -742,7 +742,7 @@ export const EditBoatModal: React.FC<EditBoatModalProps> = ({
             <button
               type="submit"
               disabled={saving || uploadingCertificate || uploadingTuningGuide}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:from-slate-500 disabled:to-slate-600 text-white rounded-xl transition-all shadow-lg shadow-cyan-500/20"
+              className="btn-primary-green flex-1 flex items-center justify-center gap-2 px-6 py-3 from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:from-slate-500 disabled:to-slate-600 text-white rounded-xl transition-all shadow-lg shadow-cyan-500/20"
             >
               <Save size={20} />
               <span>{saving ? 'Saving...' : 'Save Changes'}</span>

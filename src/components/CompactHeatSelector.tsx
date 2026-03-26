@@ -118,7 +118,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
           `}
         >
           {/* Animated gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 animate-shimmer"></div>
+          <div className="absolute inset-0 from-white/0 via-white/10 to-white/0 animate-shimmer"></div>
 
           <div className="relative z-10 flex items-center gap-3">
             {/* Heat Icon */}
@@ -384,7 +384,7 @@ export const CompactHeatSelector: React.FC<CompactHeatSelectorProps> = ({
                     onGoToRound(activeRound);
                     setIsExpanded(false);
                   }}
-                  className="w-full px-4 py-3 rounded-xl font-medium transition-all bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg"
+                  className="btn-primary-green w-full px-4 py-3 rounded-xl font-medium transition-all text-white shadow-lg"
                 >
                   Go to {getRoundLabel(activeRound!)} →
                 </button>

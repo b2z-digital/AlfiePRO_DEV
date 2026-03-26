@@ -1401,7 +1401,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
         className={`w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border animate-slideUp ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -1428,7 +1428,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
           >
             Personal Information
             {activeTab === 'personal' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-600"></div>
             )}
           </button>
 
@@ -1446,7 +1446,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
           >
             Boat Details
             {activeTab === 'boat' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-600"></div>
             )}
           </button>
 
@@ -1464,7 +1464,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
           >
             Indemnity & Payment
             {activeTab === 'indemnity' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-600"></div>
             )}
           </button>
         </div>
@@ -1492,7 +1492,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                   type="button"
                   onClick={handleNextTab}
                   disabled={activeTab === 'personal' ? !isPersonalTabValid() : !isBoatTabValid()}
-                  className="px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:from-slate-400 disabled:to-slate-500"
+                  className="btn-primary-green px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:from-slate-400 disabled:to-slate-500"
                 >
                   Continue
                   <ChevronRight size={18} />
@@ -1503,7 +1503,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 <button
                   type="submit"
                   disabled={loading || !agreedToTerms || (entryFee > 0 && !formData.payment_method)}
-                  className="px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary-green px-6 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={18} />
                   {loading ? 'Processing...' : formData.payment_method === 'online' ? 'Proceed to Payment' : 'Complete Registration'}

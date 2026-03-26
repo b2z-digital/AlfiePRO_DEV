@@ -79,7 +79,7 @@ export const SaveFilterModal: React.FC<SaveFilterModalProps> = ({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
       <div className="w-full max-w-md bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl overflow-hidden border border-slate-700/50">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-slate-800/80 to-slate-700/80 border-b border-slate-600/50">
+        <div className="flex items-center justify-between px-6 py-5 from-slate-800/80 to-slate-700/80 border-b border-slate-600/50">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <Save className="text-blue-400" size={20} />
@@ -170,7 +170,7 @@ export const SaveFilterModal: React.FC<SaveFilterModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-5 bg-gradient-to-r from-slate-800/80 to-slate-700/80 border-t border-slate-600/50">
+        <div className="flex justify-end gap-3 px-6 py-5 from-slate-800/80 to-slate-700/80 border-t border-slate-600/50">
           <button
             onClick={onClose}
             className="px-5 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-medium"
@@ -180,7 +180,7 @@ export const SaveFilterModal: React.FC<SaveFilterModalProps> = ({
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl font-medium"
+            className="btn-primary-green flex items-center gap-2 px-5 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl font-medium"
           >
             {saving ? (
               <>

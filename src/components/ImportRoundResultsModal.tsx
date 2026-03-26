@@ -1,8 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import {
-  X, Upload, FileSpreadsheet, ClipboardPaste, CheckCircle, AlertCircle,
-  Loader, ArrowRight, ArrowLeft, UserCheck, UserPlus, Search
-} from 'lucide-react';
+import { X, Upload, FileSpreadsheet, ClipboardPaste, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ArrowRight, ArrowLeft, UserCheck, UserPlus, Search } from 'lucide-react';
 import {
   ParsedResults, ColumnMapping, SkipperMatch, RaceColumnInfo,
   parseTSVData, autoDetectMappings, detectRaceColumns,
@@ -913,7 +910,7 @@ export const ImportRoundResultsModal: React.FC<ImportRoundResultsModalProps> = (
             ) : step === 'preview' ? (
               <button
                 onClick={handleImport}
-                className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium text-sm transition-colors"
               >
                 <Upload size={16} />
                 Import Results

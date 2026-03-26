@@ -281,7 +281,7 @@ export const PublicClubHomepage: React.FC = () => {
             alt={club.name}
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent"></div>
+          <div className="absolute inset-0 from-black/70 via-black/50 to-transparent"></div>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MapPin, Calendar, Eye, Heart, MessageCircle, DollarSign, Edit, Trash2, Check, ChevronLeft, ChevronRight, ZoomIn, Share2, Mail, Users, ChevronDown, Phone, ExternalLink } from 'lucide-react';
+import { X, MapPin, Calendar, Eye, Heart, MessageCircle, DollarSign, CreditCard as Edit, Trash2, Check, ChevronLeft, ChevronRight, ZoomIn, Share2, Mail, Users, ChevronDown, Phone, ExternalLink } from 'lucide-react';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { useAuth } from '../../contexts/AuthContext';
@@ -174,7 +174,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-slate-800 rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden border border-slate-700">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 flex items-center justify-between">
+          <div className="from-blue-600 to-blue-800 p-6 flex items-center justify-between">
             <h2 className="text-2xl font-bold text-white">Listing Details</h2>
             <button
               onClick={onClose}
@@ -273,7 +273,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                               className="w-12 h-12 rounded-full object-cover bg-slate-700"
                             />
                           ) : (
-                            <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-lg">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg">
                               {classified.matched_member.first_name?.[0]?.toUpperCase()}
                             </div>
                           )}
@@ -403,7 +403,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                             setInquiryType('offer');
                             setShowInquiryForm(true);
                           }}
-                          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                          className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         >
                           <DollarSign size={16} />
                           Make Offer
@@ -443,7 +443,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                         {classified.external_contact_phone && (
                           <a
                             href={`tel:${classified.external_contact_phone}`}
-                            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                            className="px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                           >
                             <Phone size={16} />
                             Call Seller
@@ -481,7 +481,7 @@ export default function ClassifiedDetailModal({ classified, onClose, onUpdate }:
                         </button>
                         <button
                           onClick={handleMarkAsSold}
-                          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                          className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         >
                           <Check size={16} />
                           Mark Sold

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Smartphone, Video, Monitor, Trash2, Star, Settings, Plus, Wifi, WifiOff, AlertCircle, QrCode } from 'lucide-react';
+import { Camera, Smartphone, Video, Monitor, Trash2, Star, Settings, Plus, Wifi, WifiOff, CircleAlert as AlertCircle, QrCode } from 'lucide-react';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import type { LivestreamCamera, CameraType, CameraStatus } from '../../types/livestream';
 import { MobileCameraQRModal } from './MobileCameraQRModal';
@@ -215,7 +215,7 @@ export function CameraManager({ sessionId, onCameraSwitch }: CameraManagerProps)
         <div className="flex gap-2">
           <button
             onClick={() => setShowQRModal(true)}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+            className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
           >
             <QrCode className="w-4 h-4" />
             Connect Phone
@@ -241,7 +241,7 @@ export function CameraManager({ sessionId, onCameraSwitch }: CameraManagerProps)
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => setShowQRModal(true)}
-              className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium inline-flex items-center gap-2 transition-colors"
+              className="btn-primary-green px-6 py-2 text-white rounded-lg font-medium inline-flex items-center gap-2 transition-colors"
             >
               <Smartphone className="w-4 h-4" />
               Connect Phone Camera

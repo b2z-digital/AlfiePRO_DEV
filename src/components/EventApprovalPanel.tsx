@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Clock, AlertCircle, Calendar, MapPin, Trophy, User, Eye, FileText, DollarSign, Users } from 'lucide-react';
+import { Check, X, Clock, CircleAlert as AlertCircle, Calendar, MapPin, Trophy, User, Eye, FileText, DollarSign, Users } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -329,7 +329,7 @@ export const EventApprovalPanel: React.FC<EventApprovalPanelProps> = ({ darkMode
               <button
                 onClick={() => handleApprove(event.id, event.event_level)}
                 disabled={actionLoading === event.id}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check size={16} />
                 Approve
@@ -370,7 +370,7 @@ export const EventApprovalPanel: React.FC<EventApprovalPanelProps> = ({ darkMode
             ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}
           `}>
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 flex items-center justify-between">
+            <div className="from-blue-600 to-blue-800 p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Trophy className="text-white" size={24} />
                 <h2 className="text-2xl font-bold text-white">Event Details</h2>
@@ -594,7 +594,7 @@ export const EventApprovalPanel: React.FC<EventApprovalPanelProps> = ({ darkMode
                     handleApprove(selectedEvent.id, selectedEvent.event_level);
                   }}
                   disabled={actionLoading === selectedEvent.id}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Check size={16} />
                   Approve Event

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle, Hash } from 'lucide-react';
+import { X, TriangleAlert as AlertTriangle, Hash } from 'lucide-react';
 import { LetterScore } from '../types/letterScores';
 
 export type { LetterScore };
@@ -169,7 +169,7 @@ export const LetterScoreSelector: React.FC<LetterScoreSelectorProps> = ({
           ) : (
             <div className="space-y-6">
               <div className="text-center">
-                <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Hash className="text-white" size={32} />
                 </div>
                 <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>

@@ -458,7 +458,7 @@ const HeroVideoBackground = React.memo(({ videoId, thumbnailUrl }: { videoId: st
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-transparent" />
+      <div className="absolute inset-0 from-black/80 via-black/30 to-transparent" />
     </div>
   );
 });
@@ -1193,7 +1193,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
+        <div className="absolute inset-0 from-black/70 via-transparent to-transparent" />
 
         <div className="absolute bottom-[20%] left-20 right-0 px-12">
           <div className="max-w-3xl">
@@ -1237,7 +1237,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-transparent" />
+      <div className="absolute inset-0 from-black/80 via-black/30 to-transparent" />
 
       <div className="absolute bottom-[20%] left-20 right-0 px-12">
         <div className="max-w-3xl">
@@ -1378,7 +1378,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       <div className="relative h-[85vh] w-full overflow-hidden">
         {renderSlideBackground()}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" />
+        <div className="absolute inset-0 from-black/70 via-transparent to-transparent" />
 
         {heroSlides.length > 1 && (
           <div className="absolute bottom-[15%] left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
@@ -1568,7 +1568,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           {canScrollLeft && (
             <button
               onClick={() => scroll('left')}
-              className="absolute left-0 top-0 bottom-0 z-[90] w-12 bg-gradient-to-r from-black/80 to-transparent flex items-center justify-start pl-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              className="btn-primary-green absolute left-0 top-0 bottom-0 z-[90] w-12 from-black/80 to-transparent flex items-center justify-start pl-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
             >
               <ChevronLeft className="w-10 h-10 text-white" />
             </button>

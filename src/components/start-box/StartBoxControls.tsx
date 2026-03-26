@@ -63,7 +63,7 @@ export const StartBoxControls: React.FC<StartBoxControlsProps> = ({
           {(isArmed || isPaused) && (
             <button
               onClick={isPaused ? onResume : onStart}
-              className="flex items-center justify-center gap-1.5 rounded-lg font-semibold text-white transition-all active:scale-95 px-3 py-2 text-xs bg-green-600 hover:bg-green-500"
+              className="btn-primary-green flex items-center justify-center gap-1.5 rounded-lg font-semibold text-white transition-all active:scale-95 px-3 py-2 text-xs"
             >
               <Play size={14} className="ml-0.5" />
               {isPaused ? 'Resume' : 'Start'}

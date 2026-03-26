@@ -538,7 +538,7 @@ export const ModernApplicationsManager: React.FC<ModernApplicationsManagerProps>
                             <button
                               onClick={() => handleApprove(application)}
                               disabled={processing === application.id}
-                              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+                              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                             >
                               <Check size={16} />
                               Approve

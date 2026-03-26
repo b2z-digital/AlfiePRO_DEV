@@ -500,7 +500,7 @@ export const RecentResultsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMod
                     />
                   ) : (
                     <div
-                      className="absolute inset-0 bg-gradient-to-br from-green-500 to-green-600"
+                      className="absolute inset-0 bg-gradient-to-br"
                       style={{
                         backgroundImage: race.venueImage ? `url(${race.venueImage})` : 'url(https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=400)',
                         backgroundSize: 'cover',

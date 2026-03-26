@@ -1355,7 +1355,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
               <button
                 onClick={handleSaveBankDetails}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50"
               >
                 <Save size={16} />
                 {saving ? 'Saving...' : 'Save Bank Details'}
@@ -1429,7 +1429,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
               <button
                 onClick={handleSaveTransactionSettings}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50"
               >
                 <Save size={16} />
                 {saving ? 'Saving...' : 'Save Opening Balance'}
@@ -1707,7 +1707,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
           <button
             onClick={handleSaveTransactionSettings}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50"
           >
             <Save size={16} />
             {saving ? 'Saving...' : 'Save'}
@@ -1736,7 +1736,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
             setEditingCategory(null);
             setShowCategoryModal(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200"
+          className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200"
         >
           <Plus size={16} />
           New Category
@@ -2127,7 +2127,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
                   <button
                     onClick={handleSaveCategory}
                     disabled={saving || !categoryForm.name}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50"
+                    className="btn-primary-green flex-1 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50"
                   >
                     {saving ? 'Saving...' : 'Save'}
                   </button>

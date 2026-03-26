@@ -1225,7 +1225,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         >
                           {SectionIcon && <SectionIcon size={18} className="opacity-70" />}
                           {section.id === 'communications' && commsSectionTotal > 0 && (
-                            <div className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                            <div className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-white text-[10px] font-bold rounded-full">
                               {commsSectionTotal}
                             </div>
                           )}
@@ -1256,7 +1256,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             {section.label}
                           </span>
                           {section.id === 'communications' && !isExpanded && commsSectionTotal > 0 && (
-                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 text-white text-[10px] font-bold rounded-full">
                               {commsSectionTotal}
                             </div>
                           )}
@@ -1322,22 +1322,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             <div className="text-left flex-1 flex items-center gap-2">
                               <div className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</div>
                               {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {unreadNotificationsCount + unreadConversationsCount}
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
                                 </div>
                               )}
                               {item.id === 'community' && unreadCommunityCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {unreadCommunityCount}
                                 </div>
                               )}
@@ -1605,7 +1605,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             {section.label}
                           </span>
                           {section.id === 'communications' && !isExpanded && commsSectionTotal > 0 && (
-                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-[10px] font-bold rounded-full">
+                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 text-white text-[10px] font-bold rounded-full">
                               {commsSectionTotal}
                             </div>
                           )}
@@ -1664,22 +1664,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             <div className="ml-3 flex-1 flex items-center gap-2">
                               <span className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</span>
                               {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {unreadNotificationsCount + unreadConversationsCount}
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
                                 </div>
                               )}
                               {item.id === 'community' && unreadCommunityCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                                   {unreadCommunityCount}
                                 </div>
                               )}

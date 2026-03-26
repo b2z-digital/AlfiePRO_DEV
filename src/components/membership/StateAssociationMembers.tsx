@@ -474,7 +474,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
           </div>
           <div className="p-6 rounded-xl border backdrop-blur-sm bg-slate-800/30 border-slate-700/50">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600">
+              <div className="p-3 rounded-lg bg-gradient-to-br">
                 <CheckCircle2 className="text-white" size={24} />
               </div>
               <div>
@@ -560,7 +560,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                 <button
                   onClick={() => handleBulkSetFinancial(true)}
                   disabled={bulkProcessing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition disabled:opacity-50"
                 >
                   <DollarSign size={15} />
                   Set Financial
@@ -1059,7 +1059,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   <button
                     onClick={handleConfirmActivation}
                     disabled={activating}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
+                    className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
                   >
                     {activating ? (
                       <>

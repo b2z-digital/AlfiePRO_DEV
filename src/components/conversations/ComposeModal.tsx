@@ -174,7 +174,7 @@ export const ComposeModal: React.FC<ComposeModalProps> = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-br from-slate-800/95 via-slate-800/90 to-slate-900/95 backdrop-blur-sm rounded-2xl border border-slate-700/50 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/40">
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 from-blue-600/10 via-transparent to-emerald-600/10">
           <div className="flex items-center gap-3">
             {step === 'compose' && !replyMode && (
               <button

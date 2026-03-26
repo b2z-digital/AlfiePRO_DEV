@@ -241,7 +241,7 @@ export const StartBoxSoundLibrary: React.FC<StartBoxSoundLibraryProps> = ({
               <button
                 onClick={handleUpload}
                 disabled={!selectedFile || !newName.trim() || uploading}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
+                className="btn-primary-green px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors"
               >
                 {uploading ? 'Uploading...' : 'Upload'}
               </button>

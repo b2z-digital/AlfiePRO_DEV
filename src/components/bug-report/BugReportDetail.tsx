@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Bug, Lightbulb, Clock, CheckCircle2, CircleDot, XCircle, Send, MessageSquare, Globe, Trash2 } from 'lucide-react';
+import { ArrowLeft, Bug, Lightbulb, Clock, CircleCheck as CheckCircle2, CircleDot, Circle as XCircle, Send, MessageSquare, Globe, Trash2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -298,7 +298,7 @@ export const BugReportDetail: React.FC<BugReportDetailProps> = ({ darkMode, repo
                   <button
                     onClick={handleSaveResolution}
                     disabled={saving}
-                    className="mt-1.5 px-3 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+                    className="btn-primary-green mt-1.5 px-3 py-1 rounded-lg text-white text-xs font-medium transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save Notes'}
                   </button>

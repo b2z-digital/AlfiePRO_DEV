@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Search, Users, Check, AlertTriangle, Send, Shield, Building2 } from 'lucide-react';
+import { X, Mail, Search, Users, Check, TriangleAlert as AlertTriangle, Send, Shield, Building2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { Avatar } from '../ui/Avatar';
@@ -480,7 +480,7 @@ Thank you.
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -726,7 +726,7 @@ Thank you.
           <button
             onClick={handleSendInvites}
             disabled={sending}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg transition-all disabled:opacity-50 font-medium shadow-sm"
+            className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg transition-all disabled:opacity-50 font-medium shadow-sm"
           >
             {sending ? (
               <>

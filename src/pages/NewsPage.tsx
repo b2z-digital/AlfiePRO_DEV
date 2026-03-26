@@ -333,7 +333,7 @@ const NewsPage: React.FC = () => {
             {can('articles.create') && (
               <button
                 onClick={handleNewArticle}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 animate-pulse whitespace-nowrap"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 animate-pulse whitespace-nowrap"
               >
                 <Plus size={18} />
                 <span className="xl:hidden">New</span>
@@ -366,7 +366,7 @@ const NewsPage: React.FC = () => {
             {isAdmin && (
               <button
                 onClick={handleNewArticle}
-                className="mt-4 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200"
+                className="btn-primary-green mt-4 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200"
               >
                 Create First Article
               </button>
@@ -462,7 +462,7 @@ const NewsPage: React.FC = () => {
                   
                   <div className="flex justify-between items-center mt-auto pt-4 border-t border-slate-700/50">
                     <button 
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-1 group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-indigo-600"
+                      className="btn-primary-green px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-1 group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-indigo-600"
                     >
                       Read more <ChevronRight size={16} className="transition-transform group-hover:translate-x-1" />
                     </button>

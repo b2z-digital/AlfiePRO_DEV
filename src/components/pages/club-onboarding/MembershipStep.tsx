@@ -101,7 +101,7 @@ export const MembershipStep: React.FC<StepProps> = ({
           </p>
           <button
             onClick={addType}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors text-sm"
+            className="btn-primary-green inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium transition-colors text-sm"
           >
             <Plus size={16} />
             Add Membership Type

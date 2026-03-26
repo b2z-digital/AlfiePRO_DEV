@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, UserX, Mail, Phone, Calendar, MessageSquare, AlertCircle, CheckCircle } from 'lucide-react';
+import { UserCheck, UserX, Mail, Phone, Calendar, MessageSquare, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react';
 import {
   getMembershipApplications,
   approveMembershipApplication,
@@ -184,7 +184,7 @@ export const MembershipApplicationsPanel: React.FC<MembershipApplicationsPanelPr
                   <button
                     onClick={() => handleApprove(application)}
                     disabled={processing === application.id}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="btn-primary-green px-4 py-2 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     title="Approve application"
                   >
                     <UserCheck size={16} />

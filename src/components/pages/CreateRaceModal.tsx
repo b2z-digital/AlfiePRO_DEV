@@ -1091,7 +1091,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
       `}>
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -3033,7 +3033,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddRound}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium transition-colors"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   >
                     <Plus size={16} />
                     Add Round

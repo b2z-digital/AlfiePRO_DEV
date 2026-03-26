@@ -681,7 +681,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
               <button
                 onClick={() => handleBulkSetFinancial(true)}
                 disabled={bulkProcessing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition disabled:opacity-50"
+                className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-sm font-medium transition disabled:opacity-50"
               >
                 <DollarSign size={15} />
                 Set Financial
@@ -1082,7 +1082,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
                   <button
                     onClick={handleConfirmActivation}
                     disabled={activating}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
+                    className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50"
                   >
                     {activating ? (
                       <>

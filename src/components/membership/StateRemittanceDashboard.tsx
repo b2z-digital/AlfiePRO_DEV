@@ -992,7 +992,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+                <div className="p-3 rounded-xl bg-gradient-to-br">
                   <DollarSign className="text-white" size={28} />
                 </div>
                 <div>
@@ -1086,7 +1086,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                 setSelectedIds(new Set(readyIds));
                 setSelectedTab('national-remittance');
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors"
             >
               <ArrowRight size={18} />
               Pay National
@@ -1256,7 +1256,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       <button
                         onClick={() => handleBulkStatusUpdate('mark-paid')}
                         disabled={bulkActionInProgress}
-                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-600/20 text-sm"
+                        className="btn-primary-green px-4 py-2.5 rounded-xl text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
                       >
                         <CheckCircle size={16} />
                         Mark as Paid
@@ -1264,7 +1264,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       <button
                         onClick={() => handleBulkStatusUpdate('mark-unpaid')}
                         disabled={bulkActionInProgress}
-                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-600/20 text-sm"
+                        className="btn-primary-green px-4 py-2.5 rounded-xl from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-600/20 text-sm"
                       >
                         <X size={16} />
                         Mark as Unpaid
@@ -1272,7 +1272,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       <button
                         onClick={handleBulkMarkNationalPaid}
                         disabled={bulkActionInProgress}
-                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 text-sm"
+                        className="btn-primary-green px-4 py-2.5 rounded-xl from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 text-sm"
                       >
                         <DollarSign size={16} />
                         Process Payment
@@ -1511,7 +1511,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   {paymentHistorySubTab === 'reports' && (
                     <button
                       onClick={() => setShowReportModal(true)}
-                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-medium transition-all flex items-center gap-2 text-sm shadow-lg shadow-teal-600/20"
+                      className="btn-primary-green px-4 py-2.5 rounded-xl hover:from-teal-500 text-white font-medium transition-all flex items-center gap-2 text-sm shadow-lg shadow-teal-600/20"
                     >
                       <Send size={16} />
                       Generate Report
@@ -1602,7 +1602,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                                   <span className="text-xs font-medium text-white">{progressPercent.toFixed(0)}%</span>
                                 </div>
                                 <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                                  <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+                                  <div className="h-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
                                 </div>
                               </div>
                             )}
@@ -1730,7 +1730,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                       </p>
                       <button
                         onClick={() => setShowReportModal(true)}
-                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-medium transition-all flex items-center gap-2 mx-auto shadow-lg shadow-teal-600/20"
+                        className="btn-primary-green px-6 py-3 rounded-xl hover:from-teal-500 text-white font-medium transition-all flex items-center gap-2 mx-auto shadow-lg shadow-teal-600/20"
                       >
                         <Send size={18} />
                         Generate First Report
@@ -1936,7 +1936,7 @@ export const StateRemittanceDashboard: React.FC<StateRemittanceDashboardProps> =
                   setShowSendReportPrompt(false);
                   setShowReportModal(true);
                 }}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-600/20"
+                className="btn-primary-green flex-1 px-4 py-2.5 rounded-xl hover:from-teal-500 text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-600/20"
               >
                 <Send size={16} />
                 Send Report
@@ -2145,7 +2145,7 @@ const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors"
+              className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors"
             >
               Record Payment
             </button>
@@ -2332,7 +2332,7 @@ const NationalPaymentModal: React.FC<NationalPaymentModalProps> = ({
             type="submit"
             form="national-payment-form"
             disabled={processing}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg shadow-green-600/20"
+            className="btn-primary-green px-6 py-2.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-lg"
           >
             {processing ? (
               <>

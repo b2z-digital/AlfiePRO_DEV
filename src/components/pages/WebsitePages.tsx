@@ -241,7 +241,7 @@ export const WebsitePages: React.FC<WebsitePagesProps> = ({ darkMode }) => {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
           >
             <Plus size={20} />
             New Page
@@ -322,7 +322,7 @@ export const WebsitePages: React.FC<WebsitePagesProps> = ({ darkMode }) => {
             {filter === 'all' && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="btn-primary-green px-6 py-3 text-white rounded-lg transition-colors"
               >
                 Create Your First Page
               </button>
@@ -388,7 +388,7 @@ export const WebsitePages: React.FC<WebsitePagesProps> = ({ darkMode }) => {
                     {page.status === 'draft' && (
                       <button
                         onClick={() => publishPage(page)}
-                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                        className="btn-primary-green px-3 py-1 text-white rounded-lg transition-colors text-sm"
                       >
                         Publish
                       </button>

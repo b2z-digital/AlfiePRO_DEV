@@ -1718,7 +1718,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   )}
                   <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-600 text-white">{event.raceClass}</span>
                   {event.isInterclub && <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-600 text-white">Interclub</span>}
-                  {event.multiDay && <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-600 text-white">{event.numberOfDays} Days</span>}
+                  {event.multiDay && <span className="px-2 py-0.5 rounded text-xs font-medium text-white">{event.numberOfDays} Days</span>}
                   {event.multiDay && event.dayResults && (
                     <span className="px-2 py-0.5 rounded text-xs font-medium bg-cyan-600 text-white">
                       {Object.keys(event.dayResults).filter(day => {
@@ -2062,12 +2062,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                     setShowEventWebsiteModal(true);
                   }
                 }}
-                className="
-                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                  bg-gradient-to-r from-purple-600 to-purple-500
-                  hover:from-purple-700 hover:to-purple-600
-                  transition-all duration-200
-                "
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 transition-all duration-200"
                 title={hasEventWebsite ? 'Manage Event Website' : 'Create Event Website'}
               >
                 <Globe size={18} />
@@ -2077,12 +2072,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             {event.enableLiveTracking && (event.clubId || event.eventLevel === 'state' || event.eventLevel === 'national') && (isAdmin || isEditor) && (
               <button
                 onClick={() => setShowLiveTrackingQR(true)}
-                className="
-                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                  bg-gradient-to-r from-blue-600 to-blue-500
-                  hover:from-blue-700 hover:to-blue-600
-                  transition-all duration-200
-                "
+                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 transition-all duration-200"
                 title="Live Skipper Tracking QR Code"
               >
                 <QrCode size={18} />
@@ -2093,13 +2083,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               <button
                 onClick={handleJoinLiveTracking}
                 disabled={loadingSkipperTracking}
-                className="
-                  flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                  bg-gradient-to-r from-cyan-600 to-blue-600
-                  hover:from-cyan-700 hover:to-blue-700
-                  transition-all duration-200
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                "
+                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Join Live Tracking"
               >
                 {loadingSkipperTracking ? <Loader2 size={18} className="animate-spin" /> : <Radio size={18} />}
@@ -2152,12 +2136,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                       }
                       setShowImportResults(true);
                     }}
-                    className="
-                      flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                      bg-gradient-to-r from-blue-600 to-cyan-600
-                      hover:from-blue-700 hover:to-cyan-700
-                      transition-all duration-200
-                    "
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all duration-200"
                   >
                     <Upload size={18} />
                     Import Results
@@ -2165,13 +2144,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 )}
                 <button
                   onClick={handleStartScoring}
-                  className="
-                    flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg
-                    bg-gradient-to-r from-green-600 to-emerald-600
-                    hover:from-green-700 hover:to-emerald-700
-                    transition-all duration-200
-                    animate-pulse
-                  "
+                  className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white shadow-lg transition-all duration-200 animate-pulse"
                 >
                   {getButtonText()}
                 </button>
@@ -3171,7 +3144,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   }
                   navigate(`/results/${resultsId}`);
                 }}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="px-4 py-2 text-white rounded-lg transition-colors"
                 style={{ color: '#ffffff' }}
               >
                 View Results
@@ -3304,7 +3277,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <span>Event Details</span>
               </div>
               {activeTab === 'details' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
               )}
             </button>
             {event.isPaid && event.entryFee && event.entryFee > 0 && (
@@ -3326,7 +3299,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   <span>Registrations</span>
                 </div>
                 {activeTab === 'registrations' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-green-500 to-emerald-500"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5"></div>
                 )}
               </button>
             )}
@@ -3348,7 +3321,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <span>Documents</span>
               </div>
               {activeTab === 'documents' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
               )}
             </button>
             <button
@@ -3369,7 +3342,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <span>Media</span>
               </div>
               {activeTab === 'media' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
               )}
             </button>
             <button
@@ -3390,7 +3363,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <span>Results</span>
               </div>
               {activeTab === 'results' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-blue-500 to-cyan-500"></div>
               )}
             </button>
             <button
@@ -3411,7 +3384,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                 <span>Weather</span>
               </div>
               {activeTab === 'weather' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-500"></div>
               )}
             </button>
           </div>

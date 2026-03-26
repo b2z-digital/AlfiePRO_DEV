@@ -387,7 +387,7 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
                 : 'bg-white/10 border-slate-200/20'}
             `}>
               {/* Club Website Header */}
-              <div className="p-6 border-b border-slate-700/50 bg-gradient-to-r from-blue-600/10 to-cyan-600/10">
+              <div className="p-6 border-b border-slate-700/50 from-blue-600/10 to-cyan-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-blue-600/20">
@@ -652,7 +652,7 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
                 : 'bg-white/10 border-slate-200/20'}
             `}>
               {/* Event Websites Header */}
-              <div className="p-6 border-b border-cyan-700/30 bg-gradient-to-r from-cyan-600/10 to-blue-600/10">
+              <div className="p-6 border-b border-cyan-700/30 from-cyan-600/10 to-blue-600/10">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-cyan-600/20">
@@ -670,7 +670,7 @@ export const WebsiteOverview: React.FC<WebsiteOverviewProps> = ({ darkMode }) =>
 
                 <button
                   onClick={() => navigate('/website/event-websites-management')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium"
+                  className="btn-primary-green w-full flex items-center justify-center gap-2 px-4 py-3 from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium"
                 >
                   <Plus size={18} />
                   Manage Event Websites

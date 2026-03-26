@@ -1001,7 +1001,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
                         {heatCompleted ? (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-500 text-white">
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-white">
                             Complete
                           </span>
                         ) : heatResults.length > 0 && !completed && (
@@ -1589,7 +1589,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   setInitialEditMode(false);
                   setSelectedSkipperToMove(null);
                 }}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm bg-green-600 text-white hover:bg-green-700"
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg transition-colors font-medium text-sm text-white"
               >
                 <Check size={18} />
                 Apply Changes

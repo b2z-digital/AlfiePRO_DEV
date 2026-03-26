@@ -228,7 +228,7 @@ export const ActionItemsSummary: React.FC<ActionItemsSummaryProps> = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white mb-1">Action Items Summary</h2>
             <p className="text-cyan-100 text-sm">{meetingName} - {formatDate(meetingDate)}</p>
@@ -246,7 +246,7 @@ export const ActionItemsSummary: React.FC<ActionItemsSummaryProps> = ({
           <button
             onClick={exportAsPDF}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-700 text-white rounded-lg hover:from-cyan-700 hover:to-blue-800 font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 from-cyan-600 to-blue-700 text-white rounded-lg hover:from-cyan-700 hover:to-blue-800 font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
           >
             <FileDown className="w-4 h-4" />
             Export as PDF

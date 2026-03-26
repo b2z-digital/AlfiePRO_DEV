@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
   arrayMove
 } from '@dnd-kit/sortable';
-import { Edit2, Check, Plus, RotateCcw, Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
+import { CreditCard as Edit2, Check, Plus, RotateCcw, Columns2 as Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { WidgetConfig, DashboardLayout, DashboardRow } from '../../types/dashboard';
 import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout, getTemplateForUser } from '../../utils/dashboardStorage';
@@ -1147,7 +1147,7 @@ export const CustomizableDashboard: React.FC = () => {
             {isAdmin && (
               <button
                 onClick={() => setShowSaveTemplate(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/80 hover:bg-green-600 text-white transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/80 text-white transition-colors"
               >
                 <Save size={16} />
                 <span className="text-sm">Save as Template</span>
@@ -1172,7 +1172,7 @@ export const CustomizableDashboard: React.FC = () => {
                 <button
                   onClick={handleSaveSystemTemplate}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
                 >
                   <Check size={16} />
                   <span className="text-sm">{saving ? 'Saving Template...' : 'Save System Template'}</span>
@@ -1189,7 +1189,7 @@ export const CustomizableDashboard: React.FC = () => {
                 <button
                   onClick={handleSaveAndExit}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
                 >
                   <Check size={16} />
                   <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>

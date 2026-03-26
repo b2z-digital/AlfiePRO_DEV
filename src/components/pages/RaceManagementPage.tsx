@@ -1504,7 +1504,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                 )}
                 {/* Completion badge for cards without images */}
                 {!venueImage && race.completed && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500 text-white text-xs font-medium">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium">
                     <CheckCircle2 size={12} className="text-white" />
                     <span className="text-white">Completed</span>
                   </div>
@@ -1766,7 +1766,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                 </div>
                 {/* Completion badge for cards without images */}
                 {!venueImage && s.completed && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500 text-white text-xs font-medium">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium">
                     <CheckCircle2 size={12} className="text-white" />
                     <span className="text-white">Completed</span>
                   </div>
@@ -1791,7 +1791,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             <div className="mb-3">
               <div className={`h-2 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
                 <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500"
+                  className="h-full from-purple-500 to-blue-500 transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
                 ></div>
               </div>
@@ -1955,7 +1955,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                             className="w-full h-full object-cover"
                                           />
                                         ) : (
-                                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-500 text-white">
+                                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br text-white">
                                             {initials}
                                           </div>
                                         )}
@@ -2319,7 +2319,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 !text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl animate-pulse"
+                className="btn-primary-green flex items-center justify-center gap-2 px-5 py-2.5 !text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl animate-pulse"
               >
                 <Plus size={20} strokeWidth={2.5} className="!text-white" />
                 <span className="!text-white">New Event</span>
@@ -2618,7 +2618,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                     console.log('Approve button clicked for event:', event);
                                     handleApproveEvent(event.id, event.event_level);
                                   }}
-                                  className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                  className="px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
                                 >
                                   <CheckCircle2 size={16} />
                                   Approve
@@ -2680,7 +2680,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                         e.stopPropagation();
                                         handleResubmitEvent(event.id);
                                       }}
-                                      className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                      className="btn-primary-green px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
                                       title="Resubmit for approval"
                                     >
                                       <Send size={16} />
@@ -2716,7 +2716,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                         e.stopPropagation();
                                         handleResubmitEvent(event.id);
                                       }}
-                                      className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                      className="btn-primary-green px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
                                       title="Resubmit for approval"
                                     >
                                       <Send size={16} />

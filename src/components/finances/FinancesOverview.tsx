@@ -600,14 +600,14 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
           <div className="flex">
             <button
               onClick={onNewTransaction}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-l-lg hover:bg-green-700 transition-colors animate-pulse"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-l-lg transition-colors animate-pulse"
             >
               <Plus size={16} />
               New Transaction
             </button>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="px-3 py-2 bg-green-600 text-white border-l border-green-700 rounded-r-lg hover:bg-green-700 transition-colors"
+              className="btn-primary-green px-3 py-2 text-white border-l border-green-700 rounded-r-lg transition-colors"
             >
               <ChevronDown size={16} />
             </button>

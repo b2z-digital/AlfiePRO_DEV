@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Calendar, CreditCard, Sailboat, Plus, Trash2, AlertTriangle, Check, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, User, Mail, Phone, Hop as Home, Building, Calendar, CreditCard, Sailboat, Plus, Trash2, TriangleAlert as AlertTriangle, Check, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { BoatType } from '../../types/member';
@@ -836,7 +836,7 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
                         <button
                           type="button"
                           onClick={handleAddBoat}
-                          className="flex items-center gap-2 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm transition-colors"
+                          className="btn-primary-green flex items-center gap-2 px-3 py-1 text-white rounded-lg text-sm transition-colors"
                         >
                           <Plus size={16} />
                           Add Boat
@@ -1105,7 +1105,7 @@ export const MembershipFormModal: React.FC<MembershipFormModalProps> = ({
                       <button
                         type="submit"
                         disabled={submitting || success}
-                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn-primary-green px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {submitting ? 'Processing...' : isRenewal ? 'Renew Membership' : existingMemberId ? 'Update Member' : 'Submit Application'}
                       </button>

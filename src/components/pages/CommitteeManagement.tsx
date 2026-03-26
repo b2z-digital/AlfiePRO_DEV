@@ -525,7 +525,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
               setEditingPosition(null);
               setShowPositionForm(true);
             }}
-            className="ml-auto mb-1 flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
+            className="btn-primary-green ml-auto mb-1 flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
           >
             <Plus size={20} strokeWidth={2.5} />
             Add Position
@@ -1088,7 +1088,7 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
       <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700/50 bg-slate-800/20">
         <button
           type="submit"
-          className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl"
+          className="btn-primary-green flex-1 px-4 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
         >
           {position ? 'Save Changes' : 'Create Position'}
         </button>

@@ -99,7 +99,7 @@ export const Register: React.FC = () => {
               onClick={() => setMode('user')}
               className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-8 text-left transition-all duration-300 hover:border-blue-500/50 hover:bg-slate-800/70 hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1"
             >
-              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-blue-500 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl from-blue-500 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="w-14 h-14 rounded-xl bg-blue-500/15 flex items-center justify-center mb-5 group-hover:bg-blue-500/25 transition-colors">
                 <User className="text-blue-400" size={28} />
               </div>
@@ -119,7 +119,7 @@ export const Register: React.FC = () => {
               onClick={() => setMode('club')}
               className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-8 text-left transition-all duration-300 hover:border-emerald-500/50 hover:bg-slate-800/70 hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1"
             >
-              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-emerald-500 to-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="w-14 h-14 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-5 group-hover:bg-emerald-500/25 transition-colors">
                 <Building className="text-emerald-400" size={28} />
               </div>

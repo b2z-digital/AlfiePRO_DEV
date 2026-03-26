@@ -265,7 +265,7 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
               </label>
               <button
                 onClick={addPosition}
-                className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+                className="btn-primary-green inline-flex items-center gap-1 px-3 py-1.5 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add Position
@@ -325,7 +325,7 @@ export const EditTeamMemberModal: React.FC<EditTeamMemberModalProps> = ({
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-6 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary-green px-6 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Updating...' : 'Update'}
           </button>

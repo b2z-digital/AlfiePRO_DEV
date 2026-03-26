@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Globe, Save, ExternalLink, Loader2, Check, AlertCircle, Eye, Settings as SettingsIcon, Sparkles, Plus, Calendar, MapPin, Trophy, BookTemplate } from 'lucide-react';
+import { X, Globe, Save, ExternalLink, Loader as Loader2, Check, CircleAlert as AlertCircle, Eye, Settings as SettingsIcon, Sparkles, Plus, Calendar, MapPin, Trophy, LayoutTemplate as BookTemplate } from 'lucide-react';
 import type { EventWebsite, EventWebsiteSettings } from '../../types/eventWebsite';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
 import { DomainManagementSection } from '../settings/DomainManagementSection';
@@ -307,7 +307,7 @@ export const EventWebsiteSettingsModal: React.FC<EventWebsiteSettingsModalProps>
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-2xl shadow-2xl border w-full max-w-5xl my-8 overflow-hidden`}>
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-violet-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-purple-600 via-purple-700 to-violet-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -343,7 +343,7 @@ export const EventWebsiteSettingsModal: React.FC<EventWebsiteSettingsModalProps>
                     onClose();
                     onOpenDashboard();
                   }}
-                  className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                  className="btn-primary-green w-full px-4 py-2.5 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <Sparkles size={18} />
                   Open Website Dashboard
@@ -555,7 +555,7 @@ export const EventWebsiteSettingsModal: React.FC<EventWebsiteSettingsModalProps>
           <button
             onClick={handleSave}
             disabled={saving || !slug}
-            className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/30"
+            className="btn-primary-green px-6 py-2.5 from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/30"
           >
             {saving ? (
               <>

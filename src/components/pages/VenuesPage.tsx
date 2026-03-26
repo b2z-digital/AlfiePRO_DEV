@@ -603,7 +603,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                       setSelectedClubId('');
                       setShowForm(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl"
+                    className="flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
                   >
                     <Plus size={18} />
                     Add Venue
@@ -612,7 +612,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                   <>
                     <button
                       onClick={() => setShowAddDropdown(!showAddDropdown)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl"
+                      className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
                     >
                       <Plus size={18} />
                       Add Venue
@@ -852,7 +852,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                       });
                       setShowForm(true);
                     }}
-                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl animate-pulse"
+                    className="px-4 py-2 text-white rounded-lg transition-all shadow-lg hover:shadow-xl animate-pulse"
                   >
                     Add Venue
                   </button>
@@ -907,7 +907,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
 
                         {venue.is_default && (
                           <div className="animate-pulse">
-                            <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
+                            <div className="from-amber-500 to-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-lg backdrop-blur-sm">
                               <Star size={14} fill="currentColor" />
                               Main Venue
                             </div>
@@ -1058,7 +1058,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                                 {venue.name}
                               </h3>
                               {venue.is_default && (
-                                <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 shadow-lg">
+                                <div className="from-amber-500 to-yellow-500 text-white px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 shadow-lg">
                                   <Star size={12} fill="currentColor" />
                                   Main Venue
                                 </div>
@@ -1272,7 +1272,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                     setVenueToShare(null);
                     fetchVenues(); // Refresh to show updated sharing
                   }}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 text-white rounded-lg font-medium transition-colors"
                 >
                   Done
                 </button>
@@ -1352,7 +1352,7 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
                       </div>
                       <button
                         onClick={() => handleUseExistingVenue(venue)}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
+                        className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
                       >
                         Use This Venue
                       </button>

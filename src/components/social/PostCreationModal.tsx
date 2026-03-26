@@ -215,7 +215,7 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
         ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
       `}>
         {/* Modern Gradient Header - Same as Create Event Modal */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -472,7 +472,7 @@ export default function PostCreationModal({ isOpen, onClose, groupId, groups: pr
             <button
               onClick={handleSubmit}
               disabled={isSubmitting || (!content.trim() && attachments.length === 0 && !videoUrl && !linkUrl)}
-              className="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl disabled:hover:shadow-lg transform hover:scale-105 disabled:hover:scale-100"
+              className="btn-primary-green px-8 py-3 from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg hover:shadow-xl disabled:hover:shadow-lg transform hover:scale-105 disabled:hover:scale-100"
             >
               {isSubmitting ? 'Posting...' : 'Post'}
             </button>

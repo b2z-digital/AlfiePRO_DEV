@@ -880,7 +880,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     }
                   }
                 }}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors shadow-md"
+                className="px-6 py-3 text-white rounded-lg font-medium transition-colors shadow-md"
               >
                 Advance to {getShrsRoundLabel(heatManagement.currentRound + 1)}
               </button>
@@ -1194,7 +1194,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                 </div>
                 <div className={`mt-2.5 w-full rounded-full h-1 ${darkMode ? 'bg-slate-700/60' : 'bg-teal-200/60'}`}>
                   <div
-                    className="h-1 rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-300"
+                    className="h-1 rounded-full transition-all duration-300"
                     style={{ width: `${totalRacing > 0 ? ((readyCount + absentCount) / totalRacing) * 100 : 0}%` }}
                   />
                 </div>
@@ -1289,7 +1289,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                           {sailNo}
                         </span>
                         {isReady && (
-                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow">
+                          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center shadow">
                             <UserCheck size={10} className="text-white" strokeWidth={3} />
                           </div>
                         )}

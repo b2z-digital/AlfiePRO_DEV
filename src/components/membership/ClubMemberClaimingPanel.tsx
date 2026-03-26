@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, CheckCircle, X, Search, Filter } from 'lucide-react';
+import { Users, CircleCheck as CheckCircle, X, Search, ListFilter as Filter } from 'lucide-react';
 import {
   getClubMemberClaims,
   acceptMemberClaim,
@@ -153,7 +153,7 @@ export default function ClubMemberClaimingPanel({ clubId, clubName }: Props) {
                     {claim.profiles?.full_name || claim.full_name || 'Unknown Name'}
                   </h4>
                   {claim.match_confidence && claim.match_confidence > 0.8 && (
-                    <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">
+                    <span className="text-green-700 text-xs px-2 py-1 rounded-full font-medium">
                       {Math.round(claim.match_confidence * 100)}% Match
                     </span>
                   )}

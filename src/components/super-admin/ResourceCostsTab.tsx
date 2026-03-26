@@ -1351,7 +1351,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                 <button
                   onClick={handleSaveEntry}
                   disabled={saving || !newEntry.metric_name || !newEntry.cost_usd}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-all"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-all"
                 >
                   {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                   Save Entry

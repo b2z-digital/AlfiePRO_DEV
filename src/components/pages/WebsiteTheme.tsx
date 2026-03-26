@@ -486,7 +486,7 @@ export const WebsiteTheme: React.FC<WebsiteThemeProps> = ({ darkMode, onBack }) 
 
           <button
             onClick={handleSaveTheme}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200"
           >
             <Save size={18} />
             Save Theme

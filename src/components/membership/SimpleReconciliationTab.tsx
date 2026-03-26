@@ -789,7 +789,7 @@ export const SimpleReconciliationTab: React.FC<SimpleReconciliationTabProps> = (
                       </div>
                       <div className="mt-2 w-full bg-slate-600 rounded-full h-1.5">
                         <div
-                          className="bg-green-500 h-1.5 rounded-full transition-all"
+                          className="h-1.5 rounded-full transition-all"
                           style={{ width: `${(payment.allocated_amount / payment.total_amount) * 100}%` }}
                         />
                       </div>

@@ -1484,7 +1484,7 @@ export const ResultsPage: React.FC = () => {
             {/* Exit Button */}
             <button
               onClick={() => navigate('/results')}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
             >
               <XCircle size={18} />
               Exit
@@ -1623,7 +1623,7 @@ export const ResultsPage: React.FC = () => {
             {/* Exit Button */}
             <button
               onClick={() => navigate('/results')}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
             >
               <XCircle size={18} />
               Exit
@@ -1764,7 +1764,7 @@ export const ResultsPage: React.FC = () => {
             {/* Exit Button */}
             <button
               onClick={() => navigate('/results')}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
             >
               <XCircle size={18} />
               Exit
@@ -1824,7 +1824,7 @@ export const ResultsPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+            <div className="p-3 rounded-xl bg-gradient-to-br">
               <Trophy className="text-white" size={24} />
             </div>
             <div>
@@ -1902,7 +1902,7 @@ export const ResultsPage: React.FC = () => {
               <span>Individual Events & Rounds</span>
               <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredEvents.length}</span>
             </div>
-            {mainTab === 'events' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
+            {mainTab === 'events' && <div className="absolute bottom-0 left-0 right-0 h-0.5" />}
           </button>
 
           <button
@@ -1931,7 +1931,7 @@ export const ResultsPage: React.FC = () => {
                 <span>State Events</span>
                 <span className="text-xs bg-slate-700 px-2 py-0.5 rounded-full">{filteredStateEvents.length}</span>
               </div>
-              {mainTab === 'state' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
+              {mainTab === 'state' && <div className="absolute bottom-0 left-0 right-0 h-0.5" />}
             </button>
           )}
 

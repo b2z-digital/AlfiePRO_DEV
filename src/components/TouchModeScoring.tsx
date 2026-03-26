@@ -1289,7 +1289,7 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
                       </span>
                     </span>
                     {isFinished && (
-                      <div className="absolute top-0.5 right-0.5 w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                      <div className="absolute top-0.5 right-0.5 w-6 h-6 rounded-full flex items-center justify-center shadow-md">
                         <Check size={14} className="text-white" strokeWidth={3} />
                       </div>
                     )}

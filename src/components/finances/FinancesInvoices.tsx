@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Download, Edit, Trash2, Send, FileText, Receipt, TrendingDown, TrendingUp, AlertTriangle, ArrowLeft, Calendar, X } from 'lucide-react';
+import { Plus, Search, Download, CreditCard as Edit, Trash2, Send, FileText, Receipt, TrendingDown, TrendingUp, TriangleAlert as AlertTriangle, ArrowLeft, Calendar, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -1129,7 +1129,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
           
           <button
             onClick={handleCreateNew}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
           >
             <Plus size={16} />
             New {activeTab === 'invoices' ? 'Invoice' : activeTab === 'expenses' ? 'Expense' : 'Deposit'}

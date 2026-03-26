@@ -677,7 +677,7 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
         w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]
         ${darkMode ? 'bg-slate-800' : 'bg-white'}
       `}>
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -1032,7 +1032,7 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
                 Cancel
               </button>
               <button type="submit" disabled={submitting || success}
-                className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
                 {submitting ? 'Adding Member...' : 'Add Member'}
               </button>
             </div>

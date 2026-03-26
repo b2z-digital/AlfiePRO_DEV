@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, Search, Plus, Calendar, User, ChevronRight, Edit2, Trash2, X, ArrowUpDown, LayoutGrid, List, Loader2 } from 'lucide-react';
+import { Newspaper, Search, Plus, Calendar, User, ChevronRight, CreditCard as Edit2, Trash2, X, ArrowUpDown, LayoutGrid, List, Loader as Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';
@@ -225,7 +225,7 @@ export const EventWebsiteNewsManager: React.FC<EventWebsiteNewsManagerProps> = (
 
         <button
           onClick={handleCreateArticle}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
+          className="btn-primary-green flex items-center gap-2 px-4 py-2 from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
         >
           <Plus size={18} />
           New Article

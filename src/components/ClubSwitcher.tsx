@@ -367,7 +367,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                               className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center flex-shrink-0">
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
                               <Icon size={20} className="text-white" />
                             </div>
                           )}
@@ -701,7 +701,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                         className="w-8 h-8 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center">
                         <OrgIcon size={16} className="text-white" />
                       </div>
                     )}

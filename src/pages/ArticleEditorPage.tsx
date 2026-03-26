@@ -505,7 +505,7 @@ const ArticleEditorPage: React.FC = () => {
 
                 <button
                   onClick={() => handleSave(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all from-blue-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   disabled={saving}
                 >
                   <Sparkles size={16} />

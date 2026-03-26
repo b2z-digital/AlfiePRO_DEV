@@ -231,7 +231,7 @@ export default function CommentSection({ postId, darkMode = false, onCommentAdde
           <button
             type="submit"
             disabled={isSubmitting || !newComment.trim()}
-            className="p-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+            className="btn-primary-green p-2.5 from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
           >
             <Send className="w-5 h-5" />
           </button>

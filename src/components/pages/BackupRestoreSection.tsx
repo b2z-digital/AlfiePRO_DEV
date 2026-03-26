@@ -366,7 +366,7 @@ export const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({ dark
             Upload a backup file to import data into this club. The imported data will be added to your existing club data.
           </p>
 
-          <label className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 cursor-pointer">
+          <label className="w-full flex items-center justify-center gap-2 px-4 py-3 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 cursor-pointer">
             <Upload size={20} />
             <span>Select Backup File</span>
             <input
@@ -538,7 +538,7 @@ export const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({ dark
                   <button
                     onClick={() => setShowConfirmation(true)}
                     disabled={isImporting || !Object.values(importSelection).some(v => v)}
-                    className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary-green px-6 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isImporting ? 'Importing...' : 'Continue'}
                   </button>
@@ -577,7 +577,7 @@ export const BackupRestoreSection: React.FC<BackupRestoreSectionProps> = ({ dark
                         }
                       }}
                       disabled={isImporting}
-                      className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-6 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isImporting ? (
                         <>

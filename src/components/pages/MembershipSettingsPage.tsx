@@ -671,7 +671,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   });
                   setShowForm(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200"
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200"
               >
                 <Plus size={18} />
                 Add Type
@@ -1026,7 +1026,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
               <button
                 onClick={handleSaveCodeOfConduct}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={18} />
                 {saving ? 'Saving...' : 'Save Code of Conduct'}
@@ -1201,7 +1201,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                 <button
                   onClick={handleSaveSettings}
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary-green w-full flex items-center justify-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={18} />
                   {saving ? 'Saving...' : 'Save Renewal Settings'}

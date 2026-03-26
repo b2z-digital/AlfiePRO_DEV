@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Send, Inbox, Search, User, Clock, Check, AlertTriangle, X, Plus, Users, Filter, Trash2, ChevronLeft, ChevronRight, Star, Archive, MessageSquare, Smile, Paperclip, Calendar, Sparkles, Reply, Forward, MailCheck, MailX, MailWarning, Trophy, UserCheck, Newspaper, Bell, FileText, Save, Building2 } from 'lucide-react';
+import { Mail, Send, Inbox, Search, User, Clock, Check, TriangleAlert as AlertTriangle, X, Plus, Users, ListFilter as Filter, Trash2, ChevronLeft, ChevronRight, Star, Archive, MessageSquare, Smile, Paperclip, Calendar, Sparkles, Reply, Forward, MailCheck, MailX, MailWarning, Trophy, UserCheck, Newspaper, Bell, FileText, Save, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
@@ -1291,7 +1291,7 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
                     setActiveTab('compose');
                     setSelectedNotification(null);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   <Reply size={16} />
                   Reply
@@ -1310,7 +1310,7 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
                     setActiveTab('compose');
                     setSelectedNotification(null);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   <Forward size={16} />
                   Forward
@@ -1650,7 +1650,7 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
                           ...composeForm,
                           recipients: members.filter(m => m.user_id).map(m => m.user_id)
                         })}
-                        className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="btn-primary-green px-3 py-1.5 text-xs text-white rounded-lg transition-colors"
                       >
                         Select All Members
                       </button>
@@ -1903,7 +1903,7 @@ export const MemberNotificationComponent: React.FC<MemberNotificationComponentPr
               <button
                 onClick={sendNotification}
                 disabled={sending || (composeForm.recipients.length === 0 && composeForm.externalEmails.length === 0) || !composeForm.subject || !composeForm.body}
-                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? (
                   <>

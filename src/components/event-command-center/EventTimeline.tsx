@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ArrowRight, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Calendar, ArrowRight, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Clock } from 'lucide-react';
 import { EnhancedTask, TaskDependency } from '../../types/eventCommandCenter';
 import { EventCommandCenterStorage } from '../../utils/eventCommandCenterStorage';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -199,7 +199,7 @@ export const EventTimeline: React.FC<EventTimelineProps> = ({
             <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Medium</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <div className="w-3 h-3 rounded-full" />
             <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Low</span>
           </div>
           <div className="flex items-center gap-2 ml-auto">

@@ -521,7 +521,7 @@ export const MembershipApplicationsManager: React.FC<MembershipApplicationsManag
 
           <button
             onClick={() => setShowAdminAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
           >
             <Plus size={16} />
             Add Member
@@ -865,7 +865,7 @@ export const MembershipApplicationsManager: React.FC<MembershipApplicationsManag
                     handleApproveMember(selectedMember.id);
                     setShowMemberDetails(false);
                   }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="btn-primary-green px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   Approve Membership
                 </button>

@@ -50,7 +50,7 @@ export const SubscriptionSuccess: React.FC = () => {
           </div>
 
           <div className="mb-6">
-            <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check size={32} className="text-white" />
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">Payment Successful!</h1>
@@ -96,7 +96,7 @@ export const SubscriptionSuccess: React.FC = () => {
           <button
             onClick={handleContinue}
             disabled={loading || !userSubscription}
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="btn-primary-green w-full py-3 px-4 from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-600 disabled:to-slate-700 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

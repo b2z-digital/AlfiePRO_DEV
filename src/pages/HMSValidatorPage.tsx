@@ -70,7 +70,7 @@ export const HMSValidatorPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 border-b border-cyan-900/50 shadow-lg">
+      <div className="from-cyan-600 via-cyan-700 to-blue-800 border-b border-cyan-900/50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

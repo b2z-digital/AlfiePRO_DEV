@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, ArrowRight, ChevronLeft } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Download, ArrowRight, ChevronLeft } from 'lucide-react';
 import Papa from 'papaparse';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -636,7 +636,7 @@ export const TransactionImportModal: React.FC<TransactionImportModalProps> = ({
                 <button
                   onClick={importTransactions}
                   disabled={validationErrors.length > 0}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary-green px-6 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Import {csvData.length} Transactions
                 </button>

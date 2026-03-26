@@ -492,7 +492,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
     <div className="space-y-8">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600">
+          <div className="p-3 rounded-xl bg-gradient-to-br">
             <DollarSign className="text-white" size={28} />
           </div>
           <div>
@@ -1022,7 +1022,7 @@ export function PlatformBillingTab({ darkMode }: PlatformBillingTabProps) {
               <button
                 onClick={generateBillingRecords}
                 disabled={generating}
-                className="flex items-center gap-2 px-5 py-2 bg-emerald-500 text-white rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                className="btn-primary-green flex items-center gap-2 px-5 py-2 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {generating ? (
                   <RefreshCw size={16} className="animate-spin" />

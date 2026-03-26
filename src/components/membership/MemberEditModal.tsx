@@ -439,7 +439,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
         darkMode ? 'bg-slate-800' : 'bg-white'
       }`}>
         {/* Header - matches Add Member gradient style */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-4 relative z-10">
             {memberData ? (
@@ -1230,7 +1230,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50"
+                className="btn-primary-green flex-1 px-6 py-3 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>

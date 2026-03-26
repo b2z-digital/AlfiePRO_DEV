@@ -96,7 +96,7 @@ export const BrandingStep: React.FC<StepProps> = ({
           <div>
             <button
               onClick={() => logoInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors text-sm"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2.5 text-white rounded-lg font-medium transition-colors text-sm"
             >
               <Upload size={16} />
               Upload Logo
@@ -161,7 +161,7 @@ export const BrandingStep: React.FC<StepProps> = ({
             <div className="absolute top-3 right-3 flex gap-2">
               <button
                 onClick={() => featuredInputRef.current?.click()}
-                className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-lg transition-colors"
+                className="btn-primary-green p-2 text-white rounded-lg shadow-lg transition-colors"
               >
                 <Upload size={16} />
               </button>

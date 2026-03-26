@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, Plus, Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload, Filter, Tag, Check } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit, Trash2, DollarSign, TrendingUp, TrendingDown, Calendar, ChevronDown, FileText, Minus, Upload, ListFilter as Filter, Tag, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -631,14 +631,14 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           <div className="flex">
             <button
               onClick={() => setShowNewTransactionModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-l-lg hover:bg-green-700 transition-colors animate-pulse"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-l-lg transition-colors animate-pulse"
             >
               <Plus size={18} />
               New Transaction
             </button>
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="px-3 py-2 bg-green-600 text-white border-l border-green-700 rounded-r-lg hover:bg-green-700 transition-colors"
+              className="btn-primary-green px-3 py-2 text-white border-l border-green-700 rounded-r-lg transition-colors"
             >
               <ChevronDown size={16} />
             </button>

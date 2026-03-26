@@ -333,7 +333,7 @@ export const TeamManagementSection: React.FC<TeamManagementSectionProps> = ({ da
         {canManage && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors shadow-lg shadow-green-500/20"
+            className="btn-primary-green inline-flex items-center px-4 py-2.5 text-white font-medium rounded-lg transition-colors shadow-lg"
           >
             <UserPlus className="mr-2 h-5 w-5" />
             Add Member

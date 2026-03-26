@@ -714,7 +714,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
           </button>
           <button
             onClick={exportToPDF}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white transition-all shadow-lg shadow-cyan-500/20"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white transition-all shadow-lg shadow-cyan-500/20"
             title="Export PDF"
           >
             <Download size={18} />
@@ -783,7 +783,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Income Card */}
         <button
           onClick={() => openDetailedReport('income', 'Income Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="btn-primary-green group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -8,7 +8,7 @@ export const ImpersonationBanner: React.FC = () => {
   if (!isImpersonating || !session) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-[9999] from-amber-500 via-amber-500 to-orange-500 shadow-lg">
       <div className="max-w-screen-2xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex-shrink-0 p-1.5 bg-white/20 rounded-lg backdrop-blur-sm">

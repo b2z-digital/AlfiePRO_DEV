@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoreHorizontal, RefreshCw, Paperclip, Download, ListChecks } from 'lucide-react';
+import { Mail, Send, Inbox, Search, X, Plus, Users, Trash2, ChevronRight, Reply, Forward, FileText, Sparkles, Circle, Archive, Flag, Folder, PanelLeftClose, PanelLeft, Star, MoveHorizontal as MoreHorizontal, RefreshCw, Paperclip, Download, ListChecks } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase } from '../utils/supabase';
@@ -947,7 +947,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
               </div>
               <button
                 onClick={() => setShowCompose(true)}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition-all hover:scale-[1.02] font-medium whitespace-nowrap text-sm animate-pulse"
+                className="btn-primary-green flex items-center gap-2 px-5 py-2 text-white rounded-lg hover:shadow-lg transition-all hover:scale-[1.02] font-medium whitespace-nowrap text-sm animate-pulse"
               >
                 <Plus size={18} />
                 Compose
@@ -1190,7 +1190,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                       href={selectedNotification.link_url}
                       target={selectedNotification.link_url.startsWith('http') ? '_blank' : undefined}
                       rel={selectedNotification.link_url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl font-medium text-sm"
                     >
                       <ChevronRight size={16} />
                       View Item
@@ -1211,7 +1211,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                           });
                           setShowCompose(true);
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
                       >
                         <Reply size={16} />
                         Reply
@@ -1303,7 +1303,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                             setExternalEmailInput('');
                           }
                         }}
-                        className="px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                        className="px-4 py-2.5 text-white rounded-lg transition-colors font-medium"
                       >
                         Add
                       </button>
@@ -1368,7 +1368,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
                             const allIds = members.map(m => m.user_id ? m.user_id : `email:${m.id}`);
                             setComposeForm({ ...composeForm, recipients: allIds });
                           }}
-                          className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                          className="btn-primary-green px-3 py-1.5 text-xs text-white rounded-lg transition-colors font-medium"
                         >
                           Select All
                         </button>
@@ -1675,7 +1675,7 @@ export const MemberNotificationComponentModern: React.FC<MemberNotificationCompo
               <button
                 onClick={sendNotification}
                 disabled={sending || !composeForm.subject || !composeForm.body || (composeForm.recipients.length === 0 && composeForm.externalEmails.length === 0)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/30 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-medium"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-medium"
               >
                 {sending ? (
                   <>

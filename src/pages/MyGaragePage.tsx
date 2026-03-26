@@ -379,7 +379,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
             </div>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 animate-pulse"
+              className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-xl font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 animate-pulse"
             >
               <Plus size={20} />
               <span className="hidden sm:inline">Add Boat</span>
@@ -432,7 +432,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
                 ? 'bg-slate-800/50 border border-slate-700/50'
                 : 'bg-white border border-slate-200'}
             `}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20 flex-shrink-0">
+              <div className="p-3 rounded-xl bg-gradient-to-br shadow-lg flex-shrink-0">
                 <Trophy className="text-white" size={24} />
               </div>
               <div className="flex-1 min-w-0">
@@ -492,7 +492,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 font-medium animate-pulse"
+                  className="btn-primary-green inline-flex items-center gap-2 px-6 py-3 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 font-medium animate-pulse"
                 >
                   <Plus size={20} />
                   <span>Add Your First Boat</span>

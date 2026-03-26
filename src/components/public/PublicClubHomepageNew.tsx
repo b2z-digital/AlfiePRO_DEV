@@ -553,7 +553,7 @@ export const PublicClubHomepageNew: React.FC<PublicClubHomepageNewProps> = ({ cl
               href="https://alfiepro.com.au"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
+              className="px-6 py-2.5 text-white font-semibold rounded-lg transition-colors text-sm tracking-wide"
             >
               MEMBERS
             </a>

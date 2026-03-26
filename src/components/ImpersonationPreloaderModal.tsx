@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, CheckCircle, Loader2, User, LayoutDashboard, Shield } from 'lucide-react';
+import { Eye, CircleCheck as CheckCircle, Loader as Loader2, User, LayoutDashboard, Shield } from 'lucide-react';
 
 interface ImpersonationPreloaderModalProps {
   isOpen: boolean;
@@ -193,7 +193,7 @@ export const ImpersonationPreloaderModal: React.FC<ImpersonationPreloaderModalPr
           <div className="mt-8">
             <div className="relative h-3 bg-slate-700/50 rounded-full overflow-hidden">
               <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 via-orange-500 to-green-500 transition-all duration-300 ease-out rounded-full"
+                className="absolute inset-y-0 left-0 from-amber-500 via-orange-500 transition-all duration-300 ease-out rounded-full"
                 style={{ width: `${progress}%` }}
               >
                 <div className="absolute inset-0 bg-white/20 animate-pulse" />

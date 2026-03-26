@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Facebook, Image, FileText, RefreshCw, Send, AlertTriangle, Check, Info, Sparkles, ImageIcon, Upload, Plus, Mail } from 'lucide-react';
+import { X, Facebook, Image, FileText, RefreshCw, Send, TriangleAlert as AlertTriangle, Check, Info, Sparkles, Image as ImageIcon, Upload, Plus, Mail } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { supabase } from '../utils/supabase';
 import { createRoot } from 'react-dom/client';
@@ -562,7 +562,7 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
         ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
       `}>
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -892,7 +892,7 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
                             className="w-full h-full object-cover"
                           />
                           {selectedAdditionalImages.includes(item.url) && (
-                            <div className="absolute top-1 right-1 bg-green-500 rounded-full p-0.5">
+                            <div className="absolute top-1 right-1 rounded-full p-0.5">
                               <Check size={14} className="text-white" />
                             </div>
                           )}
@@ -994,7 +994,7 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
                             className="w-full h-full object-cover"
                           />
                           {selectedAdditionalImages.includes(img.url) && (
-                            <div className="absolute top-1 right-1 bg-green-500 rounded-full p-0.5">
+                            <div className="absolute top-1 right-1 rounded-full p-0.5">
                               <Check size={12} className="text-white" />
                             </div>
                           )}
@@ -1052,7 +1052,7 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
               <button
                 onClick={() => setShowEmailModal(true)}
                 disabled={!message.trim()}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Mail size={16} />
                 Email
@@ -1097,7 +1097,7 @@ Stephen Walsh emerged victorious, showcasing consistent sailing despite the shif
               <button
                 onClick={handlePublishToWebsite}
                 disabled={publishing}
-                className="flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center justify-center gap-2 px-3 py-2.5 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {publishing ? (
                   <>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Users, UserPlus, UserCog, AlertCircle, Check, CheckCircle, Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap } from 'lucide-react';
+import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, CreditCard as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap } from 'lucide-react';
 import Papa from 'papaparse';
 import { Skipper } from '../types';
 import { getStoredMembers, isValidUUID, updateMember } from '../utils/storage';
@@ -1273,7 +1273,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden flex flex-col backdrop-blur-sm bg-slate-800/95 border border-slate-700">
           {/* Blue gradient header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Users className="text-white" size={24} />
               <div>
@@ -1610,7 +1610,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
           {/* Blue gradient header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <UserPlus className="text-white" size={24} />
               <div>
@@ -1816,7 +1816,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="w-full max-w-lg rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
+          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <Edit2 className="text-white" size={24} />
               <div>
@@ -2371,7 +2371,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="w-full max-w-3xl rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700 max-h-[90vh] flex flex-col">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+          <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Upload className="text-white" size={24} />
               <div>
@@ -2664,7 +2664,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] backdrop-blur-sm bg-slate-800/95 border border-slate-700">
         {/* Blue gradient header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Users className="text-white" size={24} />
             <div>
@@ -2953,7 +2953,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           <button
             onClick={handleAddSelectedMembers}
             disabled={Object.keys(selectedMemberBoats).length === 0}
-            className="px-4 py-2 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary-green px-4 py-2 rounded-lg font-medium transition-colors text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Add Selected ({Object.keys(selectedMemberBoats).length})
           </button>
@@ -2967,7 +2967,7 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
       {showAddBoatModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="w-full max-w-md rounded-xl shadow-xl overflow-hidden backdrop-blur-sm bg-slate-800/95 border border-slate-700">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+            <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Plus className="text-white" size={24} />
                 <h2 className="text-xl font-semibold text-white">

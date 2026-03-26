@@ -682,7 +682,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
               <button
                 onClick={handleBulkMarkAsPaid}
                 disabled={bulkActionInProgress}
-                className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green px-4 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check className="w-4 h-4" />
                 Mark as Paid
@@ -1075,7 +1075,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
               <button
                 onClick={confirmBulkPayment}
                 disabled={bulkActionInProgress}
-                className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bulkActionInProgress ? (
                   <>

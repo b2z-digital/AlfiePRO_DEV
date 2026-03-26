@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, DollarSign, CheckCircle, Clock, Calendar, User, Filter, Download } from 'lucide-react';
+import { X, Search, DollarSign, CircleCheck as CheckCircle, Clock, Calendar, User, ListFilter as Filter, Download } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Avatar } from '../ui/Avatar';
@@ -322,7 +322,7 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                 <button
                   onClick={handleBulkMarkAsPaid}
                   disabled={processing}
-                  className="px-3 py-1.5 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+                  className="btn-primary-green px-3 py-1.5 text-white rounded text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   Mark All as Paid
                 </button>

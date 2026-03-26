@@ -322,7 +322,7 @@ export const ClubSetupWizard: React.FC<ClubSetupWizardProps> = ({
 
             <div className="w-full bg-slate-700/50 backdrop-blur-sm rounded-full h-2 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-green-500 to-green-400 h-full transition-all duration-500"
+                className="h-full transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>

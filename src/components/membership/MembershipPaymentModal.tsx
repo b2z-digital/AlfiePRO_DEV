@@ -156,7 +156,7 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
         <div className="p-6">
           {success ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check size={32} className="text-white" />
               </div>
               <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>

@@ -246,7 +246,7 @@ export const NameMappingManager: React.FC<NameMappingManagerProps> = ({
                   <div className="flex items-center space-x-2 ml-4">
                     <button
                       onClick={() => ranking && handleAcceptMapping(suggestion, ranking.id)}
-                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                      className="btn-primary-green px-3 py-1.5 text-white text-sm rounded-lg"
                     >
                       Accept
                     </button>
