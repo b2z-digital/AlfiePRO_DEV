@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Trash2, Copy, Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader2, Crosshair, RotateCcw, Pause } from 'lucide-react';
+import { Plus, Trash2, Copy, CreditCard as Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader as Loader2, Crosshair, RotateCcw, Pause } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConfirmationModal } from '../ConfirmationModal';
 import type { StartSequence, StartSequenceSound, StartBoxSound, SequenceType } from '../../types/startBox';
@@ -224,7 +224,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
         </div>
         <button
           onClick={() => { setShowCreateForm(!showCreateForm); resetForm(); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors"
+          className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 text-white text-sm rounded-lg transition-colors"
         >
           <Plus size={14} />
           New Sequence
@@ -242,7 +242,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
             raceDefault={formRaceDefault} setRaceDefault={setFormRaceDefault}
           />
           <div className="flex gap-2 mt-3">
-            <button onClick={handleCreate} disabled={!formName.trim()} className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
+            <button onClick={handleCreate} disabled={!formName.trim()} className="btn-primary-green px-4 py-2 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
               Create
             </button>
             <button onClick={() => { setShowCreateForm(false); resetForm(); }} className={`px-4 py-2 text-sm rounded-lg ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -589,7 +589,7 @@ export const StartBoxSequenceEditor: React.FC<StartBoxSequenceEditorProps> = ({
                           </div>
                         </div>
                         <div className="flex gap-2 mt-2">
-                          <button onClick={() => handleAddSound(seq.id)} disabled={!newSoundId} className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-xs rounded-lg">Add</button>
+                          <button onClick={() => handleAddSound(seq.id)} disabled={!newSoundId} className="btn-primary-green px-3 py-1 disabled:opacity-50 text-white text-xs rounded-lg">Add</button>
                           <button onClick={() => setAddingSoundToSeq(null)} className={`px-3 py-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cancel</button>
                         </div>
                       </div>
@@ -809,7 +809,7 @@ const AudioSyncTool: React.FC<{
           {!isPlaying ? (
             <button
               onClick={handlePlay}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
             >
               <Play size={16} /> Play Audio
             </button>
@@ -818,7 +818,7 @@ const AudioSyncTool: React.FC<{
               {isPaused ? (
                 <button
                   onClick={handleResume}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+                  className="btn-primary-green flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors"
                 >
                   <Play size={14} /> Resume
                 </button>
@@ -864,7 +864,7 @@ const AudioSyncTool: React.FC<{
             style={{ width: `${progress * 100}%` }}
           />
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-green-400 z-10"
+            className="absolute top-0 bottom-0 w-0.5 z-10"
             style={{ left: `${progress * 100}%` }}
           />
 

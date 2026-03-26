@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, SortAsc, CheckSquare, X, Filter, ChevronLeft } from 'lucide-react';
+import { Plus, Search, Import as SortAsc, SquareCheck as CheckSquare, X, ListFilter as Filter, ChevronLeft } from 'lucide-react';
 import { TaskForm } from './TaskForm';
 import { TaskDetails } from './TaskDetails';
 import { TaskCategorySidebar } from './TaskCategorySidebar';
@@ -513,7 +513,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
                   setEditingTask(null);
                   setShowTaskForm(true);
                 }}
-                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 animate-pulse"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 animate-pulse"
               >
                 <Plus size={18} />
                 New Task

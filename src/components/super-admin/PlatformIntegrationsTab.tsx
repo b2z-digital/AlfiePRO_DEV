@@ -263,7 +263,7 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-gradient-to-r from-sky-500 to-cyan-600 text-white rounded-lg hover:from-sky-600 hover:to-cyan-700 transition-all flex items-center gap-2"
+          className="btn-primary-green px-4 py-2 from-sky-500 to-cyan-600 text-white rounded-lg hover:from-sky-600 hover:to-cyan-700 transition-all flex items-center gap-2"
         >
           <Plus size={18} />
           Add Integration
@@ -463,7 +463,7 @@ export function PlatformIntegrationsTab({ darkMode }: PlatformIntegrationsTabPro
           </p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-sky-500 to-cyan-600 text-white rounded-lg hover:from-sky-600 hover:to-cyan-700 transition-all"
+            className="btn-primary-green px-4 py-2 from-sky-500 to-cyan-600 text-white rounded-lg hover:from-sky-600 hover:to-cyan-700 transition-all"
           >
             Add Integration
           </button>

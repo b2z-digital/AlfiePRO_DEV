@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, X, Tag, Plus, Calendar, AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, AlignLeft, BookOpen, Users, Globe, Building2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Tag, Plus, Calendar, TriangleAlert as AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, ChevronLeft as AlignLeft, BookOpen, Users, Globe, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { WysiwygEditor } from '../components/ui/WysiwygEditor';
 import { getArticleById, createArticle, updateArticle, Article } from '../utils/articleStorage';
@@ -505,7 +505,7 @@ const ArticleEditorPage: React.FC = () => {
 
                 <button
                   onClick={() => handleSave(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all from-blue-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   disabled={saving}
                 >
                   <Sparkles size={16} />

@@ -723,7 +723,7 @@ Thank you.
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-3xl bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-700/50">
-        <div className="flex items-center justify-between px-8 py-6 bg-gradient-to-r from-slate-800/80 to-slate-700/80 border-b border-slate-600/50">
+        <div className="flex items-center justify-between px-8 py-6 from-slate-800/80 to-slate-700/80 border-b border-slate-600/50">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <FileText className="text-blue-400" size={24} />
@@ -770,7 +770,7 @@ Thank you.
               <h3 className="text-lg font-semibold text-white">Meeting Minutes</h3>
               <button
                 onClick={handleDownloadMinutes}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-700 to-slate-600 text-white rounded-lg hover:from-slate-600 hover:to-slate-500 transition-all shadow-lg hover:shadow-xl"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2.5 from-slate-700 to-slate-600 text-white rounded-lg hover:from-slate-600 hover:to-slate-500 transition-all shadow-lg hover:shadow-xl"
               >
                 <Download size={18} />
                 Download Minutes
@@ -965,7 +965,7 @@ Thank you.
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 px-8 py-6 bg-gradient-to-r from-slate-800/80 to-slate-700/80 border-t border-slate-600/50">
+        <div className="flex justify-end gap-3 px-8 py-6 from-slate-800/80 to-slate-700/80 border-t border-slate-600/50">
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-medium"
@@ -975,7 +975,7 @@ Thank you.
           <button
             onClick={handleShareMinutes}
             disabled={sending}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl font-medium"
+            className="btn-primary-green flex items-center gap-2 px-6 py-2.5 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl font-medium"
           >
             {sending ? (
               <>

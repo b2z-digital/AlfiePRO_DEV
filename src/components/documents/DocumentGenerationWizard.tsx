@@ -1,6 +1,6 @@
 // Updated: 2025-11-19 - Enhanced styling with glassmorphism, better dropdowns, square selections
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, FileText, CheckCircle, AlertCircle, Loader, Sparkles, ChevronDown } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, FileText, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, Sparkles, ChevronDown } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { RaceFormWithFields, FormField } from '../../types/forms';
 import { useAuth } from '../../contexts/AuthContext';
@@ -740,7 +740,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
       <div className={`w-full max-w-5xl my-8 rounded-2xl shadow-2xl overflow-hidden border ${
         darkMode ? 'bg-slate-800/80 backdrop-blur-2xl border-slate-700/50' : 'bg-white/95 backdrop-blur-2xl border-slate-200'
       }`}>
-        <div className="relative px-8 py-6 border-b bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-600 border-blue-700/20">
+        <div className="relative px-8 py-6 border-b from-cyan-600 via-blue-600 to-cyan-600 border-blue-700/20">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl shadow-lg bg-white/20 backdrop-blur-sm">
@@ -786,7 +786,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
             </div>
             <div className="relative w-full h-2 rounded-full overflow-hidden bg-white/20">
               <div
-                className="h-full transition-all duration-700 ease-out rounded-full bg-gradient-to-r from-white via-cyan-200 to-white shadow-lg shadow-white/30"
+                className="h-full transition-all duration-700 ease-out rounded-full from-white via-cyan-200 to-white shadow-lg shadow-white/30"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -950,7 +950,7 @@ export const DocumentGenerationWizard: React.FC<DocumentGenerationWizardProps> =
             {!isReviewPage ? (
               <button
                 onClick={handleNext}
-                className="flex items-center gap-2 px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-500/20"
+                className="btn-primary-green flex items-center gap-2 px-8 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-500/20"
               >
                 Next Step
                 <ChevronRight size={20} />

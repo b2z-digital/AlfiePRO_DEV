@@ -183,7 +183,7 @@ export const BannerPreviewModal: React.FC<BannerPreviewModalProps> = ({
                             </span>
                           </div>
                         </div>
-                        <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                        <span className="text-xs text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
                           {placement.size_width}x{placement.size_height}px
                         </span>
                       </div>

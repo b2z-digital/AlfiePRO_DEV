@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Edit2, Trash2, Search, FormInput, Eye, Copy, X, ChevronDown, File, Globe, Settings } from 'lucide-react';
+import { FileText, Plus, CreditCard as Edit2, Trash2, Search, FolderInput as FormInput, Eye, Copy, X, ChevronDown, File, Globe, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -514,7 +514,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
               
               <button
                 onClick={handleCreateTemplate}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
               >
                 <Plus size={18} />
                 Create New Document
@@ -718,7 +718,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
                   </p>
                   <button
                     onClick={handleCreateTemplate}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="btn-primary-green px-4 py-2 text-white rounded-lg transition-colors"
                   >
                     Create Your First Template
                   </button>
@@ -825,7 +825,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
                 </div>
                 <button
                   onClick={() => setShowPublicGeneratorModal(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                  className="btn-primary-green px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2"
                 >
                   <Settings size={16} />
                   Configure
@@ -845,7 +845,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
                 </p>
                 <button
                   onClick={() => setShowPublicGeneratorModal(true)}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors inline-flex items-center gap-2"
+                  className="btn-primary-green px-6 py-3 text-white rounded-lg transition-colors inline-flex items-center gap-2"
                 >
                   <Settings size={18} />
                   Set Up Public Generator
@@ -1004,7 +1004,7 @@ export const RaceDocumentsPage: React.FC<RaceDocumentsPageProps> = ({ darkMode }
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-3 shadow-inner">
                               <div 
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 shadow-sm" 
+                                className="from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-500 shadow-sm" 
                                 style={{ width: `${(1 / validPages.length) * 100}%` }}
                               ></div>
                             </div>

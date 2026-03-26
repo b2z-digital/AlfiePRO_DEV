@@ -1502,7 +1502,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
                         )}
 
                         {!isActive && hasVideo && (
-                          <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg shadow-green-400/50" />
+                          <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full shadow-lg" />
                         )}
                       </div>
 

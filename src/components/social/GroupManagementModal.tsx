@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Pencil, Trash2, Globe, Lock, Eye, Users, Shield, AlertTriangle, Ban, ChevronLeft, UserMinus, UserPlus } from 'lucide-react';
+import { X, Plus, Pencil, Trash2, Globe, Lock, Eye, Users, Shield, TriangleAlert as AlertTriangle, Ban, ChevronLeft, UserMinus, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { socialStorage, SocialGroup } from '../../utils/socialStorage';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -290,7 +290,7 @@ export default function GroupManagementModal({ isOpen, onClose, clubId, darkMode
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
           <div className="relative z-10">
             <h2 className="text-2xl font-bold text-white drop-shadow-lg">

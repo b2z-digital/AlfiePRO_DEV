@@ -121,7 +121,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[#0f1729] overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 from-blue-600/10 via-transparent to-emerald-600/10">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex -space-x-2">
             <UserAvatar
@@ -238,7 +238,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
       </div>
 
       {activeTab === 'inbox' && (
-        <div className="px-6 py-4 border-t border-slate-700/50 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10">
+        <div className="px-6 py-4 border-t border-slate-700/50 from-blue-600/10 via-transparent to-emerald-600/10">
           <div className="flex items-center gap-2">
             {notification.sender_id && (
               <button

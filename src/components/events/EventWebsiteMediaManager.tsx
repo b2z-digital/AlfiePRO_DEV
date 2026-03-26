@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Image as ImageIcon, Upload, ChevronDown, Play, Eye, Trash2, Camera, Sparkles, Loader2 } from 'lucide-react';
+import { Image as ImageIcon, Upload, ChevronDown, Play, Eye, Trash2, Camera, Sparkles, Loader as Loader2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { EventMedia } from '../../types/media';
 import { ImageUploadModal } from '../ImageUploadModal';
@@ -115,14 +115,14 @@ export const EventWebsiteMediaManager: React.FC<EventWebsiteMediaManagerProps> =
           <div className="flex">
             <button
               onClick={() => setShowImageUploadModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-l-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl font-semibold"
+              className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-l-xl transition-all shadow-lg hover:shadow-xl font-semibold"
             >
               <Upload size={18} />
               <span>Upload Media</span>
             </button>
             <button
               onClick={() => setShowUploadMenu(!showUploadMenu)}
-              className="px-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-r-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl border-l border-green-700/50"
+              className="btn-primary-green px-3 text-white rounded-r-xl transition-all shadow-lg hover:shadow-xl border-l border-green-700/50"
             >
               <ChevronDown size={18} />
             </button>
@@ -177,7 +177,7 @@ export const EventWebsiteMediaManager: React.FC<EventWebsiteMediaManagerProps> =
             </p>
             <button
               onClick={() => setShowImageUploadModal(true)}
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
+              className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
             >
               <Sparkles size={20} />
               Upload Your First Media

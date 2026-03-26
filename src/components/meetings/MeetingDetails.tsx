@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, Edit2, Mail, Check, X, AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, CreditCard as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';
@@ -176,7 +176,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               {meeting.minutes_status !== 'in_progress' && (
                 <button
                   onClick={() => setShowInviteModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
                 >
                   <Mail size={16} />
                   Send Invites
@@ -186,7 +186,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               {meeting.minutes_status === 'in_progress' ? (
                 <button
                   onClick={handleStartMeeting}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
                 >
                   <Edit2 size={16} />
                   Continue Minutes
@@ -194,7 +194,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               ) : (
                 <button
                   onClick={handleStartMeeting}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
                 >
                   <Play size={16} />
                   Start Meeting
@@ -203,7 +203,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
               <button
                 onClick={() => setShowStatusConfirm('cancel')}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
               >
                 <X size={16} />
                 Cancel
@@ -214,7 +214,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
           {meeting.status !== 'upcoming' && meeting.minutes_status === 'in_progress' && (
             <button
               onClick={handleStartMeeting}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
             >
               <Edit2 size={16} />
               Continue Minutes
@@ -225,7 +225,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             <>
               <button
                 onClick={handleStartMeeting}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
               >
                 <FileText size={16} />
                 View Minutes
@@ -234,7 +234,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               {!meeting.minutes_locked && (
                 <button
                   onClick={() => setShowLockConfirm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-lg hover:from-amber-700 hover:to-amber-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 from-amber-600 to-amber-700 text-white rounded-lg hover:from-amber-700 hover:to-amber-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20"
                 >
                   <Lock size={16} />
                   Confirm & Lock
@@ -243,7 +243,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
               >
                 <Share size={16} />
                 Share Minutes
@@ -280,7 +280,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
       )}
 
       <div className="bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden shadow-2xl">
-        <div className="relative p-8 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10 border-b border-slate-700/50">
+        <div className="relative p-8 from-blue-600/10 via-transparent to-emerald-600/10 border-b border-slate-700/50">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-emerald-500/5"></div>
           <div className="relative">
             <div className="flex flex-col gap-4">
@@ -559,7 +559,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               <div className="overflow-hidden rounded-xl border border-slate-600/50 shadow-lg">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gradient-to-r from-slate-700/80 to-slate-800/80 border-b border-slate-600/50">
+                    <tr className="from-slate-700/80 to-slate-800/80 border-b border-slate-600/50">
                       <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider w-20">No.</th>
                       <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Item</th>
                       <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Owner</th>
@@ -612,7 +612,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
           {meeting.minutes_status === 'completed' && (
             <div className="mt-8">
               <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <div className="w-1 h-8 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-full"></div>
+                <div className="w-1 h-8 bg-gradient-to-b to-blue-500 rounded-full"></div>
                 Meeting Minutes
               </h3>
 

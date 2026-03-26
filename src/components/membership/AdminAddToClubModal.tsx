@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building, Users, CheckCircle, AlertTriangle, Search, Shield, DollarSign, ArrowRight, Info } from 'lucide-react';
+import { X, Building, Users, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Search, Shield, DollarSign, ArrowRight, Info } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 
@@ -251,7 +251,7 @@ export const AdminAddToClubModal: React.FC<AdminAddToClubModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
-        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6">
+        <div className="from-blue-600 to-cyan-600 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">

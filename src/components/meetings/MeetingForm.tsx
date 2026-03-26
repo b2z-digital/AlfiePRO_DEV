@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
 import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
@@ -1058,7 +1058,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                         type="button"
                         onClick={createGoogleMeet}
                         disabled={creatingMeet || !formData.name || !formData.date}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="btn-primary-green flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <Video size={14} />
                         {creatingMeet ? 'Creating...' : 'Generate Google Meet'}
@@ -1159,7 +1159,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               <button
                 type="button"
                 onClick={handleAddAgendaItem}
-                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200"
               >
                 <Plus size={18} />
                 Add Item
@@ -1256,7 +1256,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   <button
                     type="button"
                     onClick={handleAddAgendaItem}
-                    className="mt-2 px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 text-sm transition-all"
+                    className="btn-primary-green mt-2 px-3 py-1.5 text-white rounded-lg hover:shadow-lg text-sm transition-all"
                   >
                     Add First Item
                   </button>
@@ -1280,7 +1280,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
+              className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
             >
               {loading ? (
                 <>

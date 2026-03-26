@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, GripVertical, Columns, Save, Loader2, AlertCircle, Image, Clock, Info, FileText, Calendar, Trophy, MapPin, Users, Camera, Video, Newspaper, Cloud, Map, Type, Square, MousePointer, Layout, Minus, Mail, Phone, MessageSquare, Award, Sparkles, Settings, Pencil, Eye, Edit3, Monitor, Tablet, Smartphone, Copy, Grid } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Columns2 as Columns, Save, Loader as Loader2, CircleAlert as AlertCircle, Image, Clock, Info, FileText, Calendar, Trophy, MapPin, Users, Camera, Video, Newspaper, Cloud, Map, Type, Square, MousePointer, LayoutGrid as Layout, Minus, Mail, Phone, MessageSquare, Award, Sparkles, Settings, Pencil, Eye, CreditCard as Edit3, Monitor, Tablet, Smartphone, Copy, Grid2x2 as Grid } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverEvent, DragOverlay, DragStartEvent, closestCorners, useDroppable } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -639,7 +639,7 @@ const SortableVisualWidget: React.FC<SortableVisualWidgetProps> = ({
           </div>
 
           {/* Action Buttons on Right */}
-          <div className="flex items-center gap-1 bg-green-500 rounded-lg shadow-lg p-1">
+          <div className="flex items-center gap-1 rounded-lg shadow-lg p-1">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -891,7 +891,7 @@ const DroppableVisualColumn: React.FC<DroppableVisualColumnProps> = ({
               e.stopPropagation();
               onAddWidget(column.id);
             }}
-            className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg flex items-center justify-center transition-all hover:scale-110"
+            className="btn-primary-green w-10 h-10 rounded-full text-white shadow-lg flex items-center justify-center transition-all hover:scale-110"
             title="Add Widget"
           >
             <Plus size={20} />
@@ -2521,7 +2521,7 @@ export const EventPageBuilderInline: React.FC<Props> = ({ websiteId, pageSlug, p
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium disabled:opacity-50"
+                className="btn-primary-green flex items-center gap-2 px-6 py-3 from-cyan-600 to-blue-600 text-white rounded-xl hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium disabled:opacity-50"
               >
                 {saving ? (
                   <>
@@ -3070,7 +3070,7 @@ export const EventPageBuilderInline: React.FC<Props> = ({ websiteId, pageSlug, p
                     addNotification('error', 'Failed to save page settings');
                   }
                 }}
-                className="px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/30 transition-all"
+                className="px-6 py-2.5 from-cyan-600 to-blue-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/30 transition-all"
               >
                 Save Settings
               </button>

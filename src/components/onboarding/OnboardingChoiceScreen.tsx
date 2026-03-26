@@ -82,12 +82,12 @@ export const OnboardingChoiceScreen: React.FC<OnboardingChoiceScreenProps> = ({
             onClick={onSelectStartClub}
             className="bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-slate-700 hover:border-emerald-500 p-8 group relative overflow-hidden"
           >
-            <div className="absolute top-4 right-4 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+            <div className="absolute top-4 right-4 text-white text-xs font-bold px-3 py-1 rounded-full">
               30-DAY FREE TRIAL
             </div>
 
             <div className="flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 group-hover:bg-emerald-500 transition-colors">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 group-hover:bg-emerald-500 transition-colors">
                 <Building2 className="w-10 h-10 text-emerald-600 group-hover:text-white transition-colors" />
               </div>
 
@@ -119,7 +119,7 @@ export const OnboardingChoiceScreen: React.FC<OnboardingChoiceScreenProps> = ({
                 </div>
               </div>
 
-              <button className="w-full bg-emerald-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 group-hover:bg-emerald-700">
+              <button className="btn-primary-green w-full text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 group-hover:bg-emerald-700">
                 Start Free Trial
                 <ArrowRight className="w-5 h-5" />
               </button>

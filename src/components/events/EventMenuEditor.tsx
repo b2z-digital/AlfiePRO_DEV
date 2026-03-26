@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GripVertical, Plus, Trash2, Save, Loader2, ExternalLink, Menu as MenuIcon, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Save, Loader as Loader2, ExternalLink, Menu as MenuIcon, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -809,7 +809,7 @@ export const EventMenuEditor: React.FC<Props> = ({ websiteId, headerConfig, conf
           </label>
           <button
             onClick={handleAddCTAButton}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+            className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg transition-colors text-sm font-medium"
           >
             <Plus size={16} />
             Add CTA Button
@@ -1011,7 +1011,7 @@ export const EventMenuEditor: React.FC<Props> = ({ websiteId, headerConfig, conf
         <button
           onClick={handleSubmit}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary-green flex items-center gap-2 px-6 py-2.5 text-white rounded-lg hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? (
             <>

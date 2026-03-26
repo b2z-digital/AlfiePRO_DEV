@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bug, Lightbulb, Clock, CheckCircle2, CircleDot, XCircle, AlertTriangle, Search, MessageSquare, Trash2, ArrowUpDown, ArrowLeft, Send, Globe, Copy, Eye, Zap, Layers, Database, Monitor, Navigation, Sparkles, ChevronDown, Pencil } from 'lucide-react';
+import { Bug, Lightbulb, Clock, CircleCheck as CheckCircle2, CircleDot, Circle as XCircle, TriangleAlert as AlertTriangle, Search, MessageSquare, Trash2, ArrowUpDown, ArrowLeft, Send, Globe, Copy, Eye, Zap, Layers, Database, Monitor, Navigation, Sparkles, ChevronDown, Pencil } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -683,7 +683,7 @@ export const BugReportDashboard: React.FC<BugReportDashboardProps> = ({ darkMode
                   <button
                     onClick={handleSaveNotes}
                     disabled={saving}
-                    className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+                    className="btn-primary-green px-4 py-2 rounded-xl text-white text-sm font-medium transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save Notes'}
                   </button>

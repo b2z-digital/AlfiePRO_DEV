@@ -488,7 +488,7 @@ export default function MarketingPage({ darkMode = true }: MarketingPageProps) {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg p-8 text-white">
+      <div className="from-blue-600 to-blue-700 rounded-xl shadow-lg p-8 text-white">
         <h2 className="text-2xl font-bold mb-4">Ready to grow your reach?</h2>
         <p className="text-blue-100 mb-6">
           Create powerful email campaigns and automation flows to engage your members and promote your events.

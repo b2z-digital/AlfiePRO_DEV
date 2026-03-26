@@ -355,7 +355,7 @@ export const ClassSelectorButtonsWidget: React.FC<ClassSelectorButtonsWidgetProp
             >
               <div className="relative bg-white rounded-xl p-5 shadow-sm border-2 border-slate-200 hover:border-blue-400 hover:shadow-lg transition-all duration-200 overflow-hidden">
                 {/* Hover gradient effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                <div className="absolute inset-0 from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
 
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">

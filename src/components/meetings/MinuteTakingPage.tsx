@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, Plus, Trash2, Check, AlertTriangle, User, Users, Clock, ChevronDown, ChevronUp, Paperclip, CheckSquare, FileText, Download, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Check, TriangleAlert as AlertTriangle, User, Users, Clock, ChevronDown, ChevronUp, Paperclip, SquareCheck as CheckSquare, FileText, Download, X, Loader as Loader2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Meeting, MeetingAgendaItem, MeetingAttendee, MeetingGuest } from '../../types/meeting';
 import {
@@ -667,7 +667,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
             {isReadOnly && (
               <button
                 onClick={() => setShowActionItemsSummary(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-700 text-white rounded-lg hover:from-cyan-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-cyan-600 to-blue-700 text-white rounded-lg hover:from-cyan-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl"
               >
                 <FileText size={16} />
                 <span>View Action Items</span>
@@ -697,7 +697,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
                 <button
                   onClick={handleCompleteMinutes}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
                   <Check size={16} />
                   <span>Complete & Close</span>
@@ -705,7 +705,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
               </>
             )}
             {isReadOnly && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg border border-green-200">
+              <div className="flex items-center gap-2 px-4 py-2 text-green-700 rounded-lg border border-green-200">
                 <Check size={16} />
                 <span className="font-medium">Minutes Completed</span>
               </div>
@@ -731,7 +731,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
 
       {success && (
         <div className="mx-auto max-w-5xl px-4 py-2 mt-4">
-          <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+          <div className="p-4 rounded-lg border border-green-200">
             <div className="flex">
               <div className="flex-shrink-0">
                 <Check className="h-5 w-5 text-green-500" aria-hidden="true" />
@@ -1170,7 +1170,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
                         ) : (
                           <button
                             onClick={handleCompleteMinutes}
-                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                            className="btn-primary-green px-4 py-2 text-white rounded-md transition-colors"
                           >
                             Complete & Close Meeting
                           </button>
@@ -1185,7 +1185,7 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
           })}
 
           {!isReadOnly && (
-            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg border-2 border-dashed border-teal-300 p-5">
+            <div className="to-cyan-50 rounded-lg border-2 border-dashed border-teal-300 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
                   <Plus size={16} className="text-white" />

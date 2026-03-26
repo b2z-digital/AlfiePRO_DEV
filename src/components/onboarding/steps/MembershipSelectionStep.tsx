@@ -223,7 +223,7 @@ export const MembershipSelectionStep: React.FC<MembershipSelectionStepProps> = (
             >
               {/* Recommended Badge */}
               {recommendedTypeId === type.id && (
-                <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                <div className="absolute -top-2 -right-2 from-yellow-400 to-orange-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                   Recommended
                 </div>
               )}

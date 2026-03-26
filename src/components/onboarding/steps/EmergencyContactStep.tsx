@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowRight, ArrowLeft, CircleAlert as AlertCircle } from 'lucide-react';
 import { OnboardingData } from '../OnboardingWizard';
 
 interface EmergencyContactStepProps {
@@ -151,7 +151,7 @@ export const EmergencyContactStep: React.FC<EmergencyContactStepProps> = ({
 
           <button
             onClick={handleContinue}
-            className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-green-700 transition-all shadow-lg text-sm sm:text-base"
+            className="btn-primary-green flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 text-white rounded-lg font-medium transition-all shadow-lg text-sm sm:text-base"
           >
             Continue
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />

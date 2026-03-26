@@ -473,7 +473,7 @@ export function LivestreamSetupWizard({
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
         <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-700/50">
         {/* Header */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center justify-between relative z-10">
             <div className="flex items-center gap-3">
@@ -970,7 +970,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleNext}
               disabled={currentStep === 'details' && (!wizardData.title || !wizardData.eventId)}
-              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
+              className="btn-primary-green flex items-center space-x-2 px-6 py-2.5 from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
             >
               <span>Next</span>
               <ArrowRight className="w-4 h-4" />
@@ -979,7 +979,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleComplete}
               disabled={loading || !wizardData.title || !wizardData.eventId}
-              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-500 hover:to-green-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
+              className="btn-primary-green flex items-center space-x-2 px-6 py-2.5 text-white rounded-xl disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               <Check className="w-4 h-4" />
               <span>{loading ? 'Creating...' : wizardData.timing === 'now' ? 'Go Live' : 'Schedule Stream'}</span>

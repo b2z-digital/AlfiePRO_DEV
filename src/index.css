@@ -258,6 +258,34 @@ input[type="color"]::-moz-color-swatch {
   color: #ffffff !important;
 }
 
+/* Global primary green button - use this class for all primary green action buttons */
+.btn-primary-green {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: linear-gradient(to right, #16a34a, #059669);
+  color: #ffffff !important;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  white-space: nowrap;
+}
+.btn-primary-green:hover {
+  background: linear-gradient(to right, #15803d, #047857);
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+.btn-primary-green:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary-green svg {
+  color: #ffffff !important;
+}
+
 /* Force white text on blue status badges */
 .bg-blue-500 .text-white,
 .bg-green-500 .text-white,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -427,16 +427,22 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
   if (!isOpen) return null;
 
+  const inputClass = `w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+    darkMode ? 'bg-slate-700 text-slate-200 border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-400'
+  }`;
+  const labelClass = `block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`;
+  const sectionHeaderClass = `text-lg font-medium mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`;
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border ${
-        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className={`w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] ${
+        darkMode ? 'bg-slate-800' : 'bg-white'
       }`}>
-        {/* Blue Banner Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
+        {/* Header - matches Add Member gradient style */}
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-4 relative z-10">
-            {memberData && (
+            {memberData ? (
               <div className="relative group">
                 <Avatar
                   name={`${memberData.first_name} ${memberData.last_name}`}
@@ -455,23 +461,17 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                     <Camera size={24} className="text-white" />
                   )}
                 </button>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarSelect}
-                  className="hidden"
-                />
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+              </div>
+            ) : (
+              <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
+                <User className="text-white drop-shadow-lg" size={24} />
               </div>
             )}
             <div>
-              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-                Edit Member
-              </h2>
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">Edit Member</h2>
               {memberData && (
-                <p className="text-blue-100 text-sm mt-0.5">
-                  {memberData.first_name} {memberData.last_name}
-                </p>
+                <p className="text-cyan-100 text-sm mt-0.5">{memberData.first_name} {memberData.last_name}</p>
               )}
             </div>
           </div>
@@ -483,265 +483,230 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className={`border-b ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-          <div className="flex gap-2 px-6 py-4">
+        {/* Tab Navigation - matches Add Member underline style */}
+        <div className={`flex border-b flex-shrink-0 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+          {([
+            { key: 'details', icon: User, label: 'Details' },
+            { key: 'boats', icon: Sailboat, label: 'Boats' },
+            { key: 'membership', icon: DollarSign, label: 'Membership' },
+          ] as const).map(({ key, icon: Icon, label }) => (
             <button
-              onClick={() => setActiveTab('details')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'details'
-                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
-                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                activeTab === key
+                  ? darkMode
+                    ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50'
+                    : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : darkMode
+                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'
+                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <User size={16} className="inline mr-2" />
-              Details
+              <div className="flex items-center justify-center gap-2">
+                <Icon size={18} />
+                <span className="text-sm">{label}</span>
+              </div>
             </button>
-            <button
-              onClick={() => setActiveTab('boats')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'boats'
-                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
-                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <Sailboat size={16} className="inline mr-2" />
-              Boats
-            </button>
-            <button
-              onClick={() => setActiveTab('membership')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'membership'
-                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
-                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <DollarSign size={16} className="inline mr-2" />
-              Membership
-            </button>
-          </div>
+          ))}
         </div>
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Loading...
-            </div>
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mx-auto mb-3"></div>
+            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Loading member data...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6">
             {activeTab === 'details' && memberData && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.first_name}
-                      onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.last_name}
-                      onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={memberData.email}
-                      onChange={(e) => setMemberData({ ...memberData, email: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={memberData.phone}
-                      onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                </div>
-
+                {/* Personal Information */}
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Street Address
-                  </label>
-                  <input
-                    type="text"
-                    value={memberData.street}
-                    onChange={(e) => setMemberData({ ...memberData, street: e.target.value })}
-                    className={`w-full px-4 py-2 rounded-lg ${
-                      darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                    } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.city}
-                      onChange={(e) => setMemberData({ ...memberData, city: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.state}
-                      onChange={(e) => setMemberData({ ...memberData, state: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Postcode
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.postcode}
-                      onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Country
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={memberData.country_code || 'AU'}
-                        onChange={(e) => {
-                          const country = SAILING_NATIONS.find(c => c.code === e.target.value);
-                          setMemberData({
-                            ...memberData,
-                            country_code: e.target.value,
-                            country: country?.name || e.target.value
-                          });
-                        }}
-                        className={`w-full pl-12 pr-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none`}
-                      >
-                        {SAILING_NATIONS.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.name}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-2xl pointer-events-none">
-                        {getCountryFlag(memberData.country_code || 'AU')}
-                      </span>
+                  <h3 className={sectionHeaderClass}>
+                    <User size={20} className="text-blue-400" />
+                    Personal Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelClass}>First Name *</label>
+                      <input
+                        type="text"
+                        value={memberData.first_name}
+                        onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })}
+                        className={inputClass}
+                        placeholder="Enter first name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Last Name *</label>
+                      <input
+                        type="text"
+                        value={memberData.last_name}
+                        onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })}
+                        className={inputClass}
+                        placeholder="Enter last name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Email Address</label>
+                      <div className="relative">
+                        <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="email"
+                          value={memberData.email}
+                          onChange={(e) => setMemberData({ ...memberData, email: e.target.value })}
+                          className={`${inputClass} pl-10`}
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Phone Number</label>
+                      <div className="relative">
+                        <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="tel"
+                          value={memberData.phone}
+                          onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })}
+                          className={`${inputClass} pl-10`}
+                          placeholder="Enter phone number"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Category
-                    </label>
-                    <select
-                      value={memberData.category || ''}
-                      onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    >
-                      <option value="">Select Category</option>
-                      <option value="Junior">Junior</option>
-                      <option value="Open">Open</option>
-                      <option value="Master">Master</option>
-                      <option value="Grand Master">Grand Master</option>
-                      <option value="Legend">Legend</option>
-                    </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className={labelClass}>Country <span className="text-red-400">*</span></label>
+                      <div className="relative">
+                        <Globe size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                        <div className="absolute left-10 top-1/2 -translate-y-1/2 text-2xl z-10 pointer-events-none">
+                          {getCountryFlag(memberData.country_code || 'AU')}
+                        </div>
+                        <select
+                          value={memberData.country_code || 'AU'}
+                          onChange={(e) => {
+                            const country = SAILING_NATIONS.find(c => c.code === e.target.value);
+                            setMemberData({ ...memberData, country_code: e.target.value, country: country?.name || e.target.value });
+                          }}
+                          className={`${inputClass} pl-20`}
+                        >
+                          {SAILING_NATIONS.map((country) => (
+                            <option key={country.code} value={country.code}>{country.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Category</label>
+                      <div className="relative">
+                        <Award size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={memberData.category || ''}
+                          onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}
+                          className={`${inputClass} pl-10`}
+                        >
+                          <option value="">Select Category</option>
+                          <option value="Junior">Junior</option>
+                          <option value="Open">Open</option>
+                          <option value="Master">Master</option>
+                          <option value="Grand Master">Grand Master</option>
+                          <option value="Legend">Legend</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className={`border-t pt-4 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                  <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {/* Address */}
+                <div>
+                  <h3 className={sectionHeaderClass}>
+                    <House size={20} className="text-blue-400" />
+                    Address
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className={labelClass}>Street Address</label>
+                      <input
+                        type="text"
+                        value={memberData.street}
+                        onChange={(e) => setMemberData({ ...memberData, street: e.target.value })}
+                        className={inputClass}
+                        placeholder="Enter street address"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className={labelClass}>City/Suburb</label>
+                        <input
+                          type="text"
+                          value={memberData.city}
+                          onChange={(e) => setMemberData({ ...memberData, city: e.target.value })}
+                          className={inputClass}
+                          placeholder="Enter city"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>State</label>
+                        <input
+                          type="text"
+                          value={memberData.state}
+                          onChange={(e) => setMemberData({ ...memberData, state: e.target.value })}
+                          className={inputClass}
+                          placeholder="Enter state"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Postcode</label>
+                        <input
+                          type="text"
+                          value={memberData.postcode}
+                          onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })}
+                          className={inputClass}
+                          placeholder="Enter postcode"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Emergency Contact */}
+                <div>
+                  <h3 className={sectionHeaderClass}>
+                    <Phone size={20} className="text-blue-400" />
                     Emergency Contact
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Name
-                      </label>
+                      <label className={labelClass}>Contact Name</label>
                       <input
                         type="text"
                         value={memberData.emergency_contact_name}
                         onChange={(e) => setMemberData({ ...memberData, emergency_contact_name: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className={inputClass}
+                        placeholder="Emergency contact name"
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Phone
-                      </label>
+                      <label className={labelClass}>Contact Phone</label>
                       <input
                         type="tel"
                         value={memberData.emergency_contact_phone}
                         onChange={(e) => setMemberData({ ...memberData, emergency_contact_phone: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className={inputClass}
+                        placeholder="Emergency contact phone"
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Relationship
-                      </label>
+                      <label className={labelClass}>Relationship</label>
                       <input
                         type="text"
                         value={memberData.emergency_contact_relationship}
                         onChange={(e) => setMemberData({ ...memberData, emergency_contact_relationship: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className={inputClass}
+                        placeholder="e.g., Spouse, Parent"
                       />
                     </div>
                   </div>
@@ -1249,12 +1214,15 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               </div>
             )}
 
-            <div className="flex gap-3 mt-6 pt-6 border-t border-slate-700">
+            </div>
+
+            {/* Footer buttons - sticky at bottom */}
+            <div className={`flex gap-3 px-6 py-4 border-t flex-shrink-0 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
               <button
                 type="button"
                 onClick={onClose}
                 className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
-                  darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  darkMode ? 'text-slate-300 hover:text-slate-100' : 'text-slate-700 hover:text-slate-900'
                 }`}
               >
                 Cancel
@@ -1262,7 +1230,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+                className="btn-primary-green flex-1 px-6 py-3 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CheckCircle, Grid, List, Eye, UserPlus, DollarSign, AlertCircle, MapPin as MapPinIcon, Edit2, Trash2, MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, XCircle, Check, X, Shield } from 'lucide-react';
+import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, CreditCard as Edit2, Trash2, MoveVertical as MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
@@ -813,7 +813,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               </div>
               <button
                 onClick={() => setShowAddClubModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2.5 text-white rounded-lg font-medium transition-colors"
               >
                 <Plus size={20} />
                 Add Club
@@ -951,7 +951,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                     </button>
                     <button
                       onClick={() => handleApproveClub(club.id)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="btn-primary-green flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       <Check size={14} />
                       Approve

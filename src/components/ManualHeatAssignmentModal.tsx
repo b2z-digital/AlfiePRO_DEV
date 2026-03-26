@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Users, Shuffle, Trash2, UserPlus, Edit2, Trophy } from 'lucide-react';
+import { X, Users, Shuffle, Trash2, UserPlus, CreditCard as Edit2, Trophy } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatDesignation } from '../types/heat';
 import { RaceEvent } from '../types/race';
@@ -228,7 +228,7 @@ export const ManualHeatAssignmentModal: React.FC<ManualHeatAssignmentModalProps>
             {onAddSkipper && (
               <button
                 onClick={onAddSkipper}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-green-600 text-white hover:bg-green-700 flex items-center gap-2"
+                className="btn-primary-green px-4 py-2 rounded-lg text-sm font-medium transition-colors text-white flex items-center gap-2"
               >
                 <UserPlus size={16} />
                 Add Skipper

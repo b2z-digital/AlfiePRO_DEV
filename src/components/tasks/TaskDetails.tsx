@@ -1,20 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft,
-  Calendar,
-  Clock,
-  User,
-  Flag,
-  Edit2,
-  Trash2,
-  CheckSquare,
-  Paperclip,
-  AlertTriangle,
-  Check,
-  MessageSquare,
-  Eye,
-  XCircle
-} from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, User, Flag, CreditCard as Edit2, Trash2, SquareCheck as CheckSquare, Paperclip, TriangleAlert as AlertTriangle, Check, MessageSquare, Eye, Circle as XCircle } from 'lucide-react';
 import { Task } from '../../types/task';
 import { completeTask, getTaskAttachments } from '../../utils/taskStorage';
 import { formatDate } from '../../utils/date';
@@ -203,7 +188,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
             <button
               onClick={handleMarkAsComplete}
               disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-700 text-white rounded-xl hover:from-green-700 hover:to-emerald-800 font-medium transition-all duration-200 disabled:opacity-50 shadow-lg hover:shadow-xl hover:scale-105"
+              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium transition-all duration-200 disabled:opacity-50 shadow-lg hover:shadow-xl hover:scale-105"
             >
               {loading ? (
                 <>
@@ -221,7 +206,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
 
           <button
             onClick={onEdit}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-700 text-white rounded-xl hover:from-cyan-700 hover:to-blue-800 font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
+            className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-cyan-600 to-blue-700 text-white rounded-xl hover:from-cyan-700 hover:to-blue-800 font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
           >
             <Edit2 size={18} />
             <span>Edit</span>
@@ -237,7 +222,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
 
           <button
             onClick={onClose}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-700 text-white rounded-xl hover:from-green-700 hover:to-emerald-800 font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
+            className="btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
           >
             <XCircle size={18} />
             <span>Exit</span>
@@ -339,7 +324,7 @@ export const TaskDetails: React.FC<TaskDetailsProps> = ({
                   <button
                     onClick={handleAddComment}
                     disabled={!comment.trim()}
-                    className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-700 text-white rounded-xl hover:from-cyan-700 hover:to-blue-800 font-medium transition-all duration-200 disabled:opacity-50 shadow-lg hover:shadow-xl hover:scale-105"
+                    className="btn-primary-green px-5 py-2.5 from-cyan-600 to-blue-700 text-white rounded-xl hover:from-cyan-700 hover:to-blue-800 font-medium transition-all duration-200 disabled:opacity-50 shadow-lg hover:shadow-xl hover:scale-105"
                   >
                     Add Comment
                   </button>

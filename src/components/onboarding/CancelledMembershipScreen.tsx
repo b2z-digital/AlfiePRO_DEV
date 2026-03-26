@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, RefreshCw, LogOut, ArrowRight, Building2 } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, RefreshCw, LogOut, ArrowRight, Building2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface CancelledMembership {
@@ -108,7 +108,7 @@ export const CancelledMembershipScreen: React.FC<CancelledMembershipScreenProps>
         <div className="space-y-3">
           <button
             onClick={handleRenewMembership}
-            className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30"
+            className="btn-primary-green w-full py-3.5 from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30"
           >
             <RefreshCw className="w-5 h-5" />
             Renew My Membership

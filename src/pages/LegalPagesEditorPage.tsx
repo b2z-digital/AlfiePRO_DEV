@@ -143,7 +143,7 @@ export default function LegalPagesEditorPage({ pageType }: LegalPagesEditorPageP
           )}
 
           {successMessage && (
-            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+            <div className="mb-6 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
               {successMessage}
             </div>
           )}

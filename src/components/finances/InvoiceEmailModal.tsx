@@ -194,7 +194,7 @@ ${clubName}`;
         ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
       `}>
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-blue-600 via-blue-700 to-indigo-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -374,11 +374,7 @@ ${clubName}`;
             <button
               onClick={handleSend}
               disabled={sending || !recipientEmail || !subject || !message}
-              className="
-                flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg
-                hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed
-                font-medium shadow-lg shadow-blue-500/30
-              "
+              className="btn-primary-green flex items-center gap-2 px-6 py-2.5 from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-blue-500/30"
             >
               {sending ? (
                 <>

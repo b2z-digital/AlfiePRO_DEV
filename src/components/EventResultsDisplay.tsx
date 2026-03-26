@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, Award, ChevronDown, ChevronUp, FileText, Edit2, Trash2, Settings } from 'lucide-react';
+import { Trophy, Medal, Award, ChevronDown, ChevronUp, FileText, CreditCard as Edit2, Trash2, Settings } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';
@@ -944,7 +944,7 @@ export const EventResultsDisplay: React.FC<EventResultsDisplayProps> = ({
                   )}
                   <button
                     onClick={() => setShowReport(!showReport)}
-                    className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all shadow-lg text-sm flex items-center gap-2"
+                    className="btn-primary-green px-4 py-2 from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all shadow-lg text-sm flex items-center gap-2"
                   >
                     <FileText size={16} />
                     {showReport ? 'Hide Report' : 'View Report'}

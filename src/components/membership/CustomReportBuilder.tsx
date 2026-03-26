@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Download, Eye, Save, Loader2, AlertCircle, Table, BarChart3 } from 'lucide-react';
+import { X, Plus, Trash2, Download, Eye, Save, Loader as Loader2, CircleAlert as AlertCircle, Table, ChartBar as BarChart3 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Bar, Pie, Doughnut, Line } from 'react-chartjs-2';
 import {
@@ -391,7 +391,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
         darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
       }`}>
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-cyan-700 p-6 flex items-center justify-between flex-shrink-0">
+        <div className="from-blue-600 via-blue-700 to-cyan-700 p-6 flex items-center justify-between flex-shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-white">Custom Report Builder</h2>
             <p className="text-blue-100 text-sm mt-1">Create custom reports with specific metrics and visualizations</p>
@@ -643,7 +643,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
                 </div>
                 <button
                   onClick={handleExportCsv}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+                  className="btn-primary-green flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-medium transition-colors"
                 >
                   <Download size={13} />
                   Export CSV
@@ -713,7 +713,7 @@ export const CustomReportBuilder: React.FC<CustomReportBuilderProps> = ({
             <button
               onClick={handleSaveReport}
               disabled={!reportName || metrics.length === 0 || saving}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               Save Report

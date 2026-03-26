@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, Star } from 'lucide-react';
+import { Building2, Plus, Crown, Users, Calendar, CreditCard, CircleAlert as AlertCircle, Star } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -154,7 +154,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
       case 'paid':
         return (
           <span className="inline-flex items-center text-xs font-medium text-green-400">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></div>
+            <div className="w-1.5 h-1.5 rounded-full mr-1.5"></div>
             Paid
           </span>
         );
@@ -213,7 +213,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
             </div>
             <button
               onClick={() => setShowJoinModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
             >
               <Plus className="w-4 h-4" />
               <span>Join Another Club</span>
@@ -254,7 +254,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
               </p>
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all"
+                className="btn-primary-green inline-flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Join a Club</span>

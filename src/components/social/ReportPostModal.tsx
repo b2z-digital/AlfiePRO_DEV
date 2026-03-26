@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Flag, AlertTriangle, Ban, MessageSquare, HelpCircle, ShieldAlert, Check } from 'lucide-react';
+import { X, Flag, TriangleAlert as AlertTriangle, Ban, MessageSquare, Circle as HelpCircle, ShieldAlert, Check } from 'lucide-react';
 import { socialStorage } from '../../utils/socialStorage';
 
 const REPORT_REASONS = [
@@ -58,7 +58,7 @@ export default function ReportPostModal({ isOpen, onClose, postId, clubId, group
   return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="bg-gradient-to-r from-red-600 to-orange-600 p-5 flex items-center justify-between">
+        <div className="from-red-600 to-orange-600 p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Flag className="w-5 h-5 text-white" />
             <h2 className="text-lg font-bold text-white">Report Post</h2>
@@ -71,7 +71,7 @@ export default function ReportPostModal({ isOpen, onClose, postId, clubId, group
         <div className={`p-5 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
           {submitted ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check className="w-8 h-8 text-green-600" />
               </div>
               <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Report Submitted</h3>

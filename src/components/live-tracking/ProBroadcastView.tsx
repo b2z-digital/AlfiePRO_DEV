@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Trophy, Users, BarChart3, Flag, Radio } from 'lucide-react';
+import { Trophy, Users, ChartBar as BarChart3, Flag, Radio } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { getLiveTrackingEventByToken, getRaceStatus, subscribeToRaceStatus, type RaceStatus } from '../../utils/liveTrackingStorage';
 import type { LiveTrackingEvent } from '../../types/liveTracking';
@@ -419,7 +419,7 @@ export default function ProBroadcastView() {
       >
         {/* Header */}
         <div
-          className="bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-600 relative overflow-hidden"
+          className="from-cyan-600 via-blue-600 to-cyan-600 relative overflow-hidden"
           style={{ height: `${headerHeight}px` }}
         >
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiIG9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20"></div>
@@ -436,7 +436,7 @@ export default function ProBroadcastView() {
           <table className="w-full h-full border-collapse">
             <thead>
               <tr
-                className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 border-b-2 border-cyan-500/30"
+                className="from-slate-800 via-slate-700 to-slate-800 border-b-2 border-cyan-500/30"
                 style={{ height: '50px' }}
               >
                 <th className={`px-3 text-left font-black text-cyan-400 ${baseFontSize} border-r border-slate-600/50`} style={{ width: '80px' }}>
@@ -524,7 +524,7 @@ export default function ProBroadcastView() {
                         </td>
                       );
                     })}
-                    <td className="px-3 text-center bg-gradient-to-r from-slate-800/50 to-slate-900/50">
+                    <td className="px-3 text-center from-slate-800/50 to-slate-900/50">
                       <span className={`font-black text-cyan-400 ${positionFontSize}`}>
                         {skipperData?.total.toFixed(1) || '-'}
                       </span>
@@ -538,7 +538,7 @@ export default function ProBroadcastView() {
 
         {/* Footer Legend */}
         <div
-          className="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 border-t-2 border-cyan-500/30 flex items-center justify-center gap-8"
+          className="from-slate-800 via-slate-700 to-slate-800 border-t-2 border-cyan-500/30 flex items-center justify-center gap-8"
           style={{ height: `${footerHeight}px` }}
         >
           <div className="flex items-center gap-2">
@@ -790,7 +790,7 @@ export default function ProBroadcastView() {
                   </h3>
                   <div className="flex items-center gap-2">
                     {isComplete ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-bold text-white bg-emerald-500 shadow-md">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold text-white shadow-md">
                         Complete
                       </span>
                     ) : isActiveHeat ? (
@@ -897,7 +897,7 @@ export default function ProBroadcastView() {
                             )}
 
                             {isIncomingPromotion && (
-                              <div className="flex-shrink-0 px-3 bg-emerald-500 flex items-center justify-center">
+                              <div className="flex-shrink-0 px-3 flex items-center justify-center">
                                 <span className="text-white font-bold text-xs whitespace-nowrap">
                                   From Heat {skipper.fromHeat}
                                 </span>
@@ -905,7 +905,7 @@ export default function ProBroadcastView() {
                             )}
 
                             {isRound1TopFinisher && (
-                              <div className="flex-shrink-0 px-3 bg-emerald-500 flex items-center justify-center">
+                              <div className="flex-shrink-0 px-3 flex items-center justify-center">
                                 <span className="text-white font-bold text-xs whitespace-nowrap">
                                   Promotes
                                 </span>
@@ -1003,7 +1003,7 @@ export default function ProBroadcastView() {
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-slate-700 to-slate-800 text-white">
+            <thead className="from-slate-700 to-slate-800 text-white">
               <tr>
                 <th className="px-6 py-5 text-left font-bold text-lg">Pos</th>
                 <th className="px-6 py-5 text-left font-bold text-lg">Skipper</th>

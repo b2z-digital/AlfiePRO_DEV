@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building, ChevronRight, ChevronLeft, Palette, MapPin, Users, DollarSign, CheckCircle, Loader2, Globe } from 'lucide-react';
+import { Building, ChevronRight, ChevronLeft, Palette, MapPin, Users, DollarSign, CircleCheck as CheckCircle, Loader as Loader2, Globe } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Logo } from '../Logo';
@@ -295,7 +295,7 @@ export const ClubSelfRegistration: React.FC<ClubSelfRegistrationProps> = ({ dark
             </div>
             <div className="mt-3 h-1 rounded-full overflow-hidden bg-slate-700">
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500 ease-out rounded-full"
+                className="h-full transition-all duration-500 ease-out rounded-full"
                 style={{ width: `${progress}%` }}
               />
             </div>

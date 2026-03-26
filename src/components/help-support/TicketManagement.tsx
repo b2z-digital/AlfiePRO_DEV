@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  Ticket, Search, Filter, Clock, User, MessageSquare, Send,
-  ChevronRight, AlertCircle, CheckCircle, ArrowUpRight, X,
-  BarChart3, TrendingUp, Timer, Star, ArrowLeft, Paperclip,
-  BookmarkIcon, Eye, MoreVertical, RefreshCw,
-} from 'lucide-react';
+import { Ticket, Search, ListFilter as Filter, Clock, User, MessageSquare, Send, ChevronRight, CircleAlert as AlertCircle, CircleCheck as CheckCircle, ArrowUpRight, X, ChartBar as BarChart3, TrendingUp, Timer, Star, ArrowLeft, Paperclip, Bookmark as BookmarkIcon, Eye, MoveVertical as MoreVertical, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ticketStorage, cannedResponseStorage } from '../../utils/helpSupportStorage';
 import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES, PLATFORM_AREAS } from '../../types/helpSupport';
@@ -574,7 +569,7 @@ function AnalyticsView({ analytics, onBack }: { analytics: SupportAnalytics | nu
               </div>
               <div className="h-2 rounded-full bg-slate-700">
                 <div
-                  className="h-full rounded-full bg-emerald-500"
+                  className="h-full rounded-full"
                   style={{ width: `${Math.min(100, (analytics.avgResolutionHours / 72) * 100)}%` }}
                 />
               </div>

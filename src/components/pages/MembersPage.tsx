@@ -687,13 +687,15 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setActivating(false);
     setActivationResults(result);
 
-    if (result.success && result.summary.created > 0) {
-      addNotification(
-        `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
-        'success'
-      );
+    if (result.success) {
+      if (result.summary.created > 0) {
+        addNotification(
+          `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
+          'success'
+        );
+      }
       fetchMembers();
-    } else if (!result.success) {
+    } else {
       addNotification(result.error || 'Activation failed', 'error');
     }
   };
@@ -831,7 +833,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
   const getActivationIcon = (member: Member) => {
     const hasUserId = !!member.user_id;
-    const activationStatus = (member as any).activation_status;
+    const activationStatus = member.activation_status;
 
     if (hasUserId && activationStatus === 'activated') {
       return { icon: 'activated', label: 'Account active - click for options', color: 'text-green-500 bg-green-900/20' };
@@ -874,7 +876,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           </p>
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5 text-green-400">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              <span className="w-2 h-2 rounded-full"></span>
               {members.filter(m => m.user_id).length} Connected
             </span>
             {Object.keys(emailMatches).length > 0 && (
@@ -958,7 +960,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             {/* Payment Reconciliation Button */}
             <button
               onClick={() => setShowPaymentReconciliation(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white transition-all shadow-lg hover:shadow-xl font-medium"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all shadow-lg hover:shadow-xl font-medium"
               title="Payment Reconciliation"
             >
               <DollarSign size={18} />
@@ -1048,7 +1050,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
             <button
               onClick={handleAddMember}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
+              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
             >
               <Plus size={20} strokeWidth={2.5} />
               Add Member
@@ -1320,9 +1322,9 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                            iconState.icon === 'connected' ? 'Connected' :
                                            'Pending Activation'}
                                         </p>
-                                        {(member as any).activation_sent_at && (
+                                        {member.activation_sent_at && (
                                           <p className="text-xs text-slate-500 mt-0.5">
-                                            Sent {new Date((member as any).activation_sent_at).toLocaleDateString()}
+                                            Sent {new Date(member.activation_sent_at).toLocaleDateString()}
                                           </p>
                                         )}
                                       </div>
@@ -1729,7 +1731,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                 </button>
                 <button
                   onClick={handleConfirmInvite}
-                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  className="btn-primary-green flex-1 px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   Send Invitation
                 </button>
@@ -1941,7 +1943,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                     <button
                       onClick={handleConfirmActivation}
                       disabled={activating}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {activating ? (
                         <>
@@ -2044,7 +2046,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
               <button
                 onClick={handleSetPasswordForMember}
                 disabled={settingPassword || newPassword.length < 6}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-amber-500 to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {settingPassword ? (
                   <>

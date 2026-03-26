@@ -362,7 +362,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
         {/* Header */}
         <div className={`flex items-center justify-between p-6 border-b ${darkMode ? 'border-slate-700' : 'border-gray-200'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-500 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
               <UserPlus className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -416,7 +416,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 flex-1">
-                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium">
                           {teamMember.memberName.split(' ').map(n => n[0]).join('')}
                         </div>
                         <div className="flex-1">
@@ -561,7 +561,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
                             </div>
                           </div>
                           {isSelected && (
-                            <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center">
                               <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
@@ -596,7 +596,7 @@ export const AddTeamMemberModal: React.FC<AddTeamMemberModalProps> = ({
             <button
               onClick={handleSubmit}
               disabled={selectedMembers.length === 0 || saving}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Adding...' : `Add ${selectedMembers.length > 0 ? selectedMembers.length : ''} Member${selectedMembers.length !== 1 ? 's' : ''}`}
             </button>

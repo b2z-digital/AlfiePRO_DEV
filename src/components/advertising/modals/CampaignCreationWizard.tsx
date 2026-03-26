@@ -310,7 +310,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header with blue strip */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
+        <div className="from-blue-600 to-blue-700 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">Create New Campaign</h2>
             <p className="text-blue-100 text-sm mt-1">Step {currentStep} of {steps.length}</p>
@@ -446,7 +446,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Campaign Banners</h3>
                 <button
                   onClick={addBanner}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   <Plus size={16} />
                   Add Banner
@@ -459,7 +459,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
                   <p className="text-gray-600 dark:text-gray-400 mb-4">No banners added yet</p>
                   <button
                     onClick={addBanner}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="btn-primary-green px-4 py-2 text-white rounded-lg transition-colors"
                   >
                     Add Your First Banner
                   </button>
@@ -539,7 +539,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
                             </div>
 
                             <div className="flex-1">
-                              <label className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 cursor-pointer transition-colors w-fit">
+                              <label className="flex items-center gap-2 px-4 py-2 text-white rounded-lg cursor-pointer transition-colors w-fit">
                                 <Upload size={16} />
                                 <span>Upload Image</span>
                                 <input
@@ -830,7 +830,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <div className="flex items-center gap-2 p-4 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <input
                   type="checkbox"
                   id="is_active"
@@ -961,7 +961,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
                 </div>
               </div>
 
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <div className="dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <p className="text-sm text-green-900 dark:text-green-200">
                   <strong>Ready to launch!</strong> Click "Create Campaign" to finalize and activate your advertising campaign with all configured banners.
                 </p>
@@ -985,7 +985,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
             {currentStep < 4 ? (
               <button
                 onClick={nextStep}
-                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors"
               >
                 Next
                 <ChevronRight size={16} />
@@ -994,7 +994,7 @@ export const CampaignCreationWizard: React.FC<CampaignCreationWizardProps> = ({ 
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Creating...' : 'Create Campaign'}
                 <Check size={16} />

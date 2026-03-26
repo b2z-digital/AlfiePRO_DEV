@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Check, Loader2, Building2, Mail, MapPin, Sailboat, DollarSign, CreditCard } from 'lucide-react';
+import { ArrowLeft, Check, Loader as Loader2, Building2, Mail, MapPin, Sailboat, DollarSign, CreditCard } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 import type { ClubSetupData } from '../ClubSetupWizard';
 import { BoatClass } from '../../../types/boatClass';
@@ -313,7 +313,7 @@ export const ClubReviewStep: React.FC<ClubReviewStepProps> = ({
                 ${planDetails.price}/month after trial
               </p>
             </div>
-            <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+            <div className="text-white px-3 py-1 rounded-full text-sm font-semibold">
               30-DAY FREE TRIAL
             </div>
           </div>
@@ -368,7 +368,7 @@ export const ClubReviewStep: React.FC<ClubReviewStepProps> = ({
         <button
           onClick={handleSubmit}
           disabled={loading || !agreed}
-          className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all transform shadow-lg bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold transition-all transform shadow-lg text-white hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
           {loading ? (
             <>

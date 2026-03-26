@@ -1045,7 +1045,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowEmailModal(true)}
-                    className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors"
                   >
                     <Send className="w-4 h-4" />
                     Send Email

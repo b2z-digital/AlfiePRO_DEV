@@ -2,19 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Youtube,
-  RefreshCw,
-  Search,
-  ExternalLink,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  AlertTriangle
-} from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Youtube, RefreshCw, Search, ExternalLink, CircleCheck as CheckCircle2, Eye, EyeOff, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { alfieTVStorage, AlfieTVChannel, AlfieTVVideo } from '../../utils/alfieTVStorage';
 import AddVideoModal from './AddVideoModal';
 import { ConfirmationModal } from '../ConfirmationModal';
@@ -270,14 +258,14 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setShowAddVideoModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors"
+              className="btn-primary-green flex items-center space-x-2 px-4 py-2 rounded-xl text-white transition-colors"
             >
               <Youtube className="w-5 h-5" />
               <span>Add Video URL</span>
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors"
+              className="btn-primary-green flex items-center space-x-2 px-4 py-2 rounded-xl text-white transition-colors"
             >
               <Plus className="w-5 h-5" />
               <span>Add Channel</span>
@@ -301,7 +289,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
             </p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-6 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors"
+              className="btn-primary-green px-6 py-3 rounded-xl text-white transition-colors"
             >
               Add Your First Channel
             </button>
@@ -369,7 +357,7 @@ export default function AlfieTVAdmin({ darkMode = false }: AlfieTVAdminProps) {
                           </span>
                         )}
                         {channel.auto_import && (
-                          <span className="px-2 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                          <span className="px-2 py-1 rounded-lg text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             Auto-import enabled
                           </span>
                         )}

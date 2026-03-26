@@ -196,7 +196,7 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-slate-800 rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden border border-slate-700">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 flex items-center justify-between">
+        <div className="from-blue-600 to-blue-800 p-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">
             {isEditing ? 'Edit Listing' : 'Create New Listing'}
           </h2>
@@ -592,7 +592,7 @@ export default function ClassifiedFormModal({ classified, onClose, onSave }: Pro
               <button
                 type="submit"
                 disabled={saving || uploading}
-                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex-1 px-6 py-3 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Listing'}
               </button>

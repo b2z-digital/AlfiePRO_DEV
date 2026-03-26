@@ -663,7 +663,7 @@ export const AgendaTaskManager: React.FC<AgendaTaskManagerProps> = ({
       case 'medium':
         return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">Medium</span>;
       case 'low':
-        return <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">Low</span>;
+        return <span className="px-2 py-0.5 text-xs font-medium rounded-full text-green-700">Low</span>;
       default:
         return null;
     }

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { LogOut, Upload, Download, FileUp, CheckCircle, AlertCircle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import { LogOut, Upload, Download, FileUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
 import Papa from 'papaparse';
 import { Member, MemberBoat, BoatType, MembershipLevel } from '../types/member';
 import { supabase } from '../utils/supabase';
@@ -575,7 +575,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
                 <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   or click to browse
                 </p>
-                <label className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors">
+                <label className="btn-primary-green inline-flex items-center gap-2 px-6 py-3 rounded-lg cursor-pointer transition-all">
                   <Upload className="w-5 h-5" />
                   Choose File
                   <input

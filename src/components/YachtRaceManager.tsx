@@ -2960,7 +2960,7 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowCompleteConfirm(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white font-medium rounded-lg transition-colors"
                   >
                     <Trophy size={16} />
                     <span className="text-sm">Complete Scoring</span>

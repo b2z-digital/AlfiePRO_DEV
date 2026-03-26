@@ -1,24 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { 
-  Users, 
-  TrendingUp, 
-  Calendar, 
-  Settings, 
-  FileText, 
-  Filter, 
-  BarChart2, 
-  PieChart, 
-  Activity, 
-  UserCheck,
-  Globe,
-  CreditCard,
-  Mail,
-  Check,
-  AlertTriangle,
-  ClipboardList,
-  Shield
-} from 'lucide-react';
+import { Users, TrendingUp, Calendar, Settings, FileText, ListFilter as Filter, ChartBar as BarChart2, ChartPie as PieChart, Activity, UserCheck, Globe, CreditCard, Mail, Check, TriangleAlert as AlertTriangle, ClipboardList, Shield } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
@@ -1046,7 +1028,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
             <button
               onClick={handleConnectStripe}
               disabled={success !== null}
-              className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50"
+              className="btn-primary-green mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50"
             >
               <CreditCard size={18} />
               {success ? 'Connecting...' : 'Connect with Stripe'}
@@ -1182,7 +1164,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
                 <Users size={16} />
                 <span>Members</span>
                 {paymentPendingCount > 0 && (
-                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                     {paymentPendingCount}
                   </div>
                 )}
@@ -1201,7 +1183,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
                 <ClipboardList size={16} />
                 <span>Applications</span>
                 {pendingApplicationsCount > 0 && (
-                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                     {pendingApplicationsCount}
                   </div>
                 )}
@@ -1234,7 +1216,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
                 <CreditCard size={16} />
                 <span>Remittances</span>
                 {pendingRemittancesCount > 0 && (
-                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
                     {pendingRemittancesCount}
                   </div>
                 )}

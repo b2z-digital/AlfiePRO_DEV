@@ -221,7 +221,7 @@ export const ClubContactStep: React.FC<ClubContactStepProps> = ({
         </button>
         <button
           onClick={handleNext}
-          className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+          className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg"
         >
           Continue
           <ArrowRight className="w-4 h-4" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Save, Loader2, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
+import { Plus, Trash2, Save, Loader as Loader2, Facebook, Instagram, Twitter, Youtube } from 'lucide-react';
 import type { EventFooterConfig, EventFooterColumn } from '../../types/eventWidgets';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -232,7 +232,7 @@ export const EventFooterEditor: React.FC<Props> = ({ config, onSave, saving, dar
           </label>
           <button
             onClick={handleAddColumn}
-            className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+            className="btn-primary-green flex items-center gap-2 px-3 py-1.5 bg-cyan-600 text-white rounded-lg transition-colors text-sm font-medium"
           >
             <Plus size={16} />
             <span>Add Column</span>

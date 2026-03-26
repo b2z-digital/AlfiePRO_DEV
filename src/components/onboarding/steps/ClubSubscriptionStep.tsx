@@ -105,7 +105,7 @@ export const ClubSubscriptionStep: React.FC<ClubSubscriptionStepProps> = ({
           >
             {plan.popular && (
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
+                <span className="text-white text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">
                   MOST POPULAR
                 </span>
               </div>

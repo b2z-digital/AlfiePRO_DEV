@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { X, TrendingUp, Award, Target, BarChart3, Plus, Search, ChevronDown, Users, Info, LogOut } from 'lucide-react';
+import { X, TrendingUp, Award, Target, ChartBar as BarChart3, Plus, Search, ChevronDown, Users, Info, LogOut } from 'lucide-react';
 import { Skipper } from '../types';
 import { RaceEvent } from '../types/race';
 
@@ -957,7 +957,7 @@ export const SkipperPerformanceInsights: React.FC<SkipperPerformanceInsightsProp
                 <div className="flex-1 mx-4">
                   <div className="h-2 bg-slate-600 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-green-400 to-red-400"
+                      className="h-full to-red-400"
                       style={{ width: '100%' }}
                     />
                   </div>
@@ -1117,7 +1117,7 @@ export const SkipperPerformanceInsights: React.FC<SkipperPerformanceInsightsProp
                         className="w-24 h-24 rounded-full object-cover border-2 border-green-500"
                       />
                     ) : (
-                      <div className="w-24 h-24 rounded-full flex items-center justify-center font-bold text-xl bg-green-600 text-white border-2 border-green-500">
+                      <div className="w-24 h-24 rounded-full flex items-center justify-center font-bold text-xl text-white border-2 border-green-500">
                         {allSkippers[compareSkippers[1]].name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                       </div>
                     )}
@@ -1282,7 +1282,7 @@ export const SkipperPerformanceInsights: React.FC<SkipperPerformanceInsightsProp
                           {compareSkippers[1] !== null && (
                             <th className="text-center px-4 py-3">
                               <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold text-white mb-1">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white mb-1">
                                   {allSkippers[compareSkippers[1]].name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                                 </div>
                                 <div className="text-xs text-slate-300 font-medium truncate max-w-[80px]">{allSkippers[compareSkippers[1]].name.split(' ')[0]}</div>

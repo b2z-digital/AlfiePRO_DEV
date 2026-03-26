@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, Edit2, Trash2, Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
+import { Search, ListFilter as Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, CreditCard as Edit2, Trash2, Grid2x2 as Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassifieds, getUserClassifieds, getUserFavorites, toggleClassifiedFavorite, deleteClassified } from '../utils/classifiedStorage';
 import type { Classified } from '../types/classified';
@@ -353,7 +353,7 @@ export default function ClassifiedsPage() {
             {/* Create Listing Button */}
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 flex items-center gap-2 animate-pulse"
+              className="btn-primary-green px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 flex items-center gap-2 animate-pulse"
             >
               <Plus size={18} />
               Create Listing

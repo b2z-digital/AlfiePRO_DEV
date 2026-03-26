@@ -95,7 +95,7 @@ export const ClubYachtClassesStep: React.FC<ClubYachtClassesStepProps> = ({
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     {isSelected && (
-                      <div className="absolute top-2 right-2 p-2 bg-green-500 rounded-full shadow-lg">
+                      <div className="absolute top-2 right-2 p-2 rounded-full shadow-lg">
                         <Check size={16} className="text-white" />
                       </div>
                     )}
@@ -139,7 +139,7 @@ export const ClubYachtClassesStep: React.FC<ClubYachtClassesStepProps> = ({
         </button>
         <button
           onClick={onNext}
-          className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+          className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg"
         >
           Continue
           <ArrowRight className="w-4 h-4" />

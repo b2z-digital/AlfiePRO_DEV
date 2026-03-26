@@ -10,9 +10,10 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX } from 'lucide-react';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment } from '../utils/observerUtils';
+import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface HeatScoringTableProps {
   skippers: Skipper[];
@@ -99,15 +100,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return `Round ${roundNum}`;
   };
 
-  // Get all available heats for current round, sorted in reverse order (F -> A)
-  // This ensures the last element is the lowest heat (e.g., C in a 3-heat setup)
+  const isInQualifyingRound = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound <= shrsQualifyingRounds;
+
   const availableHeats = useMemo(() => {
     if (!currentRound) return [];
-    return currentRound.heatAssignments
+    const heats = currentRound.heatAssignments
       .map(assignment => assignment.heatDesignation)
-      .sort()
-      .reverse();
-  }, [currentRound]);
+      .sort();
+    if (isInQualifyingRound) {
+      return heats;
+    }
+    return heats.reverse();
+  }, [currentRound, isInQualifyingRound]);
 
   // Start with the LOWEST heat (last in the list) by default
   // Initialize to null and let useEffect set the correct heat
@@ -124,14 +128,19 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [touchModeResultsConfirmed, setTouchModeResultsConfirmed] = useState(false); // Track if touch mode results are confirmed
   const [currentHeatObservers, setCurrentHeatObservers] = useState<ObserverAssignment[]>([]);
   const manualSelectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const [rollCallActive, setRollCallActive] = useState(false);
+  const [rollCallReady, setRollCallReady] = useState<Set<number>>(new Set());
+  const [rollCallAbsent, setRollCallAbsent] = useState<Set<number>>(new Set());
 
   // Track the round number to detect actual round changes (not just object reference changes)
   const lastRoundNumber = React.useRef<number | null>(null);
 
-  // Reset touch mode confirmation when heat or round changes
+  // Reset touch mode confirmation and roll call when heat or round changes
   React.useEffect(() => {
     console.log('🔄 Resetting touch mode confirmation for Round', heatManagement.currentRound, 'Heat', selectedHeat);
     setTouchModeResultsConfirmed(false);
+    setRollCallReady(new Set());
+    setRollCallAbsent(new Set());
   }, [selectedHeat, heatManagement.currentRound]);
 
   // Track which heat was last auto-advanced to prevent loops
@@ -169,8 +178,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     }
   }, [heatManagement.lastPromotionInfo]);
 
-  // When round NUMBER changes (not just object reference), reset to lowest incomplete heat
-  // availableHeats is ['D', 'C', 'B', 'A'] - D is the FIRST and LOWEST heat
+  // When round NUMBER changes (not just object reference), reset to first incomplete heat
   // Also re-check when results change (e.g., when returning from modal after heats completed)
   React.useEffect(() => {
     const currentRoundNumber = heatManagement.currentRound;
@@ -872,7 +880,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                     }
                   }
                 }}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors shadow-md"
+                className="px-6 py-3 text-white rounded-lg font-medium transition-colors shadow-md"
               >
                 Advance to {getShrsRoundLabel(heatManagement.currentRound + 1)}
               </button>
@@ -923,20 +931,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                   const isComplete = isHeatComplete(heat);
                   const isSelected = heat === selectedHeat;
 
-                  // Determine if this heat can be scored
-                  // Only allow scoring heats in order (lowest to highest)
-                  // availableHeats is already sorted: [F, E, D, C, B, A] or similar
                   let canScore = false;
 
                   if (index === 0) {
-                    // First heat (lowest) can always be scored if not complete
                     canScore = !isComplete;
                   } else {
-                    // Higher heats can only be scored if all lower heats are complete
-                    const allLowerHeatsComplete = availableHeats
+                    const allPriorHeatsComplete = availableHeats
                       .slice(0, index)
                       .every(lowerHeat => isHeatComplete(lowerHeat));
-                    canScore = allLowerHeatsComplete && !isComplete;
+                    canScore = allPriorHeatsComplete && !isComplete;
                   }
 
                   // Always allow viewing completed heats
@@ -1111,7 +1114,250 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           </div>
         </div>
 
-        {touchMode ? (
+        {rollCallActive && selectedHeat ? (() => {
+          const observerSailNumbers = new Set(currentHeatObservers.map(o => String(o.skipper_sail_number)));
+          const racingSkippers = heatSkipperIndices.filter(idx => {
+            const s = skippers[idx];
+            return s && !observerSailNumbers.has(String(s.sailNumber || s.sailNo));
+          });
+          const totalRacing = racingSkippers.length;
+          const readyCount = rollCallReady.size;
+          const absentCount = rollCallAbsent.size;
+          const unmarkedCount = totalRacing - readyCount - absentCount;
+          const allAccountedFor = readyCount + absentCount >= totalRacing;
+
+          return (
+            <div className={`${isFullscreen ? 'fixed inset-0 z-20' : 'h-[75vh]'} flex flex-col overflow-hidden ${isFullscreen ? '' : 'rounded-b-xl'} ${
+              darkMode ? 'bg-slate-900' : 'bg-slate-50'
+            }`}>
+              <div className={`px-5 py-3 border-b flex-shrink-0 ${
+                darkMode ? 'bg-teal-900/20 border-teal-800/30' : 'bg-teal-50/60 border-teal-200/60'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${darkMode ? 'bg-teal-500/15 ring-1 ring-teal-500/25' : 'bg-teal-100 ring-1 ring-teal-300/50'}`}>
+                      <ClipboardCheck size={20} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
+                    </div>
+                    <div>
+                      <h3 className={`font-bold text-base ${darkMode ? 'text-teal-200' : 'text-teal-900'}`}>
+                        Heat {selectedHeat} - Roll Call
+                      </h3>
+                      <p className={`text-xs ${darkMode ? 'text-teal-400/60' : 'text-teal-700/60'}`}>
+                        Tap to mark ready. Right-click to mark absent.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 text-sm">
+                      {readyCount > 0 && (
+                        <span className={`flex items-center gap-1 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                          <UserCheck size={14} /> {readyCount}
+                        </span>
+                      )}
+                      {absentCount > 0 && (
+                        <span className={`flex items-center gap-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                          <UserX size={14} /> {absentCount}
+                        </span>
+                      )}
+                      {unmarkedCount > 0 && (
+                        <span className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} text-xs`}>
+                          {unmarkedCount} waiting
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setRollCallReady(new Set(racingSkippers));
+                        setRollCallAbsent(new Set());
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        darkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                      }`}
+                    >
+                      All Ready
+                    </button>
+                    <button
+                      onClick={() => setRollCallActive(false)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                        allAccountedFor
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : darkMode
+                            ? 'bg-teal-600 text-white hover:bg-teal-500'
+                            : 'bg-teal-600 text-white hover:bg-teal-500'
+                      }`}
+                    >
+                      {allAccountedFor ? 'Start Scoring' : 'Skip Roll Call'}
+                    </button>
+                  </div>
+                </div>
+                <div className={`mt-2.5 w-full rounded-full h-1 ${darkMode ? 'bg-slate-700/60' : 'bg-teal-200/60'}`}>
+                  <div
+                    className="h-1 rounded-full transition-all duration-300"
+                    style={{ width: `${totalRacing > 0 ? ((readyCount + absentCount) / totalRacing) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className={`flex-1 overflow-y-auto p-4 sm:p-5 ${darkMode ? 'bg-slate-900/80' : 'bg-slate-50'}`}>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+                  {racingSkippers.map(originalIdx => {
+                    const skipper = skippers[originalIdx];
+                    if (!skipper) return null;
+                    const sailNo = String(skipper.sailNumber || skipper.sailNo);
+                    const isReady = rollCallReady.has(originalIdx);
+                    const isAbsent = rollCallAbsent.has(originalIdx);
+                    const initials = skipper.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+                    return (
+                      <button
+                        key={originalIdx}
+                        onClick={() => {
+                          if (isAbsent) {
+                            setRollCallAbsent(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                            setRollCallReady(prev => new Set(prev).add(originalIdx));
+                          } else if (isReady) {
+                            setRollCallReady(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                          } else {
+                            setRollCallReady(prev => new Set(prev).add(originalIdx));
+                          }
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          if (isAbsent) {
+                            setRollCallAbsent(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                          } else {
+                            setRollCallReady(prev => { const n = new Set(prev); n.delete(originalIdx); return n; });
+                            setRollCallAbsent(prev => new Set(prev).add(originalIdx));
+                          }
+                        }}
+                        className={`
+                          relative flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl
+                          transition-all duration-200 active:scale-95
+                          ${isReady
+                            ? darkMode
+                              ? 'bg-green-500/12 border border-green-500/40 shadow-sm shadow-green-500/10'
+                              : 'bg-green-50 border border-green-400/50 shadow-sm shadow-green-500/10'
+                            : isAbsent
+                              ? darkMode
+                                ? 'bg-red-500/8 border border-red-500/25 opacity-50'
+                                : 'bg-red-50 border border-red-300/40 opacity-50'
+                              : darkMode
+                                ? 'bg-slate-800/80 border border-slate-700/50 hover:border-teal-500/40 hover:bg-slate-800'
+                                : 'bg-white border border-slate-200 hover:border-teal-400/50 hover:shadow-sm'
+                          }
+                        `}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 overflow-hidden mb-1 ${
+                          isReady
+                            ? 'ring-2 ring-green-500/50'
+                            : isAbsent
+                              ? 'ring-2 ring-red-500/30 grayscale'
+                              : ''
+                        }`}>
+                          {skipper.avatarUrl ? (
+                            <img src={skipper.avatarUrl} alt={skipper.name} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center rounded-full ${
+                              isReady
+                                ? 'bg-green-600 text-white'
+                                : isAbsent
+                                  ? 'bg-red-500/60 text-white'
+                                  : darkMode
+                                    ? 'bg-slate-600 text-slate-300'
+                                    : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {initials}
+                            </div>
+                          )}
+                        </div>
+                        {currentEvent?.show_country && skipper?.country_code && (
+                          <span className={`text-[10px] font-medium leading-none ${
+                            isReady ? (darkMode ? 'text-green-400/70' : 'text-green-600/70')
+                              : isAbsent ? (darkMode ? 'text-red-400/50' : 'text-red-500/50')
+                              : darkMode ? 'text-slate-500' : 'text-slate-400'
+                          }`}>
+                            {getIOCCode(skipper.country_code)}
+                          </span>
+                        )}
+                        <span className={`text-lg font-bold leading-none ${
+                          isReady ? (darkMode ? 'text-green-300' : 'text-green-700')
+                            : isAbsent ? (darkMode ? 'text-red-400' : 'text-red-500')
+                            : darkMode ? 'text-slate-100' : 'text-slate-700'
+                        }`}>
+                          {sailNo}
+                        </span>
+                        {isReady && (
+                          <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center shadow">
+                            <UserCheck size={10} className="text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                        {isAbsent && (
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow">
+                            <UserX size={10} className="text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {currentHeatObservers.length > 0 && (
+                <div className={`px-5 py-3 border-t flex-shrink-0 ${
+                  darkMode ? 'bg-purple-900/15 border-purple-800/25' : 'bg-purple-50/50 border-purple-200/50'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md ${
+                      darkMode ? 'bg-purple-500/15' : 'bg-purple-100/60'
+                    }`}>
+                      <Eye size={13} className={darkMode ? 'text-purple-400' : 'text-purple-600'} />
+                      <span className={`text-xs font-semibold ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                        Observers
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {currentHeatObservers.map((obs, idx) => (
+                        <div key={idx} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ${
+                          darkMode
+                            ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20'
+                            : 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                        }`}>
+                          <span>{obs.skipper_name}</span>
+                          <span className={darkMode ? 'text-purple-400/60' : 'text-purple-500/60'}>#{obs.skipper_sail_number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className={`px-5 py-2.5 border-t flex-shrink-0 ${darkMode ? 'bg-teal-900/15 border-teal-800/20' : 'bg-teal-50/40 border-teal-200/40'}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-medium tracking-wider uppercase ${darkMode ? 'text-teal-500/50' : 'text-teal-600/50'}`}>
+                    Roll Call Mode
+                  </span>
+                  <button
+                    onClick={() => setRollCallActive(false)}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                      allAccountedFor
+                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-md'
+                        : darkMode
+                          ? 'bg-teal-600 text-white hover:bg-teal-500'
+                          : 'bg-teal-600 text-white hover:bg-teal-500'
+                    }`}
+                  >
+                    {allAccountedFor
+                      ? `Start Scoring (${readyCount} racing${absentCount > 0 ? `, ${absentCount} absent` : ''})`
+                      : 'Start Scoring'
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })() : touchMode ? (
           <TouchModeScoring
             skippers={heatSkippers}
             currentRace={heatManagement.currentRound}
@@ -1226,14 +1472,19 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (heatManagement.roundJustCompleted) {
             delete heatManagement.roundJustCompleted;
           }
-          // Ensure touch mode confirmation is reset when modal closes
-          // This allows scoring to continue for the newly selected heat
           if (touchMode) {
             setTouchModeResultsConfirmed(false);
           }
-          // CRITICAL: Force observer reload when modal closes to ensure fresh observers for scoring
-          // This ensures observers are reloaded from the database, not stale modal state
           setObserverReloadTrigger(prev => prev + 1);
+          if (touchMode && selectedHeat) {
+            const progress = getHeatProgress(selectedHeat);
+            const isComplete = progress.scored >= progress.total && progress.total > 0;
+            if (!isComplete) {
+              setRollCallActive(true);
+              setRollCallReady(new Set());
+              setRollCallAbsent(new Set());
+            }
+          }
         }}
         heatManagement={heatManagement}
         skippers={skippers}

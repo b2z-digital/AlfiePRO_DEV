@@ -270,7 +270,7 @@ export const AnalyticsTab: React.FC = () => {
                 {analytics.total_clicks.toLocaleString()}
               </p>
             </div>
-            <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
+            <div className="p-3 dark:bg-green-900 rounded-lg">
               <MousePointer className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
           </div>

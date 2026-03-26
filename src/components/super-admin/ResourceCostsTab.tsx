@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Database, Cloud, DollarSign, HardDrive, Server, TrendingUp,
-  RefreshCw, Plus, Calendar, Building,
-  Globe2, AlertTriangle, CheckCircle, Zap, BarChart3,
-  Save, Archive, FolderOpen, Loader2, CloudOff, Bot, MessageSquare,
-  Activity, Users, Cpu
-} from 'lucide-react';
+import { Database, Cloud, DollarSign, HardDrive, Server, TrendingUp, RefreshCw, Plus, Calendar, Building, Globe as Globe2, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Zap, ChartBar as BarChart3, Save, Archive, FolderOpen, Loader as Loader2, CloudOff, Bot, MessageSquare, Activity, Users, Cpu } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import { supabase } from '../../utils/supabase';
@@ -1351,7 +1345,7 @@ export function ResourceCostsTab({ darkMode }: ResourceCostsTabProps) {
                 <button
                   onClick={handleSaveEntry}
                   disabled={saving || !newEntry.metric_name || !newEntry.cost_usd}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 transition-all"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-all"
                 >
                   {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                   Save Entry

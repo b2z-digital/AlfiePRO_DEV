@@ -307,7 +307,7 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
             <div className="space-y-3">
               <button
                 onClick={() => setShowPaymentOptions(true)}
-                className="w-full py-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30"
+                className="btn-primary-green w-full py-3.5 from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30"
               >
                 <CreditCard className="w-5 h-5" />
                 {isRenewal ? 'Renew Membership' : 'Make Payment'}
@@ -447,7 +447,7 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
                   <button
                     onClick={handlePayment}
                     disabled={!selectedType || processing}
-                    className="w-full py-3.5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary-green w-full py-3.5 from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processing ? (
                       <>

@@ -1,22 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Bell,
-  Trophy,
-  TrendingUp,
-  TrendingDown,
-  Sailboat,
-  RefreshCw,
-  LogOut,
-  Target,
-  Award,
-  Activity,
-  BarChart2,
-  List,
-  Home,
-  Layers,
-  Flag,
-} from 'lucide-react';
+import { Bell, Trophy, TrendingUp, TrendingDown, Sailboat, RefreshCw, LogOut, Target, Award, Activity, ChartBar as BarChart2, List, Hop as Home, Layers, Flag } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import {
   getCurrentTrackingSession,
@@ -780,7 +764,7 @@ export default function LiveDashboardPage() {
 
     const badges = {
       promoted: (
-        <div className="flex items-center gap-2 px-6 py-3 bg-green-500 text-white rounded-xl shadow-lg font-bold text-lg">
+        <div className="flex items-center gap-2 px-6 py-3 text-white rounded-xl shadow-lg font-bold text-lg">
           <TrendingUp size={24} />
           <span>Promoted!</span>
         </div>
@@ -1067,7 +1051,7 @@ export default function LiveDashboardPage() {
 
         {/* Create Account CTA */}
         {!session?.member_id && (
-          <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-white/20 rounded-xl">
                 <Trophy size={32} />
@@ -1079,7 +1063,7 @@ export default function LiveDashboardPage() {
                 </p>
                 <button
                   onClick={() => navigate('/register')}
-                  className="px-6 py-3 bg-white hover:bg-green-50 text-green-600 font-bold rounded-lg transition-all shadow-md"
+                  className="btn-primary-green px-6 py-3 bg-white text-green-600 font-bold rounded-lg transition-all shadow-md"
                 >
                   Create Free Account
                 </button>
@@ -1096,7 +1080,7 @@ export default function LiveDashboardPage() {
             alt="Alfie Logo"
             className="w-6 h-6"
           />
-          <span className="text-sm font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+          <span className="text-sm font-bold from-cyan-600 to-blue-600 bg-clip-text text-transparent">
             AlfiePRO
           </span>
         </div>

@@ -199,7 +199,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
         w-full max-w-4xl rounded-xl shadow-xl overflow-hidden max-h-[90vh] flex flex-col
         ${darkMode ? 'bg-slate-800' : 'bg-white'}
       `}>
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6">
+        <div className="from-blue-600 to-blue-800 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {memberData?.avatar_url ? (
@@ -579,7 +579,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
                         <div className="flex items-end gap-2">
                           <button
                             onClick={() => handleSaveBoat(boat)}
-                            className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                            className="btn-primary-green flex-1 px-3 py-2 text-white rounded-lg transition-colors text-sm"
                           >
                             Save
                           </button>
@@ -660,7 +660,7 @@ export const MemberDetailsModal: React.FC<MemberDetailsModalProps> = ({
                               // Handle add boat logic here
                               setShowAddBoat(false);
                             }}
-                            className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                            className="btn-primary-green flex-1 px-3 py-2 text-white rounded-lg transition-colors text-sm"
                           >
                             Add
                           </button>

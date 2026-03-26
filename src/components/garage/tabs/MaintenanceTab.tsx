@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Wrench, Plus, Calendar, DollarSign, Clock, Bell,
-  CheckCircle, AlertCircle, Edit, Trash2, FileText,
-  RepeatIcon, User
-} from 'lucide-react';
+import { Wrench, Plus, Calendar, DollarSign, Clock, Bell, CircleCheck as CheckCircle, CircleAlert as AlertCircle, CreditCard as Edit, Trash2, FileText, Repeat as RepeatIcon, User } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNotifications } from '../../../contexts/NotificationContext';
@@ -350,7 +346,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({ boatId, darkMode
                 setEditingLog(null);
                 setShowLogModal(true);
               }}
-              className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200"
+              className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200"
             >
               <Plus className="w-4 h-4 inline mr-2" />
               Add Log
@@ -455,7 +451,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({ boatId, darkMode
                 setEditingReminder(null);
                 setShowReminderModal(true);
               }}
-              className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200"
+              className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200"
             >
               <Plus className="w-4 h-4 inline mr-2" />
               Add Reminder
@@ -888,7 +884,7 @@ const MaintenanceLogModal: React.FC<MaintenanceLogModalProps> = ({ boatId, log, 
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
+            className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Log'}
           </button>
@@ -1079,7 +1075,7 @@ const MaintenanceReminderModal: React.FC<MaintenanceReminderModalProps> = ({ boa
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
+            className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save Reminder'}
           </button>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Eye, Clock, ArrowUp, ArrowDown, Loader2, Info, X } from 'lucide-react';
+import { ChartBar as BarChart3, TrendingUp, Users, Eye, Clock, ArrowUp, ArrowDown, Loader as Loader2, Info, X } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
@@ -447,7 +447,7 @@ export const ClubWebsiteAnalytics: React.FC<ClubWebsiteAnalyticsProps> = ({ dark
                 <div className="flex items-center gap-3">
                   <div className="w-32 bg-slate-700 rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500"
+                      className="from-cyan-500 to-blue-500 h-full transition-all duration-500"
                       style={{ width: `${referrer.count}%` }}
                     ></div>
                   </div>

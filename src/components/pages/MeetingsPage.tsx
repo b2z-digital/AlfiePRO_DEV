@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, Filter, MapPin, Clock, Users, Edit2, Trash2, ChevronRight, AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
+import { Calendar, Plus, Search, ListFilter as Filter, MapPin, Clock, Users, CreditCard as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting } from '../../types/meeting';
 import { getMeetings, deleteMeeting, updateMeetingStatus } from '../../utils/meetingStorage';
@@ -358,7 +358,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           {can('meetings.create') && (
             <button
               onClick={handleCreateMeeting}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 animate-pulse"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 animate-pulse"
             >
               <Plus size={18} />
               Create a New Meeting
@@ -382,7 +382,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
             </p>
             <button
               onClick={handleCreateMeeting}
-              className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200"
+              className="btn-primary-green px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200"
             >
               Schedule a Meeting
             </button>

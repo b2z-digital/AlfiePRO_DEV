@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Settings, Search, BarChart2, Share2, Save, Check, Image } from 'lucide-react';
+import { Globe, Settings, Search, ChartBar as BarChart2, Share2, Save, Check, Image } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { EnhancedDomainManagementSection } from '../settings/EnhancedDomainManagementSection';
@@ -408,7 +408,7 @@ export const WebsiteSettings: React.FC<WebsiteSettingsProps> = ({ darkMode }) =>
             <button
               onClick={handleSaveSettings}
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>

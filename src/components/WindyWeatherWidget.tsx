@@ -27,7 +27,7 @@ export const WindyWeatherWidget: React.FC<WindyWeatherWidgetProps> = ({
   return (
     <div className="w-full h-full rounded-lg overflow-hidden flex flex-col">
       {locationName && (
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center gap-2 flex-shrink-0">
+        <div className="from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center gap-2 flex-shrink-0">
           <MapPin size={18} />
           <div>
             <div className="font-semibold">{locationName}</div>

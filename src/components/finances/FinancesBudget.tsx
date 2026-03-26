@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, BarChart3, PieChart as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, Edit3 } from 'lucide-react';
+import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, ChartBar as BarChart3, ChartPie as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, CreditCard as Edit3 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
@@ -572,7 +572,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       {categories.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/5">
+            <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg">
               <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
@@ -708,7 +708,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           {renderCategorySection('income', incomeCategories, incomeExpanded, () => setIncomeExpanded(!incomeExpanded))}
           {renderCategorySection('expense', expenseCategories, expenseExpanded, () => setExpenseExpanded(!expenseExpanded))}
 
-          <div className="bg-gradient-to-r from-cyan-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-cyan-500/20 p-5">
+          <div className="from-cyan-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-cyan-500/20 p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-cyan-500/10 rounded-xl">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader2 } from 'lucide-react';
+import { X, Save, Loader as Loader2 } from 'lucide-react';
 import type { EventWebsitePage } from '../../types/eventWebsite';
 
 interface Props {
@@ -233,7 +233,7 @@ export const CreatePageModal: React.FC<Props> = ({ websiteId, onSave, onClose, d
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium disabled:opacity-50 flex items-center gap-2"
+              className="btn-primary-green px-6 py-3 from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? (
                 <>

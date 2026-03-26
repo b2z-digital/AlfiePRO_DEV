@@ -1,28 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  CreditCard,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Mail,
-  Phone,
-  MapPin,
-  FileText,
-  Download,
-  Edit2,
-  X,
-  Sailboat,
-  Shield,
-  Clock,
-  ChevronRight,
-  User,
-  Anchor,
-  Heart,
-  Users,
-  TrendingUp,
-  Award,
-  Activity
-} from 'lucide-react';
+import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, CreditCard as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -465,7 +442,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             </div>
             <button
               onClick={() => setShowEditModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
+              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
             >
               <Edit2 size={16} />
               <span className="hidden sm:inline">Edit Details</span>
@@ -490,7 +467,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                     className="w-20 h-20 rounded-2xl ring-2 ring-slate-600/50"
                   />
                   {membershipStatus.status === 'active' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-slate-800 flex items-center justify-center">
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-slate-800 flex items-center justify-center">
                       <CheckCircle size={12} className="text-white" />
                     </div>
                   )}
@@ -570,7 +547,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                   <button
                     onClick={() => setShowRenewalModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all flex-shrink-0"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all flex-shrink-0"
                   >
                     <CreditCard size={14} />
                     Renew Now
@@ -632,7 +609,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               <div className="relative">
                 <div className="h-2 rounded-full bg-slate-700/50 overflow-hidden">
                   <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500"
+                    className="h-full rounded-full from-blue-500 via-cyan-500"
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.max(5, Math.min(100, ((365 - membershipStatus.daysLeft) / 365) * 100))}%` }}
                     transition={{ duration: 1, ease: 'easeOut', delay: 0.5 }}
@@ -693,7 +670,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6"
             >
               <div className="flex items-center gap-3 mb-5">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br shadow-lg">
                   <Shield size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Membership Details</h3>
@@ -922,7 +899,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             >
               <button
                 onClick={() => setShowRenewalModal(true)}
-                className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105 transition-all duration-200"
+                className="btn-primary-green flex items-center gap-2 px-8 py-3 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105 transition-all duration-200"
               >
                 <CreditCard size={18} />
                 Renew Membership
@@ -1044,7 +1021,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   <button
                     onClick={handleRenewal}
                     disabled={!selectedMembershipType || processingPayment}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary-green flex-1 px-4 py-2.5 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processingPayment ? (
                       <div className="flex items-center justify-center gap-2">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Menu, X, Calendar, Clock, MapPin, Trophy, Filter, ChevronDown, Users, Award, List, Grid, CalendarDays, CalendarRange, Link2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { Menu, X, Calendar, Clock, MapPin, Trophy, ListFilter as Filter, ChevronDown, Users, Award, List, Grid2x2 as Grid, CalendarDays, CalendarRange, Link2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';
@@ -661,7 +661,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
                             >
                               {event.race_format === 'handicap' ? 'Handicap' : 'Scratch'}
                             </div>
-                            <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                            <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800">
                               {event.race_class}
                             </div>
                           </div>
@@ -748,7 +748,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
                             >
                               {event.race_format === 'handicap' ? 'H' : 'S'}
                             </div>
-                            <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">
+                            <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800">
                               {event.race_class}
                             </div>
                           </div>
@@ -812,7 +812,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
       {/* Main Content */}
       <div className="pt-20">
         {/* Page Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-12">
+        <div className="from-blue-600 to-blue-800 text-white py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4 mb-4">
               <Calendar className="w-10 h-10" />
@@ -1007,7 +1007,7 @@ export const PublicRaceCalendarPage: React.FC = () => {
                 <div className="relative" ref={subscribeMenuRef}>
                   <button
                     onClick={() => setShowSubscribeMenu(!showSubscribeMenu)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white"
                   >
                     <Link2 size={16} />
                     Subscribe

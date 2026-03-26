@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2, Calendar } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CircleCheck as CheckCircle, Loader as Loader2, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -838,7 +838,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           </div>
           <div className={`mt-3 h-1 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500 ease-out rounded-full"
+              className="h-full transition-all duration-500 ease-out rounded-full"
               style={{ width: `${progress}%` }}
             />
           </div>

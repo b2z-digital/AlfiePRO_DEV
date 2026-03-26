@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Calendar, Plus, Edit2, Trash2, MapPin, X, FileText, CalendarRange } from 'lucide-react';
+import { Trophy, Calendar, Plus, CreditCard as Edit2, Trash2, MapPin, X, FileText, CalendarRange } from 'lucide-react';
 import { RaceType } from '../types';
 import { RaceEvent } from '../types/race';
 import { storeRaceEvent, setCurrentEvent, getStoredRaceEvents, deleteRaceEvent, archiveRaceEvent } from '../utils/raceStorage';
@@ -268,7 +268,7 @@ export const SingleEventManagement: React.FC<SingleEventManagementProps> = ({
                         </div>
                       )}
                       {event.completed && (
-                        <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        <div className="px-2 py-0.5 rounded-full text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
                           Completed
                         </div>
                       )}

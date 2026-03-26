@@ -79,7 +79,7 @@ export const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext, onBack }) => {
           )}
           <button
             onClick={() => onNext({})}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base"
+            className="btn-primary-green w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-4 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base"
           >
             Get Started
             <ArrowRight size={18} className="sm:w-5 sm:h-5" />

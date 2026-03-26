@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, MoreHorizontal, Trophy, TrendingUp, Settings, Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
+import { Plus, MoveHorizontal as MoreHorizontal, Trophy, TrendingUp, Settings, Hop as Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { RaceInput } from './RaceInput';
@@ -899,7 +899,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                 e.stopPropagation();
                 onCompleteScoring();
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-semibold"
             >
               <Trophy size={18} />
               <span className="text-sm font-medium">
@@ -1399,7 +1399,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                       e.stopPropagation();
                                       setShowLetterScoreSelector({ race, skipperIndex: index });
                                     }}
-                                    className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-slate-700 text-slate-300 hover:bg-green-600 transition-colors flex items-center justify-center text-sm shadow-lg border border-slate-500"
+                                    className="btn-primary-green absolute -top-1 -right-1 w-7 h-7 rounded-full bg-slate-700 text-slate-300 transition-colors flex items-center justify-center text-sm shadow-lg border border-slate-500"
                                     title="Letter Score"
                                   >
                                     +

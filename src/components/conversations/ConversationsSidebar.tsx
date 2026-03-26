@@ -89,7 +89,7 @@ const UserAvatar = ({ name, avatarUrl, size = 48, isOnline }: { name: string; av
         </div>
       )}
       {isOnline && (
-        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-[#131c31]" />
+        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#131c31]" />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, AlertTriangle, Download, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Download, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { ValidationResult } from '../../types/hmsValidator';
 
 interface HMSValidationResultsProps {
@@ -193,7 +193,7 @@ export const HMSValidationResults: React.FC<HMSValidationResultsProps> = ({ resu
         const { standings, dropsAllowed, numRaces } = generateAlfieProResults();
         return (
           <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 px-6 py-4 border-b border-slate-700/50">
+            <div className="from-blue-900/50 to-indigo-900/50 px-6 py-4 border-b border-slate-700/50">
               <h3 className="font-semibold text-white text-lg">Overall Series Standings - HMS vs AlfiePRO</h3>
               <p className="text-sm text-slate-300 mt-1">
                 How these results would appear in AlfiePRO with drop rules applied
