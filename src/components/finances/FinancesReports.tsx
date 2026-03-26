@@ -725,7 +725,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-xl border border-slate-700/50 p-4 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 backdrop-blur-sm">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-sm font-medium text-slate-300 mb-2">Period</label>
@@ -783,7 +783,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Income Card */}
         <button
           onClick={() => openDetailedReport('income', 'Income Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-emerald-500/20 p-6 hover:border-emerald-500/40 transition-all duration-300 hover:shadow-xl cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -816,7 +816,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Total Expenses Card */}
         <button
           onClick={() => openDetailedReport('expenses', 'Expenses Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-red-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-red-500/20 p-6 hover:border-red-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -849,7 +849,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         {/* Net Cash Flow Card */}
         <button
           onClick={() => openDetailedReport('cash-flow', 'Cash Flow Report')}
-          className="group relative overflow-hidden bg-gradient-to-br from-cyan-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105"
+          className="group relative overflow-hidden bg-slate-800/40 rounded-2xl border border-cyan-500/20 p-6 hover:border-cyan-500/40 transition-all duration-300 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer text-left w-full hover:scale-105"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-500"></div>
           <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -885,8 +885,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         <div
           className={`group relative overflow-hidden rounded-2xl border p-6 text-left w-full ${
             bankPosition.currentBalance >= 0
-              ? 'bg-gradient-to-br from-blue-500/10 via-slate-800/50 to-slate-800/30 border-blue-500/20'
-              : 'bg-gradient-to-br from-red-500/10 via-slate-800/50 to-slate-800/30 border-red-500/20'
+              ? 'bg-slate-800/40 border-blue-500/20'
+              : 'bg-slate-800/40 border-red-500/20'
           }`}
         >
           <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-16 -mt-16 ${
@@ -923,7 +923,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Income vs Expenses Trend */}
-        <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -939,7 +939,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Net Cash Flow Chart */}
-        <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -955,7 +955,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Income Breakdown */}
-        <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/30 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/40 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -975,7 +975,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Expenses Breakdown */}
-        <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/30 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/40 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -998,7 +998,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
       {/* Financial Health Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Cash Runway */}
-        <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-amber-500/10 rounded-xl">
               <DollarSign className="text-amber-400" size={24} />
@@ -1015,7 +1015,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Year to Date Summary */}
-        <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-blue-500/10 rounded-xl">
               <CreditCard className="text-blue-400" size={24} />
