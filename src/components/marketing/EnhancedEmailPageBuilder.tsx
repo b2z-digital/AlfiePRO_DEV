@@ -1,8 +1,5 @@
 import { useState, useRef } from 'react';
-import {
-  Plus, GripVertical, Settings, Trash2, Copy, Upload,
-  Type, Image as ImageIcon, Square, Minus, Video, Share2, Menu, Columns, Code, Move, Heading
-} from 'lucide-react';
+import { Plus, GripVertical, Settings, Trash2, Copy, Upload, Type, Image as ImageIcon, Square, Minus, Video, Share2, Menu, Columns2 as Columns, Code, Move, Heading } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -41,9 +38,12 @@ interface EnhancedEmailPageBuilderProps {
   content?: EmailRow[];
   onChange: (content: EmailRow[]) => void;
   darkMode?: boolean;
+  outerTab?: 'design' | 'recipients' | 'settings';
+  recipientsPanel?: React.ReactNode;
+  settingsPanel?: React.ReactNode;
 }
 
-export default function EnhancedEmailPageBuilder({ content = [], onChange, darkMode = false }: EnhancedEmailPageBuilderProps) {
+export default function EnhancedEmailPageBuilder({ content = [], onChange, darkMode = false, outerTab = 'design', recipientsPanel, settingsPanel }: EnhancedEmailPageBuilderProps) {
   const { currentClub } = useAuth();
   const [rows, setRows] = useState<EmailRow[]>(content);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
@@ -613,6 +613,12 @@ export default function EnhancedEmailPageBuilder({ content = [], onChange, darkM
           darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
         }`}>
           <div className="p-4">
+            {outerTab === 'recipients' && recipientsPanel ? (
+              <div>{recipientsPanel}</div>
+            ) : outerTab === 'settings' && settingsPanel ? (
+              <div>{settingsPanel}</div>
+            ) : (
+              <>
             {/* Tabs */}
             <div className="flex gap-1 mb-4">
               <button
@@ -740,6 +746,8 @@ export default function EnhancedEmailPageBuilder({ content = [], onChange, darkM
                   />
                 )}
               </div>
+            )}
+              </>
             )}
           </div>
         </div>
@@ -967,12 +975,18 @@ function RowSettings({ row, onUpdate, onBack, darkMode }: any) {
         <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
           Background Color
         </label>
-        <input
-          type="color"
-          value={row.backgroundColor}
-          onChange={(e) => onUpdate({ backgroundColor: e.target.value })}
-          className="w-full h-10 rounded-lg"
-        />
+        <div className="flex items-center gap-2">
+          <label className="relative cursor-pointer">
+            <input
+              type="color"
+              value={row.backgroundColor}
+              onChange={(e) => onUpdate({ backgroundColor: e.target.value })}
+              className="absolute inset-0 w-0 h-0 opacity-0"
+            />
+            <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: row.backgroundColor }} />
+          </label>
+          <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{row.backgroundColor}</span>
+        </div>
       </div>
 
       <div>
@@ -1158,12 +1172,18 @@ function BlockSettings({ block, rowId, onUpdate, onBack, onImageUpload, uploadin
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   Color
                 </label>
-                <input
-                  type="color"
-                  value={block.config.color}
-                  onChange={(e) => onUpdate({ color: e.target.value })}
-                  className="w-full h-10 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="color"
+                      value={block.config.color}
+                      onChange={(e) => onUpdate({ color: e.target.value })}
+                      className="absolute inset-0 w-0 h-0 opacity-0"
+                    />
+                    <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.color }} />
+                  </label>
+                  <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.color}</span>
+                </div>
               </div>
             </div>
             <div>
@@ -1269,12 +1289,18 @@ function BlockSettings({ block, rowId, onUpdate, onBack, onImageUpload, uploadin
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   Color
                 </label>
-                <input
-                  type="color"
-                  value={block.config.color}
-                  onChange={(e) => onUpdate({ color: e.target.value })}
-                  className="w-full h-10 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="color"
+                      value={block.config.color}
+                      onChange={(e) => onUpdate({ color: e.target.value })}
+                      className="absolute inset-0 w-0 h-0 opacity-0"
+                    />
+                    <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.color }} />
+                  </label>
+                  <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.color}</span>
+                </div>
               </div>
             </div>
             <div>
@@ -1423,23 +1449,35 @@ function BlockSettings({ block, rowId, onUpdate, onBack, onImageUpload, uploadin
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   Background
                 </label>
-                <input
-                  type="color"
-                  value={block.config.backgroundColor}
-                  onChange={(e) => onUpdate({ backgroundColor: e.target.value })}
-                  className="w-full h-10 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="color"
+                      value={block.config.backgroundColor}
+                      onChange={(e) => onUpdate({ backgroundColor: e.target.value })}
+                      className="absolute inset-0 w-0 h-0 opacity-0"
+                    />
+                    <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.backgroundColor }} />
+                  </label>
+                  <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.backgroundColor}</span>
+                </div>
               </div>
               <div>
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   Text Color
                 </label>
-                <input
-                  type="color"
-                  value={block.config.textColor}
-                  onChange={(e) => onUpdate({ textColor: e.target.value })}
-                  className="w-full h-10 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="color"
+                      value={block.config.textColor}
+                      onChange={(e) => onUpdate({ textColor: e.target.value })}
+                      className="absolute inset-0 w-0 h-0 opacity-0"
+                    />
+                    <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.textColor }} />
+                  </label>
+                  <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.textColor}</span>
+                </div>
               </div>
             </div>
             <div>
@@ -1481,12 +1519,18 @@ function BlockSettings({ block, rowId, onUpdate, onBack, onImageUpload, uploadin
               <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                 Color
               </label>
-              <input
-                type="color"
-                value={block.config.color}
-                onChange={(e) => onUpdate({ color: e.target.value })}
-                className="w-full h-10 rounded-lg"
-              />
+              <div className="flex items-center gap-2">
+                <label className="relative cursor-pointer">
+                  <input
+                    type="color"
+                    value={block.config.color}
+                    onChange={(e) => onUpdate({ color: e.target.value })}
+                    className="absolute inset-0 w-0 h-0 opacity-0"
+                  />
+                  <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.color }} />
+                </label>
+                <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.color}</span>
+              </div>
             </div>
             <div>
               <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
@@ -1581,23 +1625,35 @@ function BlockSettings({ block, rowId, onUpdate, onBack, onImageUpload, uploadin
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   Icon Background
                 </label>
-                <input
-                  type="color"
-                  value={block.config.iconBackgroundColor}
-                  onChange={(e) => onUpdate({ iconBackgroundColor: e.target.value })}
-                  className="w-full h-10 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="color"
+                      value={block.config.iconBackgroundColor}
+                      onChange={(e) => onUpdate({ iconBackgroundColor: e.target.value })}
+                      className="absolute inset-0 w-0 h-0 opacity-0"
+                    />
+                    <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.iconBackgroundColor }} />
+                  </label>
+                  <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.iconBackgroundColor}</span>
+                </div>
               </div>
               <div>
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                   Icon Color
                 </label>
-                <input
-                  type="color"
-                  value={block.config.iconColor}
-                  onChange={(e) => onUpdate({ iconColor: e.target.value })}
-                  className="w-full h-10 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <label className="relative cursor-pointer">
+                    <input
+                      type="color"
+                      value={block.config.iconColor}
+                      onChange={(e) => onUpdate({ iconColor: e.target.value })}
+                      className="absolute inset-0 w-0 h-0 opacity-0"
+                    />
+                    <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.iconColor }} />
+                  </label>
+                  <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.iconColor}</span>
+                </div>
               </div>
             </div>
           </>
@@ -1643,12 +1699,18 @@ function BlockSettings({ block, rowId, onUpdate, onBack, onImageUpload, uploadin
               <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
                 Link Color
               </label>
-              <input
-                type="color"
-                value={block.config.linkColor}
-                onChange={(e) => onUpdate({ linkColor: e.target.value })}
-                className="w-full h-10 rounded-lg"
-              />
+              <div className="flex items-center gap-2">
+                <label className="relative cursor-pointer">
+                  <input
+                    type="color"
+                    value={block.config.linkColor}
+                    onChange={(e) => onUpdate({ linkColor: e.target.value })}
+                    className="absolute inset-0 w-0 h-0 opacity-0"
+                  />
+                  <div className={`w-8 h-8 rounded-full border-2 shadow-sm ${darkMode ? 'border-slate-500' : 'border-gray-300'}`} style={{ backgroundColor: block.config.linkColor }} />
+                </label>
+                <span className={`text-xs font-mono ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>{block.config.linkColor}</span>
+              </div>
             </div>
           </div>
         );
@@ -1702,32 +1764,55 @@ function GlobalSettingsPanel({ settings, onUpdate, darkMode }: any) {
         Global Settings
       </h3>
 
-      <div>
-        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-          Page Background Color
-        </label>
-        <input
-          type="color"
-          value={settings.pageBackgroundColor}
-          onChange={(e) => onUpdate({ ...settings, pageBackgroundColor: e.target.value })}
-          className="w-full h-10 rounded-lg"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+            Page Background
+          </label>
+          <div className="flex items-center gap-2">
+            <label className="relative cursor-pointer">
+              <input
+                type="color"
+                value={settings.pageBackgroundColor}
+                onChange={(e) => onUpdate({ ...settings, pageBackgroundColor: e.target.value })}
+                className="absolute inset-0 w-0 h-0 opacity-0"
+              />
+              <div
+                className={`w-8 h-8 rounded-full border-2 shadow-sm transition-transform hover:scale-110 ${darkMode ? 'border-slate-500' : 'border-gray-300'}`}
+                style={{ backgroundColor: settings.pageBackgroundColor }}
+              />
+            </label>
+            <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+              {settings.pageBackgroundColor}
+            </span>
+          </div>
+        </div>
+        <div>
+          <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+            Content Background
+          </label>
+          <div className="flex items-center gap-2">
+            <label className="relative cursor-pointer">
+              <input
+                type="color"
+                value={settings.contentBackgroundColor}
+                onChange={(e) => onUpdate({ ...settings, contentBackgroundColor: e.target.value })}
+                className="absolute inset-0 w-0 h-0 opacity-0"
+              />
+              <div
+                className={`w-8 h-8 rounded-full border-2 shadow-sm transition-transform hover:scale-110 ${darkMode ? 'border-slate-500' : 'border-gray-300'}`}
+                style={{ backgroundColor: settings.contentBackgroundColor }}
+              />
+            </label>
+            <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+              {settings.contentBackgroundColor}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div>
-        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
-          Content Background Color
-        </label>
-        <input
-          type="color"
-          value={settings.contentBackgroundColor}
-          onChange={(e) => onUpdate({ ...settings, contentBackgroundColor: e.target.value })}
-          className="w-full h-10 rounded-lg"
-        />
-      </div>
-
-      <div>
-        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+        <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
           Content Width
         </label>
         <input
@@ -1744,7 +1829,7 @@ function GlobalSettingsPanel({ settings, onUpdate, darkMode }: any) {
       </div>
 
       <div>
-        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+        <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
           Content Padding
         </label>
         <input
@@ -1761,7 +1846,7 @@ function GlobalSettingsPanel({ settings, onUpdate, darkMode }: any) {
       </div>
 
       <div>
-        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
+        <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-gray-700'}`}>
           Font Family
         </label>
         <select
