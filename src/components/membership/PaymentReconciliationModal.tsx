@@ -81,15 +81,25 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
         .eq('club_id', clubId)
         .eq('status', 'approved');
 
+      const { data: membershipTypes } = await supabase
+        .from('membership_types')
+        .select('name, amount')
+        .eq('club_id', clubId);
+
       const membersWithData = members.map(member => {
         const profile = profiles.find(p => p.id === member.user_id);
         const application = applications?.find(a => a.user_id === member.user_id);
+        const feeType = membershipTypes?.find(t => t.name === member.membership_level);
+
+        const membershipAmount = application?.membership_amount
+          || member.amount_paid
+          || (feeType ? Number(feeType.amount) : undefined);
 
         return {
           ...member,
           avatar_url: profile?.avatar_url,
           application_data: {
-            membership_amount: application?.membership_amount,
+            membership_amount: membershipAmount,
             payment_method: application?.payment_method,
           },
         };

@@ -252,7 +252,7 @@ async function createTransactionForImportedMember(
   try {
     const { data: member, error: memberError } = await supabase
       .from('members')
-      .select('id, club_id, first_name, last_name, membership_level, application_data')
+      .select('id, club_id, first_name, last_name, membership_level, amount_paid, user_id')
       .eq('id', memberId)
       .maybeSingle();
 
@@ -262,8 +262,38 @@ async function createTransactionForImportedMember(
 
     const memberName = `${member.first_name} ${member.last_name}`;
     const membershipType = member.membership_level || 'Membership';
-    const amount = member.application_data?.membership_amount || 0;
     const transactionDate = paymentDate || new Date().toISOString().split('T')[0];
+
+    let amount = member.amount_paid || 0;
+
+    if (!amount && member.membership_level && member.club_id) {
+      const { data: membershipTypeData } = await supabase
+        .from('membership_types')
+        .select('amount')
+        .eq('club_id', member.club_id)
+        .eq('name', member.membership_level)
+        .maybeSingle();
+
+      if (membershipTypeData?.amount) {
+        amount = Number(membershipTypeData.amount);
+      }
+    }
+
+    if (!amount && member.user_id) {
+      const { data: application } = await supabase
+        .from('membership_applications')
+        .select('membership_amount')
+        .eq('club_id', member.club_id)
+        .eq('user_id', member.user_id)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (application?.membership_amount) {
+        amount = Number(application.membership_amount);
+      }
+    }
 
     const config = await getClubFinanceConfig(member.club_id);
 
