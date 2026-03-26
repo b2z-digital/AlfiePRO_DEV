@@ -36,8 +36,8 @@ interface SettingsPageProps {
 }
 
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
-  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-opening-balance' |
-  'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
+  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' |
+  'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
@@ -955,12 +955,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <CreditCard size={20} className="text-amber-400" />
+                      <Landmark size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Bank Details</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                         Set bank name, BSB, and account number for payments
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Payment Settings Card */}
+                <button
+                  onClick={() => setActiveTab('finance-payment-settings')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'finance-payment-settings'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
+                      <CreditCard size={20} className="text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Settings</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Configure Stripe and membership payment integration
                       </p>
                     </div>
                   </div>
@@ -1125,36 +1150,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Code of Conduct</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                         Define club rules and conduct policies
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Payment Settings Card */}
-                <button
-                  onClick={() => setActiveTab('membership-payment')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'membership-payment'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`
-                      p-3 rounded-lg transition-colors
-                      ${activeTab === 'membership-payment'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-slate-700 text-slate-400 group-hover:bg-slate-600'}
-                    `}>
-                      <CreditCard size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Information</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure payment details for invoices
                       </p>
                     </div>
                   </div>
@@ -1788,6 +1783,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-payment' && (
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+          )}
+
+          {activeTab === 'finance-payment-settings' && (
             <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
@@ -1809,10 +1808,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
 
           {activeTab === 'membership-conduct' && (
             <MembershipSettingsPage darkMode={darkMode} initialView="conduct" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
-          )}
-
-          {activeTab === 'membership-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
           )}
 
           {activeTab === 'race-documents' && (
