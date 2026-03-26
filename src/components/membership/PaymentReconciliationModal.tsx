@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, DollarSign, CircleCheck as CheckCircle, Clock, Calendar, User, ListFilter as Filter, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Search, DollarSign, CircleCheck as CheckCircle, Clock, Calendar, User, ListFilter as Filter, Download, ChevronDown, History } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Avatar } from '../ui/Avatar';
@@ -44,6 +44,18 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'pending' | 'financial'>('pending');
   const [processing, setProcessing] = useState(false);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdownId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -187,6 +199,73 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
     }
   };
 
+  const handleMarkAsFinancialOnly = async (memberId: string) => {
+    try {
+      setProcessing(true);
+      setOpenDropdownId(null);
+
+      const today = new Date();
+      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+
+      const { error } = await supabase
+        .from('members')
+        .update({
+          is_financial: true,
+          payment_status: 'paid',
+          payment_confirmed_at: new Date().toISOString(),
+          renewal_date: renewalDate.toISOString().split('T')[0],
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      addNotification('success', 'Marked as previously paid (no finance record created)');
+      await fetchAllMembers();
+      setSelectedMembers(new Set());
+      onUpdate?.();
+    } catch (error: any) {
+      console.error('Error updating payment status:', error);
+      addNotification('error', 'Failed to update payment status');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleBulkMarkAsFinancialOnly = async () => {
+    if (selectedMembers.size === 0) return;
+
+    try {
+      setProcessing(true);
+
+      const today = new Date();
+      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+
+      const { error } = await supabase
+        .from('members')
+        .update({
+          is_financial: true,
+          payment_status: 'paid',
+          payment_confirmed_at: new Date().toISOString(),
+          renewal_date: renewalDate.toISOString().split('T')[0],
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', Array.from(selectedMembers));
+
+      if (error) throw error;
+
+      addNotification('success', `${selectedMembers.size} member(s) marked as previously paid`);
+      await fetchAllMembers();
+      setSelectedMembers(new Set());
+      onUpdate?.();
+    } catch (error: any) {
+      console.error('Error updating payments:', error);
+      addNotification('error', 'Failed to update payments');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const toggleMemberSelection = (memberId: string) => {
     const newSelection = new Set(selectedMembers);
     if (newSelection.has(memberId)) {
@@ -313,11 +392,21 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                   Deselect All
                 </button>
                 <button
+                  onClick={handleBulkMarkAsFinancialOnly}
+                  disabled={processing}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5 ${
+                    darkMode ? 'bg-slate-600 text-slate-200 hover:bg-slate-500' : 'bg-slate-300 text-slate-800 hover:bg-slate-400'
+                  }`}
+                >
+                  <History size={14} />
+                  Previously Paid
+                </button>
+                <button
                   onClick={handleBulkMarkAsPaid}
                   disabled={processing}
                   className="btn-primary-green px-3 py-1.5 text-white rounded text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  Mark All as Paid
+                  Confirm Payment
                 </button>
               </div>
             </div>
@@ -416,17 +505,57 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleMarkAsPaid(member.id, member.payment_status === 'paid')}
-                      disabled={processing}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                        member.payment_status === 'paid'
-                          ? darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                          : 'bg-green-500 text-white hover:bg-green-600'
-                      }`}
-                    >
-                      {member.payment_status === 'paid' ? 'Mark Unpaid' : 'Confirm Payment'}
-                    </button>
+                    {member.payment_status === 'paid' ? (
+                      <button
+                        onClick={() => handleMarkAsPaid(member.id, true)}
+                        disabled={processing}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                          darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                      >
+                        Mark Unpaid
+                      </button>
+                    ) : (
+                      <div className="relative" ref={openDropdownId === member.id ? dropdownRef : undefined}>
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => handleMarkAsPaid(member.id, false)}
+                            disabled={processing}
+                            className="px-4 py-2 rounded-l-lg font-medium transition-colors disabled:opacity-50 bg-green-500 text-white hover:bg-green-600"
+                          >
+                            Confirm Payment
+                          </button>
+                          <button
+                            onClick={() => setOpenDropdownId(openDropdownId === member.id ? null : member.id)}
+                            disabled={processing}
+                            className="px-2 py-2 rounded-r-lg font-medium transition-colors disabled:opacity-50 bg-green-600 text-white hover:bg-green-700 border-l border-green-400/30"
+                          >
+                            <ChevronDown size={16} />
+                          </button>
+                        </div>
+                        {openDropdownId === member.id && (
+                          <div className={`absolute right-0 top-full mt-1 w-52 rounded-lg shadow-xl z-20 border overflow-hidden ${
+                            darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'
+                          }`}>
+                            <button
+                              onClick={() => handleMarkAsFinancialOnly(member.id)}
+                              disabled={processing}
+                              className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center gap-2.5 ${
+                                darkMode ? 'hover:bg-slate-600 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <History size={15} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                              <div>
+                                <div className="font-medium">Previously Paid</div>
+                                <div className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  No finance record created
+                                </div>
+                              </div>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
