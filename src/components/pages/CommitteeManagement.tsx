@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Users, UserPlus, Shield, Trash2, Edit2, GripVertical, Plus,
-  Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown,
-  Globe, LayoutGrid, Check
-} from 'lucide-react';
+import { Users, UserPlus, Shield, Trash2, CreditCard as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -479,7 +475,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-700">
+      <div className="flex items-center gap-2 border-b border-slate-700">
         <button
           onClick={() => setActiveTab('assignments')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -521,6 +517,18 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
               <LayoutGrid size={16} />
               Manage Access Levels
             </div>
+          </button>
+        )}
+        {activeTab === 'positions' && canManage && !showPositionForm && (
+          <button
+            onClick={() => {
+              setEditingPosition(null);
+              setShowPositionForm(true);
+            }}
+            className="ml-auto mb-1 flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-semibold transition-all text-sm"
+          >
+            <Plus size={16} />
+            Add Position
           </button>
         )}
       </div>
@@ -578,19 +586,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
       {activeTab === 'positions' && canManage && (
         <div className="space-y-4">
-          {!showPositionForm && (
-            <button
-              onClick={() => {
-                setEditingPosition(null);
-                setShowPositionForm(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Plus size={16} />
-              Add Position
-            </button>
-          )}
-
           {showPositionForm && (
             <PositionForm
               position={editingPosition}
@@ -1093,7 +1088,7 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
       <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700/50 bg-slate-800/20">
         <button
           type="submit"
-          className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+          className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg font-semibold text-sm transition-all"
         >
           {position ? 'Save Changes' : 'Create Position'}
         </button>
