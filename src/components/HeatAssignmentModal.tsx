@@ -683,8 +683,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 <Eye className="absolute inset-0 m-auto text-blue-400" size={24} />
               </div>
               <div className="text-center">
-                <p className="text-white font-semibold text-lg">Generating Observers</p>
-                <p className="text-slate-300 text-sm mt-1">Allocating fair observer rotation for each heat...</p>
+                <p className="text-white font-semibold text-lg">Loading Observers</p>
+                <p className="text-slate-300 text-sm mt-1">Fetching observer assignments for each heat...</p>
               </div>
             </div>
           </div>

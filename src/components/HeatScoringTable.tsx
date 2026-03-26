@@ -100,15 +100,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return `Round ${roundNum}`;
   };
 
-  // Get all available heats for current round, sorted in reverse order (F -> A)
-  // This ensures the last element is the lowest heat (e.g., C in a 3-heat setup)
+  const isInQualifyingRound = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound <= shrsQualifyingRounds;
+
   const availableHeats = useMemo(() => {
     if (!currentRound) return [];
-    return currentRound.heatAssignments
+    const heats = currentRound.heatAssignments
       .map(assignment => assignment.heatDesignation)
-      .sort()
-      .reverse();
-  }, [currentRound]);
+      .sort();
+    if (isInQualifyingRound) {
+      return heats;
+    }
+    return heats.reverse();
+  }, [currentRound, isInQualifyingRound]);
 
   // Start with the LOWEST heat (last in the list) by default
   // Initialize to null and let useEffect set the correct heat
@@ -175,8 +178,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     }
   }, [heatManagement.lastPromotionInfo]);
 
-  // When round NUMBER changes (not just object reference), reset to lowest incomplete heat
-  // availableHeats is ['D', 'C', 'B', 'A'] - D is the FIRST and LOWEST heat
+  // When round NUMBER changes (not just object reference), reset to first incomplete heat
   // Also re-check when results change (e.g., when returning from modal after heats completed)
   React.useEffect(() => {
     const currentRoundNumber = heatManagement.currentRound;
@@ -929,20 +931,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                   const isComplete = isHeatComplete(heat);
                   const isSelected = heat === selectedHeat;
 
-                  // Determine if this heat can be scored
-                  // Only allow scoring heats in order (lowest to highest)
-                  // availableHeats is already sorted: [F, E, D, C, B, A] or similar
                   let canScore = false;
 
                   if (index === 0) {
-                    // First heat (lowest) can always be scored if not complete
                     canScore = !isComplete;
                   } else {
-                    // Higher heats can only be scored if all lower heats are complete
-                    const allLowerHeatsComplete = availableHeats
+                    const allPriorHeatsComplete = availableHeats
                       .slice(0, index)
                       .every(lowerHeat => isHeatComplete(lowerHeat));
-                    canScore = allLowerHeatsComplete && !isComplete;
+                    canScore = allPriorHeatsComplete && !isComplete;
                   }
 
                   // Always allow viewing completed heats
