@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, X, Tag, Plus, Calendar, AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, AlignLeft, BookOpen, Users, Globe, Building2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Tag, Plus, Calendar, TriangleAlert as AlertTriangle, Check, Upload, Eye, FileText, Image as ImageIcon, Settings, Sparkles, Type, ChevronLeft as AlignLeft, BookOpen, Users, Globe, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { WysiwygEditor } from '../components/ui/WysiwygEditor';
 import { getArticleById, createArticle, updateArticle, Article } from '../utils/articleStorage';

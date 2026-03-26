@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, Mail, Phone, Calendar, DollarSign, Check, X, Eye, Edit, Trash2, Download, Send, AlertTriangle, CheckCircle, Clock, CreditCard, ChevronDown } from 'lucide-react';
+import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Calendar, DollarSign, Check, X, Eye, CreditCard as Edit, Trash2, Download, Send, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Clock, CreditCard, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { MembershipFormModal } from './MembershipFormModal';

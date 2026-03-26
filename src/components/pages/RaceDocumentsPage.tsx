@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Edit2, Trash2, Search, FormInput, Eye, Copy, X, ChevronDown, File, Globe, Settings } from 'lucide-react';
+import { FileText, Plus, CreditCard as Edit2, Trash2, Search, FolderInput as FormInput, Eye, Copy, X, ChevronDown, File, Globe, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';

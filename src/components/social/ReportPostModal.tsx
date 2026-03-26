@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Flag, AlertTriangle, Ban, MessageSquare, HelpCircle, ShieldAlert, Check } from 'lucide-react';
+import { X, Flag, TriangleAlert as AlertTriangle, Ban, MessageSquare, Circle as HelpCircle, ShieldAlert, Check } from 'lucide-react';
 import { socialStorage } from '../../utils/socialStorage';
 
 const REPORT_REASONS = [

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Menu, X, Calendar, Clock, MapPin, Trophy, Filter, ChevronDown, Users, Award, List, Grid, CalendarDays, CalendarRange, Link2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
+import { Menu, X, Calendar, Clock, MapPin, Trophy, ListFilter as Filter, ChevronDown, Users, Award, List, Grid2x2 as Grid, CalendarDays, CalendarRange, Link2, ChevronLeft, ChevronRight, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Club } from '../../types/club';
 import { formatDate } from '../../utils/date';

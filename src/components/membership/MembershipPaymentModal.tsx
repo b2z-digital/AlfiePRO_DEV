@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, CreditCard, DollarSign, Calendar, User, AlertTriangle, Check } from 'lucide-react';
+import { X, CreditCard, DollarSign, Calendar, User, TriangleAlert as AlertTriangle, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Eye, Trash2, Home, Globe, GripVertical, FileText, CheckCircle2, Clock, MoreVertical } from 'lucide-react';
+import { Plus, CreditCard as Edit, Eye, Trash2, Hop as Home, Globe, GripVertical, FileText, CircleCheck as CheckCircle2, Clock, MoveVertical as MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { OrganizationType, OrganizationPageLayout } from '../../types/organizationWidgets';
 import {

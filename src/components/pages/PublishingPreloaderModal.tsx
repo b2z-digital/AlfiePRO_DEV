@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, CheckCircle, Loader2, AlertCircle, Shield, Server, Clock } from 'lucide-react';
+import { Globe, CircleCheck as CheckCircle, Loader as Loader2, CircleAlert as AlertCircle, Shield, Server, Clock } from 'lucide-react';
 
 interface PublishingPreloaderModalProps {
   isOpen: boolean;

@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  DollarSign, Plus, Edit2, Check,
-  X, Clock, AlertCircle, CheckCircle, Receipt, Coins,
-  Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe2, Target,
-  Mail, Send, Loader2, MailCheck
-} from 'lucide-react';
+import { DollarSign, Plus, CreditCard as Edit2, Check, X, Clock, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Receipt, Coins, Calendar, RefreshCw, ChevronDown, ChevronUp, Users, Building2, Globe as Globe2, Target, Mail, Send, Loader as Loader2, MailCheck } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { supabase } from '../../utils/supabase';

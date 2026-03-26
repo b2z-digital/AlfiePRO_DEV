@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  DollarSign, Users, CheckCircle, Sparkles, ArrowRight,
-  Plus, LogOut, Calendar, Building2, AlertCircle, Zap, Check,
-  ChevronDown, ChevronRight, TrendingUp, Edit, Trash2
-} from 'lucide-react';
+import { DollarSign, Users, CircleCheck as CheckCircle, Sparkles, ArrowRight, Plus, LogOut, Calendar, Building2, CircleAlert as AlertCircle, Zap, Check, ChevronDown, ChevronRight, TrendingUp, CreditCard as Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface Payment {

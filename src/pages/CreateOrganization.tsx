@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building, Users, Globe, Upload, ArrowRight, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Building, Users, Globe, Upload, ArrowRight, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';

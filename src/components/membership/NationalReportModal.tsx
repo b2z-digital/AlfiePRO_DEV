@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Download, Mail, Users, FileText, Clock, CheckCircle, AlertTriangle, Building2, Calendar, ChevronRight, Loader2, Settings2 } from 'lucide-react';
+import { X, Send, Download, Mail, Users, FileText, Clock, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Building2, Calendar, ChevronRight, Loader as Loader2, Settings2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface MemberForReport {

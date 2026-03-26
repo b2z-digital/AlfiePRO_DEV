@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, AlertTriangle } from 'lucide-react';
+import { X, Save, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { MemberFilterConfig } from '../../types/memberFilters';
 

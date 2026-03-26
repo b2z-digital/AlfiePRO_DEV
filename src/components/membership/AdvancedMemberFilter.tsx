@@ -697,7 +697,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
             </button>
             <button
               onClick={handleApply}
-              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 font-medium transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all"
             >
               <Filter size={18} />
               Apply Filters

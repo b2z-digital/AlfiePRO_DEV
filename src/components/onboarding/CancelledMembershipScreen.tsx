@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, RefreshCw, LogOut, ArrowRight, Building2 } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, RefreshCw, LogOut, ArrowRight, Building2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface CancelledMembership {

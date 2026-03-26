@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Pencil, Trash2, Globe, Lock, Eye, Users, Shield, AlertTriangle, Ban, ChevronLeft, UserMinus, UserPlus } from 'lucide-react';
+import { X, Plus, Pencil, Trash2, Globe, Lock, Eye, Users, Shield, TriangleAlert as AlertTriangle, Ban, ChevronLeft, UserMinus, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { socialStorage, SocialGroup } from '../../utils/socialStorage';
 import { useNotification } from '../../contexts/NotificationContext';

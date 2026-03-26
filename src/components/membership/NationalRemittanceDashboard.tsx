@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, TrendingUp, CheckCircle, Download, RefreshCw, BarChart3, DollarSign, Check, X, CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
+import { Globe, TrendingUp, CircleCheck as CheckCircle, Download, RefreshCw, ChartBar as BarChart3, DollarSign, Check, X, SquareCheck as CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import {

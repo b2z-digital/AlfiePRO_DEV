@@ -1,24 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import { 
-  Users, 
-  TrendingUp, 
-  Calendar, 
-  Settings, 
-  FileText, 
-  Filter, 
-  BarChart2, 
-  PieChart, 
-  Activity, 
-  UserCheck,
-  Globe,
-  CreditCard,
-  Mail,
-  Check,
-  AlertTriangle,
-  ClipboardList,
-  Shield
-} from 'lucide-react';
+import { Users, TrendingUp, Calendar, Settings, FileText, ListFilter as Filter, ChartBar as BarChart2, ChartPie as PieChart, Activity, UserCheck, Globe, CreditCard, Mail, Check, TriangleAlert as AlertTriangle, ClipboardList, Shield } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, Edit2, Trash2, Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
+import { Search, ListFilter as Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, CreditCard as Edit2, Trash2, Grid2x2 as Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassifieds, getUserClassifieds, getUserFavorites, toggleClassifiedFavorite, deleteClassified } from '../utils/classifiedStorage';
 import type { Classified } from '../types/classified';

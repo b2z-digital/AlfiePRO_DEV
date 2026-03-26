@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Plus, Trash2, DollarSign, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Users, Plus, Trash2, DollarSign, Calendar, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle } from 'lucide-react';
 import { StepProps, MembershipTypeEntry } from './types';
 import { v4 as uuidv4 } from 'uuid';
 

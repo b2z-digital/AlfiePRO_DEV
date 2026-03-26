@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Check, Loader2, Building2, Mail, MapPin, Sailboat, DollarSign, CreditCard } from 'lucide-react';
+import { ArrowLeft, Check, Loader as Loader2, Building2, Mail, MapPin, Sailboat, DollarSign, CreditCard } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 import type { ClubSetupData } from '../ClubSetupWizard';
 import { BoatClass } from '../../../types/boatClass';

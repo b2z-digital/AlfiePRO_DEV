@@ -1,28 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  CreditCard,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Mail,
-  Phone,
-  MapPin,
-  FileText,
-  Download,
-  Edit2,
-  X,
-  Sailboat,
-  Shield,
-  Clock,
-  ChevronRight,
-  User,
-  Anchor,
-  Heart,
-  Users,
-  TrendingUp,
-  Award,
-  Activity
-} from 'lucide-react';
+import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, CreditCard as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';

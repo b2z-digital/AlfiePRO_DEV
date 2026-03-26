@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MoreHorizontal, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Send, MoveHorizontal as MoreHorizontal, Pencil, Trash2, X, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { socialStorage, SocialComment } from '../../utils/socialStorage';

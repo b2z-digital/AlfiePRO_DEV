@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Edit2, Trash2, Check, Settings, Save, BookmarkPlus } from 'lucide-react';
+import { X, CreditCard as Edit2, Trash2, Check, Settings, Save, BookmarkPlus } from 'lucide-react';
 import { FilterPreset } from '../../types/memberFilters';
 import { supabase } from '../../utils/supabase';
 

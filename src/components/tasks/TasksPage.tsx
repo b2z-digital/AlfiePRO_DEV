@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, SortAsc, CheckSquare, X, Filter, ChevronLeft } from 'lucide-react';
+import { Plus, Search, Import as SortAsc, SquareCheck as CheckSquare, X, ListFilter as Filter, ChevronLeft } from 'lucide-react';
 import { TaskForm } from './TaskForm';
 import { TaskDetails } from './TaskDetails';
 import { TaskCategorySidebar } from './TaskCategorySidebar';

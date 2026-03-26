@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowRight, ArrowLeft, Upload, Loader2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Upload, Loader as Loader2 } from 'lucide-react';
 import { loadGoogleMaps } from '../../../utils/googleMaps';
 
 const toTitleCase = (str: string): string => {

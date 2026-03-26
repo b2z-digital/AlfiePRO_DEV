@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Search, CheckCircle, Loader, Users, MonitorPlay } from 'lucide-react';
+import { Search, CircleCheck as CheckCircle, Loader, Users, MonitorPlay } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import {
   getLiveTrackingEventByToken,

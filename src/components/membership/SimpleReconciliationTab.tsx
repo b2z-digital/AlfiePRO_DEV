@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import {
-  DollarSign, Users, CheckCircle, Plus, LogOut, Calendar,
-  Building2, AlertCircle, Check, ChevronDown, ChevronRight, Edit, Trash2
-} from 'lucide-react';
+import { DollarSign, Users, CircleCheck as CheckCircle, Plus, LogOut, Calendar, Building2, CircleAlert as AlertCircle, Check, ChevronDown, ChevronRight, CreditCard as Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Avatar } from '../ui/Avatar';
 

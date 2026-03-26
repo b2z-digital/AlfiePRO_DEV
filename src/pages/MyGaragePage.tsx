@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Wrench, Plus, TrendingUp,
-  Bell, Award, Activity, ChevronRight, Zap,
-  Image as ImageIcon, Anchor, Trophy,
-  Edit2, Trash2
-} from 'lucide-react';
+import { Wrench, Plus, TrendingUp, Bell, Award, Activity, ChevronRight, Zap, Image as ImageIcon, Anchor, Trophy, CreditCard as Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';

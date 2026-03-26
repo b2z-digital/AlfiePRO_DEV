@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Search } from 'lucide-react';
+import { CircleCheck as CheckCircle, Circle as XCircle, TriangleAlert as AlertTriangle, RefreshCw, Search } from 'lucide-react';
 import type { SkipperNameMapping, NationalRanking, FuzzyMatchResult } from '../../types/rankings';
 import type { Member } from '../../types/member';
 import {

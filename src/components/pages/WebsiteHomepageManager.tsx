@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Image as ImageIcon, MoveUp, MoveDown, Eye, EyeOff } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Image as ImageIcon, MoveUp, MoveDown, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';

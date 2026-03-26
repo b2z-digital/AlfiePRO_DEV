@@ -1,22 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Bell,
-  Trophy,
-  TrendingUp,
-  TrendingDown,
-  Sailboat,
-  RefreshCw,
-  LogOut,
-  Target,
-  Award,
-  Activity,
-  BarChart2,
-  List,
-  Home,
-  Layers,
-  Flag,
-} from 'lucide-react';
+import { Bell, Trophy, TrendingUp, TrendingDown, Sailboat, RefreshCw, LogOut, Target, Award, Activity, ChartBar as BarChart2, List, Hop as Home, Layers, Flag } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import {
   getCurrentTrackingSession,

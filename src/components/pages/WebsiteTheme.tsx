@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, Palette, Type, Image, Save, Layout, Check, X, ArrowLeft } from 'lucide-react';
+import { Globe, Palette, Type, Image, Save, LayoutGrid as Layout, Check, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface WebsiteThemeProps {

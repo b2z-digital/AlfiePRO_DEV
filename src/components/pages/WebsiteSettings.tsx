@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Settings, Search, BarChart2, Share2, Save, Check, Image } from 'lucide-react';
+import { Globe, Settings, Search, ChartBar as BarChart2, Share2, Save, Check, Image } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { EnhancedDomainManagementSection } from '../settings/EnhancedDomainManagementSection';

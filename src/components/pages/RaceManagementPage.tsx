@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Plus, Edit2, Trash2, Calendar, MapPin, Search, Filter, ChevronDown, ChevronUp, Grid, List, AlertTriangle, Flag, ArrowUpDown, Users, CheckCircle2, Clock, XCircle, PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, Edit, Send, Radio } from 'lucide-react';
+import { Trophy, Plus, CreditCard as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, CreditCard as Edit, Send, Radio } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { getStoredRaceEvents, getStoredRaceSeries, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';

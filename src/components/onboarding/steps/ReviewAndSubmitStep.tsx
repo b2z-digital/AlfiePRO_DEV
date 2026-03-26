@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Edit2, CheckCircle } from 'lucide-react';
+import { Send, CreditCard as Edit2, CircleCheck as CheckCircle } from 'lucide-react';
 import { OnboardingData } from '../OnboardingWizard';
 import { ApplicationSummaryView } from '../../membership/ApplicationSummaryView';
 

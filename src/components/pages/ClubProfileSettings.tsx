@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Upload, X, Image as ImageIcon, AlertCircle, Check, Plus, Trash2 } from 'lucide-react';
+import { Save, Upload, X, Image as ImageIcon, CircleAlert as AlertCircle, Check, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import imageCompression from 'browser-image-compression';

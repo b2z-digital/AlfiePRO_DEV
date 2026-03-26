@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, Star } from 'lucide-react';
+import { Building2, Plus, Crown, Users, Calendar, CreditCard, CircleAlert as AlertCircle, Star } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';

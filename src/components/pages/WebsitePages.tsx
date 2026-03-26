@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Plus, Edit, Eye, Trash2, FileText, CheckCircle2, Clock, Archive } from 'lucide-react';
+import { Globe, Plus, CreditCard as Edit, Eye, Trash2, FileText, CircleCheck as CheckCircle2, Clock, Archive } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Download, Info } from 'lucide-react';
+import { ArrowLeft, Upload, FileSpreadsheet, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Download, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { HMSFileUploader } from '../components/hms-validator/HMSFileUploader';
 import { HMSDataPreview } from '../components/hms-validator/HMSDataPreview';

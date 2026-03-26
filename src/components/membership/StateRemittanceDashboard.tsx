@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Building2, CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, CheckSquare, Square, Eye, Plus, Receipt, Trash2, AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History, X } from 'lucide-react';
+import { DollarSign, Building2, CircleCheck as CheckCircle, Download, RefreshCw, ArrowRight, TrendingUp, Calendar, Check, LogOut, SquareCheck as CheckSquare, Square, Eye, Plus, Receipt, Trash2, TriangleAlert as AlertTriangle, ChevronDown, ChevronRight, Mail, FileText, Clock, Send, Users, ArrowUpRight, ArrowDownLeft, History, X } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { ConfirmationModal } from '../ConfirmationModal';

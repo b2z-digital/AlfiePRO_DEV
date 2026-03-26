@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Edit, Plus, Eye, ArrowUpRight, Activity, Users, Calendar, BarChart2, Clock, Settings, Palette, FileText, Image, Trophy, TrendingUp, ExternalLink, Zap, Sparkles, Rocket, Layout, Navigation } from 'lucide-react';
+import { Globe, CreditCard as Edit, Plus, Eye, ArrowUpRight, Activity, Users, Calendar, ChartBar as BarChart2, Clock, Settings, Palette, FileText, Image, Trophy, TrendingUp, ExternalLink, Zap, Sparkles, Rocket, LayoutGrid as Layout, Navigation } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNavigate } from 'react-router-dom';

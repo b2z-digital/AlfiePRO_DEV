@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Download, Upload, AlertCircle, CheckCircle, Clock, MapPin, Link2 } from 'lucide-react';
+import { RefreshCw, Download, Upload, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, MapPin, Link2 } from 'lucide-react';
 import type { NationalRanking, RankingSyncLog, RankingURLConfig } from '../../types/rankings';
 import {
   getAllRankings,

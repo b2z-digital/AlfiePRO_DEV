@@ -1,11 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Database, Cloud, DollarSign, HardDrive, Server, TrendingUp,
-  RefreshCw, Plus, Calendar, Building,
-  Globe2, AlertTriangle, CheckCircle, Zap, BarChart3,
-  Save, Archive, FolderOpen, Loader2, CloudOff, Bot, MessageSquare,
-  Activity, Users, Cpu
-} from 'lucide-react';
+import { Database, Cloud, DollarSign, HardDrive, Server, TrendingUp, RefreshCw, Plus, Calendar, Building, Globe as Globe2, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, Zap, ChartBar as BarChart3, Save, Archive, FolderOpen, Loader as Loader2, CloudOff, Bot, MessageSquare, Activity, Users, Cpu } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import { supabase } from '../../utils/supabase';

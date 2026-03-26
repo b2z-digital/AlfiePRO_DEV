@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, X, FileJson, Info, Building2 } from 'lucide-react';
+import { Download, Upload, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle, X, File as FileJson, Info, Building2 } from 'lucide-react';
 import { exportClubBackup, downloadBackup, importClubBackup, validateBackupFile, ClubBackupData } from '../../utils/backupRestore';
 import { useAuth } from '../../contexts/AuthContext';
 import { ClubSwitcher } from '../ClubSwitcher';
