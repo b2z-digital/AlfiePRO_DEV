@@ -1760,11 +1760,91 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                 <ChevronLeft className="w-5 h-5 mr-2" />
                 Back to all channels
               </button>
-              <h1 className="text-4xl font-bold text-white mb-4">
-                {channels.find(c => c.id === selectedChannelId)?.channel_name}
-              </h1>
+              {(() => {
+                const selectedChannel = channels.find(c => c.id === selectedChannelId);
+                const channelPlaylists = playlists
+                  .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+                  .sort((a, b) => {
+                    if (a.is_featured && !b.is_featured) return -1;
+                    if (!a.is_featured && b.is_featured) return 1;
+                    return (b.video_count || 0) - (a.video_count || 0);
+                  });
+                return (
+                  <>
+                    <div className="flex items-center gap-4 mb-6">
+                      {selectedChannel?.channel_thumbnail && (
+                        <img
+                          src={selectedChannel.channel_thumbnail}
+                          alt={selectedChannel.channel_name}
+                          className="w-16 h-16 rounded-full ring-2 ring-white/20"
+                        />
+                      )}
+                      <div>
+                        <h1 className="text-4xl font-bold text-white">
+                          {selectedChannel?.channel_name}
+                        </h1>
+                        <p className="text-gray-400 text-sm mt-1">
+                          {channelPlaylists.length} playlist{channelPlaylists.length !== 1 ? 's' : ''}
+                          {selectedChannel?.video_count ? ` / ${selectedChannel.video_count} videos` : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    {channelPlaylists.length > 0 && (
+                      <div className="mb-10">
+                        <h2 className="text-lg font-semibold text-white mb-4">Playlists</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                          {channelPlaylists.map(playlist => {
+                            const videos = playlistVideos[playlist.id] || [];
+                            return (
+                              <div
+                                key={playlist.id}
+                                onClick={() => {
+                                  const firstVideoRow = document.getElementById(`playlist-row-${playlist.id}`);
+                                  if (firstVideoRow) {
+                                    firstVideoRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  }
+                                }}
+                                className="group cursor-pointer"
+                              >
+                                <div className={`relative aspect-video rounded-lg overflow-hidden bg-slate-800 mb-2 transition-all ${
+                                  playlist.is_featured ? 'ring-2 ring-amber-500/50 group-hover:ring-amber-500' : 'ring-1 ring-white/10 group-hover:ring-white/30'
+                                }`}>
+                                  {playlist.thumbnail_url ? (
+                                    <img
+                                      src={playlist.thumbnail_url}
+                                      alt={playlist.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-700 to-slate-900">
+                                      <Play className="w-8 h-8 text-slate-500" />
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                  {playlist.is_featured && (
+                                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold uppercase tracking-wider">
+                                      Featured
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-xs font-medium">
+                                    {playlist.video_count} videos
+                                  </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-white line-clamp-2 group-hover:text-blue-400 transition-colors">
+                                  {playlist.title}
+                                </h3>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
-            {/* Channel Playlists */}
+
             {playlists
               .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
               .sort((a, b) => {
@@ -1776,11 +1856,12 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                 const videos = playlistVideos[playlist.id] || [];
                 if (videos.length === 0) return null;
                 return (
-                  <VideoRow
-                    key={playlist.id}
-                    title={playlist.is_featured ? `${playlist.title}` : playlist.title}
-                    videos={videos}
-                  />
+                  <div key={playlist.id} id={`playlist-row-${playlist.id}`}>
+                    <VideoRow
+                      title={playlist.is_featured ? `${playlist.title}` : playlist.title}
+                      videos={videos}
+                    />
+                  </div>
                 );
               })}
           </div>
@@ -1791,30 +1872,36 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               <p className="text-gray-400">Browse content by channel</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 px-12">
-              {channels.map(channel => (
-                <div
-                  key={channel.id}
-                  onClick={() => setSelectedChannelId(channel.id)}
-                  className="group cursor-pointer"
-                >
-                  <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
-                    {channel.channel_thumbnail ? (
-                      <img
-                        src={channel.channel_thumbnail}
-                        alt={channel.channel_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <Youtube className="w-16 h-16 text-red-600" />
-                      </div>
-                    )}
+              {channels.map(channel => {
+                const channelPlaylistCount = playlists.filter(p => p.channel_id === channel.id).length;
+                return (
+                  <div
+                    key={channel.id}
+                    onClick={() => setSelectedChannelId(channel.id)}
+                    className="group cursor-pointer"
+                  >
+                    <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
+                      {channel.channel_thumbnail ? (
+                        <img
+                          src={channel.channel_thumbnail}
+                          alt={channel.channel_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <Youtube className="w-16 h-16 text-red-600" />
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
+                      {channel.channel_name}
+                    </h3>
+                    <p className="text-gray-500 text-center text-xs mt-1">
+                      {channelPlaylistCount > 0 && `${channelPlaylistCount} playlist${channelPlaylistCount !== 1 ? 's' : ''} / `}{channel.video_count || 0} videos
+                    </p>
                   </div>
-                  <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
-                    {channel.channel_name}
-                  </h3>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Suggest a Channel Button */}
@@ -2200,7 +2287,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                                     />
                                   ) : (
                                     <div className="flex items-center justify-center h-full">
-                                      <ListFilter className="w-10 h-10 text-slate-600" />
+                                      <Filter className="w-10 h-10 text-slate-600" />
                                     </div>
                                   )}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
