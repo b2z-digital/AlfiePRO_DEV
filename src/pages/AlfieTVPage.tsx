@@ -29,6 +29,7 @@ interface YouTubePlaylist {
   is_visible?: boolean;
   view_count?: number;
   display_order?: number;
+  published_at?: string;
   last_synced_at?: string;
 }
 
@@ -985,13 +986,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           is_visible,
           view_count,
           display_order,
+          published_at,
           last_synced_at
         `)
         .in('channel_id', channelsData?.map(c => c.id) || [])
         .eq('is_visible', true)
         .order('is_featured', { ascending: false })
-        .order('display_order', { ascending: false })
-        .order('video_count', { ascending: false });
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
 
       // Initialize playlistVideoMap
       let playlistVideoMap: { [key: string]: AlfieTVVideo[] } = {};
@@ -1819,7 +1821,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                   .sort((a, b) => {
                     if (a.is_featured && !b.is_featured) return -1;
                     if (!a.is_featured && b.is_featured) return 1;
-                    return (b.video_count || 0) - (a.video_count || 0);
+                    const dateA = a.published_at || a.last_synced_at || '';
+                    const dateB = b.published_at || b.last_synced_at || '';
+                    return dateB.localeCompare(dateA);
                   });
                 return (
                   <>
@@ -1902,7 +1906,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               .sort((a, b) => {
                 if (a.is_featured && !b.is_featured) return -1;
                 if (!a.is_featured && b.is_featured) return 1;
-                return (b.video_count || 0) - (a.video_count || 0);
+                const dateA = a.published_at || a.last_synced_at || '';
+                const dateB = b.published_at || b.last_synced_at || '';
+                return dateB.localeCompare(dateA);
               })
               .map(playlist => {
                 const videos = playlistVideos[playlist.id] || [];

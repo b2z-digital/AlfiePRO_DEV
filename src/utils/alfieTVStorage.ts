@@ -84,6 +84,7 @@ export interface AlfieTVYouTubePlaylist {
   is_visible: boolean;
   display_order: number;
   featured_at: string | null;
+  published_at: string | null;
   view_count: number;
   last_synced_at: string | null;
   created_at: string;
@@ -614,8 +615,8 @@ export const alfieTVStorage = {
       .select('*, channel:alfie_tv_channels(id, channel_name, channel_thumbnail)')
       .in('channel_id', channelIds)
       .order('is_featured', { ascending: false })
-      .order('display_order', { ascending: false })
-      .order('video_count', { ascending: false });
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
     return data || [];
