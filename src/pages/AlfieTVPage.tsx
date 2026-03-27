@@ -23,9 +23,13 @@ interface YouTubePlaylist {
   description: string;
   thumbnail_url: string;
   video_count: number;
+  channel_id?: string;
   playlist_category?: string;
   is_featured?: boolean;
+  is_visible?: boolean;
   view_count?: number;
+  display_order?: number;
+  published_at?: string;
   last_synced_at?: string;
 }
 
@@ -871,6 +875,45 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     }
   };
 
+  const loadPlaylistVideosForChannel = async (channelId: string) => {
+    const channelPlaylists = playlists.filter(p => p.channel_id === channelId);
+    const unloadedPlaylists = channelPlaylists.filter(p => !playlistVideos[p.id]);
+    if (unloadedPlaylists.length === 0) return;
+
+    const newVideoMap: { [key: string]: AlfieTVVideo[] } = {};
+    const promises = unloadedPlaylists.map(async (playlist) => {
+      const { data: playlistVideoIds } = await supabase
+        .from('alfie_tv_youtube_playlist_videos')
+        .select('video_id')
+        .eq('youtube_playlist_id', playlist.id)
+        .order('position')
+        .limit(10);
+
+      if (playlistVideoIds && playlistVideoIds.length > 0) {
+        const orderedIds = playlistVideoIds.map(pv => pv.video_id);
+        const { data: videos } = await supabase
+          .from('alfie_tv_videos')
+          .select('*')
+          .in('id', orderedIds);
+        const idToIndex = new Map(orderedIds.map((id, i) => [id, i]));
+        const sorted = (videos || []).sort((a, b) => (idToIndex.get(a.id) ?? 99) - (idToIndex.get(b.id) ?? 99));
+        return { playlistId: playlist.id, videos: sorted };
+      }
+      return { playlistId: playlist.id, videos: [] };
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(r => { newVideoMap[r.playlistId] = r.videos; });
+    setPlaylistVideos(prev => ({ ...prev, ...newVideoMap }));
+  };
+
+  const handleSelectChannel = (channelId: string | null) => {
+    setSelectedChannelId(channelId);
+    if (channelId) {
+      loadPlaylistVideosForChannel(channelId);
+    }
+  };
+
   type HeroSlide =
     | { type: 'live'; stream: LivestreamSession & { venue_image?: string; club_name?: string } }
     | { type: 'upcoming'; stream: LivestreamSession & { venue_image?: string; club_name?: string } }
@@ -928,7 +971,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         setChannels(channelsData);
       }
 
-      // Load YouTube playlists
+      // Load YouTube playlists (all visible playlists, no limit)
       const { data: playlistsData } = await supabase
         .from('alfie_tv_youtube_playlists')
         .select(`
@@ -940,12 +983,17 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           channel_id,
           playlist_category,
           is_featured,
+          is_visible,
           view_count,
+          display_order,
+          published_at,
           last_synced_at
         `)
         .in('channel_id', channelsData?.map(c => c.id) || [])
-        .order('video_count', { ascending: false })
-        .limit(20);
+        .eq('is_visible', true)
+        .order('is_featured', { ascending: false })
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
 
       // Initialize playlistVideoMap
       let playlistVideoMap: { [key: string]: AlfieTVVideo[] } = {};
@@ -953,8 +1001,16 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       if (playlistsData) {
         setPlaylists(playlistsData);
 
-        // Load videos for each playlist (first 10 videos)
-        const playlistVideoPromises = playlistsData.map(async (playlist) => {
+        // Load videos for top playlists (featured first, then by video count)
+        const sortedForVideoLoad = [...playlistsData]
+          .sort((a, b) => {
+            if (a.is_featured && !b.is_featured) return -1;
+            if (!a.is_featured && b.is_featured) return 1;
+            return (b.video_count || 0) - (a.video_count || 0);
+          })
+          .slice(0, 40);
+
+        const playlistVideoPromises = sortedForVideoLoad.map(async (playlist) => {
           const { data: playlistVideoIds } = await supabase
             .from('alfie_tv_youtube_playlist_videos')
             .select('video_id')
@@ -963,12 +1019,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
             .limit(10);
 
           if (playlistVideoIds && playlistVideoIds.length > 0) {
+            const orderedIds = playlistVideoIds.map(pv => pv.video_id);
             const { data: videos } = await supabase
               .from('alfie_tv_videos')
               .select('*')
-              .in('id', playlistVideoIds.map(pv => pv.video_id));
-
-            return { playlistId: playlist.id, videos: videos || [] };
+              .in('id', orderedIds);
+            const idToIndex = new Map(orderedIds.map((id, i) => [id, i]));
+            const sorted = (videos || []).sort((a, b) => (idToIndex.get(a.id) ?? 99) - (idToIndex.get(b.id) ?? 99));
+            return { playlistId: playlist.id, videos: sorted };
           }
           return { playlistId: playlist.id, videos: [] };
         });
@@ -1756,22 +1814,112 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                 <ChevronLeft className="w-5 h-5 mr-2" />
                 Back to all channels
               </button>
-              <h1 className="text-4xl font-bold text-white mb-4">
-                {channels.find(c => c.id === selectedChannelId)?.channel_name}
-              </h1>
+              {(() => {
+                const selectedChannel = channels.find(c => c.id === selectedChannelId);
+                const channelPlaylists = playlists
+                  .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+                  .sort((a, b) => {
+                    if (a.is_featured && !b.is_featured) return -1;
+                    if (!a.is_featured && b.is_featured) return 1;
+                    const dateA = a.published_at || a.last_synced_at || '';
+                    const dateB = b.published_at || b.last_synced_at || '';
+                    return dateB.localeCompare(dateA);
+                  });
+                return (
+                  <>
+                    <div className="flex items-center gap-4 mb-6">
+                      {selectedChannel?.channel_thumbnail && (
+                        <img
+                          src={selectedChannel.channel_thumbnail}
+                          alt={selectedChannel.channel_name}
+                          className="w-16 h-16 rounded-full ring-2 ring-white/20"
+                        />
+                      )}
+                      <div>
+                        <h1 className="text-4xl font-bold text-white">
+                          {selectedChannel?.channel_name}
+                        </h1>
+                        <p className="text-gray-400 text-sm mt-1">
+                          {channelPlaylists.length} playlist{channelPlaylists.length !== 1 ? 's' : ''}
+                          {selectedChannel?.video_count ? ` / ${selectedChannel.video_count} videos` : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    {channelPlaylists.length > 0 && (
+                      <div className="-mx-12 px-12 py-6 mb-6 bg-gradient-to-b from-white/[0.03] via-white/[0.02] to-transparent border-t border-b border-white/[0.06]">
+                        <h2 className="text-lg font-semibold text-white mb-4">
+                          All Playlists
+                          <span className="text-sm font-normal text-gray-500 ml-2">({channelPlaylists.length})</span>
+                        </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                          {channelPlaylists.map(playlist => (
+                              <div
+                                key={playlist.id}
+                                onClick={() => {
+                                  const firstVideoRow = document.getElementById(`playlist-row-${playlist.id}`);
+                                  if (firstVideoRow) {
+                                    firstVideoRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  }
+                                }}
+                                className="group cursor-pointer"
+                              >
+                                <div className={`relative aspect-video rounded-lg overflow-hidden bg-slate-800 mb-2 transition-all ${
+                                  playlist.is_featured ? 'ring-2 ring-amber-500/50 group-hover:ring-amber-500' : 'ring-1 ring-white/[0.06] group-hover:ring-white/20'
+                                }`}>
+                                  {playlist.thumbnail_url ? (
+                                    <img
+                                      src={playlist.thumbnail_url}
+                                      alt={playlist.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-700 to-slate-900">
+                                      <Play className="w-8 h-8 text-slate-500" />
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                  {playlist.is_featured && (
+                                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold uppercase tracking-wider">
+                                      Featured
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-xs font-medium">
+                                    {playlist.video_count} videos
+                                  </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-white line-clamp-2 group-hover:text-blue-400 transition-colors">
+                                  {playlist.title}
+                                </h3>
+                              </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
-            {/* Channel Playlists */}
+
             {playlists
-              .filter(p => p.channel_id === selectedChannelId)
+              .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+              .sort((a, b) => {
+                if (a.is_featured && !b.is_featured) return -1;
+                if (!a.is_featured && b.is_featured) return 1;
+                const dateA = a.published_at || a.last_synced_at || '';
+                const dateB = b.published_at || b.last_synced_at || '';
+                return dateB.localeCompare(dateA);
+              })
               .map(playlist => {
                 const videos = playlistVideos[playlist.id] || [];
                 if (videos.length === 0) return null;
                 return (
-                  <VideoRow
-                    key={playlist.id}
-                    title={playlist.title}
-                    videos={videos}
-                  />
+                  <div key={playlist.id} id={`playlist-row-${playlist.id}`}>
+                    <VideoRow
+                      title={playlist.is_featured ? `${playlist.title}` : playlist.title}
+                      videos={videos}
+                    />
+                  </div>
                 );
               })}
           </div>
@@ -1782,30 +1930,36 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               <p className="text-gray-400">Browse content by channel</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 px-12">
-              {channels.map(channel => (
-                <div
-                  key={channel.id}
-                  onClick={() => setSelectedChannelId(channel.id)}
-                  className="group cursor-pointer"
-                >
-                  <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
-                    {channel.channel_thumbnail ? (
-                      <img
-                        src={channel.channel_thumbnail}
-                        alt={channel.channel_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <Youtube className="w-16 h-16 text-red-600" />
-                      </div>
-                    )}
+              {channels.map(channel => {
+                const channelPlaylistCount = playlists.filter(p => p.channel_id === channel.id).length;
+                return (
+                  <div
+                    key={channel.id}
+                    onClick={() => handleSelectChannel(channel.id)}
+                    className="group cursor-pointer"
+                  >
+                    <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
+                      {channel.channel_thumbnail ? (
+                        <img
+                          src={channel.channel_thumbnail}
+                          alt={channel.channel_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <Youtube className="w-16 h-16 text-red-600" />
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
+                      {channel.channel_name}
+                    </h3>
+                    <p className="text-gray-500 text-center text-xs mt-1">
+                      {channelPlaylistCount > 0 && `${channelPlaylistCount} playlist${channelPlaylistCount !== 1 ? 's' : ''} / `}{channel.video_count || 0} videos
+                    </p>
                   </div>
-                  <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
-                    {channel.channel_name}
-                  </h3>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Suggest a Channel Button */}
@@ -2159,15 +2313,32 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     maybeAddAd();
                   }
 
-                  // Playlists as Rows
+                  // Featured Playlists - show as video rows prioritized on home screen
+                  const featuredPlaylists = playlists.filter(p => p.is_featured);
+                  featuredPlaylists.forEach(playlist => {
+                    const videos = playlistVideos[playlist.id] || [];
+                    const channel = channels.find(c => c.id === playlist.channel_id);
+                    if (videos.length > 0) {
+                      rows.push(
+                        <VideoRow
+                          key={`featured-playlist-${playlist.id}`}
+                          title={`${playlist.title}${channel ? ` - ${channel.channel_name}` : ''}`}
+                          videos={videos}
+                        />
+                      );
+                      rowIndex++;
+                      maybeAddAd();
+                    }
+                  });
+
+                  // Playlists as Rows (exclude featured - already shown above)
+                  const featuredPlaylistIds = new Set(featuredPlaylists.map(p => p.id));
                   playlists
                     .filter(playlist => {
-                      // Filter by playlist category
+                      if (featuredPlaylistIds.has(playlist.id)) return false;
                       if (selectedPlaylistCategory !== 'all' && playlist.playlist_category !== selectedPlaylistCategory) {
                         return false;
                       }
-
-                      // Filter by channel visibility
                       const channel = channels.find(c => c.id === playlist.channel_id);
                       if (!channel) return false;
                       return channel.is_visible !== false;
@@ -2176,7 +2347,6 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     .forEach((playlist, index) => {
                       const videos = (playlistVideos[playlist.id] || [])
                         .filter(video => {
-                          // Apply search filter
                           if (!searchTerm.trim()) return true;
                           const searchLower = searchTerm.toLowerCase();
                           return (
