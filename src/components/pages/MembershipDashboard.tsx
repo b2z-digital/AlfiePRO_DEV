@@ -1164,7 +1164,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
                 <Users size={16} />
                 <span>Members</span>
                 {paymentPendingCount > 0 && (
-                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                     {paymentPendingCount}
                   </div>
                 )}
@@ -1183,7 +1183,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
                 <ClipboardList size={16} />
                 <span>Applications</span>
                 {pendingApplicationsCount > 0 && (
-                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                     {pendingApplicationsCount}
                   </div>
                 )}
@@ -1216,7 +1216,7 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
                 <CreditCard size={16} />
                 <span>Remittances</span>
                 {pendingRemittancesCount > 0 && (
-                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-white text-xs font-bold rounded-full">
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
                     {pendingRemittancesCount}
                   </div>
                 )}
