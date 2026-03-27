@@ -45,22 +45,22 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
       <div className="p-16">
         {/* Header */}
         <div className="mb-8 flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500">
             <DollarSign className="text-white" size={28} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Financial Management</h1>
-            <p className="text-slate-400">Manage your club's finances, invoices, and budgets</p>
+            <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Financial Management</h1>
+            <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>Manage your club's finances, invoices, and budgets</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="mb-8 border-b border-slate-700">
+        <div className={`mb-8 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
           <div className="flex space-x-1 overflow-x-auto">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
-              
+
               return (
                 <button
                   key={tab.id}
@@ -68,8 +68,10 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
                   className={`
                     flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap
                     ${isActive
-                      ? 'border-blue-500 text-blue-400'
-                      : 'border-transparent text-slate-400 hover:text-slate-300'
+                      ? 'border-blue-500 text-blue-500'
+                      : darkMode
+                        ? 'border-transparent text-slate-400 hover:text-slate-300'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
                     }
                   `}
                 >
@@ -82,7 +84,7 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
         </div>
 
         {/* Content */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 p-8">
+        <div className={`backdrop-blur-sm rounded-xl border p-8 ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <Routes>
             <Route path="/" element={
               <FinancesOverview

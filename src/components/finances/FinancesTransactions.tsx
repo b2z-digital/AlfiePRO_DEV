@@ -529,47 +529,47 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Total Income</p>
-              <p className="text-2xl font-bold text-green-400">{formatCurrency(totalIncome)}</p>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income</p>
+              <p className="text-2xl font-bold text-green-500">{formatCurrency(totalIncome)}</p>
             </div>
-            <div className="p-3 rounded-lg bg-green-900/30">
-              <DollarSign className="text-green-400" size={24} />
+            <div className="p-3 rounded-lg bg-green-500/15">
+              <DollarSign className="text-green-500" size={24} />
             </div>
           </div>
         </div>
 
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Total Expenses</p>
-              <p className="text-2xl font-bold text-red-400">{formatCurrency(totalExpenses)}</p>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</p>
+              <p className="text-2xl font-bold text-red-500">{formatCurrency(totalExpenses)}</p>
             </div>
-            <div className="p-3 rounded-lg bg-red-900/30">
-              <DollarSign className="text-red-400" size={24} />
+            <div className="p-3 rounded-lg bg-red-500/15">
+              <DollarSign className="text-red-500" size={24} />
             </div>
           </div>
         </div>
 
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Net Amount</p>
-              <p className={`text-2xl font-bold ${netAmount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Amount</p>
+              <p className={`text-2xl font-bold ${netAmount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 {netAmount >= 0 ? '' : '-'}{formatCurrency(Math.abs(netAmount))}
               </p>
             </div>
-            <div className={`p-3 rounded-lg ${netAmount >= 0 ? 'bg-green-900/30' : 'bg-red-900/30'}`}>
-              <DollarSign className={netAmount >= 0 ? 'text-green-400' : 'text-red-400'} size={24} />
+            <div className={`p-3 rounded-lg ${netAmount >= 0 ? 'bg-green-500/15' : 'bg-red-500/15'}`}>
+              <DollarSign className={netAmount >= 0 ? 'text-green-500' : 'text-red-500'} size={24} />
             </div>
           </div>
         </div>
@@ -646,61 +646,61 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
           </div>
 
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
+            <div className={`absolute right-0 mt-2 w-64 rounded-lg shadow-xl border py-2 z-50 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               <button
                 onClick={() => handleTransactionTypeClick('invoice')}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-blue-600/20">
-                  <FileText className="text-blue-400" size={18} />
+                <div className="p-2 rounded-lg bg-blue-500/15">
+                  <FileText className="text-blue-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">New Invoice</div>
-                  <div className="text-slate-400 text-xs">Create an invoice for services or products</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Invoice</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Create an invoice for services or products</div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleTransactionTypeClick('deposit')}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-green-600/20">
-                  <Plus className="text-green-400" size={18} />
+                <div className="p-2 rounded-lg bg-green-500/15">
+                  <Plus className="text-green-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">New Deposit</div>
-                  <div className="text-slate-400 text-xs">Record incoming money or payments</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Deposit</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record incoming money or payments</div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleTransactionTypeClick('expense')}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-red-600/20">
-                  <Minus className="text-red-400" size={18} />
+                <div className="p-2 rounded-lg bg-red-500/15">
+                  <Minus className="text-red-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">New Expense</div>
-                  <div className="text-slate-400 text-xs">Record money spent or outgoing payments</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Expense</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record money spent or outgoing payments</div>
                 </div>
               </button>
 
-              <div className="my-2 border-t border-slate-700"></div>
+              <div className={`my-2 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}></div>
 
               <button
                 onClick={() => {
                   setShowImportModal(true);
                   setShowDropdown(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-purple-600/20">
-                  <Upload className="text-purple-400" size={18} />
+                <div className="p-2 rounded-lg bg-blue-500/15">
+                  <Upload className="text-blue-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">Import Transactions</div>
-                  <div className="text-slate-400 text-xs">Import from CSV file with smart mapping</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>Import Transactions</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Import from CSV file with smart mapping</div>
                 </div>
               </button>
             </div>
@@ -711,41 +711,39 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
       {/* Transactions Table */}
       <div className={`
         rounded-xl border backdrop-blur-sm overflow-hidden
-        ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white/10 border-slate-200/20'}
+        ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}
       `}>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className={`
-              ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100/50'}
-            `}>
+            <thead className={darkMode ? 'bg-slate-700/50' : 'bg-slate-50'}>
               <tr>
-                <th className="text-left p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Date
                 </th>
-                <th className="text-left p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Description
                 </th>
-                <th className="text-left p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Type
                 </th>
-                <th className="text-left p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-left p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Category
                 </th>
-                <th className="text-right p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-right p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Amount
                 </th>
-                <th className="text-center p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-center p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Status
                 </th>
-                <th className="text-center p-4 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                <th className={`text-center p-4 text-xs font-semibold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className={`divide-y ${darkMode ? 'divide-slate-700/50' : 'divide-slate-100'}`}>
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                  <td colSpan={7} className={`p-8 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     No transactions found
                   </td>
                 </tr>
@@ -753,24 +751,24 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                 filteredTransactions.map((transaction) => (
                   <tr
                     key={transaction.id}
-                    className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                    className={`transition-colors cursor-pointer ${darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'}`}
                     onClick={() => {
                       setSelectedTransaction(transaction);
                       setShowDetailModal(true);
                     }}
                   >
                     <td className="p-4">
-                      <div className="flex items-center gap-2 text-slate-300">
+                      <div className={`flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                         <Calendar size={14} />
                         {formatDate(transaction.date)}
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="text-white font-medium">
+                      <div className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         {transaction.description}
                       </div>
                       {transaction.line_items && transaction.line_items.length > 1 && (
-                        <div className="text-xs text-slate-400 mt-1">
+                        <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {transaction.line_items.length} line items
                         </div>
                       )}
@@ -779,21 +777,21 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                       <span className={`
                         px-2 py-1 rounded-full text-xs font-medium
                         ${transaction.type === 'deposit' || transaction.type === 'income'
-                          ? 'bg-green-900/30 text-green-400'
-                          : 'bg-red-900/30 text-red-400'}
+                          ? 'bg-green-500/15 text-green-600'
+                          : 'bg-red-500/15 text-red-600'}
                       `}>
                         {transaction.type === 'deposit' || transaction.type === 'income' ? 'Income' : 'Expense'}
                       </span>
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                      <div className={`flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <div className="w-2 h-2 rounded-full bg-slate-400"></div>
                         {transaction.category_name}
                       </div>
                     </td>
                     <td className="p-4 text-right">
                       <span className={`font-medium ${
-                        transaction.type === 'deposit' || transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
+                        transaction.type === 'deposit' || transaction.type === 'income' ? 'text-green-500' : 'text-red-500'
                       }`}>
                         {transaction.type === 'deposit' || transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
                       </span>
@@ -802,8 +800,8 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                       <span className={`
                         px-2 py-1 rounded-full text-xs font-medium
                         ${(transaction.payment_status === 'paid' || transaction.payment_status === 'completed')
-                          ? 'bg-green-900/30 text-green-400'
-                          : 'bg-amber-900/30 text-amber-400'}
+                          ? 'bg-green-500/15 text-green-600'
+                          : 'bg-amber-500/15 text-amber-600'}
                       `}>
                         {(transaction.payment_status === 'paid' || transaction.payment_status === 'completed') ? 'Paid' : 'Awaiting Payment'}
                       </span>
@@ -816,7 +814,7 @@ export const FinancesTransactions: React.FC<FinancesTransactionsProps> = ({ dark
                             setSelectedTransaction(transaction);
                             setShowDetailModal(true);
                           }}
-                          className="p-2 text-slate-400 hover:text-white transition-colors"
+                          className={`p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'}`}
                           title="View/Edit transaction"
                         >
                           <Edit size={16} />

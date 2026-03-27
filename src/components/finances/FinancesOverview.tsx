@@ -595,7 +595,7 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-semibold text-white">Financial Overview</h2>
+        <h2 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Financial Overview</h2>
         <div className="relative" ref={dropdownRef}>
           <div className="flex rounded-lg overflow-hidden shadow-md cursor-pointer" style={{ background: 'linear-gradient(to right, #16a34a, #059669)' }}>
             <button
@@ -615,43 +615,43 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
           </div>
 
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
+            <div className={`absolute right-0 mt-2 w-64 rounded-lg shadow-xl border py-2 z-50 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               <button
                 onClick={() => handleTransactionTypeClick('invoice')}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-blue-600/20">
-                  <FileText className="text-blue-400" size={18} />
+                <div className="p-2 rounded-lg bg-blue-500/15">
+                  <FileText className="text-blue-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">New Invoice</div>
-                  <div className="text-slate-400 text-xs">Create an invoice for services or products</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Invoice</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Create an invoice for services or products</div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleTransactionTypeClick('deposit')}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-green-600/20">
-                  <Plus className="text-green-400" size={18} />
+                <div className="p-2 rounded-lg bg-green-500/15">
+                  <Plus className="text-green-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">New Deposit</div>
-                  <div className="text-slate-400 text-xs">Record incoming money or payments</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Deposit</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record incoming money or payments</div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleTransactionTypeClick('expense')}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`}
               >
-                <div className="p-2 rounded-lg bg-red-600/20">
-                  <Minus className="text-red-400" size={18} />
+                <div className="p-2 rounded-lg bg-red-500/15">
+                  <Minus className="text-red-500" size={18} />
                 </div>
                 <div>
-                  <div className="text-white font-medium text-sm">New Expense</div>
-                  <div className="text-slate-400 text-xs">Record money spent or outgoing payments</div>
+                  <div className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>New Expense</div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Record money spent or outgoing payments</div>
                 </div>
               </button>
             </div>
@@ -664,19 +664,17 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         {/* Gross Income */}
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode
-            ? 'bg-slate-800/30 border-slate-700/50'
-            : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Gross Income</p>
-              <p className="text-2xl font-bold text-white">
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gross Income</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {formatCurrency(summary.totalIncome)}
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-green-900/30">
-              <TrendingUp className="text-green-400" size={24} />
+            <div className="p-3 rounded-lg bg-green-500/15">
+              <TrendingUp className="text-green-500" size={24} />
             </div>
           </div>
           <div className={`flex items-center gap-1 text-sm ${getChangeColor(summary.incomeChange)}`}>
@@ -688,26 +686,24 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         {/* Current Account Balance */}
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode
-            ? 'bg-slate-800/30 border-slate-700/50'
-            : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-slate-400 text-sm font-medium">
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Account Balance
               </p>
-              <p className={`text-2xl font-bold ${summary.currentBalance >= 0 ? 'text-white' : 'text-red-400'}`}>
+              <p className={`text-2xl font-bold ${summary.currentBalance >= 0 ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-red-500'}`}>
                 {formatCurrency(summary.currentBalance)}
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-blue-900/30">
-              <DollarSign className="text-blue-400" size={24} />
+            <div className="p-3 rounded-lg bg-blue-500/15">
+              <DollarSign className="text-blue-500" size={24} />
             </div>
           </div>
-          <div className="flex items-center gap-1 text-xs text-slate-400">
+          <div className={`flex items-center gap-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             <span>Opening: {formatCurrency(summary.openingBalance)}</span>
-            <span className="mx-1">•</span>
+            <span className="mx-1">-</span>
             <span>Period Net: {formatCurrency(summary.netIncomeAfterTax)}</span>
           </div>
         </div>
@@ -715,19 +711,17 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         {/* Total Expenses */}
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode
-            ? 'bg-slate-800/30 border-slate-700/50'
-            : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Total Expenses</p>
-              <p className="text-2xl font-bold text-white">
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {formatCurrency(summary.totalExpenses)}
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-red-900/30">
-              <TrendingDown className="text-red-400" size={24} />
+            <div className="p-3 rounded-lg bg-red-500/15">
+              <TrendingDown className="text-red-500" size={24} />
             </div>
           </div>
           <div className={`flex items-center gap-1 text-sm ${getChangeColor(summary.expensesChange)}`}>
@@ -739,25 +733,23 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         {/* Membership Income */}
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode
-            ? 'bg-slate-800/30 border-slate-700/50'
-            : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Membership Income</p>
-              <p className="text-2xl font-bold text-white">
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Membership Income</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {formatCurrency(summary.membershipIncome)}
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-cyan-900/30">
-              <Users className="text-cyan-400" size={24} />
+            <div className="p-3 rounded-lg bg-cyan-500/15">
+              <Users className="text-cyan-500" size={24} />
             </div>
           </div>
-          <div className="flex items-center gap-1 text-sm text-slate-400">
+          <div className={`flex items-center gap-1 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             {summary.pendingMembershipPayments > 0 ? (
               <>
-                <span className="text-orange-400">{summary.pendingMembershipPayments} pending</span>
+                <span className="text-orange-500">{summary.pendingMembershipPayments} pending</span>
               </>
             ) : (
               <span>All payments current</span>
@@ -768,22 +760,20 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         {/* Pending Invoices */}
         <div className={`
           p-6 rounded-xl border backdrop-blur-sm
-          ${darkMode
-            ? 'bg-slate-800/30 border-slate-700/50'
-            : 'bg-white/10 border-slate-200/20'}
+          ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-50 border-slate-200'}
         `}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-slate-400 text-sm font-medium">Pending Invoices</p>
-              <p className="text-2xl font-bold text-white">
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Pending Invoices</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {formatCurrency(summary.pendingInvoicesAmount)}
               </p>
             </div>
-            <div className="p-3 rounded-lg bg-yellow-900/30">
-              <Receipt className="text-yellow-400" size={24} />
+            <div className="p-3 rounded-lg bg-yellow-500/15">
+              <Receipt className="text-yellow-500" size={24} />
             </div>
           </div>
-          <div className="flex items-center gap-1 text-sm text-yellow-400">
+          <div className="flex items-center gap-1 text-sm text-yellow-500">
             <Receipt size={14} />
             <span>Awaiting payment</span>
           </div>
@@ -802,15 +792,13 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
       {/* Recent Transactions */}
       <div className={`
         rounded-xl border backdrop-blur-sm p-6
-        ${darkMode 
-          ? 'bg-slate-800/30 border-slate-700/50' 
-          : 'bg-white/10 border-slate-200/20'}
+        ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}
       `}>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-white">Recent Transactions</h3>
+          <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Recent Transactions</h3>
           <button
             onClick={() => onTabChange('transactions')}
-            className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
+            className="text-blue-500 hover:text-blue-400 text-sm transition-colors"
           >
             View all
           </button>
@@ -818,9 +806,9 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
 
         {recentTransactions.length === 0 ? (
           <div className="text-center py-8">
-            <DollarSign size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
-            <p className="text-slate-400 mb-2">No recent transactions</p>
-            <p className="text-slate-500 text-sm">Transactions will appear here once you add them</p>
+            <DollarSign size={48} className="mx-auto mb-4 text-slate-400 opacity-50" />
+            <p className={`mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No recent transactions</p>
+            <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Transactions will appear here once you add them</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -829,37 +817,35 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
                 key={transaction.id}
                 className={`
                   flex items-center justify-between p-4 rounded-lg border
-                  ${darkMode 
-                    ? 'bg-slate-700/30 border-slate-600/50' 
-                    : 'bg-white/5 border-slate-200/10'}
+                  ${darkMode ? 'bg-slate-700/30 border-slate-600/50' : 'bg-slate-50 border-slate-100'}
                 `}
               >
                 <div className="flex items-center gap-3">
                   <div className={`
                     p-2 rounded-lg
                     ${transaction.type === 'deposit' || transaction.type === 'income'
-                      ? 'bg-green-900/30'
-                      : 'bg-red-900/30'}
+                      ? 'bg-green-500/15'
+                      : 'bg-red-500/15'}
                   `}>
                     {transaction.type === 'deposit' || transaction.type === 'income' ? (
-                      <ArrowUpRight className="text-green-400" size={16} />
+                      <ArrowUpRight className="text-green-500" size={16} />
                     ) : (
-                      <ArrowDownRight className="text-red-400" size={16} />
+                      <ArrowDownRight className="text-red-500" size={16} />
                     )}
                   </div>
                   <div>
-                    <p className="text-white font-medium">{transaction.description}</p>
-                    <p className="text-slate-400 text-sm">
+                    <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{transaction.description}</p>
+                    <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                       {new Date(transaction.date).toLocaleDateString('en-AU')}
                       {transaction.budget_categories && (
-                        <> • {transaction.budget_categories.name}</>
+                        <> - {transaction.budget_categories.name}</>
                       )}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className={`font-semibold ${
-                    transaction.type === 'deposit' || transaction.type === 'income' ? 'text-green-400' : 'text-red-400'
+                    transaction.type === 'deposit' || transaction.type === 'income' ? 'text-green-500' : 'text-red-500'
                   }`}>
                     {transaction.type === 'deposit' || transaction.type === 'income' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
                   </p>
