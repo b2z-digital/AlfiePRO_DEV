@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, Plus, CreditCard as Edit2, Trash2, Save, X, Settings, Receipt, Tag, Percent, Users, CreditCard, CircleAlert as AlertCircle, CircleCheck as CheckCircle2 } from 'lucide-react';
+import { DollarSign, Plus, Pencil, Trash2, Save, X, Settings, Receipt, Tag, Percent, Users, CreditCard, CircleAlert as AlertCircle, CircleCheck as CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { CircularCheckbox } from '../ui/CircularCheckbox';
@@ -605,11 +605,6 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
   };
 
   const handleDeleteTaxRate = async (taxRateId: string) => {
-    if (taxRates.length <= 1) {
-      setError('Cannot delete the only tax rate');
-      return;
-    }
-
     if (!confirm('Are you sure you want to delete this tax rate?')) return;
 
     try {
@@ -1238,26 +1233,26 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    setTaxForm({ 
-                      name: taxRate.name, 
+                    setTaxForm({
+                      name: taxRate.name,
                       rate: taxRate.rate,
-                      currency: taxRate.currency 
+                      currency: taxRate.currency
                     });
                     setEditingTax(taxRate);
                     setShowTaxModal(true);
                   }}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
+                  className={`p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                  title="Edit tax rate"
                 >
-                  <Edit2 size={16} />
+                  <Pencil size={16} />
                 </button>
-                {taxRates.length > 1 && (
-                  <button
-                    onClick={() => handleDeleteTaxRate(taxRate.id)}
-                    className="p-2 text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
+                <button
+                  onClick={() => handleDeleteTaxRate(taxRate.id)}
+                  className={`p-2 transition-colors ${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-500 hover:text-red-600'}`}
+                  title="Delete tax rate"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
           </div>
@@ -1814,7 +1809,7 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
                   }`}
                   title={category.is_system ? 'System categories cannot be edited' : 'Edit category'}
                 >
-                  <Edit2 size={16} />
+                  <Pencil size={16} />
                 </button>
                 <button
                   onClick={() => handleDeleteCategory(category.id)}
