@@ -889,11 +889,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         .limit(10);
 
       if (playlistVideoIds && playlistVideoIds.length > 0) {
+        const orderedIds = playlistVideoIds.map(pv => pv.video_id);
         const { data: videos } = await supabase
           .from('alfie_tv_videos')
           .select('*')
-          .in('id', playlistVideoIds.map(pv => pv.video_id));
-        return { playlistId: playlist.id, videos: videos || [] };
+          .in('id', orderedIds);
+        const idToIndex = new Map(orderedIds.map((id, i) => [id, i]));
+        const sorted = (videos || []).sort((a, b) => (idToIndex.get(a.id) ?? 99) - (idToIndex.get(b.id) ?? 99));
+        return { playlistId: playlist.id, videos: sorted };
       }
       return { playlistId: playlist.id, videos: [] };
     });
@@ -1014,12 +1017,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
             .limit(10);
 
           if (playlistVideoIds && playlistVideoIds.length > 0) {
+            const orderedIds = playlistVideoIds.map(pv => pv.video_id);
             const { data: videos } = await supabase
               .from('alfie_tv_videos')
               .select('*')
-              .in('id', playlistVideoIds.map(pv => pv.video_id));
-
-            return { playlistId: playlist.id, videos: videos || [] };
+              .in('id', orderedIds);
+            const idToIndex = new Map(orderedIds.map((id, i) => [id, i]));
+            const sorted = (videos || []).sort((a, b) => (idToIndex.get(a.id) ?? 99) - (idToIndex.get(b.id) ?? 99));
+            return { playlistId: playlist.id, videos: sorted };
           }
           return { playlistId: playlist.id, videos: [] };
         });
@@ -2320,9 +2325,11 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     }
                   });
 
-                  // Playlists as Rows
+                  // Playlists as Rows (exclude featured - already shown above)
+                  const featuredPlaylistIds = new Set(featuredPlaylists.map(p => p.id));
                   playlists
                     .filter(playlist => {
+                      if (featuredPlaylistIds.has(playlist.id)) return false;
                       if (selectedPlaylistCategory !== 'all' && playlist.playlist_category !== selectedPlaylistCategory) {
                         return false;
                       }
@@ -2330,11 +2337,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                       if (!channel) return false;
                       return channel.is_visible !== false;
                     })
-                    .sort((a, b) => {
-                      if (a.is_featured && !b.is_featured) return -1;
-                      if (!a.is_featured && b.is_featured) return 1;
-                      return (b.video_count || 0) - (a.video_count || 0);
-                    })
+                    .sort((a, b) => (b.video_count || 0) - (a.video_count || 0))
                     .forEach((playlist, index) => {
                       const videos = (playlistVideos[playlist.id] || [])
                         .filter(video => {
