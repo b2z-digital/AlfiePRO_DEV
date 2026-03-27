@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, ChartBar as BarChart3, ChartPie as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, CreditCard as Edit3 } from 'lucide-react';
+import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, ChartBar as BarChart3, ChartPie as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, CreditCard as Edit3, Tag, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
@@ -34,6 +35,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associationId, associationType }) => {
   const { currentClub } = useAuth();
+  const navigate = useNavigate();
   const isAssociation = !!associationId && !!associationType;
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([]);
@@ -733,15 +735,20 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       ) : (
         <div className="text-center py-20 rounded-2xl border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-700/50 mb-4">
-            <DollarSign size={32} className="text-slate-400" />
+            <Tag size={32} className="text-slate-400" />
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">No Budget Categories</h3>
-          <p className="text-slate-400 mb-1 max-w-md mx-auto text-sm">
+          <p className="text-slate-400 mb-4 max-w-md mx-auto text-sm">
             Create budget categories before you can plan your budget.
           </p>
-          <p className="text-slate-500 text-xs">
-            Go to Settings &rarr; Finance &rarr; Categories to get started.
-          </p>
+          <button
+            onClick={() => navigate('/finances/categories')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Tag size={16} />
+            Set Up Categories
+            <ArrowRight size={16} />
+          </button>
         </div>
       )}
     </div>
