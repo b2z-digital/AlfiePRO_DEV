@@ -81,10 +81,14 @@ export interface AlfieTVYouTubePlaylist {
   video_count: number;
   playlist_category: 'live_events' | 'big_boat_yachting' | 'rc_yachting' | 'training_tips' | 'highlights_recaps' | 'event_archives' | 'general';
   is_featured: boolean;
+  is_visible: boolean;
+  display_order: number;
+  featured_at: string | null;
   view_count: number;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
+  channel?: AlfieTVChannel;
 }
 
 export interface AlfieTVUserList {
@@ -571,10 +575,50 @@ export const alfieTVStorage = {
   async updateYouTubePlaylist(id: string, updates: Partial<AlfieTVYouTubePlaylist>): Promise<void> {
     const { error } = await supabase
       .from('alfie_tv_youtube_playlists')
-      .update(updates)
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  async togglePlaylistFeatured(id: string, isFeatured: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('alfie_tv_youtube_playlists')
+      .update({
+        is_featured: isFeatured,
+        featured_at: isFeatured ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async togglePlaylistVisibility(id: string, isVisible: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('alfie_tv_youtube_playlists')
+      .update({
+        is_visible: isVisible,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async getChannelPlaylists(channelIds: string[]): Promise<AlfieTVYouTubePlaylist[]> {
+    if (channelIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('alfie_tv_youtube_playlists')
+      .select('*, channel:alfie_tv_channels(id, channel_name, channel_thumbnail)')
+      .in('channel_id', channelIds)
+      .order('is_featured', { ascending: false })
+      .order('display_order', { ascending: false })
+      .order('video_count', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
   },
 
   // User Lists

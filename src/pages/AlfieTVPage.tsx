@@ -23,8 +23,10 @@ interface YouTubePlaylist {
   description: string;
   thumbnail_url: string;
   video_count: number;
+  channel_id?: string;
   playlist_category?: string;
   is_featured?: boolean;
+  is_visible?: boolean;
   view_count?: number;
   last_synced_at?: string;
 }
@@ -940,12 +942,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           channel_id,
           playlist_category,
           is_featured,
+          is_visible,
           view_count,
           last_synced_at
         `)
         .in('channel_id', channelsData?.map(c => c.id) || [])
+        .eq('is_visible', true)
         .order('video_count', { ascending: false })
-        .limit(20);
+        .limit(30);
 
       // Initialize playlistVideoMap
       let playlistVideoMap: { [key: string]: AlfieTVVideo[] } = {};
@@ -1762,14 +1766,19 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
             </div>
             {/* Channel Playlists */}
             {playlists
-              .filter(p => p.channel_id === selectedChannelId)
+              .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+              .sort((a, b) => {
+                if (a.is_featured && !b.is_featured) return -1;
+                if (!a.is_featured && b.is_featured) return 1;
+                return (b.video_count || 0) - (a.video_count || 0);
+              })
               .map(playlist => {
                 const videos = playlistVideos[playlist.id] || [];
                 if (videos.length === 0) return null;
                 return (
                   <VideoRow
                     key={playlist.id}
-                    title={playlist.title}
+                    title={playlist.is_featured ? `${playlist.title}` : playlist.title}
                     videos={videos}
                   />
                 );
@@ -2159,24 +2168,82 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     maybeAddAd();
                   }
 
+                  // Featured Playlists Section
+                  const featuredPlaylists = playlists.filter(p => p.is_featured);
+                  if (featuredPlaylists.length > 0) {
+                    rows.push(
+                      <div key="featured-playlists" className="mb-8 px-12">
+                        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                          Featured Collections
+                        </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                          {featuredPlaylists.map(playlist => {
+                            const channel = channels.find(c => c.id === playlist.channel_id);
+                            const videos = playlistVideos[playlist.id] || [];
+                            return (
+                              <div
+                                key={playlist.id}
+                                onClick={() => {
+                                  if (channel) {
+                                    setCurrentView('channels');
+                                    setSelectedChannelId(channel.id);
+                                  }
+                                }}
+                                className="group cursor-pointer"
+                              >
+                                <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-800 mb-2 ring-2 ring-amber-500/30 group-hover:ring-amber-500/60 transition-all">
+                                  {playlist.thumbnail_url ? (
+                                    <img
+                                      src={playlist.thumbnail_url}
+                                      alt={playlist.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full">
+                                      <ListFilter className="w-10 h-10 text-slate-600" />
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                                  <div className="absolute bottom-2 left-2 right-2">
+                                    <div className="text-xs text-white/80 font-medium">
+                                      {playlist.video_count} videos
+                                    </div>
+                                  </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-white line-clamp-2 mb-1 group-hover:text-amber-400 transition-colors">
+                                  {playlist.title}
+                                </h3>
+                                {channel && (
+                                  <p className="text-xs text-slate-400">{channel.channel_name}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                    rowIndex++;
+                    maybeAddAd();
+                  }
+
                   // Playlists as Rows
                   playlists
                     .filter(playlist => {
-                      // Filter by playlist category
                       if (selectedPlaylistCategory !== 'all' && playlist.playlist_category !== selectedPlaylistCategory) {
                         return false;
                       }
-
-                      // Filter by channel visibility
                       const channel = channels.find(c => c.id === playlist.channel_id);
                       if (!channel) return false;
                       return channel.is_visible !== false;
                     })
-                    .sort((a, b) => (b.video_count || 0) - (a.video_count || 0))
+                    .sort((a, b) => {
+                      if (a.is_featured && !b.is_featured) return -1;
+                      if (!a.is_featured && b.is_featured) return 1;
+                      return (b.video_count || 0) - (a.video_count || 0);
+                    })
                     .forEach((playlist, index) => {
                       const videos = (playlistVideos[playlist.id] || [])
                         .filter(video => {
-                          // Apply search filter
                           if (!searchTerm.trim()) return true;
                           const searchLower = searchTerm.toLowerCase();
                           return (
