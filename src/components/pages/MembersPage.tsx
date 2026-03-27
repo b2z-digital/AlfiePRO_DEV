@@ -968,18 +968,10 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
               </span>
             )}
             {unlinkedMembersWithEmail.length > 0 && (
-              <button
-                onClick={handleActivateBulk}
-                disabled={activating}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-colors disabled:opacity-50"
-              >
-                {activating ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Smartphone size={12} />
-                )}
-                Activate {unlinkedMembersWithEmail.length} for App
-              </button>
+              <span className="flex items-center gap-1.5 text-sky-400/70 text-xs">
+                <Smartphone size={12} />
+                {unlinkedMembersWithEmail.length} ready to activate
+              </span>
             )}
           </div>
         </div>
@@ -1158,50 +1150,74 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         })}
       </div>
 
-      {selectedMemberIds.size > 0 && (
-        <div className="flex items-center gap-4 px-4 py-3 bg-blue-600/15 border border-blue-500/30 rounded-xl">
-          <div className="flex items-center gap-2">
-            <CheckSquare size={18} className="text-blue-400" />
-            <span className="text-sm font-medium text-blue-300">
-              {selectedMemberIds.size} member{selectedMemberIds.size === 1 ? '' : 's'} selected
-            </span>
+      {selectedMemberIds.size > 0 && (() => {
+        const selectedUnlinkedWithEmail = members.filter(m => selectedMemberIds.has(m.id) && !m.user_id && m.email);
+        return (
+          <div className="flex items-center gap-4 px-4 py-3 bg-blue-600/15 border border-blue-500/30 rounded-xl flex-wrap">
+            <div className="flex items-center gap-2">
+              <CheckSquare size={18} className="text-blue-400" />
+              <span className="text-sm font-medium text-blue-300">
+                {selectedMemberIds.size} member{selectedMemberIds.size === 1 ? '' : 's'} selected
+              </span>
+            </div>
+            <div className="h-5 w-px bg-slate-600" />
+            <div className="flex items-center gap-2">
+              <Tag size={16} className="text-slate-400" />
+              <select
+                value={bulkMembershipType}
+                onChange={(e) => setBulkMembershipType(e.target.value)}
+                className="px-3 py-1.5 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Assign membership type...</option>
+                {membershipTypes.map(type => (
+                  <option key={type.id} value={type.name}>{type.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkAssignMembershipType}
+                disabled={!bulkMembershipType || bulkUpdating}
+                className="btn-primary-green flex items-center gap-2 px-4 py-1.5 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkUpdating ? (
+                  <><Loader2 size={14} className="animate-spin" /> Updating...</>
+                ) : (
+                  'Apply'
+                )}
+              </button>
+            </div>
+            {selectedUnlinkedWithEmail.length > 0 && (
+              <>
+                <div className="h-5 w-px bg-slate-600" />
+                <button
+                  onClick={() => {
+                    setMembersToActivate(selectedUnlinkedWithEmail);
+                    setActivationResults(null);
+                    setShowActivateConfirmModal(true);
+                  }}
+                  disabled={activating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  {activating ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Smartphone size={14} />
+                  )}
+                  Activate {selectedUnlinkedWithEmail.length} for App
+                </button>
+              </>
+            )}
+            <div className="ml-auto">
+              <button
+                onClick={() => { setSelectedMemberIds(new Set()); setBulkMembershipType(''); }}
+                className="text-slate-400 hover:text-white transition-colors p-1"
+                title="Clear selection"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
-          <div className="h-5 w-px bg-slate-600" />
-          <div className="flex items-center gap-2">
-            <Tag size={16} className="text-slate-400" />
-            <select
-              value={bulkMembershipType}
-              onChange={(e) => setBulkMembershipType(e.target.value)}
-              className="px-3 py-1.5 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Assign membership type...</option>
-              {membershipTypes.map(type => (
-                <option key={type.id} value={type.name}>{type.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={handleBulkAssignMembershipType}
-              disabled={!bulkMembershipType || bulkUpdating}
-              className="btn-primary-green flex items-center gap-2 px-4 py-1.5 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {bulkUpdating ? (
-                <><Loader2 size={14} className="animate-spin" /> Updating...</>
-              ) : (
-                'Apply'
-              )}
-            </button>
-          </div>
-          <div className="ml-auto">
-            <button
-              onClick={() => { setSelectedMemberIds(new Set()); setBulkMembershipType(''); }}
-              className="text-slate-400 hover:text-white transition-colors p-1"
-              title="Clear selection"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
