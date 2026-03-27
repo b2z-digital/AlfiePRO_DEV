@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { DollarSign, TrendingUp, Receipt, FileText, BarChart3 } from 'lucide-react';
+import { DollarSign, TrendingUp, Receipt, FileText, ChartBar as BarChart3, Tag } from 'lucide-react';
 import { FinancesOverview } from '../components/finances/FinancesOverview';
 import { FinancesTransactions } from '../components/finances/FinancesTransactions';
 import { FinancesInvoices } from '../components/finances/FinancesInvoices';
 import { FinancesBudget } from '../components/finances/FinancesBudget';
 import { FinancesReports } from '../components/finances/FinancesReports';
 import { NewTransactionModal } from '../components/finances/NewTransactionModal';
+import { FinanceSettingsPage } from '../components/pages/FinanceSettingsPage';
 
 interface FinancesPageProps {
   darkMode: boolean;
@@ -22,6 +23,7 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
     { id: 'transactions', label: 'Transactions', icon: TrendingUp, path: '/finances/transactions' },
     { id: 'invoices', label: 'Invoices', icon: Receipt, path: '/finances/invoices' },
     { id: 'budget', label: 'Budget', icon: BarChart3, path: '/finances/budget' },
+    { id: 'categories', label: 'Categories', icon: Tag, path: '/finances/categories' },
     { id: 'reports', label: 'Reports', icon: FileText, path: '/finances/reports' }
   ];
 
@@ -31,6 +33,7 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
     if (path.includes('/transactions')) return 'transactions';
     if (path.includes('/invoices')) return 'invoices';
     if (path.includes('/budget')) return 'budget';
+    if (path.includes('/categories')) return 'categories';
     if (path.includes('/reports')) return 'reports';
     return 'overview';
   };
@@ -90,6 +93,7 @@ export const FinancesPage: React.FC<FinancesPageProps> = ({ darkMode }) => {
             <Route path="/transactions" element={<FinancesTransactions darkMode={darkMode} />} />
             <Route path="/invoices/*" element={<FinancesInvoices darkMode={darkMode} />} />
             <Route path="/budget" element={<FinancesBudget darkMode={darkMode} />} />
+            <Route path="/categories" element={<FinanceSettingsPage darkMode={darkMode} initialTab="categories" />} />
             <Route path="/reports" element={<FinancesReports darkMode={darkMode} />} />
           </Routes>
         </div>

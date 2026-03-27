@@ -64,6 +64,11 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
   // Data
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
+
+  // Quick add category
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
   
   // Totals
   const [subtotal, setSubtotal] = useState(0);
@@ -160,6 +165,47 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
     } catch (err) {
       console.error('Error loading data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load data');
+    }
+  };
+
+  const handleQuickAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setSavingCategory(true);
+    try {
+      if (isAssociation) {
+        const { data, error: insertError } = await supabase
+          .from('association_budget_categories')
+          .insert({
+            association_id: associationId,
+            association_type: associationType,
+            name: newCategoryName.trim(),
+            type: 'income',
+            is_active: true
+          })
+          .select('id, name, type')
+          .single();
+        if (insertError) throw insertError;
+        if (data) setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('budget_categories')
+          .insert({
+            club_id: currentClub?.clubId,
+            name: newCategoryName.trim(),
+            type: 'income',
+            is_active: true
+          })
+          .select('id, name, type')
+          .single();
+        if (insertError) throw insertError;
+        if (data) setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      setNewCategoryName('');
+      setShowAddCategory(false);
+    } catch (err) {
+      console.error('Error creating category:', err);
+    } finally {
+      setSavingCategory(false);
     }
   };
 
@@ -538,7 +584,14 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
                   <div className="col-span-3">
                     <select
                       value={item.categoryId}
-                      onChange={(e) => updateLineItem(index, 'categoryId', e.target.value)}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          e.target.value = item.categoryId;
+                          setShowAddCategory(true);
+                          return;
+                        }
+                        updateLineItem(index, 'categoryId', e.target.value);
+                      }}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                     >
                       <option value="">Select category</option>
@@ -547,6 +600,7 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
                           {category.name}
                         </option>
                       ))}
+                      <option value="__add_new__">+ Add a Category...</option>
                     </select>
                   </div>
 
@@ -657,6 +711,38 @@ export const DepositCreationPage: React.FC<DepositCreationPageProps> = ({
           </div>
         </form>
       </div>
+
+      {showAddCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Add Income Category</h3>
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm mb-4"
+              placeholder="Category name"
+              autoFocus
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                className="px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleQuickAddCategory}
+                disabled={savingCategory || !newCategoryName.trim()}
+                className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                {savingCategory ? 'Adding...' : 'Add Category'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
