@@ -412,7 +412,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
   if (error) {
     return (
       <div className="bg-red-900/10 border border-red-900/20 rounded-lg p-6 text-center">
-        <h2 className="text-xl font-bold text-white mb-2">Error</h2>
+        <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-2`}>Error</h2>
         <p className="text-red-300">{error}</p>
       </div>
     );
@@ -468,7 +468,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     datasets: [{
       data: categoryBreakdown.income.map(c => c.amount),
       backgroundColor: categoryBreakdown.income.map(c => c.color + 'aa'),
-      borderColor: 'rgb(15, 23, 42)',
+      borderColor: darkMode ? 'rgb(15, 23, 42)' : 'rgb(255, 255, 255)',
       borderWidth: 2
     }]
   };
@@ -478,7 +478,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     datasets: [{
       data: categoryBreakdown.expenses.map(c => c.amount),
       backgroundColor: categoryBreakdown.expenses.map(c => c.color + 'aa'),
-      borderColor: 'rgb(15, 23, 42)',
+      borderColor: darkMode ? 'rgb(15, 23, 42)' : 'rgb(255, 255, 255)',
       borderWidth: 2
     }]
   };
@@ -491,16 +491,16 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         display: true,
         position: 'bottom' as const,
         labels: {
-          color: 'rgb(203, 213, 225)',
+          color: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
           padding: 15,
           font: { size: 12 }
         }
       },
       tooltip: {
-        backgroundColor: 'rgb(30, 41, 59)',
-        titleColor: 'rgb(226, 232, 240)',
-        bodyColor: 'rgb(203, 213, 225)',
-        borderColor: 'rgb(51, 65, 85)',
+        backgroundColor: darkMode ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)',
+        titleColor: darkMode ? 'rgb(226, 232, 240)' : 'rgb(15, 23, 42)',
+        bodyColor: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
+        borderColor: darkMode ? 'rgb(51, 65, 85)' : 'rgb(226, 232, 240)',
         borderWidth: 1,
         padding: 12,
         displayColors: true
@@ -508,12 +508,12 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     },
     scales: {
       x: {
-        grid: { color: 'rgba(71, 85, 105, 0.3)' },
-        ticks: { color: 'rgb(148, 163, 184)' }
+        grid: { color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(226, 232, 240, 0.8)' },
+        ticks: { color: darkMode ? 'rgb(148, 163, 184)' : 'rgb(100, 116, 139)' }
       },
       y: {
-        grid: { color: 'rgba(71, 85, 105, 0.3)' },
-        ticks: { color: 'rgb(148, 163, 184)' }
+        grid: { color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(226, 232, 240, 0.8)' },
+        ticks: { color: darkMode ? 'rgb(148, 163, 184)' : 'rgb(100, 116, 139)' }
       }
     }
   };
@@ -526,16 +526,16 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         display: true,
         position: 'right' as const,
         labels: {
-          color: 'rgb(203, 213, 225)',
+          color: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
           padding: 10,
           font: { size: 11 }
         }
       },
       tooltip: {
-        backgroundColor: 'rgb(30, 41, 59)',
-        titleColor: 'rgb(226, 232, 240)',
-        bodyColor: 'rgb(203, 213, 225)',
-        borderColor: 'rgb(51, 65, 85)',
+        backgroundColor: darkMode ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)',
+        titleColor: darkMode ? 'rgb(226, 232, 240)' : 'rgb(15, 23, 42)',
+        bodyColor: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
+        borderColor: darkMode ? 'rgb(51, 65, 85)' : 'rgb(226, 232, 240)',
         borderWidth: 1,
         padding: 12,
         callbacks: {
@@ -696,14 +696,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
     <div className="space-y-6">
       {/* Header with Tabs and Actions */}
       <div className="flex items-center justify-between">
-        <div className="flex border-b border-slate-700">
+        <div className={`flex border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
           <button
             onClick={() => setActiveTab('cash-flow')}
             className={`
               px-4 py-3 text-sm font-medium transition-colors border-b-2
               ${activeTab === 'cash-flow'
                 ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'}
+                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
             `}
           >
             Financial Analytics
@@ -714,7 +714,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
               px-4 py-3 text-sm font-medium transition-colors border-b-2
               ${activeTab === 'shared'
                 ? 'border-cyan-500 text-cyan-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'}
+                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`}
             `}
           >
             Shared (0)
@@ -724,7 +724,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition-colors text-slate-300"
+            className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-slate-700/50 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
             title="Filter"
           >
             <Filter size={18} />
@@ -742,16 +742,16 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4 backdrop-blur-sm">
+        <div className={`rounded-xl border p-4 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-slate-300 mb-2">Period</label>
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Period</label>
               <div className="relative">
-                <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Calendar size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                 <select
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all appearance-none"
+                  className={`w-full pl-10 pr-10 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all appearance-none ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600/50' : 'bg-white text-slate-900 border-slate-300'}`}
                   style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1rem' }}
                 >
                   <option value="this-year">This Financial Year (Jul-Jun)</option>
@@ -762,9 +762,9 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
             </div>
 
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-slate-300 mb-2">Start Date</label>
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Start Date</label>
               <div className="relative">
-                <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Calendar size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   type="date"
                   value={startDate}
@@ -772,16 +772,16 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                     setStartDate(e.target.value);
                     setDateRange('custom');
                   }}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
-                  style={{ colorScheme: 'dark' }}
+                  className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600/50' : 'bg-white text-slate-900 border-slate-300'}`}
+                  style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                 />
               </div>
             </div>
 
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-slate-300 mb-2">End Date</label>
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>End Date</label>
               <div className="relative">
-                <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Calendar size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
                 <input
                   type="date"
                   value={endDate}
@@ -789,8 +789,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                     setEndDate(e.target.value);
                     setDateRange('custom');
                   }}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600/50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
-                  style={{ colorScheme: 'dark' }}
+                  className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all ${darkMode ? 'bg-slate-700 text-slate-200 border-slate-600/50' : 'bg-white text-slate-900 border-slate-300'}`}
+                  style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                 />
               </div>
             </div>
@@ -825,8 +825,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
               })()}
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-slate-400 font-medium">Total Income</p>
-              <p className="text-3xl font-bold text-white">{formatCurrency(reportData.thisPeriod.income)}</p>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income</p>
+              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(reportData.thisPeriod.income)}</p>
               <p className="text-xs text-slate-500">vs {formatCurrency(reportData.previousPeriod.income)} last period</p>
               <p className="text-xs text-emerald-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click for detailed report →</p>
             </div>
@@ -858,8 +858,8 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
               })()}
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-slate-400 font-medium">Total Expenses</p>
-              <p className="text-3xl font-bold text-white">{formatCurrency(reportData.thisPeriod.expenses)}</p>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</p>
+              <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(reportData.thisPeriod.expenses)}</p>
               <p className="text-xs text-slate-500">vs {formatCurrency(reportData.previousPeriod.expenses)} last period</p>
               <p className="text-xs text-red-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Click for detailed report →</p>
             </div>
@@ -891,7 +891,7 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
               })()}
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-slate-400 font-medium">Net Cash Flow</p>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Cash Flow</p>
               <p className={`text-3xl font-bold ${reportData.thisPeriod.netCash >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatCurrency(reportData.thisPeriod.netCash)}
               </p>
@@ -920,14 +920,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
                 <Landmark className={bankPosition.currentBalance >= 0 ? 'text-blue-400' : 'text-red-400'} size={24} />
               </div>
               {bankPosition.openingBalance > 0 && (
-                <div className="flex items-center gap-1 text-sm font-medium text-slate-400">
+                <div className={`flex items-center gap-1 text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                   <Sparkles size={16} />
                 </div>
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-slate-400 font-medium">Bank Position</p>
-              <p className={`text-3xl font-bold ${bankPosition.currentBalance >= 0 ? 'text-white' : 'text-red-400'}`}>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Bank Position</p>
+              <p className={`text-3xl font-bold ${bankPosition.currentBalance >= 0 ? (darkMode ? 'text-white' : 'text-slate-900') : 'text-red-400'}`}>
                 {formatCurrency(bankPosition.currentBalance)}
               </p>
               {bankPosition.openingBalance > 0 ? (
@@ -943,14 +943,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Income vs Expenses Trend */}
-        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <LineChartIcon size={20} className="text-cyan-400" />
                 Income vs Expenses Trend
               </h3>
-              <p className="text-sm text-slate-400 mt-1">Monthly comparison</p>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Monthly comparison</p>
             </div>
           </div>
           <div className="h-[300px]">
@@ -959,14 +959,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Net Cash Flow Chart */}
-        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <BarChart3 size={20} className="text-cyan-400" />
                 Net Cash Flow
               </h3>
-              <p className="text-sm text-slate-400 mt-1">Monthly net position</p>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Monthly net position</p>
             </div>
           </div>
           <div className="h-[300px]">
@@ -975,14 +975,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Income Breakdown */}
-        <div className="bg-slate-800/40 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
+        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/40 border-slate-700/40' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <PieChartIcon size={20} className="text-emerald-400" />
                 Income by Category
               </h3>
-              <p className="text-sm text-slate-400 mt-1">Top 5 sources</p>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Top 5 sources</p>
             </div>
           </div>
           <div className="h-[300px]">
@@ -995,14 +995,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Expenses Breakdown */}
-        <div className="bg-slate-800/40 rounded-2xl border border-slate-700/40 p-6 backdrop-blur-sm">
+        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/40 border-slate-700/40' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h3 className={`text-lg font-semibold flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 <PieChartIcon size={20} className="text-red-400" />
                 Expenses by Category
               </h3>
-              <p className="text-sm text-slate-400 mt-1">Top 5 categories</p>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Top 5 categories</p>
             </div>
           </div>
           <div className="h-[300px]">
@@ -1018,14 +1018,14 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
       {/* Financial Health Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Cash Runway */}
-        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-amber-500/10 rounded-xl">
               <DollarSign className="text-amber-400" size={24} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Average Monthly Burn</h3>
-              <p className="text-sm text-slate-400">Based on current period</p>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Average Monthly Burn</h3>
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Based on current period</p>
             </div>
           </div>
           <div className="mt-4">
@@ -1035,27 +1035,27 @@ export const FinancesReports: React.FC<FinancesReportsProps> = ({ darkMode, asso
         </div>
 
         {/* Year to Date Summary */}
-        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+        <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 bg-blue-500/10 rounded-xl">
               <CreditCard className="text-blue-400" size={24} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Year to Date Summary</h3>
-              <p className="text-sm text-slate-400">FY {(() => { const t = new Date(); const s = t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1; return `${s}/${s + 1}`; })()}</p>
+              <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Year to Date Summary</h3>
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>FY {(() => { const t = new Date(); const s = t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1; return `${s}/${s + 1}`; })()}</p>
             </div>
           </div>
           <div className="space-y-3 mt-4">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Total Income</span>
+              <span className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income</span>
               <span className="font-semibold text-emerald-400">{formatCurrency(reportData.yearToDate.income)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Total Expenses</span>
+              <span className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expenses</span>
               <span className="font-semibold text-red-400">{formatCurrency(reportData.yearToDate.expenses)}</span>
             </div>
-            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between">
-              <span className="text-white font-medium">Net Position</span>
+            <div className={`pt-3 border-t flex items-center justify-between ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+              <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>Net Position</span>
               <span className={`font-bold text-lg ${reportData.yearToDate.netCash >= 0 ? 'text-cyan-400' : 'text-red-400'}`}>
                 {formatCurrency(reportData.yearToDate.netCash)}
               </span>

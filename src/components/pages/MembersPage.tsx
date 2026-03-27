@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Pencil, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2, KeyRound, RefreshCw, MoveVertical as MoreVertical } from 'lucide-react';
+import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Pencil, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2, KeyRound, RefreshCw, MoveVertical as MoreVertical, SquareCheck as CheckSquare, Square, Tag } from 'lucide-react';
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -89,6 +89,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [resendingActivation, setResendingActivation] = useState<string | null>(null);
   const activationMenuRef = useRef<HTMLDivElement>(null);
 
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [bulkMembershipType, setBulkMembershipType] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (activationMenuRef.current && !activationMenuRef.current.contains(e.target as Node)) {
@@ -106,6 +111,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       fetchRemittanceStatuses();
       fetchFilterPresets();
       fetchEmailMatches();
+      fetchMembershipTypes();
     }
   }, [currentClub, filterStatus]);
 
@@ -190,6 +196,64 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       }
     } catch (err) {
       console.error('Error checking email matches:', err);
+    }
+  };
+
+  const fetchMembershipTypes = async () => {
+    if (!currentClub?.clubId) return;
+    try {
+      const { data, error } = await supabase
+        .from('membership_types')
+        .select('id, name')
+        .eq('club_id', currentClub.clubId)
+        .order('name', { ascending: true });
+      if (error) throw error;
+      setMembershipTypes(data || []);
+    } catch (err) {
+      console.error('Error fetching membership types:', err);
+    }
+  };
+
+  const toggleMemberSelection = (memberId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(memberId)) {
+        next.delete(memberId);
+      } else {
+        next.add(memberId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMemberIds.size === filteredMembers.length) {
+      setSelectedMemberIds(new Set());
+    } else {
+      setSelectedMemberIds(new Set(filteredMembers.map(m => m.id)));
+    }
+  };
+
+  const handleBulkAssignMembershipType = async () => {
+    if (!bulkMembershipType || selectedMemberIds.size === 0) return;
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('members')
+        .update({ membership_level: bulkMembershipType })
+        .in('id', Array.from(selectedMemberIds));
+
+      if (error) throw error;
+
+      addNotification('success', `Membership type updated for ${selectedMemberIds.size} member${selectedMemberIds.size === 1 ? '' : 's'}`);
+      setSelectedMemberIds(new Set());
+      setBulkMembershipType('');
+      await fetchMembers();
+    } catch (err: any) {
+      addNotification('error', err.message || 'Failed to update membership types');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -1043,7 +1107,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   className="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm hover:bg-slate-600 transition-colors"
                   title="Manage Filters"
                 >
-                  <Edit2 size={16} />
+                  <Pencil size={16} />
                 </button>
               </div>
             )}
@@ -1094,11 +1158,69 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         })}
       </div>
 
+      {selectedMemberIds.size > 0 && (
+        <div className="flex items-center gap-4 px-4 py-3 bg-blue-600/15 border border-blue-500/30 rounded-xl">
+          <div className="flex items-center gap-2">
+            <CheckSquare size={18} className="text-blue-400" />
+            <span className="text-sm font-medium text-blue-300">
+              {selectedMemberIds.size} member{selectedMemberIds.size === 1 ? '' : 's'} selected
+            </span>
+          </div>
+          <div className="h-5 w-px bg-slate-600" />
+          <div className="flex items-center gap-2">
+            <Tag size={16} className="text-slate-400" />
+            <select
+              value={bulkMembershipType}
+              onChange={(e) => setBulkMembershipType(e.target.value)}
+              className="px-3 py-1.5 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Assign membership type...</option>
+              {membershipTypes.map(type => (
+                <option key={type.id} value={type.name}>{type.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleBulkAssignMembershipType}
+              disabled={!bulkMembershipType || bulkUpdating}
+              className="btn-primary-green flex items-center gap-2 px-4 py-1.5 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {bulkUpdating ? (
+                <><Loader2 size={14} className="animate-spin" /> Updating...</>
+              ) : (
+                'Apply'
+              )}
+            </button>
+          </div>
+          <div className="ml-auto">
+            <button
+              onClick={() => { setSelectedMemberIds(new Set()); setBulkMembershipType(''); }}
+              className="text-slate-400 hover:text-white transition-colors p-1"
+              title="Clear selection"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-700/50">
               <tr>
+                <th className="px-3 py-3 w-10">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="text-slate-400 hover:text-white transition-colors"
+                    title={selectedMemberIds.size === filteredMembers.length ? 'Deselect all' : 'Select all'}
+                  >
+                    {selectedMemberIds.size > 0 && selectedMemberIds.size === filteredMembers.length ? (
+                      <CheckSquare size={18} className="text-blue-400" />
+                    ) : (
+                      <Square size={18} />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
                   <button
                     onClick={toggleSort}
@@ -1119,27 +1241,40 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             <tbody className="divide-y divide-slate-700/50">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     Loading members...
                   </td>
                 </tr>
               ) : filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     No members found
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map(member => {
-                  const isExpired = !member.is_financial || 
+                  const isExpired = !member.is_financial ||
                     (member.renewal_date && new Date(member.renewal_date) < new Date());
-                  
+                  const isSelected = selectedMemberIds.has(member.id);
+
                   return (
                     <tr
                       key={member.id}
                       onClick={() => handleEditMember(member.id)}
-                      className="hover:bg-slate-700/30 cursor-pointer transition-colors"
+                      className={`hover:bg-slate-700/30 cursor-pointer transition-colors ${isSelected ? 'bg-blue-600/10' : ''}`}
                     >
+                      <td className="px-3 py-4 w-10">
+                        <button
+                          onClick={(e) => toggleMemberSelection(member.id, e)}
+                          className="text-slate-400 hover:text-white transition-colors"
+                        >
+                          {isSelected ? (
+                            <CheckSquare size={18} className="text-blue-400" />
+                          ) : (
+                            <Square size={18} />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="relative flex-shrink-0">
