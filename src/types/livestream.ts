@@ -32,6 +32,40 @@ export interface OverlayStyle {
   fontSize: number;
 }
 
+export type SegmentUploadStatus = 'pending' | 'uploading' | 'uploaded' | 'failed' | 'cleanup_complete';
+export type SegmentTriggerType = 'race_scored' | 'on_hold' | 'manual' | 'stream_end';
+
+export interface LivestreamRaceSegment {
+  id: string;
+  session_id: string;
+  club_id: string;
+  event_id?: string;
+  race_number: number;
+  heat_number?: number;
+  segment_title: string;
+  cloudflare_video_id?: string;
+  cloudflare_input_id?: string;
+  segment_start_time: string;
+  segment_end_time?: string;
+  duration?: number;
+  youtube_video_id?: string;
+  youtube_playlist_id?: string;
+  upload_status: SegmentUploadStatus;
+  upload_error?: string;
+  trigger_type: SegmentTriggerType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LivestreamYouTubePlaylist {
+  id: string;
+  club_id: string;
+  event_id: string;
+  youtube_playlist_id: string;
+  playlist_title: string;
+  created_at: string;
+}
+
 export interface LivestreamSession {
   id: string;
   club_id: string;
@@ -57,7 +91,7 @@ export interface LivestreamSession {
   end_time?: string;
 
   event_id?: string;
-  event_day?: number; // For multi-day events: which day this stream covers (1, 2, 3, etc.)
+  event_day?: number;
   heat_number?: number;
 
   status: LivestreamStatus;
@@ -77,6 +111,11 @@ export interface LivestreamSession {
 
   viewer_count: number;
   peak_viewers: number;
+
+  auto_segment_enabled: boolean;
+  current_race_number: number;
+  current_segment_start?: string;
+  youtube_playlist_id?: string;
 
   created_at: string;
   updated_at: string;

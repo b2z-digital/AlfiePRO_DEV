@@ -100,6 +100,9 @@ Deno.serve(async (req: Request) => {
       case "ensureRecording":
         return await ensureRecording(credentials, sessionData, corsHeaders);
 
+      case "deleteVideo":
+        return await deleteVideo(credentials, sessionData, corsHeaders);
+
       default:
         return new Response(
           JSON.stringify({ error: "Invalid action" }),
@@ -831,6 +834,48 @@ async function ensureRecording(
   console.log("[CF Stream] Recording enabled successfully for:", liveInputId);
   return new Response(
     JSON.stringify({ success: true, message: "Recording enabled", mode: "automatic" }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+async function deleteVideo(
+  credentials: CloudflareCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>
+): Promise<Response> {
+  const { videoId } = sessionData;
+
+  if (!videoId) {
+    return new Response(
+      JSON.stringify({ error: "videoId is required" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log("[CF Stream] Deleting video:", videoId);
+
+  const response = await fetch(
+    `${CF_API_BASE}/accounts/${credentials.account_id}/stream/${videoId}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${credentials.api_token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    console.error("[CF Stream] Error deleting video:", data);
+    return new Response(
+      JSON.stringify({ error: data.errors?.[0]?.message || "Failed to delete video" }),
+      { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  console.log("[CF Stream] Video deleted:", videoId);
+  return new Response(
+    JSON.stringify({ success: true }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
