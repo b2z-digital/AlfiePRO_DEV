@@ -72,6 +72,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const segmentTransitionRef = useRef(false);
   const pendingSegmentStartRef = useRef(false);
   const [showTitleCard, setShowTitleCard] = useState(false);
+  const [titleCardTrigger, setTitleCardTrigger] = useState(0);
   const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastBytesSentRef = useRef<number>(0);
 
@@ -131,7 +132,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
             if (activeSession?.cloudflare_whip_url) {
               const stream = compositedStreamRef.current || activePreviewStreamRef.current || mediaStreamRef.current;
               if (stream) {
-                stopWhipStreaming();
+                await stopWhipStreaming();
                 await new Promise(r => setTimeout(r, 1000));
                 await startWhipStreaming(activeSession.cloudflare_whip_url, stream);
               }
@@ -451,7 +452,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         });
       }
 
-      stopWhipStreaming();
+      await stopWhipStreaming();
+      console.log('[Segment] WHIP disconnected. Waiting 3s for Cloudflare to finalize recording...');
+      await new Promise(r => setTimeout(r, 3000));
       setCurrentSegment(null);
 
       if (isFinalSegment) {
@@ -471,7 +474,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       if (pendingSegmentStartRef.current && !isFinalSegment) {
         pendingSegmentStartRef.current = false;
         console.log('[Segment] Processing queued segment start after stop completed');
-        setTimeout(() => handleSegmentStart(), 500);
+        setTimeout(() => handleSegmentStart(), 1500);
       }
     }
   };
@@ -534,23 +537,10 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         return;
       }
 
-      await new Promise<void>((resolve) => {
-        const pc = whipPeerConnectionRef.current;
-        if (!pc) { resolve(); return; }
-        if (pc.connectionState === 'connected') { resolve(); return; }
-        const timeout = setTimeout(resolve, 8000);
-        const handler = () => {
-          if (pc.connectionState === 'connected' || pc.connectionState === 'failed') {
-            clearTimeout(timeout);
-            pc.removeEventListener('connectionstatechange', handler);
-            resolve();
-          }
-        };
-        pc.addEventListener('connectionstatechange', handler);
-      });
-
       setIsPaused(false);
       await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
+
+      setTitleCardTrigger(prev => prev + 1);
 
       const nextRaceNumber = segmentCount + 1;
       const segmentTitle = buildSegmentTitle(nextRaceNumber);
@@ -646,10 +636,13 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const whipResourceUrlRef = useRef<string | null>(null);
+
   const startWhipStreaming = async (whipUrl: string, streamToSend: MediaStream): Promise<boolean> => {
     try {
       setWhipStatus('connecting');
       if (whipPeerConnectionRef.current) { whipPeerConnectionRef.current.close(); whipPeerConnectionRef.current = null; }
+      whipResourceUrlRef.current = null;
 
       const liveTracks = streamToSend.getTracks().filter(t => t.readyState === 'live' && t.enabled);
       const hasVideo = liveTracks.some(t => t.kind === 'video');
@@ -720,15 +713,59 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       const localDescription = pc.localDescription;
       if (!localDescription) throw new Error('No local description after ICE gathering');
       console.log('[WHIP] Sending offer to:', whipUrl);
+      console.log('[WHIP] SDP offer length:', localDescription.sdp?.length, 'bytes');
       const response = await fetch(whipUrl, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: localDescription.sdp });
+      console.log('[WHIP] Response status:', response.status);
+      console.log('[WHIP] Response headers - Location:', response.headers.get('Location'));
+      console.log('[WHIP] Response headers - Content-Type:', response.headers.get('Content-Type'));
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
         console.error('[WHIP] Server error:', response.status, errorText);
         throw new Error(`WHIP server error: ${response.status} ${errorText}`);
       }
+      const resourceUrl = response.headers.get('Location');
+      if (resourceUrl) {
+        whipResourceUrlRef.current = resourceUrl.startsWith('http') ? resourceUrl : new URL(resourceUrl, whipUrl).href;
+        console.log('[WHIP] Resource URL for teardown:', whipResourceUrlRef.current);
+      }
       const answerSdp = await response.text();
-      console.log('[WHIP] Received answer SDP, setting remote description');
+      console.log('[WHIP] Received answer SDP length:', answerSdp.length, 'bytes');
+      if (!answerSdp || answerSdp.length < 50) {
+        console.error('[WHIP] Answer SDP appears invalid:', answerSdp.substring(0, 200));
+        throw new Error('Invalid SDP answer from WHIP server');
+      }
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      console.log('[WHIP] Remote description set. Waiting for connection...');
+
+      const connected = await new Promise<boolean>((resolve) => {
+        if (pc.connectionState === 'connected') { resolve(true); return; }
+        const timeout = setTimeout(() => {
+          console.warn('[WHIP] Connection timeout after 10s. State:', pc.connectionState, 'ICE:', pc.iceConnectionState);
+          resolve(pc.connectionState === 'connected');
+        }, 10000);
+        const handler = () => {
+          if (pc.connectionState === 'connected') {
+            clearTimeout(timeout);
+            pc.removeEventListener('connectionstatechange', handler);
+            resolve(true);
+          } else if (pc.connectionState === 'failed') {
+            clearTimeout(timeout);
+            pc.removeEventListener('connectionstatechange', handler);
+            resolve(false);
+          }
+        };
+        pc.addEventListener('connectionstatechange', handler);
+      });
+
+      if (!connected) {
+        console.error('[WHIP] Connection failed to establish. Final state:', pc.connectionState);
+        pc.close();
+        whipPeerConnectionRef.current = null;
+        setWhipStatus('error');
+        return false;
+      }
+
+      console.log('[WHIP] Connection established successfully!');
       return true;
     } catch (error) {
       console.error('[WHIP] Error:', error);
@@ -738,7 +775,14 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     }
   };
 
-  const stopWhipStreaming = () => {
+  const stopWhipStreaming = async () => {
+    if (whipResourceUrlRef.current) {
+      try {
+        console.log('[WHIP] Sending DELETE to resource URL:', whipResourceUrlRef.current);
+        await fetch(whipResourceUrlRef.current, { method: 'DELETE' }).catch(() => {});
+      } catch {}
+      whipResourceUrlRef.current = null;
+    }
     if (whipPeerConnectionRef.current) { whipPeerConnectionRef.current.close(); whipPeerConnectionRef.current = null; }
     setWhipStatus('disconnected');
     lastBytesSentRef.current = 0;
@@ -962,7 +1006,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       if (autoSegmentEnabled && updatedSession.event_id) {
         setTimeout(() => startFirstSegment(), 1000);
       }
-    } catch (error) { console.error('Error going live:', error); setStreamStatus('testing'); stopWhipStreaming(); alert('Failed to go live.'); }
+    } catch (error) { console.error('Error going live:', error); setStreamStatus('testing'); await stopWhipStreaming(); alert('Failed to go live.'); }
   };
 
   const pauseResumeInProgressRef = useRef(false);
@@ -971,7 +1015,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     if (!activeSession || streamStatus !== 'live' || pauseResumeInProgressRef.current) return;
     pauseResumeInProgressRef.current = true;
     try {
-      stopWhipStreaming();
+      await stopWhipStreaming();
       setIsPaused(true);
       await livestreamStorage.updateSession(activeSession.id, { is_paused: true });
       addNotification('info', 'Broadcast paused. Viewers will see a hold screen.', 4000);
@@ -1016,55 +1060,18 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
 
       if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Reconnecting to streaming server...', 3000);
-        const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        let whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        if (!whipSuccess) {
+          console.warn('[Resume] First WHIP attempt failed, retrying...');
+          await new Promise(r => setTimeout(r, 2000));
+          whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+        }
         if (!whipSuccess) {
           addNotification('error', 'Failed to reconnect to streaming server.', 8000);
           pauseResumeInProgressRef.current = false;
           return;
         }
-
-        await new Promise<void>((resolve) => {
-          const pc = whipPeerConnectionRef.current;
-          if (!pc) { resolve(); return; }
-          if (pc.connectionState === 'connected') { resolve(); return; }
-          const timeout = setTimeout(resolve, 8000);
-          const handler = () => {
-            if (pc.connectionState === 'connected' || pc.connectionState === 'failed') {
-              clearTimeout(timeout);
-              pc.removeEventListener('connectionstatechange', handler);
-              resolve();
-            }
-          };
-          pc.addEventListener('connectionstatechange', handler);
-        });
-
-        if (whipPeerConnectionRef.current?.connectionState !== 'connected') {
-          console.warn('[Resume] WHIP did not reach connected state, retrying...');
-          stopWhipStreaming();
-          await new Promise(r => setTimeout(r, 1000));
-          const retrySuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-          if (!retrySuccess) {
-            addNotification('error', 'Failed to reconnect after retry.', 8000);
-            pauseResumeInProgressRef.current = false;
-            return;
-          }
-          await new Promise<void>((resolve) => {
-            const pc = whipPeerConnectionRef.current;
-            if (!pc) { resolve(); return; }
-            if (pc.connectionState === 'connected') { resolve(); return; }
-            const timeout = setTimeout(resolve, 8000);
-            const handler = () => {
-              if (pc.connectionState === 'connected' || pc.connectionState === 'failed') {
-                clearTimeout(timeout);
-                pc.removeEventListener('connectionstatechange', handler);
-                resolve();
-              }
-            };
-            pc.addEventListener('connectionstatechange', handler);
-          });
-        }
-
-        console.log('[Resume] WHIP connection state:', whipPeerConnectionRef.current?.connectionState);
+        console.log('[Resume] WHIP connected successfully');
       }
 
       setIsPaused(false);
@@ -1100,7 +1107,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         livestreamStorage.triggerSegmentProcessing(currentSegment.id).catch(() => {});
         setCurrentSegment(null);
       }
-      stopWhipStreaming();
+      await stopWhipStreaming();
       if (mediaStream) { mediaStream.getTracks().forEach(track => track.stop()); setMediaStream(null); }
       await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString(), is_paused: false });
       setStreamStatus('offline');
@@ -1204,7 +1211,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         } catch (e) {
           console.warn(`[WHIP] replaceTrack failed for ${sender.track.kind}, will reconnect`, e);
           if (activeSession?.cloudflare_whip_url) {
-            stopWhipStreaming();
+            await stopWhipStreaming();
             await new Promise(r => setTimeout(r, 500));
             await startWhipStreaming(activeSession.cloudflare_whip_url, newStream);
           }
@@ -1563,7 +1570,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
               <video ref={(el) => { (videoRef as React.MutableRefObject<HTMLVideoElement | null>).current = el; setVideoElReady(el); }} autoPlay muted playsInline className="w-full h-full object-cover bg-black" />
 
               {activeSession.enable_overlays && streamStatus !== 'offline' && (
-                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} />
+                <LivestreamOverlayRenderer ref={(el: HTMLDivElement | null) => { (overlayRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setOverlayElReady(el); }} session={activeSession} showTitleCard={showTitleCard} titleCardTrigger={titleCardTrigger} />
               )}
 
               {isPaused && streamStatus === 'live' && (
