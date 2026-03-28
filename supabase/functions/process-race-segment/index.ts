@@ -104,14 +104,19 @@ async function getCloudflareCredentials(
 async function waitForRecording(
   cfCreds: CloudflareCredentials,
   liveInputId: string,
-  maxAttempts = 12,
+  segmentStartTime?: string,
+  segmentEndTime?: string,
+  maxAttempts = 15,
   delayMs = 5000
 ): Promise<any> {
+  const segStart = segmentStartTime ? new Date(segmentStartTime).getTime() : 0;
+  const segEnd = segmentEndTime ? new Date(segmentEndTime).getTime() : Date.now();
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     console.log(`[Segment] Checking recordings (attempt ${attempt}/${maxAttempts})...`);
 
     const res = await fetch(
-      `${CF_API_BASE}/accounts/${cfCreds.account_id}/stream?search=${liveInputId}&type=live`,
+      `${CF_API_BASE}/accounts/${cfCreds.account_id}/stream/live_inputs/${liveInputId}/videos`,
       { headers: { Authorization: `Bearer ${cfCreds.api_token}` } }
     );
 
@@ -121,14 +126,32 @@ async function waitForRecording(
         (a: any, b: any) => new Date(b.created).getTime() - new Date(a.created).getTime()
       );
 
+      console.log(`[Segment] Found ${sorted.length} recordings for live input. Matching to segment window...`);
+
+      const matchedRecording = sorted.find((r: any) => {
+        const created = new Date(r.created).getTime();
+        const tolerance = 30000;
+        return created >= (segStart - tolerance) && created <= (segEnd + tolerance);
+      });
+
+      if (matchedRecording?.readyToStream) {
+        console.log(`[Segment] Found ready matched recording: ${matchedRecording.uid} (created: ${matchedRecording.created})`);
+        return matchedRecording;
+      }
+
+      if (matchedRecording && attempt >= 6) {
+        console.log(`[Segment] Using matched recording (not fully ready): ${matchedRecording.uid}`);
+        return matchedRecording;
+      }
+
       const readyRecording = sorted.find((r: any) => r.readyToStream);
-      if (readyRecording) {
-        console.log(`[Segment] Found ready recording: ${readyRecording.uid}`);
+      if (readyRecording && attempt >= 8) {
+        console.log(`[Segment] Falling back to latest ready recording: ${readyRecording.uid}`);
         return readyRecording;
       }
 
-      if (sorted.length > 0 && attempt >= 6) {
-        console.log(`[Segment] Using latest recording even if not fully ready: ${sorted[0].uid}`);
+      if (sorted.length > 0 && attempt >= 10) {
+        console.log(`[Segment] Last resort - using latest recording: ${sorted[0].uid}`);
         return sorted[0];
       }
     }
@@ -392,10 +415,10 @@ Deno.serve(async (req: Request) => {
       if (res.ok && data.success) {
         recording = data.result;
       } else {
-        recording = await waitForRecording(cfCreds, segment.cloudflare_input_id);
+        recording = await waitForRecording(cfCreds, segment.cloudflare_input_id, segment.segment_start_time, segment.segment_end_time);
       }
     } else {
-      recording = await waitForRecording(cfCreds, segment.cloudflare_input_id);
+      recording = await waitForRecording(cfCreds, segment.cloudflare_input_id, segment.segment_start_time, segment.segment_end_time);
     }
 
     const cfVideoId = recording.uid;
