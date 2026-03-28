@@ -727,6 +727,9 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       if (resourceUrl) {
         whipResourceUrlRef.current = resourceUrl.startsWith('http') ? resourceUrl : new URL(resourceUrl, whipUrl).href;
         console.log('[WHIP] Resource URL for teardown:', whipResourceUrlRef.current);
+      } else {
+        whipResourceUrlRef.current = whipUrl;
+        console.log('[WHIP] No Location header (CORS may block it), using WHIP URL as fallback:', whipUrl);
       }
       const answerSdp = await response.text();
       console.log('[WHIP] Received answer SDP length:', answerSdp.length, 'bytes');
@@ -776,10 +779,30 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   };
 
   const stopWhipStreaming = async () => {
+    if (whipPeerConnectionRef.current) {
+      const pc = whipPeerConnectionRef.current;
+      try {
+        const senders = pc.getSenders();
+        for (const sender of senders) {
+          const stats = await sender.getStats();
+          stats.forEach((report: any) => {
+            if (report.type === 'outbound-rtp' && report.kind === 'video') {
+              console.log(`[WHIP] Video stats before close - bytes: ${report.bytesSent}, packets: ${report.packetsSent}, frames: ${report.framesEncoded}`);
+            }
+          });
+        }
+      } catch {}
+    }
     if (whipResourceUrlRef.current) {
       try {
         console.log('[WHIP] Sending DELETE to resource URL:', whipResourceUrlRef.current);
-        await fetch(whipResourceUrlRef.current, { method: 'DELETE' }).catch(() => {});
+        const deleteResp = await fetch(whipResourceUrlRef.current, { method: 'DELETE' }).catch((e) => {
+          console.warn('[WHIP] DELETE request failed:', e);
+          return null;
+        });
+        if (deleteResp) {
+          console.log('[WHIP] DELETE response status:', deleteResp.status);
+        }
       } catch {}
       whipResourceUrlRef.current = null;
     }

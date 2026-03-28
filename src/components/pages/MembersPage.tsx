@@ -1600,18 +1600,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               <ChevronRight size={16} />
                             </button>
                           )}
-                          {filterStatus === 'archived' ? (
+                          {member.membership_status === 'archived' ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRestoreMember(member.id);
                               }}
                               className="p-1.5 rounded-lg text-green-400 hover:bg-green-900/30 transition-colors"
-                              title="Restore member"
+                              title="Restore archived member"
                             >
                               <ArchiveRestore size={16} />
                             </button>
-                          ) : filterStatus === 'cancelled' ? (
+                          ) : member.membership_status === 'cancelled' ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
