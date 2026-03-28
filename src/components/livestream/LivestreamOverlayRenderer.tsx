@@ -270,12 +270,32 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         }
 
         const heatManagement = quickRaces.heat_management as any;
-        const isHeatManagement = !!heatManagement && !!heatManagement.heats && Array.isArray(heatManagement.heats) && heatManagement.heats.length > 0;
+        const hasLegacyHeats = !!heatManagement?.heats && Array.isArray(heatManagement.heats) && heatManagement.heats.length > 0;
+        const hasSHRSRounds = !!heatManagement?.rounds && Array.isArray(heatManagement.rounds) && heatManagement.rounds.length > 0;
+        const isHeatManagement = hasLegacyHeats || hasSHRSRounds;
 
-        let displayHeatNumber: number | null = null;
-        let currentHeat: any = null;
+        let displayHeatLabel: string | null = null;
+        let displayRoundNumber: number | null = null;
+        let heatSkipperIndices: number[] | null = null;
 
-        if (isHeatManagement) {
+        if (hasSHRSRounds) {
+          const activeRoundNum = heatManagement.currentRound || 1;
+          const activeHeatDesig = heatManagement.currentHeat || 'A';
+          displayRoundNumber = activeRoundNum;
+
+          const activeRound = heatManagement.rounds.find((r: any) => r.round === activeRoundNum) || heatManagement.rounds[0];
+
+          if (activeRound?.heatAssignments && Array.isArray(activeRound.heatAssignments)) {
+            const activeAssignment = activeRound.heatAssignments.find((ha: any) => ha.heatDesignation === activeHeatDesig);
+            if (activeAssignment?.skipperIndices) {
+              heatSkipperIndices = activeAssignment.skipperIndices;
+              displayHeatLabel = `Qualifying Rd ${activeRoundNum} - Heat ${activeHeatDesig}`;
+            }
+          }
+
+          console.log('[Overlay Debug] SHRS format: round', activeRoundNum, 'heat', activeHeatDesig, 'indices:', heatSkipperIndices?.length);
+        } else if (hasLegacyHeats) {
+          let currentHeat: any = null;
           if (quickRaces.current_day) {
             currentHeat = heatManagement.heats.find((h: any) => h.heat_number === quickRaces.current_day);
           }
@@ -286,33 +306,49 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
             currentHeat = heatManagement.heats[0];
           }
 
-          if (session.heat_number && heatManagement.heats.some((h: any) => h.heat_number === session.heat_number)) {
-            const manualHeat = heatManagement.heats.find((h: any) => h.heat_number === session.heat_number);
-            if (manualHeat) {
-              currentHeat = manualHeat;
+          if (currentHeat) {
+            displayHeatLabel = `Heat ${currentHeat.heat_number}`;
+            displayRoundNumber = currentHeat.heat_number;
+
+            if (currentHeat.skippers && Array.isArray(currentHeat.skippers) && currentHeat.skippers.length > 0) {
+              const heatSkipperSet = new Set(
+                currentHeat.skippers.map((hs: any) => String(hs.sailNo || hs.sail_number || '').trim())
+              );
+              const filtered = allSkippers.filter((skipper: any) => {
+                const sailNum = String(skipper.sail_number || skipper.sailNo || '').trim();
+                return heatSkipperSet.has(sailNum);
+              });
+              if (filtered.length > 0) {
+                allSkippers = filtered;
+              }
             }
           }
-
-          displayHeatNumber = currentHeat?.heat_number || null;
         }
 
-        if (isHeatManagement && currentHeat && currentHeat.skippers && Array.isArray(currentHeat.skippers) && currentHeat.skippers.length > 0) {
-          console.log('[Overlay Debug] Filtering skippers for heat', displayHeatNumber, ':', currentHeat.skippers.length, 'entries');
+        if (hasSHRSRounds && heatSkipperIndices && heatSkipperIndices.length > 0) {
+          const skippersArray = quickRaces.skippers as any[];
+          if (skippersArray && Array.isArray(skippersArray)) {
+            const heatSkippers = heatSkipperIndices
+              .filter((idx: number) => idx >= 0 && idx < skippersArray.length)
+              .map((idx: number, pos: number) => {
+                const skipper = skippersArray[idx];
+                return {
+                  id: idx,
+                  skipper_name: skipper.name || skipper.skipper_name,
+                  sail_number: skipper.sailNo || skipper.sail_number,
+                  sailNo: skipper.sailNo,
+                  hull: skipper.hull || skipper.boatModel,
+                  boatModel: skipper.boatModel || skipper.hull,
+                  position: null,
+                  score: null,
+                };
+              });
 
-          const heatSkipperSet = new Set(
-            currentHeat.skippers.map((hs: any) => String(hs.sailNo || hs.sail_number || '').trim())
-          );
-
-          const filtered = allSkippers.filter((skipper: any) => {
-            const sailNum = String(skipper.sail_number || skipper.sailNo || '').trim();
-            return heatSkipperSet.has(sailNum);
-          });
-
-          if (filtered.length > 0) {
-            allSkippers = filtered;
+            if (heatSkippers.length > 0) {
+              allSkippers = heatSkippers;
+            }
           }
-
-          console.log('[Overlay Debug] Filtered to', allSkippers.length, 'skippers in heat');
+          console.log('[Overlay Debug] SHRS filtered to', allSkippers.length, 'skippers');
         }
 
         console.log('[Overlay Debug] Final skippers list:', allSkippers);
@@ -326,12 +362,12 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           raceStatus = 'in_progress';
         }
 
-        // Update live tracking data with race info
         setLiveTrackingData((prev: any) => ({
           ...prev,
           race_type: isHeatManagement ? 'heat' : 'fleet',
-          heat_number: displayHeatNumber || null,
-          race_number: quickRaces.current_day || 1,
+          heat_label: displayHeatLabel || null,
+          heat_number: displayRoundNumber || null,
+          race_number: displayRoundNumber || 1,
           event_name: eventData?.event_name || quickRaces.event_name,
           event_id: session.event_id,
           status: raceStatusData?.status || raceStatus,
@@ -512,7 +548,9 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       {config.showHeatNumber && (displayData || session.heat_number) && (
         <div className="absolute bottom-6 left-6">
           <p className="text-4xl font-bold text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}
+            {displayData?.heat_label || (
+              `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}`
+            )}
           </p>
         </div>
       )}
@@ -601,11 +639,13 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
                 <span className="text-slate-400 font-medium">
                   {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
-                {(displayData?.heat_number || displayData?.race_number || session.heat_number) && (
+                {(displayData?.heat_label || displayData?.heat_number || displayData?.race_number || session.heat_number) && (
                   <>
                     <span className="text-slate-600">|</span>
                     <span className="text-yellow-400 font-semibold">
-                      {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {displayData?.heat_number || displayData?.race_number || session.heat_number || 1}
+                      {displayData?.heat_label || (
+                        `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || 1}`
+                      )}
                     </span>
                   </>
                 )}
