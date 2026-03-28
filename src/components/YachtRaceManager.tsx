@@ -2548,39 +2548,53 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
   const handleCompleteHeat = (heat: HeatDesignation) => {
     if (!heatManagement) return;
 
-    // Pass the scoring system to completeHeat so it can use the right logic
     const updatedHeatManagement = completeHeat(heatManagement, heat, currentDropRules);
 
-    // Convert all heat results to race results for display
     const convertedResults = convertHeatResultsToRaceResults(updatedHeatManagement, skippers);
     if (convertedResults.length > 0) {
       setRaceResults(convertedResults);
 
-      // Update lastCompletedRace based on the CURRENT round if it just completed
-      // This enables scoring in the current round's column
       const currentRoundData = updatedHeatManagement.rounds.find(r => r.round === updatedHeatManagement.currentRound);
       if (currentRoundData?.completed) {
-        // Current round just completed - update lastCompletedRace to current round
         console.log('Round', updatedHeatManagement.currentRound, 'completed - updating lastCompletedRace');
         setLastCompletedRace(updatedHeatManagement.currentRound);
 
-        // Check if next round exists
+        const currentEvent = getCurrentEvent();
+        if (currentEvent?.id && currentEvent?.enableLiveTracking) {
+          const completedRound = updatedHeatManagement.currentRound;
+          updateRaceStatus(
+            currentEvent.id,
+            'on_hold',
+            `Qualifying Rd ${completedRound} complete`,
+            currentEvent.clubId,
+            completedRound
+          ).catch(() => {});
+        }
+
         const nextRoundNumber = updatedHeatManagement.currentRound + 1;
         const nextRoundExists = updatedHeatManagement.rounds.some(r => r.round === nextRoundNumber);
 
         if (nextRoundExists) {
-          // Automatically advance to next round
           updatedHeatManagement.currentRound = nextRoundNumber;
 
-          // Determine scoring system message
           const scoringSystem = updatedHeatManagement.configuration.scoringSystem || 'hms';
           const mode = updatedHeatManagement.configuration.shrsAssignmentMode;
           const systemName = scoringSystem === 'shrs' ? `SHR-${mode === 'preset' ? 'B' : 'P'}` : 'HMS';
 
+          if (currentEvent?.id && currentEvent?.enableLiveTracking) {
+            setTimeout(() => {
+              updateRaceStatus(
+                currentEvent.id,
+                'live',
+                `Qualifying Rd ${nextRoundNumber}`,
+                currentEvent.clubId,
+                nextRoundNumber
+              ).catch(() => {});
+            }, 3000);
+          }
         } else {
         }
       } else {
-        // Round not completed yet - set to highest completed round
         const completedRounds = updatedHeatManagement.rounds.filter(r => r.completed);
         const highestCompletedRound = completedRounds.length > 0
           ? Math.max(...completedRounds.map(r => r.round))
