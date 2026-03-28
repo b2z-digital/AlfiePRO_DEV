@@ -129,7 +129,8 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
             num_races,
             series_id,
             current_day,
-            round_index
+            round_index,
+            last_completed_race
           `)
           .eq('series_id', seriesId)
           .eq('round_index', dayNumber)
@@ -149,7 +150,8 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
             heat_management: data.heat_management,
             num_races: data.num_races,
             current_day: dayNumber,
-            public_event_id: null
+            public_event_id: null,
+            last_completed_race: (data as any).last_completed_race
           };
         }
         error = roundError;
@@ -169,7 +171,8 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
             heat_management,
             num_races,
             current_day,
-            public_event_id
+            public_event_id,
+            last_completed_race
           `)
           .eq('id', session.event_id)
           .maybeSingle();
@@ -364,12 +367,16 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           raceStatus = 'in_progress';
         }
 
+        const currentRaceNumber = isHeatManagement
+          ? (displayRoundNumber || 1)
+          : ((quickRaces.last_completed_race || 0) + 1);
+
         setLiveTrackingData((prev: any) => ({
           ...prev,
           race_type: isHeatManagement ? 'heat' : 'fleet',
           heat_label: displayHeatLabel || null,
           heat_number: displayRoundNumber || null,
-          race_number: displayRoundNumber || 1,
+          race_number: currentRaceNumber,
           event_name: eventData?.event_name || quickRaces.event_name,
           event_id: session.event_id,
           status: raceStatusData?.status || raceStatus,

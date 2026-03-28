@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoveHorizontal as MoreHorizontal, X, GripVertical, Check, Users, Award, Eye, Timer, Flag, Pause } from 'lucide-react';
 import { Skipper, RaceResult } from '../types';
 import { RaceEvent } from '../types/race';
 import { LetterScoreSelector } from './LetterScoreSelector';
@@ -14,6 +14,7 @@ import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import type { ObserverAssignment } from '../utils/observerUtils';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { RaceElapsedTimer } from './start-box/RaceElapsedTimer';
+import { LiveStatusControl } from './LiveStatusControl';
 
 interface TouchModeScoringProps {
   skippers: Skipper[];
@@ -964,6 +965,9 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
             <Timer size={16} />
             Starter Console
           </button>
+          {currentEvent?.id && currentEvent?.enableLiveTracking && !currentEvent?.completed && (
+            <LiveStatusControl eventId={currentEvent.id} darkMode={darkMode} />
+          )}
         </div>
 
         <div className="flex items-center gap-4">

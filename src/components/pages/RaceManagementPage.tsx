@@ -1458,8 +1458,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                       : 'bg-white/50 text-slate-400 cursor-not-allowed'
                     : darkMode
-                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
-                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
+                      ? 'bg-amber-900/90 hover:bg-amber-800 text-amber-400'
+                      : 'bg-amber-50/90 hover:bg-amber-100 text-amber-600'
                 }`}
                 title={hasEventStartedScoring(race) ? "Cannot edit - scoring has commenced" : "Edit event"}
                 disabled={hasEventStartedScoring(race)}
@@ -1730,8 +1730,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                       : 'bg-white/50 text-slate-400 cursor-not-allowed'
                     : darkMode
-                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
-                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
+                      ? 'bg-amber-900/90 hover:bg-amber-800 text-amber-400'
+                      : 'bg-amber-50/90 hover:bg-amber-100 text-amber-600'
                 }`}
                 title={isSeriesFullyCompleted(s) ? "Cannot edit - all rounds completed" : "Edit series"}
                 disabled={isSeriesFullyCompleted(s)}
