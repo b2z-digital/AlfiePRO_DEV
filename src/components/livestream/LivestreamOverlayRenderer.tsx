@@ -28,7 +28,9 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
   }, [session.id]);
 
   useEffect(() => {
-    // Subscribe to live tracking if event is linked
+    setLiveTrackingData(null);
+    setLiveSkippers([]);
+
     if (session.event_id) {
       loadLiveTrackingData();
 
@@ -267,45 +269,48 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           });
         }
 
-        // Extract heat/race info from heat_management if available
         const heatManagement = quickRaces.heat_management as any;
-        const isHeatManagement = !!heatManagement;
+        const isHeatManagement = !!heatManagement && !!heatManagement.heats && Array.isArray(heatManagement.heats) && heatManagement.heats.length > 0;
 
-        // Determine which heat/race to show based on manual selection or auto-detection
-        let displayHeatNumber = session.heat_number; // Manual selection takes priority
-        let currentHeat = null;
+        let displayHeatNumber: number | null = null;
+        let currentHeat: any = null;
 
-        if (isHeatManagement && heatManagement.heats) {
-          if (displayHeatNumber) {
-            // Find manually selected heat
-            currentHeat = heatManagement.heats.find((h: any) => h.heat_number === displayHeatNumber);
-          } else {
-            // Auto-detect: Use current_day from quick_races or find first incomplete heat
-            if (quickRaces.current_day) {
-              currentHeat = heatManagement.heats.find((h: any) => h.heat_number === quickRaces.current_day);
-            }
-            if (!currentHeat) {
-              currentHeat = heatManagement.heats.find((h: any) => !h.completed);
-            }
-            if (currentHeat) {
-              displayHeatNumber = currentHeat.heat_number;
+        if (isHeatManagement) {
+          if (quickRaces.current_day) {
+            currentHeat = heatManagement.heats.find((h: any) => h.heat_number === quickRaces.current_day);
+          }
+          if (!currentHeat) {
+            currentHeat = heatManagement.heats.find((h: any) => !h.completed);
+          }
+          if (!currentHeat) {
+            currentHeat = heatManagement.heats[0];
+          }
+
+          if (session.heat_number && heatManagement.heats.some((h: any) => h.heat_number === session.heat_number)) {
+            const manualHeat = heatManagement.heats.find((h: any) => h.heat_number === session.heat_number);
+            if (manualHeat) {
+              currentHeat = manualHeat;
             }
           }
+
+          displayHeatNumber = currentHeat?.heat_number || null;
         }
 
-        // Filter skippers for heat racing
-        if (isHeatManagement && currentHeat && currentHeat.skippers) {
-          console.log('[Overlay Debug] Filtering skippers for heat', displayHeatNumber, ':', currentHeat.skippers);
+        if (isHeatManagement && currentHeat && currentHeat.skippers && Array.isArray(currentHeat.skippers) && currentHeat.skippers.length > 0) {
+          console.log('[Overlay Debug] Filtering skippers for heat', displayHeatNumber, ':', currentHeat.skippers.length, 'entries');
 
-          // Filter to only show skippers in the current heat
-          allSkippers = allSkippers.filter((skipper: any) => {
-            // Match by sail number or skipper name
-            return currentHeat.skippers.some((heatSkipper: any) =>
-              heatSkipper.sailNo === skipper.sail_number ||
-              heatSkipper.sailNo === skipper.sailNo ||
-              heatSkipper.name === skipper.skipper_name
-            );
+          const heatSkipperSet = new Set(
+            currentHeat.skippers.map((hs: any) => String(hs.sailNo || hs.sail_number || '').trim())
+          );
+
+          const filtered = allSkippers.filter((skipper: any) => {
+            const sailNum = String(skipper.sail_number || skipper.sailNo || '').trim();
+            return heatSkipperSet.has(sailNum);
           });
+
+          if (filtered.length > 0) {
+            allSkippers = filtered;
+          }
 
           console.log('[Overlay Debug] Filtered to', allSkippers.length, 'skippers in heat');
         }
@@ -504,11 +509,10 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         </div>
       )}
 
-      {/* Race Number - Bottom Left - Yellow like example */}
       {config.showHeatNumber && (displayData || session.heat_number) && (
         <div className="absolute bottom-6 left-6">
           <p className="text-4xl font-bold text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {session.heat_number || displayData?.heat_number || displayData?.race_number || '1'}
+            {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}
           </p>
         </div>
       )}
@@ -597,11 +601,11 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
                 <span className="text-slate-400 font-medium">
                   {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
-                {(session.heat_number || displayData?.heat_number || displayData?.race_number) && (
+                {(displayData?.heat_number || displayData?.race_number || session.heat_number) && (
                   <>
                     <span className="text-slate-600">|</span>
                     <span className="text-yellow-400 font-semibold">
-                      {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {session.heat_number || displayData?.heat_number || displayData?.race_number || 1}
+                      {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {displayData?.heat_number || displayData?.race_number || session.heat_number || 1}
                     </span>
                   </>
                 )}
