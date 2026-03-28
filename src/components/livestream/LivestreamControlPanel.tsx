@@ -408,10 +408,12 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
         if (segmentTransitionRef.current) return;
 
         if (raceStatus === 'on_hold' || raceStatus === 'completed_for_day' || raceStatus === 'event_complete') {
-          await handleRaceSegmentTransition(
+          await handleSegmentStop(
             raceStatus === 'on_hold' ? 'on_hold' : 'race_scored',
             raceStatus === 'event_complete' || raceStatus === 'completed_for_day'
           );
+        } else if (raceStatus === 'live') {
+          await handleSegmentStart();
         }
       }
     );
@@ -419,7 +421,16 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     return unsubscribe;
   }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
 
-  const handleRaceSegmentTransition = async (triggerType: 'race_scored' | 'on_hold' | 'manual' | 'stream_end', isFinalSegment = false) => {
+  const buildSegmentTitle = (raceNumber: number) => {
+    const eventTitle = activeSession?.title || 'Race';
+    const heatNum = activeSession?.heat_number;
+    if (heatNum) {
+      return `Heat ${heatNum} - Race ${raceNumber} | ${eventTitle}`;
+    }
+    return `Race ${raceNumber} | ${eventTitle}`;
+  };
+
+  const handleSegmentStop = async (triggerType: 'race_scored' | 'on_hold' | 'manual' | 'stream_end', isFinalSegment = false) => {
     if (!activeSession || segmentTransitionRef.current) return;
     segmentTransitionRef.current = true;
     setSegmentProcessing(true);
@@ -427,7 +438,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
     try {
       if (currentSegment) {
         await livestreamStorage.finalizeSegment(currentSegment.id, triggerType);
-        addNotification('info', `Race ${currentSegment.race_number} segment saved. Processing...`, 4000);
+        addNotification('info', `Race ${currentSegment.race_number} recording saved. Processing upload...`, 4000);
 
         livestreamStorage.triggerSegmentProcessing(currentSegment.id).catch((err) => {
           console.error('[Segment] Background processing error:', err);
@@ -435,65 +446,103 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
       }
 
       stopWhipStreaming();
-      await new Promise(r => setTimeout(r, 2000));
+      setCurrentSegment(null);
 
-      if (!isFinalSegment && activeSession.cloudflare_whip_url) {
-        const nextRaceNumber = segmentCount + 2;
-        const rawStream = activePreviewStream || mediaStream;
-        if (!rawStream) {
-          addNotification('error', 'No video source for next segment', 5000);
-          segmentTransitionRef.current = false;
-          setSegmentProcessing(false);
-          return;
-        }
-
-        let streamToSend = rawStream;
-        const cs = compositedStreamRef.current;
-        if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
-          streamToSend = cs;
-        }
-
-        const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
-        if (!whipSuccess) {
-          addNotification('error', 'Failed to start new segment. Try resuming manually.', 8000);
-          setIsPaused(true);
-          await livestreamStorage.updateSession(activeSession.id, { is_paused: true });
-          segmentTransitionRef.current = false;
-          setSegmentProcessing(false);
-          return;
-        }
-
-        const eventTitle = activeSession.title || 'Race';
-        const segmentTitle = `Race ${nextRaceNumber} - ${eventTitle}`;
-
-        const newSegment = await livestreamStorage.createSegment({
-          session_id: activeSession.id,
-          club_id: activeSession.club_id,
-          event_id: activeSession.event_id || undefined,
-          race_number: nextRaceNumber,
-          heat_number: activeSession.heat_number || undefined,
-          segment_title: segmentTitle,
-          cloudflare_input_id: activeSession.cloudflare_live_input_id || undefined,
-          segment_start_time: new Date().toISOString(),
-          upload_status: 'pending',
-          trigger_type: 'race_scored',
-        });
-
-        setCurrentSegment(newSegment);
-        setSegmentCount(prev => prev + 1);
-
-        await livestreamStorage.updateSession(activeSession.id, {
-          current_race_number: nextRaceNumber,
-          current_segment_start: new Date().toISOString(),
-        });
-
-        addNotification('success', `Now recording Race ${nextRaceNumber}`, 4000);
-      } else if (isFinalSegment) {
-        addNotification('success', 'Final race segment saved. Stream will be processed.', 5000);
+      if (isFinalSegment) {
+        addNotification('success', 'Final race segment saved. Recordings will be uploaded to YouTube.', 5000);
+      } else {
+        setIsPaused(true);
+        await livestreamStorage.updateSession(activeSession.id, { is_paused: true });
+        addNotification('info', 'Recording paused between races. Will resume when next race starts.', 5000);
       }
     } catch (error) {
-      console.error('[Segment] Transition error:', error);
-      addNotification('error', 'Segment transition failed. Stream may need manual restart.', 8000);
+      console.error('[Segment] Stop error:', error);
+      addNotification('error', 'Failed to save segment. Stream may need manual restart.', 8000);
+    } finally {
+      segmentTransitionRef.current = false;
+      setSegmentProcessing(false);
+    }
+  };
+
+  const handleSegmentStart = async () => {
+    if (!activeSession || segmentTransitionRef.current) return;
+    if (whipStatus === 'connected') return;
+
+    segmentTransitionRef.current = true;
+    setSegmentProcessing(true);
+
+    try {
+      if (!activeSession.cloudflare_whip_url) {
+        addNotification('error', 'No Cloudflare WHIP URL available', 5000);
+        return;
+      }
+
+      const rawStream = activePreviewStream || mediaStream;
+      if (!rawStream) {
+        addNotification('error', 'No video source available', 5000);
+        return;
+      }
+
+      if (activeSession.cloudflare_live_input_id) {
+        try {
+          const { data: { session: authSession } } = await supabase.auth.getSession();
+          if (authSession) {
+            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${authSession.access_token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'ensureRecording',
+                clubId: activeSession.club_id,
+                sessionData: { liveInputId: activeSession.cloudflare_live_input_id },
+              }),
+            });
+          }
+        } catch (e) { console.warn('[Segment] Could not verify recording mode:', e); }
+      }
+
+      let streamToSend = rawStream;
+      const cs = compositedStreamRef.current;
+      if (cs && cs.getVideoTracks().some(t => t.readyState === 'live' && t.enabled)) {
+        streamToSend = cs;
+      }
+
+      const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
+      if (!whipSuccess) {
+        addNotification('error', 'Failed to start recording for new race. Try resuming manually.', 8000);
+        return;
+      }
+
+      setIsPaused(false);
+      await livestreamStorage.updateSession(activeSession.id, { is_paused: false });
+
+      const nextRaceNumber = segmentCount + 1;
+      const segmentTitle = buildSegmentTitle(nextRaceNumber);
+
+      const newSegment = await livestreamStorage.createSegment({
+        session_id: activeSession.id,
+        club_id: activeSession.club_id,
+        event_id: activeSession.event_id || undefined,
+        race_number: nextRaceNumber,
+        heat_number: activeSession.heat_number || undefined,
+        segment_title: segmentTitle,
+        cloudflare_input_id: activeSession.cloudflare_live_input_id || undefined,
+        segment_start_time: new Date().toISOString(),
+        upload_status: 'pending',
+        trigger_type: 'race_scored',
+      });
+
+      setCurrentSegment(newSegment);
+      setSegmentCount(nextRaceNumber);
+
+      await livestreamStorage.updateSession(activeSession.id, {
+        current_race_number: nextRaceNumber,
+        current_segment_start: new Date().toISOString(),
+      });
+
+      addNotification('success', `Now recording ${segmentTitle}`, 4000);
+    } catch (error) {
+      console.error('[Segment] Start error:', error);
+      addNotification('error', 'Failed to start new race segment.', 8000);
     } finally {
       segmentTransitionRef.current = false;
       setSegmentProcessing(false);
@@ -503,8 +552,7 @@ export function LivestreamControlPanel({ clubId, sessionId }: LivestreamControlP
   const startFirstSegment = async () => {
     if (!activeSession || !autoSegmentEnabled) return;
 
-    const eventTitle = activeSession.title || 'Race';
-    const segmentTitle = `Race 1 - ${eventTitle}`;
+    const segmentTitle = buildSegmentTitle(1);
 
     try {
       const newSegment = await livestreamStorage.createSegment({
