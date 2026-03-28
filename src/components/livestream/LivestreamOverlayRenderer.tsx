@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Wind, Trophy, Users, Hash, Timer, CircleAlert as AlertCircle } from 'lucide-react';
 import type { LivestreamSession, LivestreamOverlay } from '../../types/livestream';
 import { livestreamStorage } from '../../utils/livestreamStorage';
@@ -9,13 +9,17 @@ interface LivestreamOverlayRendererProps {
   session: LivestreamSession;
   raceData?: any;
   weatherData?: any;
+  showTitleCard?: boolean;
 }
 
-export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData }, ref) {
+export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard }, ref) {
   const [overlays, setOverlays] = useState<LivestreamOverlay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
   const [liveSkippers, setLiveSkippers] = useState<any[]>([]);
+  const [titleCardVisible, setTitleCardVisible] = useState(false);
+  const [titleCardPhase, setTitleCardPhase] = useState<'entering' | 'visible' | 'exiting' | 'hidden'>('hidden');
+  const titleCardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadOverlays();
@@ -55,6 +59,34 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       };
     }
   }, [session.event_id]);
+
+  useEffect(() => {
+    if (showTitleCard && titleCardPhase === 'hidden') {
+      setTitleCardVisible(true);
+      setTitleCardPhase('entering');
+
+      const enterTimer = setTimeout(() => setTitleCardPhase('visible'), 100);
+      const holdTimer = setTimeout(() => setTitleCardPhase('exiting'), 8000);
+      const hideTimer = setTimeout(() => {
+        setTitleCardPhase('hidden');
+        setTitleCardVisible(false);
+      }, 9500);
+
+      titleCardTimerRef.current = hideTimer;
+
+      return () => {
+        clearTimeout(enterTimer);
+        clearTimeout(holdTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [showTitleCard]);
+
+  useEffect(() => {
+    return () => {
+      if (titleCardTimerRef.current) clearTimeout(titleCardTimerRef.current);
+    };
+  }, []);
 
   const loadLiveTrackingData = async () => {
     if (!session.event_id) {
@@ -488,6 +520,103 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           <path fill="#0078d3" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
         </svg>
       </div>
+
+      {titleCardVisible && (
+        <div
+          className="absolute inset-0 flex items-center justify-center z-50"
+          style={{
+            opacity: titleCardPhase === 'entering' ? 0 : titleCardPhase === 'exiting' ? 0 : 1,
+            transition: 'opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <div
+            className="relative px-16 py-12 rounded-2xl overflow-hidden"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(15,23,42,0.9) 50%, rgba(0,0,0,0.85) 100%)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)',
+              transform: titleCardPhase === 'entering' ? 'scale(0.95)' :
+                         titleCardPhase === 'exiting' ? 'scale(1.02)' : 'scale(1)',
+              transition: 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              maxWidth: '80%',
+            }}
+          >
+            <div
+              className="absolute top-0 left-0 right-0 h-px"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(0,102,180,0.6), rgba(0,120,211,0.8), rgba(0,102,180,0.6), transparent)',
+              }}
+            />
+
+            <div className="text-center">
+              <div
+                className="flex items-center justify-center gap-3 mb-6"
+                style={{
+                  opacity: titleCardPhase === 'visible' ? 1 : 0,
+                  transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(-10px)',
+                  transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s',
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-8 h-8">
+                  <path fill="#0078d3" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+                  <path fill="#0066b4" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+                </svg>
+                <span
+                  className="text-lg font-bold tracking-[0.3em] uppercase"
+                  style={{
+                    background: 'linear-gradient(135deg, #0078d3, #00a3ff)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  AlfiePRO
+                </span>
+              </div>
+
+              <h1
+                className="text-3xl font-bold text-white mb-3 leading-tight"
+                style={{
+                  opacity: titleCardPhase === 'visible' ? 1 : 0,
+                  transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
+                  transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.5)',
+                }}
+              >
+                {displayData?.event_name || session.title || 'Live Race'}
+              </h1>
+
+              <div
+                className="flex items-center justify-center gap-4 text-sm"
+                style={{
+                  opacity: titleCardPhase === 'visible' ? 1 : 0,
+                  transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
+                  transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.9s',
+                }}
+              >
+                <span className="text-slate-400 font-medium">
+                  {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+                {(session.heat_number || displayData?.heat_number || displayData?.race_number) && (
+                  <>
+                    <span className="text-slate-600">|</span>
+                    <span className="text-yellow-400 font-semibold">
+                      {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {session.heat_number || displayData?.heat_number || displayData?.race_number || 1}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div
+              className="absolute bottom-0 left-0 right-0 h-px"
+              style={{
+                background: 'linear-gradient(90deg, transparent, rgba(0,102,180,0.4), rgba(0,120,211,0.6), rgba(0,102,180,0.4), transparent)',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {overlays.map((overlay) => (
         <CustomOverlay key={overlay.id} overlay={overlay} />

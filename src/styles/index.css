@@ -13,7 +13,8 @@
   }
 
   body.light-mode {
-    @apply bg-gray-50 text-gray-900;
+    background-color: #f9fafb;
+    color: #111827;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -55,79 +56,471 @@
 
 /* Light mode overrides */
 body.light-mode {
-  background: linear-gradient(to bottom right, #f8fafc, #e2e8f0) !important;
+  background: #f1f5f9 !important;
 }
 
-body.light-mode .bg-slate-800 {
-  @apply bg-white border-gray-200;
-}
-
-body.light-mode .bg-slate-700 {
-  @apply bg-gray-100 border-gray-200;
-}
-
+/* === BACKGROUND OVERRIDES === */
 body.light-mode .bg-slate-900 {
-  @apply bg-gray-50;
+  background-color: #f1f5f9 !important;
 }
-
-body.light-mode .text-white {
-  @apply text-gray-900;
+body.light-mode .bg-slate-800 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0;
 }
-
-body.light-mode .text-slate-100 {
-  @apply text-gray-900;
+body.light-mode .bg-slate-700 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0;
 }
-
-body.light-mode .text-slate-200 {
-  @apply text-gray-800;
-}
-
-body.light-mode .text-slate-300 {
-  @apply text-gray-700;
-}
-
-body.light-mode .text-slate-400 {
-  @apply text-gray-600;
-}
-
-body.light-mode .text-slate-500 {
-  @apply text-gray-500;
-}
-
-body.light-mode .border-slate-700 {
-  @apply border-gray-200;
-}
-
-body.light-mode .border-slate-600 {
-  @apply border-gray-300;
-}
-
 body.light-mode .bg-slate-800\/50 {
-  @apply bg-white/90;
+  background-color: rgba(255, 255, 255, 0.95) !important;
 }
-
 body.light-mode .bg-slate-800\/30 {
-  @apply bg-white/80;
+  background-color: rgba(255, 255, 255, 0.9) !important;
 }
-
 body.light-mode .bg-slate-700\/50 {
-  @apply bg-gray-100/90;
+  background-color: rgba(248, 250, 252, 0.95) !important;
 }
-
 body.light-mode .bg-slate-700\/30 {
-  @apply bg-gray-100/80;
+  background-color: rgba(248, 250, 252, 0.9) !important;
+}
+body.light-mode .bg-slate-900\/50 {
+  background-color: rgba(241, 245, 249, 0.95) !important;
+}
+body.light-mode .bg-slate-900\/80 {
+  background-color: rgba(241, 245, 249, 0.98) !important;
+}
+body.light-mode .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.99) !important;
 }
 
+/* === TEXT COLOR OVERRIDES === */
+body.light-mode .text-slate-100 {
+  color: #0f172a !important;
+}
+body.light-mode .text-slate-200 {
+  color: #1e293b !important;
+}
+body.light-mode .text-slate-300 {
+  color: #334155 !important;
+}
+body.light-mode .text-slate-400 {
+  color: #64748b !important;
+}
+body.light-mode .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* text-white becomes dark on light backgrounds */
+body.light-mode .text-white {
+  color: #0f172a !important;
+}
+
+/* PRESERVE white text on solid colored backgrounds */
+body.light-mode .bg-blue-600 .text-white,
+body.light-mode .bg-blue-500 .text-white,
+body.light-mode .bg-blue-700 .text-white,
+body.light-mode .bg-green-600 .text-white,
+body.light-mode .bg-green-500 .text-white,
+body.light-mode .bg-emerald-600 .text-white,
+body.light-mode .bg-emerald-500 .text-white,
+body.light-mode .bg-red-600 .text-white,
+body.light-mode .bg-red-500 .text-white,
+body.light-mode .bg-yellow-600 .text-white,
+body.light-mode .bg-amber-600 .text-white,
+body.light-mode .bg-amber-500 .text-white,
+body.light-mode .bg-orange-600 .text-white,
+body.light-mode .bg-orange-500 .text-white,
+body.light-mode .bg-cyan-600 .text-white,
+body.light-mode .bg-teal-600 .text-white,
+body.light-mode .bg-teal-500 .text-white,
+body.light-mode .bg-sky-600 .text-white,
+body.light-mode .bg-sky-500 .text-white,
+body.light-mode .bg-slate-600 .text-white,
+body.light-mode .bg-gray-800 .text-white,
+body.light-mode .bg-gray-900 .text-white,
+body.light-mode .bg-black .text-white {
+  color: #ffffff !important;
+}
+
+/* Self-colored elements (same element has bg + text-white) */
+body.light-mode .bg-blue-600.text-white,
+body.light-mode .bg-blue-500.text-white,
+body.light-mode .bg-blue-700.text-white,
+body.light-mode .bg-green-600.text-white,
+body.light-mode .bg-green-500.text-white,
+body.light-mode .bg-emerald-600.text-white,
+body.light-mode .bg-emerald-500.text-white,
+body.light-mode .bg-red-600.text-white,
+body.light-mode .bg-red-500.text-white,
+body.light-mode .bg-yellow-600.text-white,
+body.light-mode .bg-amber-600.text-white,
+body.light-mode .bg-amber-500.text-white,
+body.light-mode .bg-orange-600.text-white,
+body.light-mode .bg-orange-500.text-white,
+body.light-mode .bg-cyan-600.text-white,
+body.light-mode .bg-teal-600.text-white,
+body.light-mode .bg-teal-500.text-white,
+body.light-mode .bg-sky-600.text-white,
+body.light-mode .bg-sky-500.text-white,
+body.light-mode .bg-slate-600.text-white,
+body.light-mode .bg-gray-800.text-white,
+body.light-mode .bg-gray-900.text-white,
+body.light-mode .bg-black.text-white {
+  color: #ffffff !important;
+}
+
+/* Preserve white text in buttons */
+body.light-mode .btn-primary .text-white,
+body.light-mode .btn-primary.text-white,
+body.light-mode [class*="btn-primary"] {
+  color: #ffffff !important;
+}
+
+/* icon-container stays white */
+body.light-mode .icon-container {
+  color: #ffffff !important;
+}
+body.light-mode .icon-container .text-white {
+  color: #ffffff !important;
+}
+
+/* Hover states keep white */
+body.light-mode .hover\:text-white:hover {
+  color: #ffffff !important;
+}
+
+/* Preserve white text inside any solid-colored parent via wildcard */
+body.light-mode [class*="bg-emerald-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-green-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-red-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-blue-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-blue-6"] .text-white,
+body.light-mode [class*="bg-amber-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-orange-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-sky-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-cyan-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white,
+body.light-mode [class*="bg-teal-5"]:not([class*="/10"]):not([class*="/20"]):not([class*="/30"]) .text-white {
+  color: #ffffff !important;
+}
+
+/* Colored accent text - make bolder/deeper for light mode contrast */
+body.light-mode .text-emerald-400,
+body.light-mode .text-emerald-300 {
+  color: #047857 !important;
+}
+body.light-mode .text-green-400,
+body.light-mode .text-green-300 {
+  color: #047857 !important;
+}
+body.light-mode .text-red-400,
+body.light-mode .text-red-300 {
+  color: #dc2626 !important;
+}
+body.light-mode .text-blue-400,
+body.light-mode .text-blue-300 {
+  color: #2563eb !important;
+}
+body.light-mode .text-amber-400,
+body.light-mode .text-amber-300 {
+  color: #b45309 !important;
+}
+body.light-mode .text-sky-400,
+body.light-mode .text-sky-300 {
+  color: #0369a1 !important;
+}
+body.light-mode .text-cyan-400,
+body.light-mode .text-cyan-300 {
+  color: #0e7490 !important;
+}
+body.light-mode .text-orange-400,
+body.light-mode .text-orange-300 {
+  color: #c2410c !important;
+}
+body.light-mode .text-teal-400,
+body.light-mode .text-teal-300 {
+  color: #0f766e !important;
+}
+body.light-mode .text-yellow-400,
+body.light-mode .text-yellow-300 {
+  color: #a16207 !important;
+}
+body.light-mode .text-purple-400,
+body.light-mode .text-purple-300 {
+  color: #7c3aed !important;
+}
+body.light-mode .text-indigo-400,
+body.light-mode .text-indigo-300 {
+  color: #4f46e5 !important;
+}
+body.light-mode .text-pink-400,
+body.light-mode .text-pink-300 {
+  color: #db2777 !important;
+}
+
+/* === BORDER OVERRIDES === */
+body.light-mode .border-slate-700 {
+  border-color: #e2e8f0 !important;
+}
+body.light-mode .border-slate-600 {
+  border-color: #cbd5e1 !important;
+}
 body.light-mode .border-slate-700\/50 {
-  @apply border-gray-200/80;
+  border-color: rgba(226, 232, 240, 0.8) !important;
+}
+body.light-mode .border-slate-600\/50 {
+  border-color: rgba(203, 213, 225, 0.8) !important;
+}
+body.light-mode .border-slate-500 {
+  border-color: #cbd5e1 !important;
 }
 
+/* === HOVER STATES === */
 body.light-mode .hover\:bg-slate-700:hover {
-  @apply hover:bg-gray-100;
+  background-color: #f1f5f9 !important;
+}
+body.light-mode .hover\:bg-slate-600:hover {
+  background-color: #e2e8f0 !important;
+}
+body.light-mode .hover\:bg-slate-800:hover {
+  background-color: #f8fafc !important;
+}
+body.light-mode .hover\:bg-slate-700\/50:hover {
+  background-color: rgba(241, 245, 249, 0.95) !important;
 }
 
-body.light-mode .hover\:bg-slate-600:hover {
-  @apply hover:bg-gray-200;
+/* === WIDGET GRADIENT BACKGROUNDS - stronger/richer on light === */
+/* These override the from-{color}-600/20 to-{color}-800/20 patterns used by dashboard widgets */
+body.light-mode .from-blue-600\/20 { --tw-gradient-from: rgba(37, 99, 235, 0.08) !important; }
+body.light-mode .to-blue-800\/20 { --tw-gradient-to: rgba(30, 64, 175, 0.12) !important; }
+body.light-mode .from-green-600\/20 { --tw-gradient-from: rgba(22, 163, 74, 0.08) !important; }
+body.light-mode .to-green-800\/20 { --tw-gradient-to: rgba(22, 101, 52, 0.12) !important; }
+body.light-mode .from-purple-600\/20 { --tw-gradient-from: rgba(147, 51, 234, 0.08) !important; }
+body.light-mode .to-purple-800\/20 { --tw-gradient-to: rgba(107, 33, 168, 0.12) !important; }
+body.light-mode .from-orange-600\/20 { --tw-gradient-from: rgba(234, 88, 12, 0.08) !important; }
+body.light-mode .to-orange-800\/20 { --tw-gradient-to: rgba(154, 52, 18, 0.12) !important; }
+body.light-mode .from-pink-600\/20 { --tw-gradient-from: rgba(219, 39, 119, 0.08) !important; }
+body.light-mode .to-pink-800\/20 { --tw-gradient-to: rgba(157, 23, 77, 0.12) !important; }
+body.light-mode .from-red-600\/20 { --tw-gradient-from: rgba(220, 38, 38, 0.08) !important; }
+body.light-mode .to-red-800\/20 { --tw-gradient-to: rgba(153, 27, 27, 0.12) !important; }
+body.light-mode .from-indigo-600\/20 { --tw-gradient-from: rgba(79, 70, 229, 0.08) !important; }
+body.light-mode .to-indigo-800\/20 { --tw-gradient-to: rgba(55, 48, 163, 0.12) !important; }
+body.light-mode .from-teal-600\/20 { --tw-gradient-from: rgba(13, 148, 136, 0.08) !important; }
+body.light-mode .to-teal-800\/20 { --tw-gradient-to: rgba(17, 94, 89, 0.12) !important; }
+body.light-mode .from-amber-600\/20 { --tw-gradient-from: rgba(217, 119, 6, 0.08) !important; }
+body.light-mode .to-amber-800\/20 { --tw-gradient-to: rgba(146, 64, 14, 0.12) !important; }
+body.light-mode .from-slate-600\/50 { --tw-gradient-from: rgba(71, 85, 105, 0.06) !important; }
+body.light-mode .to-slate-800\/50 { --tw-gradient-to: rgba(30, 41, 59, 0.08) !important; }
+
+/* Widget border colors on light */
+body.light-mode .border-purple-500\/30 { border-color: rgba(147, 51, 234, 0.2) !important; }
+body.light-mode .border-blue-500\/30 { border-color: rgba(37, 99, 235, 0.2) !important; }
+body.light-mode .border-green-500\/30 { border-color: rgba(22, 163, 74, 0.2) !important; }
+body.light-mode .border-orange-500\/30 { border-color: rgba(234, 88, 12, 0.2) !important; }
+body.light-mode .border-pink-500\/30 { border-color: rgba(219, 39, 119, 0.2) !important; }
+body.light-mode .border-red-500\/30 { border-color: rgba(220, 38, 38, 0.2) !important; }
+body.light-mode .border-indigo-500\/30 { border-color: rgba(79, 70, 229, 0.2) !important; }
+body.light-mode .border-teal-500\/30 { border-color: rgba(13, 148, 136, 0.2) !important; }
+body.light-mode .border-amber-500\/30 { border-color: rgba(217, 119, 6, 0.2) !important; }
+
+/* === COLORED TILES - solid fill on light backgrounds === */
+body.light-mode .bg-emerald-500\/10,
+body.light-mode .bg-green-500\/10 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+body.light-mode .bg-emerald-500\/20,
+body.light-mode .bg-green-500\/20 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+body.light-mode .border-emerald-500\/20,
+body.light-mode .border-green-500\/20 {
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+body.light-mode .bg-red-500\/10 {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+}
+body.light-mode .bg-red-500\/20 {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+}
+body.light-mode .border-red-500\/20 {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+body.light-mode .bg-blue-500\/10 {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+body.light-mode .bg-blue-500\/20 {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+}
+body.light-mode .bg-blue-600\/10 {
+  background-color: rgba(37, 99, 235, 0.08) !important;
+}
+body.light-mode .bg-blue-600\/15 {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+body.light-mode .border-blue-500\/20 {
+  border-color: rgba(59, 130, 246, 0.25) !important;
+}
+body.light-mode .border-blue-500\/30 {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+body.light-mode .bg-amber-500\/10,
+body.light-mode .bg-yellow-500\/10 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+body.light-mode .bg-amber-500\/20,
+body.light-mode .bg-yellow-500\/20 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+body.light-mode .border-amber-500\/20,
+body.light-mode .border-yellow-500\/20 {
+  border-color: rgba(245, 158, 11, 0.25) !important;
+}
+body.light-mode .bg-sky-500\/10 {
+  background-color: rgba(14, 165, 233, 0.08) !important;
+}
+body.light-mode .bg-sky-500\/15 {
+  background-color: rgba(14, 165, 233, 0.1) !important;
+}
+body.light-mode .bg-sky-500\/20 {
+  background-color: rgba(14, 165, 233, 0.12) !important;
+}
+body.light-mode .border-sky-500\/20 {
+  border-color: rgba(14, 165, 233, 0.25) !important;
+}
+body.light-mode .border-sky-500\/30 {
+  border-color: rgba(14, 165, 233, 0.3) !important;
+}
+body.light-mode .bg-cyan-500\/10 {
+  background-color: rgba(6, 182, 212, 0.08) !important;
+}
+body.light-mode .bg-cyan-500\/20 {
+  background-color: rgba(6, 182, 212, 0.12) !important;
+}
+body.light-mode .bg-teal-500\/10 {
+  background-color: rgba(20, 184, 166, 0.08) !important;
+}
+body.light-mode .bg-teal-500\/20 {
+  background-color: rgba(20, 184, 166, 0.12) !important;
+}
+body.light-mode .bg-orange-500\/10 {
+  background-color: rgba(249, 115, 22, 0.08) !important;
+}
+body.light-mode .bg-orange-500\/20 {
+  background-color: rgba(249, 115, 22, 0.12) !important;
+}
+body.light-mode .bg-purple-500\/20,
+body.light-mode .bg-purple-600\/20 {
+  background-color: rgba(147, 51, 234, 0.12) !important;
+}
+body.light-mode .bg-indigo-500\/20,
+body.light-mode .bg-indigo-600\/20 {
+  background-color: rgba(79, 70, 229, 0.12) !important;
+}
+
+/* Dark 950-shade backgrounds */
+body.light-mode .bg-emerald-950\/30,
+body.light-mode .bg-green-950\/30 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+}
+body.light-mode .bg-red-950\/30 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+body.light-mode .bg-blue-950\/30 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Very low opacity colored bgs */
+body.light-mode .bg-emerald-500\/5 {
+  background-color: rgba(16, 185, 129, 0.06) !important;
+}
+body.light-mode .bg-red-500\/5 {
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+
+/* === INPUT FIELDS === */
+body.light-mode input[class*="bg-slate"],
+body.light-mode select[class*="bg-slate"],
+body.light-mode textarea[class*="bg-slate"] {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+body.light-mode input[class*="bg-slate"]::placeholder,
+body.light-mode textarea[class*="bg-slate"]::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* === MODAL/OVERLAY BACKGROUNDS === */
+body.light-mode .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+}
+body.light-mode .bg-black\/60 {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* === DROPDOWN/SELECT === */
+body.light-mode select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+/* === TABLE HEADERS === */
+body.light-mode thead[class*="bg-slate"] {
+  background-color: #f1f5f9 !important;
+}
+body.light-mode thead[class*="bg-slate"] th {
+  color: #334155 !important;
+}
+
+/* === SCROLLBARS === */
+body.light-mode .overflow-x-auto::-webkit-scrollbar-track,
+body.light-mode .overflow-y-auto::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.8);
+}
+body.light-mode .overflow-x-auto::-webkit-scrollbar-thumb,
+body.light-mode .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border: 2px solid rgba(241, 245, 249, 0.8);
+}
+body.light-mode .overflow-x-auto::-webkit-scrollbar-thumb:hover,
+body.light-mode .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+body.light-mode .overflow-x-auto,
+body.light-mode .overflow-y-auto {
+  scrollbar-color: rgba(148, 163, 184, 0.4) rgba(241, 245, 249, 0.8);
+}
+
+/* === GLASS BACKGROUNDS === */
+body.light-mode .glass-bg {
+  background-color: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(226, 232, 240, 0.6) !important;
+}
+body.light-mode .animated-tile {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+/* === SHADOWS - sharper on light === */
+body.light-mode .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.04) !important;
+}
+body.light-mode .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04) !important;
+}
+
+/* === DIVIDE COLORS === */
+body.light-mode .divide-slate-700 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+body.light-mode .divide-slate-600 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #cbd5e1 !important;
+}
+
+/* === CARD ELEVATION - give white cards subtle border for definition === */
+body.light-mode [class*="rounded-2xl"][class*="border"][class*="backdrop-blur"] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
 }
 
 
@@ -148,7 +541,8 @@ body.light-mode .hover\:bg-slate-600:hover {
   }
   
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    @apply bg-blue-600 hover:bg-blue-700;
+    color: #ffffff;
   }
   
   .btn-secondary {
@@ -203,7 +597,8 @@ body.light-mode .hover\:bg-slate-600:hover {
 
 /* Icon container styles */
 .icon-container {
-  @apply flex items-center justify-center rounded-xl text-white relative;
+  @apply flex items-center justify-center rounded-xl relative;
+  color: #ffffff;
   width: 64px;
   height: 64px;
   background-color: rgba(30, 41, 59, 0.8);
