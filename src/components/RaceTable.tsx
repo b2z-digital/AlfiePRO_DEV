@@ -125,21 +125,39 @@ export const RaceTable: React.FC<RaceTableProps> = ({
     console.log('🔍 RaceTable dropRules changed:', dropRules, 'isArray:', Array.isArray(dropRules), 'length:', Array.isArray(dropRules) ? dropRules.length : 'N/A');
   }, [dropRules]);
 
-  // Auto-update race status to "live" when scoring starts
+  const prevCompletedRaceRef = useRef(lastCompletedRace);
+
   useEffect(() => {
     const autoUpdateRaceStatus = async () => {
       if (!currentEvent?.id || !currentEvent?.enableLiveTracking) return;
 
       const { getRaceStatus, updateRaceStatus } = await import('../utils/liveTrackingStorage');
 
-      const statusData = await getRaceStatus(currentEvent.id);
+      const raceJustCompleted = lastCompletedRace > prevCompletedRaceRef.current;
+      prevCompletedRaceRef.current = lastCompletedRace;
+
+      if (raceJustCompleted && lastCompletedRace > 0) {
+        await updateRaceStatus(
+          currentEvent.id,
+          'on_hold',
+          `Race ${lastCompletedRace} complete`,
+          currentEvent.clubId,
+          currentEvent.currentDay || 1
+        );
+
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
       const activeRace = lastCompletedRace + 1;
       const raceNote = `Race ${activeRace}`;
 
+      const statusData = await getRaceStatus(currentEvent.id);
       if (!statusData || (statusData.status !== 'live' && statusData.status !== 'event_complete')) {
         await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
       } else if (statusData.status === 'live' && statusData.notes !== raceNote) {
         await updateRaceStatus(currentEvent.id, 'live', raceNote);
+      } else if (statusData.status === 'on_hold') {
+        await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
       }
     };
 

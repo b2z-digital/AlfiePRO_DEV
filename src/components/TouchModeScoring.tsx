@@ -189,14 +189,14 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
     }
   }, [heatObservers, skippers, currentRace]);
 
-  // Auto-update race status to "live" when scoring starts
+  const prevRaceRef = useRef(currentRace);
+
   useEffect(() => {
     const autoUpdateRaceStatus = async () => {
       if (!currentEvent?.id || !currentEvent?.enableLiveTracking) return;
 
       const { getRaceStatus, updateRaceStatus } = await import('../utils/liveTrackingStorage');
 
-      const statusData = await getRaceStatus(currentEvent.id);
       const raceNote = (() => {
         if (!isHeatScoring) return `Race ${currentRace}`;
         const isShrsScoring = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
@@ -207,7 +207,36 @@ export const TouchModeScoring: React.FC<TouchModeScoringProps> = ({
         return `Round ${currentRace}`;
       })();
 
+      const raceJustAdvanced = currentRace > prevRaceRef.current;
+      prevRaceRef.current = currentRace;
+
+      if (raceJustAdvanced && currentRace > 1) {
+        const prevNote = (() => {
+          const prev = currentRace - 1;
+          if (!isHeatScoring) return `Race ${prev} complete`;
+          const isShrsScoring = currentEvent?.heatManagement?.configuration?.scoringSystem === 'shrs';
+          const shrsQR = currentEvent?.heatManagement?.configuration?.shrsQualifyingRounds || 0;
+          if (isShrsScoring && shrsQR > 0) {
+            return prev <= shrsQR ? `Qualifying Rd ${prev} complete` : `Final ${prev - shrsQR} complete`;
+          }
+          return `Round ${prev} complete`;
+        })();
+
+        await updateRaceStatus(
+          currentEvent.id,
+          'on_hold',
+          prevNote,
+          currentEvent.clubId,
+          currentEvent.currentDay || 1
+        );
+
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
+      const statusData = await getRaceStatus(currentEvent.id);
       if (!statusData || (statusData.status !== 'live' && statusData.status !== 'event_complete')) {
+        await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
+      } else if (statusData.status === 'on_hold') {
         await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
       } else if (statusData.status === 'live' && statusData.notes !== raceNote) {
         await updateRaceStatus(currentEvent.id, 'live', raceNote);
