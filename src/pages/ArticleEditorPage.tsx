@@ -414,9 +414,16 @@ const ArticleEditorPage: React.FC = () => {
           navigate('/news');
         }
       }, 1500);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving article:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred while saving the article');
+      const supabaseMessage = err?.message || err?.error_description || '';
+      if (supabaseMessage.includes('row-level security') || supabaseMessage.includes('policy') || err?.code === '42501') {
+        setError('Permission denied. Please make sure you are viewing the correct club or association before creating an article.');
+      } else if (supabaseMessage.includes('0 rows') || err?.code === 'PGRST116') {
+        setError('Permission denied. You may not have the required role to save articles for this organization.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An error occurred while saving the article');
+      }
     } finally {
       setSaving(false);
     }
