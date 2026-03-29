@@ -175,6 +175,8 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
       await markMembersAsPaid(memberIds);
 
+      await markRemittancesAsExternallyPaid(memberIds);
+
       addNotification('success', `${memberIds.length} member(s) marked as previously paid`);
       await fetchAllMembers();
       setSelectedMembers(new Set());
@@ -184,6 +186,26 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
       addNotification('error', 'Failed to update payments');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const markRemittancesAsExternallyPaid = async (memberIds: string[]) => {
+    const { error } = await supabase
+      .from('membership_remittances')
+      .update({
+        club_to_state_status: 'paid',
+        club_to_state_paid_date: new Date().toISOString().split('T')[0],
+        state_to_national_status: 'paid',
+        state_to_national_paid_date: new Date().toISOString().split('T')[0],
+        bulk_payment: true,
+        updated_at: new Date().toISOString(),
+      })
+      .in('member_id', memberIds)
+      .eq('club_id', clubId)
+      .eq('club_to_state_status', 'pending');
+
+    if (error) {
+      console.error('Error marking remittances as externally paid:', error);
     }
   };
 
