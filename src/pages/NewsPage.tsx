@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, Search, ListFilter as Filter, Plus, Calendar, User, ChevronRight, CreditCard as Edit2, Trash2, TriangleAlert as AlertTriangle, X, ArrowUpDown, LayoutGrid, List } from 'lucide-react';
+import { Newspaper, Search, ListFilter as Filter, Plus, Calendar, User, ChevronRight, CreditCard as Edit2, Trash2, TriangleAlert as AlertTriangle, X, ArrowUpDown, LayoutGrid, List, File as FileEdit } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';
 import { formatDate } from '../utils/date';
 import { useNavigate } from 'react-router-dom';
-import { getArticles, deleteArticle, Article } from '../utils/articleStorage';
+import { getArticles, getDraftArticles, deleteArticle, Article } from '../utils/articleStorage';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { usePermissions } from '../hooks/usePermissions';
@@ -51,6 +51,8 @@ const NewsPage: React.FC = () => {
   const [pageSubtitle, setPageSubtitle] = useState('');
   const [filterYachtClass, setFilterYachtClass] = useState<string | null>(null);
   const [availableYachtClasses, setAvailableYachtClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const [viewTab, setViewTab] = useState<'published' | 'drafts'>('published');
+  const [draftArticles, setDraftArticles] = useState<Article[]>([]);
   
   useEffect(() => {
     const fetchArticles = async () => {
@@ -123,13 +125,25 @@ const NewsPage: React.FC = () => {
         });
         setAllTags(Array.from(tags));
 
-        // Check if user is admin or editor
-        setIsAdmin(
+        const userIsAdmin =
           currentClub?.role === 'admin' ||
           currentClub?.role === 'editor' ||
           currentOrganization?.role === 'state_admin' ||
-          currentOrganization?.role === 'national_admin'
-        );
+          currentOrganization?.role === 'national_admin';
+        setIsAdmin(userIsAdmin);
+
+        if (userIsAdmin) {
+          try {
+            const drafts = await getDraftArticles(
+              orgType === 'club' ? orgId : undefined,
+              orgType !== 'club' ? orgId : undefined,
+              orgType !== 'club' ? orgType as 'state' | 'national' : undefined
+            );
+            setDraftArticles(drafts);
+          } catch {
+            setDraftArticles([]);
+          }
+        }
       } catch (err) {
         console.error('Error fetching articles:', err);
         setError(err instanceof Error ? err.message : 'Failed to load articles');
@@ -141,6 +155,12 @@ const NewsPage: React.FC = () => {
     fetchArticles();
   }, [currentClub, currentOrganization]);
   
+  useEffect(() => {
+    if (viewTab === 'drafts' && draftArticles.length === 0) {
+      setViewTab('published');
+    }
+  }, [draftArticles.length, viewTab]);
+
   // Filter articles based on search term and tag
   const filteredArticles = articles.filter(article => {
     const matchesSearch = article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -200,6 +220,7 @@ const NewsPage: React.FC = () => {
     try {
       await deleteArticle(deleteConfirm.articleId);
       setArticles(articles.filter(article => article.id !== deleteConfirm.articleId));
+      setDraftArticles(prev => prev.filter(article => article.id !== deleteConfirm.articleId));
       addNotification('success', 'Article deleted successfully');
     } catch (err) {
       console.error('Error deleting article:', err);
@@ -343,7 +364,101 @@ const NewsPage: React.FC = () => {
           </div>
         </div>
         
-        {loading ? (
+        {isAdmin && draftArticles.length > 0 && (
+          <div className="flex items-center gap-1 mb-6 bg-slate-800/50 rounded-lg p-1 w-fit">
+            <button
+              onClick={() => setViewTab('published')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                viewTab === 'published'
+                  ? 'bg-slate-700 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Published
+            </button>
+            <button
+              onClick={() => setViewTab('drafts')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                viewTab === 'drafts'
+                  ? 'bg-slate-700 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <FileEdit size={14} />
+              Drafts
+              <span className="px-1.5 py-0.5 text-xs rounded-full bg-amber-500/20 text-amber-400">
+                {draftArticles.length}
+              </span>
+            </button>
+          </div>
+        )}
+
+        {viewTab === 'drafts' && isAdmin ? (
+          draftArticles.length === 0 ? (
+            <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
+              <FileEdit size={48} className="mx-auto mb-4 text-slate-600" />
+              <h3 className="text-lg font-medium text-slate-300 mb-2">No Drafts</h3>
+              <p className="text-slate-400">All articles have been published</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {draftArticles.map(article => (
+                <div
+                  key={article.id}
+                  className="bg-slate-800/50 rounded-xl border border-amber-500/20 overflow-hidden transition-all hover:border-amber-500/40 hover:shadow-lg cursor-pointer"
+                  onClick={() => navigate(`/news/edit/${article.id}`)}
+                >
+                  <div className="flex items-center gap-4 p-4">
+                    <div className="relative w-32 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
+                      <img
+                        src={getArticleImageUrl(article.cover_image)}
+                        alt={article.title}
+                        className="w-full h-full object-cover opacity-70"
+                        onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_COVER_IMAGE; }}
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                          Draft
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          Last edited {article.updated_at ? formatDate(article.updated_at) : 'recently'}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">
+                        {article.title || 'Untitled Article'}
+                      </h3>
+                      <p className="text-slate-400 text-sm line-clamp-1">
+                        {article.content?.replace(/<[^>]*>/g, '').substring(0, 120) || 'No content yet'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/news/edit/${article.id}`);
+                        }}
+                      >
+                        <Edit2 size={14} />
+                        Edit
+                      </button>
+                      <button
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+                        onClick={(e) => handleDeleteArticle(article.id, e)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : loading ? (
           <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700/50">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p className="text-slate-400">Loading articles...</p>
