@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Save, Wind, Waves, Star, Trash2, Copy, FileText, ExternalLink, Pencil, Check, X, MoveVertical as MoreVertical } from 'lucide-react';
+import { Settings, Plus, Save, Wind, Waves, Star, Trash2, Copy, FileText, ExternalLink, Pencil, Check, X } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 
 interface RigTuningTabProps {
@@ -85,7 +85,6 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
   const [tuningGuideFileName, setTuningGuideFileName] = useState<string | null>(null);
   const [editingRigId, setEditingRigId] = useState<string | null>(null);
   const [editingRigName, setEditingRigName] = useState('');
-  const [rigMenuOpen, setRigMenuOpen] = useState<string | null>(null);
   const [deleteRigConfirm, setDeleteRigConfirm] = useState<string | null>(null);
 
   useEffect(() => {
@@ -243,7 +242,6 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
 
       if (error) throw error;
       setDeleteRigConfirm(null);
-      setRigMenuOpen(null);
       await loadRigs();
       onUpdate();
     } catch (error) {
@@ -459,11 +457,37 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
                       </button>
                     </div>
                   </div>
+                ) : deleteRigConfirm === rig.id ? (
+                  <div className="p-3">
+                    <p className={`text-xs font-medium mb-2 ${selectedRig?.id === rig.id ? 'text-white/90' : darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                      Delete "{rig.name}" and all its settings?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteRig(rig.id)}
+                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg font-medium hover:bg-red-700 transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setDeleteRigConfirm(null)}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                          selectedRig?.id === rig.id
+                            ? 'bg-white/20 text-white hover:bg-white/30'
+                            : darkMode
+                            ? 'bg-slate-600 text-white hover:bg-slate-500'
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <div className="flex items-start">
+                  <div>
                     <button
                       onClick={() => setSelectedRig(rig)}
-                      className="flex-1 p-4 text-left"
+                      className="w-full p-4 pb-2 text-left"
                     >
                       <div className="font-bold text-sm">{rig.name}</div>
                       {rig.is_default && (
@@ -475,87 +499,40 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
                         </div>
                       )}
                     </button>
-
-                    <div className="relative p-2">
+                    <div className="flex items-center gap-1 px-3 pb-3">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setRigMenuOpen(rigMenuOpen === rig.id ? null : rig.id);
+                          setEditingRigId(rig.id);
+                          setEditingRigName(rig.name);
                         }}
+                        title="Rename rig"
                         className={`p-1.5 rounded-lg transition-colors ${
                           selectedRig?.id === rig.id
-                            ? 'hover:bg-white/20 text-white/80'
+                            ? 'hover:bg-white/20 text-white/70 hover:text-white'
                             : darkMode
-                            ? 'hover:bg-slate-500 text-slate-400'
-                            : 'hover:bg-slate-300 text-slate-500'
+                            ? 'hover:bg-slate-500 text-slate-400 hover:text-slate-200'
+                            : 'hover:bg-slate-300 text-slate-400 hover:text-slate-600'
                         }`}
                       >
-                        <MoreVertical className="w-4 h-4" />
+                        <Pencil className="w-3.5 h-3.5" />
                       </button>
-
-                      {rigMenuOpen === rig.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setRigMenuOpen(null)} />
-                          <div className={`absolute right-0 top-full mt-1 z-20 rounded-lg shadow-xl border min-w-[140px] overflow-hidden ${
-                            darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
-                          }`}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingRigId(rig.id);
-                                setEditingRigName(rig.name);
-                                setRigMenuOpen(null);
-                              }}
-                              className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 transition-colors ${
-                                darkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              Rename
-                            </button>
-                            {deleteRigConfirm === rig.id ? (
-                              <div className={`px-4 py-2.5 ${darkMode ? 'bg-red-900/30' : 'bg-red-50'}`}>
-                                <p className="text-xs text-red-400 mb-2">Delete this rig and all its settings?</p>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteRig(rig.id);
-                                    }}
-                                    className="px-3 py-1 bg-red-600 text-white text-xs rounded font-medium hover:bg-red-700 transition-colors"
-                                  >
-                                    Delete
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteRigConfirm(null);
-                                    }}
-                                    className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
-                                      darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                                    }`}
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteRigConfirm(rig.id);
-                                }}
-                                className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 transition-colors text-red-400 ${
-                                  darkMode ? 'hover:bg-red-900/30' : 'hover:bg-red-50'
-                                }`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteRigConfirm(rig.id);
+                        }}
+                        title="Delete rig"
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          selectedRig?.id === rig.id
+                            ? 'hover:bg-red-500/30 text-white/70 hover:text-red-200'
+                            : darkMode
+                            ? 'hover:bg-red-900/40 text-slate-400 hover:text-red-400'
+                            : 'hover:bg-red-100 text-slate-400 hover:text-red-500'
+                        }`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 )}
