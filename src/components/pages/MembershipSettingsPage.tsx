@@ -84,20 +84,45 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       
       if (typesError) throw typesError;
 
-      const { data: countData } = await supabase
+      const countsByTypeId: Record<string, number> = {};
+      const countsByName: Record<string, number> = {};
+
+      const { data: cmData } = await supabase
         .from('club_memberships')
         .select('membership_type_id')
+        .eq('club_id', currentClub.clubId)
+        .not('membership_type_id', 'is', null);
+
+      if (cmData) {
+        cmData.forEach(row => {
+          countsByTypeId[row.membership_type_id] = (countsByTypeId[row.membership_type_id] || 0) + 1;
+        });
+      }
+
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('membership_level')
         .eq('club_id', currentClub.clubId);
 
-      const counts: Record<string, number> = {};
-      if (countData) {
-        countData.forEach(row => {
-          if (row.membership_type_id) {
-            counts[row.membership_type_id] = (counts[row.membership_type_id] || 0) + 1;
+      if (membersData) {
+        membersData.forEach(row => {
+          if (row.membership_level) {
+            countsByName[row.membership_level] = (countsByName[row.membership_level] || 0) + 1;
           }
         });
       }
-      setMemberCountsByType(counts);
+
+      const merged: Record<string, number> = {};
+      if (typesData) {
+        typesData.forEach((t: any) => {
+          const fromId = countsByTypeId[t.id] || 0;
+          const fromName = countsByName[t.name] || 0;
+          const total = Math.max(fromId, fromName);
+          if (total > 0) merged[t.id] = total;
+        });
+      }
+
+      setMemberCountsByType(merged);
 
       // Fetch club settings including renewal settings
       const { data: clubData, error: clubError } = await supabase
