@@ -275,6 +275,63 @@ export const getArticles = async (
   }
 };
 
+export const getDraftArticles = async (
+  clubId?: string,
+  associationId?: string,
+  associationType?: 'state' | 'national'
+): Promise<Article[]> => {
+  try {
+    let query = supabase
+      .from('articles')
+      .select(`
+        *,
+        article_tags(tag),
+        clubs(name),
+        state_associations(name, abbreviation),
+        national_associations(name, abbreviation)
+      `)
+      .eq('status', 'draft')
+      .order('updated_at', { ascending: false });
+
+    if (clubId) {
+      query = query.eq('club_id', clubId);
+    } else if (associationId && associationType === 'state') {
+      query = query.eq('state_association_id', associationId);
+    } else if (associationId && associationType === 'national') {
+      query = query.eq('national_association_id', associationId);
+    } else {
+      return [];
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    const authorIds = data.map(a => a.author_id).filter(Boolean);
+    const { data: users } = authorIds.length > 0
+      ? await supabase.from('profiles').select('id, first_name, last_name').in('id', authorIds)
+      : { data: [] };
+
+    return data.map(article => {
+      let authorName = 'Unknown Author';
+      if (article.is_scraped && article.scraped_author) {
+        authorName = article.scraped_author;
+      } else {
+        const author = users?.find(u => u.id === article.author_id);
+        if (author) {
+          authorName = `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author';
+        }
+      }
+      const tags = article.article_tags?.map((t: any) => t.tag) || [];
+      const { article_tags, clubs, state_associations, national_associations, ...articleData } = article;
+      return { ...articleData, tags, author_name: authorName } as Article;
+    });
+  } catch (error) {
+    console.error('Error fetching draft articles:', error);
+    return [];
+  }
+};
+
 // Get a single article by ID
 export const getArticleById = async (id: string): Promise<Article | null> => {
   try {
