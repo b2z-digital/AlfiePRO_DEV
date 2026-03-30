@@ -744,10 +744,17 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             <h3 className="text-base font-semibold text-white mb-1 truncate">
               {event.eventName}
             </h3>
-            <div className="flex items-center text-sm text-slate-400 mb-2">
-              <MapPin size={14} className="mr-1" />
-              <span className="truncate">{event.venue}</span>
-            </div>
+            {event.venue ? (
+              <div className="flex items-center text-sm text-slate-400 mb-2">
+                <MapPin size={14} className="mr-1 flex-shrink-0" />
+                <span className="truncate">{event.venue}</span>
+              </div>
+            ) : event.clubName ? (
+              <div className="flex items-center text-sm text-slate-400 mb-2">
+                <MapPin size={14} className="mr-1 flex-shrink-0" />
+                <span className="truncate">{event.clubName}</span>
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-wrap">
