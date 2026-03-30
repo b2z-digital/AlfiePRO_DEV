@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Calendar, Clock, User, Flag, CreditCard as Edit2, Trash2, SquareCheck as CheckSquare, Paperclip, TriangleAlert as AlertTriangle, Check, MessageSquare, Eye, Circle as XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, User, Flag, SquarePen as Edit2, Trash2, SquareCheck as CheckSquare, Paperclip, TriangleAlert as AlertTriangle, Check, MessageSquare, Eye, Circle as XCircle } from 'lucide-react';
 import { Task } from '../../types/task';
 import { completeTask, getTaskAttachments } from '../../utils/taskStorage';
 import { formatDate } from '../../utils/date';

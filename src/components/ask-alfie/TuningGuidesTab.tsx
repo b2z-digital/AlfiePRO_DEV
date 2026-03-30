@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Search, FileText, Trash2, CreditCard as Edit2, Eye, EyeOff, RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Clock, X, ChevronDown, MoveVertical as MoreVertical, Download, Type, Plus } from 'lucide-react';
+import { Upload, Search, FileText, Trash2, SquarePen as Edit2, Eye, EyeOff, RefreshCw, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle, Clock, X, ChevronDown, MoveVertical as MoreVertical, Download, Type, Plus } from 'lucide-react';
 import {
   AlfieTuningGuide, getTuningGuides, uploadTuningGuide, createTextTuningGuide,
   updateTuningGuide, deleteTuningGuide, triggerGuideProcessing,

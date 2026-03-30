@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Trash2, Copy, CreditCard as Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader as Loader2, Crosshair, RotateCcw, Pause } from 'lucide-react';
+import { Plus, Trash2, Copy, SquarePen as Edit2, Check, X, ChevronDown, ChevronUp, Play, Square, Clock, Volume2, Shield, ListMusic, Timer, Upload, Music, Loader as Loader2, Crosshair, RotateCcw, Pause } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConfirmationModal } from '../ConfirmationModal';
 import type { StartSequence, StartSequenceSound, StartBoxSound, SequenceType } from '../../types/startBox';

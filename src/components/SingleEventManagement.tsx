@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Calendar, Plus, CreditCard as Edit2, Trash2, MapPin, X, FileText, CalendarRange } from 'lucide-react';
+import { Trophy, Calendar, Plus, SquarePen as Edit2, Trash2, MapPin, X, FileText, CalendarRange } from 'lucide-react';
 import { RaceType } from '../types';
 import { RaceEvent } from '../types/race';
 import { storeRaceEvent, setCurrentEvent, getStoredRaceEvents, deleteRaceEvent, archiveRaceEvent } from '../utils/raceStorage';

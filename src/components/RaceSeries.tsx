@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, CreditCard as Edit2, Trash2, MapPin, Calendar, Trophy, TriangleAlert as AlertTriangle, Upload } from 'lucide-react';
+import { X, Plus, SquarePen as Edit2, Trash2, MapPin, Calendar, Trophy, TriangleAlert as AlertTriangle, Upload } from 'lucide-react';
 import { ImportRoundResultsModal } from './ImportRoundResultsModal';
 import { RaceType, BoatType } from '../types';
 import { RaceSeries as RaceSeriesType, RaceEvent } from '../types/race';

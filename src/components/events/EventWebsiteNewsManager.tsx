@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, Search, Plus, Calendar, User, ChevronRight, CreditCard as Edit2, Trash2, X, ArrowUpDown, LayoutGrid, List, Loader as Loader2 } from 'lucide-react';
+import { Newspaper, Search, Plus, Calendar, User, ChevronRight, SquarePen as Edit2, Trash2, X, ArrowUpDown, LayoutGrid, List, Loader as Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';

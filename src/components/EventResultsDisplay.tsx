@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, Award, ChevronDown, ChevronUp, FileText, CreditCard as Edit2, Trash2, Settings } from 'lucide-react';
+import { Trophy, Medal, Award, ChevronDown, ChevronUp, FileText, SquarePen as Edit2, Trash2, Settings } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { RaceEvent } from '../types/race';
 import { formatDate } from '../utils/date';

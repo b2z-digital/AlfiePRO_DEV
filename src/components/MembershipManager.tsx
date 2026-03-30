@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Users, UserPlus, Upload, Download, Search, CreditCard as Edit2, Sailboat, Phone, Mail, Building, Grid2x2 as Grid, List, ListFilter as Filter, RefreshCw, Calendar, Check, TriangleAlert as AlertTriangle, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
+import { X, Plus, Trash2, Users, UserPlus, Upload, Download, Search, SquarePen as Edit2, Sailboat, Phone, Mail, Building, Grid2x2 as Grid, List, ListFilter as Filter, RefreshCw, Calendar, Check, TriangleAlert as AlertTriangle, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
 import { MemberImportExportModal } from './MemberImportExportModal';
 import { Member, MemberFormData, ImportedMember, BoatType, MembershipLevel } from '../types/member';
 import { getStoredMembers, addMember, updateMember, deleteMember, getEditSession, setEditSession, clearEditSession, isEditSessionValid, addMembers, parseDate, parseAmount } from '../utils/storage';

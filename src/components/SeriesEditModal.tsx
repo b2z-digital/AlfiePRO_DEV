@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calculator, Save, ChevronDown, CreditCard as Edit2, Check } from 'lucide-react';
+import { X, Calculator, Save, ChevronDown, SquarePen as Edit2, Check } from 'lucide-react';
 import { RaceSeries } from '../types/race';
 import { Avatar } from './ui/Avatar';
 

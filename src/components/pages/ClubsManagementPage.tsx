@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, CreditCard as Edit2, Trash2, MoveVertical as MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
+import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, SquarePen as Edit2, Trash2, MoveVertical as MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';

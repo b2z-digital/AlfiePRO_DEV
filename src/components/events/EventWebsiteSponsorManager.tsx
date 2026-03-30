@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard as Edit2, Trash2, Loader as Loader2, Trophy, Upload, LogOut, ExternalLink, Image as ImageIcon, Check, Sparkles } from 'lucide-react';
+import { Plus, SquarePen as Edit2, Trash2, Loader as Loader2, Trophy, Upload, LogOut, ExternalLink, Image as ImageIcon, Check, Sparkles } from 'lucide-react';
 import type { EventSponsor } from '../../types/eventWebsite';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
 import { supabase } from '../../utils/supabase';

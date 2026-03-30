@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Users, Shuffle, Trash2, UserPlus, CreditCard as Edit2, Trophy } from 'lucide-react';
+import { X, Users, Shuffle, Trash2, UserPlus, SquarePen as Edit2, Trophy } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatDesignation } from '../types/heat';
 import { RaceEvent } from '../types/race';

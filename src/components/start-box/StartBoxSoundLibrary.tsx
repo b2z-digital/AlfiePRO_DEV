@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Play, Square, Trash2, Music, Volume2, Clock, HardDrive, Shield, CreditCard as Edit2, Check, X } from 'lucide-react';
+import { Upload, Play, Square, Trash2, Music, Volume2, Clock, HardDrive, Shield, SquarePen as Edit2, Check, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { StartBoxSound } from '../../types/startBox';
 import { getSounds, uploadSound, deleteSound } from '../../utils/startBoxStorage';
