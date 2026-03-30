@@ -57,7 +57,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     currency: 'AUD',
     renewal_period: 'annual' as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
     requires_association_fees: true,
-    replaces_membership_type_id: '' as string
+    replaces_membership_type_id: '' as string,
+    is_active: true
   });
 
   useEffect(() => {
@@ -298,7 +299,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount,
         currency: typeFormData.currency,
         renewal_period,
-        is_active: true,
+        is_active: typeFormData.is_active,
         requires_association_fees: typeFormData.requires_association_fees,
         replaces_membership_type_id: typeFormData.replaces_membership_type_id || null
       };
@@ -320,10 +321,11 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         currency: 'AUD',
         renewal_period: 'annual',
         requires_association_fees: true,
-        replaces_membership_type_id: ''
+        replaces_membership_type_id: '',
+        is_active: true
       });
       setSuccess('Membership type added successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
       
@@ -373,6 +375,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount,
         currency: typeFormData.currency,
         renewal_period,
+        is_active: typeFormData.is_active,
         requires_association_fees: typeFormData.requires_association_fees,
         replaces_membership_type_id: typeFormData.replaces_membership_type_id || null
       };
@@ -397,10 +400,11 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         currency: 'AUD',
         renewal_period: 'annual',
         requires_association_fees: true,
-        replaces_membership_type_id: ''
+        replaces_membership_type_id: '',
+        is_active: true
       });
       setSuccess('Membership type updated successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
       
@@ -462,7 +466,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       currency: type.currency,
       renewal_period: type.renewal_period as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
       requires_association_fees: type.requires_association_fees !== false,
-      replaces_membership_type_id: type.replaces_membership_type_id || ''
+      replaces_membership_type_id: type.replaces_membership_type_id || '',
+      is_active: type.is_active !== false
     });
     setShowForm(true);
   };
@@ -669,7 +674,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                     currency: 'AUD',
                     renewal_period: renewalMode === 'fixed' ? 'annual' : 'annual',
                     requires_association_fees: true,
-                    replaces_membership_type_id: ''
+                    replaces_membership_type_id: '',
+                    is_active: true
                   });
                   setShowForm(true);
                 }}
@@ -854,7 +860,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   <input
                     type="checkbox"
                     id="is-active"
-                    checked={true}
+                    checked={typeFormData.is_active}
+                    onChange={(e) => setTypeFormData(prev => ({ ...prev, is_active: e.target.checked }))}
                     className="h-4 w-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
                   />
                   <label htmlFor="is-active" className="ml-2 block text-sm text-slate-300">
@@ -875,7 +882,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                         currency: 'AUD',
                         renewal_period: 'annual',
                         requires_association_fees: true,
-                        replaces_membership_type_id: ''
+                        replaces_membership_type_id: '',
+                        is_active: true
                       });
                     }}
                     className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
