@@ -180,7 +180,14 @@ function parseEventsListPage(html: string, baseUrl: string): DiscoveredEvent[] {
     else if (!href.startsWith("http")) fullUrl = origin + "/" + href;
 
     const dateCell = cells.length > 1 ? stripTags(cells[1][1]) : "";
-    const venueCell = cells.length > 2 ? stripTags(cells[2][1]) : "";
+
+    let venueCell = "";
+    if (cells.length > 2) {
+      const eventCellHtml = cells[2][1];
+      const withoutLink = eventCellHtml.replace(/<a[^>]*>[\s\S]*?<\/a>/gi, "");
+      const withoutStrong = withoutLink.replace(/<strong[^>]*>[\s\S]*?<\/strong>/gi, "");
+      venueCell = stripTags(withoutStrong).trim();
+    }
 
     let eventDate = parseMonthDate(dateCell);
     let eventStatus: string = "active";
@@ -381,7 +388,10 @@ function parseEventDetailPage(html: string, baseUrl: string): EventDetail {
     if (!location && /,\s*(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\s*(?:,?\s*AUS)?/i.test(chunk) && chunk !== eventName) {
       let loc = chunk;
       if (eventName && loc.startsWith(eventName)) loc = loc.slice(eventName.length).trim();
-      if (loc.length > 3) location = loc;
+      if (loc.length > 3) {
+        location = loc;
+        if (!venue) venue = loc;
+      }
     }
   }
 
@@ -654,6 +664,10 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             };
             if (evt.eventDate) updates.event_date = evt.eventDate;
+            if (evt.venue) {
+              updates.venue = evt.venue;
+              updates.location = evt.venue;
+            }
             if (evt.stateCode) updates.state_code = evt.stateCode;
             if (evt.boatClassMapped) updates.boat_class_mapped = evt.boatClassMapped;
             updates.event_type = evt.eventType;
@@ -676,7 +690,7 @@ Deno.serve(async (req: Request) => {
               event_name: evt.name,
               event_date: evt.eventDate,
               event_end_date: null,
-              venue: null,
+              venue: evt.venue,
               location: evt.venue,
               state_code: evt.stateCode,
               country_code: evt.countryCode,
