@@ -15,6 +15,7 @@ interface MembershipSettingsPageProps {
 export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ darkMode, initialView }) => {
   const { currentClub } = useAuth();
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
+  const [memberCountsByType, setMemberCountsByType] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +83,47 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         .order('created_at');
       
       if (typesError) throw typesError;
-      
+
+      const countsByTypeId: Record<string, number> = {};
+      const countsByName: Record<string, number> = {};
+
+      const { data: cmData } = await supabase
+        .from('club_memberships')
+        .select('membership_type_id')
+        .eq('club_id', currentClub.clubId)
+        .not('membership_type_id', 'is', null);
+
+      if (cmData) {
+        cmData.forEach(row => {
+          countsByTypeId[row.membership_type_id] = (countsByTypeId[row.membership_type_id] || 0) + 1;
+        });
+      }
+
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('membership_level')
+        .eq('club_id', currentClub.clubId);
+
+      if (membersData) {
+        membersData.forEach(row => {
+          if (row.membership_level) {
+            countsByName[row.membership_level] = (countsByName[row.membership_level] || 0) + 1;
+          }
+        });
+      }
+
+      const merged: Record<string, number> = {};
+      if (typesData) {
+        typesData.forEach((t: any) => {
+          const fromId = countsByTypeId[t.id] || 0;
+          const fromName = countsByName[t.name] || 0;
+          const total = Math.max(fromId, fromName);
+          if (total > 0) merged[t.id] = total;
+        });
+      }
+
+      setMemberCountsByType(merged);
+
       // Fetch club settings including renewal settings
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
@@ -417,7 +458,13 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
   const handleDeleteType = async (typeId: string) => {
     if (!currentClub?.clubId) return;
 
-    // Check if this is the last primary membership type
+    const memberCount = memberCountsByType[typeId] || 0;
+    if (memberCount > 0) {
+      setError(`Cannot delete this membership type because ${memberCount} member${memberCount === 1 ? ' is' : 's are'} currently assigned to it. Set it to inactive instead.`);
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+
     const typeToDelete = membershipTypes.find(t => t.id === typeId);
     if (typeToDelete?.requires_association_fees !== false) {
       const primaryTypes = membershipTypes.filter(t => t.requires_association_fees !== false);
@@ -428,7 +475,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       }
     }
 
-    if (!confirm('Are you sure you want to delete this membership type?')) {
+    if (!confirm('Are you sure you want to delete this membership type? This cannot be undone.')) {
       return;
     }
 
@@ -989,12 +1036,26 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                               >
                                 <Edit2 size={16} />
                               </button>
-                              <button
-                                onClick={() => handleDeleteType(type.id)}
-                                className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                              {(memberCountsByType[type.id] || 0) > 0 ? (
+                                <div className="relative group">
+                                  <button
+                                    disabled
+                                    className="p-2 rounded-lg text-slate-600 cursor-not-allowed"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                  <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-xs text-slate-300 rounded-lg border border-slate-600 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    {memberCountsByType[type.id]} member{memberCountsByType[type.id] === 1 ? '' : 's'} assigned - set inactive instead
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleDeleteType(type.id)}
+                                  className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
