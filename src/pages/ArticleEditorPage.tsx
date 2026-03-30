@@ -333,9 +333,9 @@ const ArticleEditorPage: React.FC = () => {
         content,
         excerpt: generatedExcerpt,
         author_id: user.id,
-        club_id: currentClub?.clubId,
-        state_association_id: currentOrganization?.type === 'state' ? currentOrganization.id : undefined,
-        national_association_id: currentOrganization?.type === 'national' ? currentOrganization.id : undefined,
+        club_id: isAssociation ? undefined : currentClub?.clubId,
+        state_association_id: isAssociation && currentOrganization?.type === 'state' ? currentOrganization.id : undefined,
+        national_association_id: isAssociation && currentOrganization?.type === 'national' ? currentOrganization.id : undefined,
         event_website_id: eventWebsiteId || undefined,
         cover_image: coverImage || DEFAULT_COVER_IMAGE,
         status: publish ? 'published' : 'draft'
