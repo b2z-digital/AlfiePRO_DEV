@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -31,6 +31,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   const [filterDays, setFilterDays] = useState(90);
   const [activeTab, setActiveTab] = useState<'expiring' | 'overdue'>('expiring');
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [replacementMap, setReplacementMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (currentClub?.clubId) {
@@ -63,6 +64,25 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
       setExpiringMembers(expiringData || []);
       setOverdueMembers(overdueData || []);
+
+      const { data: typesData } = await supabase
+        .from('membership_types')
+        .select('id, name, is_active, replaces_membership_type_id')
+        .eq('club_id', currentClub.clubId);
+
+      if (typesData) {
+        const map: Record<string, string> = {};
+        const inactiveTypes = typesData.filter(t => !t.is_active);
+        const activeReplacements = typesData.filter(t => t.is_active && t.replaces_membership_type_id);
+
+        for (const replacement of activeReplacements) {
+          const oldType = inactiveTypes.find(t => t.id === replacement.replaces_membership_type_id);
+          if (oldType) {
+            map[oldType.name] = replacement.name;
+          }
+        }
+        setReplacementMap(map);
+      }
     } catch (error) {
       console.error('Error fetching expiring memberships:', error);
       addNotification('error', 'Failed to load expiring memberships');
@@ -341,6 +361,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Contact</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Migration</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Renewal Date</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Status</th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Actions</th>
@@ -377,6 +398,16 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-slate-300">{member.membership_level}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {replacementMap[member.membership_level] ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                          <ArrowRightLeft size={12} />
+                          {replacementMap[member.membership_level]}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-slate-300">{formatDate(member.renewal_date)}</span>
