@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, SquarePen as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText } from 'lucide-react';
+import { Plus, Trash2, SquarePen as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { MembershipType, MembershipSettings, RenewalMode } from '../../types/membership';
@@ -56,7 +56,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     amount: '',
     currency: 'AUD',
     renewal_period: 'annual' as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
-    requires_association_fees: true // Default to primary/full membership
+    requires_association_fees: true,
+    replaces_membership_type_id: '' as string,
+    is_active: true
   });
 
   useEffect(() => {
@@ -290,28 +292,26 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         renewal_period = 'annual';
       }
       
-      // Prepare data
-      const newType = {
+      const newType: Record<string, any> = {
         club_id: currentClub.clubId,
         name: typeFormData.name,
         description: typeFormData.description || null,
         amount,
         currency: typeFormData.currency,
         renewal_period,
-        is_active: true,
-        requires_association_fees: typeFormData.requires_association_fees
+        is_active: typeFormData.is_active,
+        requires_association_fees: typeFormData.requires_association_fees,
+        replaces_membership_type_id: typeFormData.replaces_membership_type_id || null
       };
-      
-      // Insert new type
+
       const { data: memberData, error: insertError } = await supabase
         .from('membership_types')
         .insert(newType)
         .select()
         .single();
-      
+
       if (insertError) throw insertError;
-      
-      // Update state
+
       setMembershipTypes([...membershipTypes, memberData]);
       setShowForm(false);
       setTypeFormData({
@@ -320,10 +320,12 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount: '',
         currency: 'AUD',
         renewal_period: 'annual',
-        requires_association_fees: true
+        requires_association_fees: true,
+        replaces_membership_type_id: '',
+        is_active: true
       });
       setSuccess('Membership type added successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
       
@@ -367,27 +369,26 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         renewal_period = 'annual';
       }
       
-      // Prepare data
-      const updatedType = {
+      const updatedType: Record<string, any> = {
         name: typeFormData.name,
         description: typeFormData.description || null,
         amount,
         currency: typeFormData.currency,
         renewal_period,
-        requires_association_fees: typeFormData.requires_association_fees
+        is_active: typeFormData.is_active,
+        requires_association_fees: typeFormData.requires_association_fees,
+        replaces_membership_type_id: typeFormData.replaces_membership_type_id || null
       };
-      
-      // Update type
+
       const { error: updateError } = await supabase
         .from('membership_types')
         .update(updatedType)
         .eq('id', editingType.id)
         .eq('club_id', currentClub.clubId);
-      
+
       if (updateError) throw updateError;
-      
-      // Update state
-      setMembershipTypes(membershipTypes.map(type => 
+
+      setMembershipTypes(membershipTypes.map(type =>
         type.id === editingType.id ? { ...type, ...updatedType } : type
       ));
       setEditingType(null);
@@ -398,10 +399,12 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount: '',
         currency: 'AUD',
         renewal_period: 'annual',
-        requires_association_fees: true
+        requires_association_fees: true,
+        replaces_membership_type_id: '',
+        is_active: true
       });
       setSuccess('Membership type updated successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
       
@@ -462,7 +465,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       amount: type.amount.toString(),
       currency: type.currency,
       renewal_period: type.renewal_period as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
-      requires_association_fees: type.requires_association_fees !== false // Default to true if not set
+      requires_association_fees: type.requires_association_fees !== false,
+      replaces_membership_type_id: type.replaces_membership_type_id || '',
+      is_active: type.is_active !== false
     });
     setShowForm(true);
   };
@@ -667,7 +672,10 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                     description: '',
                     amount: '',
                     currency: 'AUD',
-                    renewal_period: renewalMode === 'fixed' ? 'annual' : 'annual'
+                    renewal_period: renewalMode === 'fixed' ? 'annual' : 'annual',
+                    requires_association_fees: true,
+                    replaces_membership_type_id: '',
+                    is_active: true
                   });
                   setShowForm(true);
                 }}
@@ -752,6 +760,37 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   </div>
                 </div>
 
+                {(() => {
+                  const inactiveTypes = membershipTypes.filter(t =>
+                    !t.is_active && (!editingType || t.id !== editingType.id)
+                  );
+                  if (inactiveTypes.length > 0) {
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                          Replaces (optional)
+                        </label>
+                        <select
+                          value={typeFormData.replaces_membership_type_id}
+                          onChange={(e) => setTypeFormData(prev => ({ ...prev, replaces_membership_type_id: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">None - new membership type</option>
+                          {inactiveTypes.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} (${t.amount} {t.currency} - inactive)
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Members on the selected inactive type will be automatically moved to this type at renewal time.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
@@ -821,7 +860,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   <input
                     type="checkbox"
                     id="is-active"
-                    checked={true}
+                    checked={typeFormData.is_active}
+                    onChange={(e) => setTypeFormData(prev => ({ ...prev, is_active: e.target.checked }))}
                     className="h-4 w-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
                   />
                   <label htmlFor="is-active" className="ml-2 block text-sm text-slate-300">
@@ -840,7 +880,10 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                         description: '',
                         amount: '',
                         currency: 'AUD',
-                        renewal_period: 'annual'
+                        renewal_period: 'annual',
+                        requires_association_fees: true,
+                        replaces_membership_type_id: '',
+                        is_active: true
                       });
                     }}
                     className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
@@ -887,52 +930,76 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {membershipTypes.map(type => (
-                      <div 
-                        key={type.id}
-                        className="p-4 rounded-lg bg-slate-800/70 border border-slate-700/50 hover:bg-slate-800 transition-colors"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg font-medium text-white">{type.name}</h3>
-                            {type.description && (
-                              <p className="text-sm text-slate-400 mt-1">{type.description}</p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2">
-                              <div className="flex items-center gap-1 text-sm">
-                                <DollarSign size={14} className="text-green-400" />
-                                <span className="text-slate-300">
-                                  {type.amount} {type.currency}
-                                </span>
+                    {membershipTypes.map(type => {
+                      const replacesType = type.replaces_membership_type_id
+                        ? membershipTypes.find(t => t.id === type.replaces_membership_type_id)
+                        : null;
+                      return (
+                        <div
+                          key={type.id}
+                          className={`p-4 rounded-lg border hover:bg-slate-800 transition-colors ${
+                            type.is_active
+                              ? 'bg-slate-800/70 border-slate-700/50'
+                              : 'bg-slate-900/50 border-slate-700/30 opacity-60'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-medium text-white">{type.name}</h3>
+                                {!type.is_active && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-400">
+                                    Inactive
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex items-center gap-1 text-sm">
-                                <Calendar size={14} className="text-blue-400" />
-                                <span className="text-slate-300">
-                                  {type.renewal_period === 'annual' ? 'Annual' : 
-                                   type.renewal_period === 'monthly' ? 'Monthly' : 
-                                   type.renewal_period === 'quarterly' ? 'Quarterly' : 
-                                   'Lifetime'}
-                                </span>
+                              {type.description && (
+                                <p className="text-sm text-slate-400 mt-1">{type.description}</p>
+                              )}
+                              <div className="flex items-center gap-4 mt-2 flex-wrap">
+                                <div className="flex items-center gap-1 text-sm">
+                                  <DollarSign size={14} className="text-green-400" />
+                                  <span className="text-slate-300">
+                                    {type.amount} {type.currency}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Calendar size={14} className="text-blue-400" />
+                                  <span className="text-slate-300">
+                                    {type.renewal_period === 'annual' ? 'Annual' :
+                                     type.renewal_period === 'monthly' ? 'Monthly' :
+                                     type.renewal_period === 'quarterly' ? 'Quarterly' :
+                                     'Lifetime'}
+                                  </span>
+                                </div>
+                                {replacesType && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <ArrowRightLeft size={14} className="text-amber-400" />
+                                    <span className="text-amber-300">
+                                      Replaces "{replacesType.name}"
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEditType(type)}
-                              className="p-2 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteType(type.id)}
-                              className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditType(type)}
+                                className="p-2 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteType(type.id)}
+                                className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </>

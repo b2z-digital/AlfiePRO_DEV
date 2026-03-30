@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity } from 'lucide-react';
+import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -49,6 +49,8 @@ interface MembershipType {
   amount: number;
   currency: string;
   renewal_period: string;
+  is_active: boolean;
+  replaces_membership_type_id: string | null;
 }
 
 interface PaymentRecord {
@@ -116,6 +118,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [migrationNotice, setMigrationNotice] = useState<{ from: string; to: string } | null>(null);
 
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const effectiveMemberId = isImpersonating ? impersonationSession?.targetMemberId : null;
@@ -151,7 +154,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         memberQuery = memberQuery.eq('user_id', effectiveUserId);
       }
 
-      const [memberResult, typesResult] = await Promise.all([
+      const [memberResult, activeTypesResult, allTypesResult] = await Promise.all([
         memberQuery.maybeSingle(),
         supabase
           .from('membership_types')
@@ -159,13 +162,33 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           .eq('club_id', currentClub?.clubId)
           .eq('is_active', true)
           .neq('name', 'Life Member')
-          .order('amount', { ascending: true })
+          .order('amount', { ascending: true }),
+        supabase
+          .from('membership_types')
+          .select('id, name, is_active, replaces_membership_type_id')
+          .eq('club_id', currentClub?.clubId)
       ]);
 
       if (memberResult.error) throw memberResult.error;
 
+      const activeTypes = activeTypesResult.data || [];
+      const allTypes = allTypesResult.data || [];
+
       if (memberResult.data) {
         setMemberData(memberResult.data as MemberData);
+
+        const memberLevel = memberResult.data.membership_level_custom || memberResult.data.membership_level;
+        const currentInactiveType = allTypes.find(t => !t.is_active && t.name === memberLevel);
+
+        if (currentInactiveType) {
+          const replacementType = allTypes.find(
+            t => t.is_active && t.replaces_membership_type_id === currentInactiveType.id
+          );
+          if (replacementType) {
+            setMigrationNotice({ from: currentInactiveType.name, to: replacementType.name });
+            setSelectedMembershipType(replacementType.id);
+          }
+        }
 
         const [boatsResult, paymentsResult] = await Promise.all([
           supabase
@@ -194,7 +217,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         setError('Member record not found');
       }
 
-      setMembershipTypes(typesResult.data || []);
+      setMembershipTypes(activeTypes);
     } catch (err) {
       console.error('Error fetching member data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load membership data');
@@ -954,6 +977,19 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               </div>
 
               <div className="p-6">
+                {migrationNotice && (
+                  <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                    <ArrowRightLeft size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-300">Membership Type Updated</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Your previous "{migrationNotice.from}" membership has been replaced by "{migrationNotice.to}".
+                        This has been pre-selected for you below.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-slate-400 mb-6">Choose your membership type to continue with renewal:</p>
 
                 <div className="space-y-3 mb-6">

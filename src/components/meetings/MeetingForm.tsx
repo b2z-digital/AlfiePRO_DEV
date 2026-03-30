@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
@@ -258,6 +258,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         visible_to_member_clubs: meeting.visible_to_member_clubs ?? true
       });
 
+      if (locationInputRef.current) {
+        locationInputRef.current.value = meeting.location || '';
+      }
+
       fetchAgendaItems();
     }
   }, [meeting, clubId, associationId, associationType, currentClub?.clubId, currentOrganization?.id]);
@@ -266,7 +270,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     loadGoogleMaps(() => setMapsLoaded(true));
   }, []);
 
-  const initAutocomplete = useCallback(() => {
+  useEffect(() => {
     if (!mapsLoaded || !locationInputRef.current || autocompleteRef.current) return;
 
     const autocomplete = new (window as any).google.maps.places.Autocomplete(locationInputRef.current, {
@@ -282,6 +286,9 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         ? `${place.name}, ${place.formatted_address}`
         : place.formatted_address || place.name || '';
 
+      if (locationInputRef.current) {
+        locationInputRef.current.value = displayName;
+      }
       setFormData(prev => ({
         ...prev,
         location: displayName,
@@ -293,10 +300,6 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
 
     autocompleteRef.current = autocomplete;
   }, [mapsLoaded]);
-
-  useEffect(() => {
-    initAutocomplete();
-  }, [initAutocomplete]);
 
   const checkGoogleIntegration = async () => {
     try {
@@ -651,13 +654,15 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     e.preventDefault();
     setError(null);
     setLoading(true);
-    
+
+    const currentLocation = locationInputRef.current?.value || formData.location;
+
     try {
       // Validate form
       if (!formData.name) {
         throw new Error('Meeting name is required');
       }
-      
+
       if (!formData.date) {
         throw new Error('Meeting date is required');
       }
@@ -666,13 +671,13 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         throw new Error('Please select an end date for the recurring series');
       }
 
-      if ((formData.meeting_type === 'hybrid' || formData.meeting_type === 'in_person') && !formData.location) {
+      if ((formData.meeting_type === 'hybrid' || formData.meeting_type === 'in_person') && !currentLocation) {
         throw new Error('A location is required for in-person and hybrid meetings');
       }
-      
+
       const meetingData: any = {
         name: formData.name,
-        location: formData.location,
+        location: currentLocation,
         location_lat: formData.location_lat,
         location_lng: formData.location_lng,
         location_place_id: formData.location_place_id || undefined,
@@ -910,7 +915,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       ref={locationInputRef}
                       type="text"
                       name="location"
-                      value={formData.location}
+                      defaultValue={formData.location}
                       onChange={(e) => {
                         setFormData(prev => ({
                           ...prev,
