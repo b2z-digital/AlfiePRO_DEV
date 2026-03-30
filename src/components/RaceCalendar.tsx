@@ -1287,9 +1287,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span className="font-medium truncate">{event.venue}</span>
-                            </div>
+                            {(event.venue || event.clubName) && (
+                              <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                <MapPin size={13} className="flex-shrink-0" />
+                                <span className="font-medium truncate">{event.venue || event.clubName}</span>
+                              </div>
+                            )}
                             {event.isExternalEvent ? (
                               event.displayCategory?.startsWith('state_') ? (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
@@ -1753,12 +1756,14 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             Up Next
                           </div>
                         )}
-                        <div className="absolute bottom-3 left-3 right-3">
-                          <div className="flex items-center gap-1.5 text-white text-sm font-medium">
-                            <MapPin size={14} />
-                            <span className="truncate">{event.venue}</span>
+                        {(event.venue || event.clubName) && (
+                          <div className="absolute bottom-3 left-3 right-3">
+                            <div className="flex items-center gap-1.5 text-white text-sm font-medium">
+                              <MapPin size={14} />
+                              <span className="truncate">{event.venue || event.clubName}</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ) : (
                       <div className={`w-full h-40 flex items-center justify-center ${

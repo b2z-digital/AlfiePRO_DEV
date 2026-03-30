@@ -447,10 +447,12 @@ export const PublicRaceCalendarPage: React.FC = () => {
                             </p>
                           )}
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mt-2">
-                            <div className="flex items-center gap-1.5">
-                              <MapPin size={14} className="flex-shrink-0" />
-                              <span className="truncate">{event.venue}</span>
-                            </div>
+                            {event.venue && (
+                              <div className="flex items-center gap-1.5">
+                                <MapPin size={14} className="flex-shrink-0" />
+                                <span className="truncate">{event.venue}</span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-1.5">
                               <Trophy size={14} className="flex-shrink-0" />
                               <span>Class: {event.race_class}</span>
@@ -551,10 +553,12 @@ export const PublicRaceCalendarPage: React.FC = () => {
                       <Clock size={14} />
                       <span>{formatDate(event.date)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin size={14} />
-                      <span className="truncate">{event.venue}</span>
-                    </div>
+                    {event.venue && (
+                      <div className="flex items-center gap-2">
+                        <MapPin size={14} />
+                        <span className="truncate">{event.venue}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <Trophy size={14} />
                       <span>{event.race_class}</span>
@@ -666,9 +670,11 @@ export const PublicRaceCalendarPage: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="text-gray-600 truncate">
-                            {event.venue}
-                          </div>
+                          {event.venue && (
+                            <div className="text-gray-600 truncate">
+                              {event.venue}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
