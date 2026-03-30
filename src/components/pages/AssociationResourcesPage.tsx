@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FolderOpen, Plus, CreditCard as Edit2, Trash2, FileText, Search, Grid2x2 as Grid, List, HardDrive, RefreshCw, ChevronRight, Hop as Home, Upload, File, Image as ImageIcon, Music, Film, Archive, FolderPlus, CloudUpload as UploadCloud, Eye, Download, ExternalLink, MoveVertical as MoreVertical, X, Building2, Users, Cloud } from 'lucide-react';
+import { FolderOpen, Plus, SquarePen as Edit2, Trash2, FileText, Search, Grid2x2 as Grid, List, HardDrive, RefreshCw, ChevronRight, Hop as Home, Upload, File, Image as ImageIcon, Music, Film, Archive, FolderPlus, CloudUpload as UploadCloud, Eye, Download, ExternalLink, MoveVertical as MoreVertical, X, Building2, Users, Cloud } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import * as ResourceStorage from '../../utils/associationResourceStorage';

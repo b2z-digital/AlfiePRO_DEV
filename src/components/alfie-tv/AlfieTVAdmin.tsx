@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import { Plus, CreditCard as Edit2, Trash2, Youtube, RefreshCw, Search, ExternalLink, CircleCheck as CheckCircle2, Eye, EyeOff, TriangleAlert as AlertTriangle, Star, ListVideo, Globe, ListFilter as Filter } from 'lucide-react';
+import { Plus, SquarePen as Edit2, Trash2, Youtube, RefreshCw, Search, ExternalLink, CircleCheck as CheckCircle2, Eye, EyeOff, TriangleAlert as AlertTriangle, Star, ListVideo, Globe, ListFilter as Filter } from 'lucide-react';
 import { alfieTVStorage, AlfieTVChannel, AlfieTVVideo, AlfieTVYouTubePlaylist } from '../../utils/alfieTVStorage';
 import AddVideoModal from './AddVideoModal';
 import { ConfirmationModal } from '../ConfirmationModal';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, Menu, Plus, Trash2, CreditCard as Edit2, ExternalLink, FileText, ChevronRight, ChevronDown, Save, ArrowLeft } from 'lucide-react';
+import { Globe, Menu, Plus, Trash2, SquarePen as Edit2, ExternalLink, FileText, ChevronRight, ChevronDown, Save, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface WebsiteNavigationProps {

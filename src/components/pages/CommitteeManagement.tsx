@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, UserPlus, Shield, Trash2, CreditCard as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check } from 'lucide-react';
+import { Users, UserPlus, Shield, Trash2, SquarePen as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard as Edit2, Trash2, MapPin, Star, ExternalLink, Eye, EyeOff, Award } from 'lucide-react';
+import { Plus, SquarePen as Edit2, Trash2, MapPin, Star, ExternalLink, Eye, EyeOff, Award } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { AccommodationFormModal } from './AccommodationFormModal';
 

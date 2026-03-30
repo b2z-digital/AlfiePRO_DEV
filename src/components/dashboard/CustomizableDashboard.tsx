@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
   arrayMove
 } from '@dnd-kit/sortable';
-import { CreditCard as Edit2, Check, Plus, RotateCcw, Columns2 as Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
+import { SquarePen as Edit2, Check, Plus, RotateCcw, Columns2 as Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { WidgetConfig, DashboardLayout, DashboardRow } from '../../types/dashboard';
 import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout, getTemplateForUser } from '../../utils/dashboardStorage';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, ListFilter as Filter, MapPin, Clock, Users, CreditCard as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
+import { Calendar, Plus, Search, ListFilter as Filter, MapPin, Clock, Users, SquarePen as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting } from '../../types/meeting';
 import { getMeetings, deleteMeeting, updateMeetingStatus } from '../../utils/meetingStorage';

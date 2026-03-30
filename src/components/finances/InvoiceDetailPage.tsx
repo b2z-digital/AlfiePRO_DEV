@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Send, Plus, CreditCard as Edit2, Trash2, DollarSign, Calendar, User, FileText, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Download, Send, Plus, SquarePen as Edit2, Trash2, DollarSign, Calendar, User, FileText, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { formatDate } from '../../utils/date';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, UserPlus, Shield, Mail, Trash2, TriangleAlert as AlertTriangle, CreditCard as Edit2, Crown } from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, Trash2, TriangleAlert as AlertTriangle, SquarePen as Edit2, Crown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Video, Search, ListFilter as Filter, Grid2x2 as Grid, List, Play, Calendar, Trophy, Eye, Download, ExternalLink, Youtube, CreditCard as Edit2, Trash2, X, Save, Share2, SquareCheck as CheckSquare, Square, Building, Check, ArrowUpDown, ChevronDown, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
+import { Camera, Video, Search, ListFilter as Filter, Grid2x2 as Grid, List, Play, Calendar, Trophy, Eye, Download, ExternalLink, Youtube, SquarePen as Edit2, Trash2, X, Save, Share2, SquareCheck as CheckSquare, Square, Building, Check, ArrowUpDown, ChevronDown, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../utils/supabase';

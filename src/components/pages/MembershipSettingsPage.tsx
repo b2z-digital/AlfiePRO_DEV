@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, CreditCard as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText } from 'lucide-react';
+import { Plus, Trash2, SquarePen as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { MembershipType, MembershipSettings, RenewalMode } from '../../types/membership';

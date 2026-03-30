@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, CreditCard as Edit2, Trash2, Eye, EyeOff, X, RefreshCw, MoveVertical as MoreVertical, Sparkles, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, SquarePen as Edit2, Trash2, Eye, EyeOff, X, RefreshCw, MoveVertical as MoreVertical, Sparkles, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   AlfieAiInstruction, getAiInstructions, createAiInstruction,
   updateAiInstruction, deleteAiInstruction,

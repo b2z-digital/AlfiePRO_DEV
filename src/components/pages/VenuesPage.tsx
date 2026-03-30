@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Plus, Trash2, Upload, X, CreditCard as Edit2, Map, Eye, Search, Star, ArrowUpDown, LayoutGrid, List, Building, Share2, Users, CircleAlert as AlertCircle, Link2, Unlink, ChevronDown } from 'lucide-react';
+import { MapPin, Plus, Trash2, Upload, X, SquarePen as Edit2, Map, Eye, Search, Star, ArrowUpDown, LayoutGrid, List, Building, Share2, Users, CircleAlert as AlertCircle, Link2, Unlink, ChevronDown } from 'lucide-react';
 import { Venue, VenueFormData } from '../../types/venue';
 import { getStoredVenues, addVenue, updateVenue, deleteVenue, shareVenueWithClub, unshareVenueFromClub, getVenueClubs, findSimilarVenues, unlinkVenueFromClub, setVenueAsClubDefault } from '../../utils/venueStorage';
 import { loadGoogleMaps } from '../../utils/googleMaps';

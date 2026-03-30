@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save, CreditCard as Edit2 } from 'lucide-react';
+import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save, SquarePen as Edit2 } from 'lucide-react';
 import { WIDGET_REGISTRY, getAllCategories, getWidgetsByCategory } from './WidgetRegistry';
 import { WidgetConfig, DashboardLayout } from '../../types/dashboard';
 import { DASHBOARD_TEMPLATES } from '../../constants/dashboardTemplates';

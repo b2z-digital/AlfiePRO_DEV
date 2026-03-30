@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, CreditCard as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CreditCard as Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Hop as Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoveHorizontal as MoreHorizontal, CreditCard as Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
+import { SquarePen as Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Hop as Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoveHorizontal as MoreHorizontal, SquarePen as Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
 import { HeatRaceInput } from './HeatRaceInput';
 import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calculateOverallPositions } from '../types/heat';
 import { useNavigate } from 'react-router-dom';
