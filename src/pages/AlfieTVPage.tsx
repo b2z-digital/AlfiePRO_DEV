@@ -824,6 +824,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .from('livestream_archives')
           .select('*')
           .eq('is_public', true)
+          .or('youtube_url.not.is.null,cloudflare_playback_url.not.is.null')
+          .not('duration', 'is', null)
+          .gt('duration', 0)
           .order('recorded_at', { ascending: false })
           .limit(20);
         setReplayArchives(archives || []);

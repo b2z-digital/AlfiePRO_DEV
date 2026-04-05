@@ -27,15 +27,16 @@ export const BasicInfoStep: React.FC<StepProps & { stateAssociationId: string }>
   useEffect(() => {
     if (mapsReady) {
       const input = document.getElementById('onboarding-club-location') as HTMLInputElement;
-      if (input && window.google) {
+      if (input && window.google?.maps?.places) {
         const searchBox = new google.maps.places.SearchBox(input);
         searchBox.addListener('places_changed', () => {
           const places = searchBox.getPlaces();
           if (!places || places.length === 0) return;
           const place = places[0];
-          updateFormData({
-            location: place.formatted_address || place.name || formData.location
-          });
+          const address = place.formatted_address || place.name;
+          if (address && address !== 'undefined') {
+            updateFormData({ location: address });
+          }
         });
       }
     }

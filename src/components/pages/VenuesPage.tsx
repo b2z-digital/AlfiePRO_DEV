@@ -233,11 +233,12 @@ export const VenuesPage: React.FC<VenuesPageProps> = ({
       map.setCenter(place.geometry.location);
       marker.setPosition(place.geometry.location);
 
+      const address = place.formatted_address;
       setFormData(prev => ({
         ...prev,
         latitude: place.geometry.location.lat(),
         longitude: place.geometry.location.lng(),
-        address: place.formatted_address || prev.address
+        ...(address && address !== 'undefined' ? { address } : {})
       }));
     });
 
