@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { MapPin, Navigation, FileText, Loader2 } from 'lucide-react';
+import { MapPin, Navigation, FileText, Loader as Loader2 } from 'lucide-react';
 import { loadGoogleMaps } from '../../../utils/googleMaps';
 import { StepProps } from './types';
 
@@ -95,10 +95,11 @@ export const VenueStep: React.FC<StepProps> = ({
         map.setCenter(place.geometry.location);
         marker.setPosition(place.geometry.location);
 
+        const address = place.formatted_address;
         updateFormData({
           venueLatitude: place.geometry.location.lat(),
           venueLongitude: place.geometry.location.lng(),
-          venueAddress: place.formatted_address || formData.venueAddress,
+          ...(address && address !== 'undefined' ? { venueAddress: address } : {}),
         });
       });
     }

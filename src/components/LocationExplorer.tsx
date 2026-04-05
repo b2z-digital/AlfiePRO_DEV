@@ -1,24 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  LogOut,
-  MapPin,
-  Search,
-  Navigation,
-  Calendar,
-  SlidersHorizontal,
-  Heart,
-  Clock,
-  MapIcon,
-  List,
-  Bookmark,
-  Star,
-  Navigation2,
-  Grid,
-  Globe,
-  Flag
-} from 'lucide-react';
+import { LogOut, MapPin, Search, Navigation, Calendar, SlidersHorizontal, Heart, Clock, Map as MapIcon, List, Bookmark, Star, Navigation2, Grid2x2 as Grid, Globe, Flag } from 'lucide-react';
 import { RaceEvent } from '../types/race';
 import { Venue } from '../types/venue';
 import { useAuth } from '../contexts/AuthContext';
@@ -346,10 +329,11 @@ export const LocationExplorer: React.FC<LocationExplorerProps> = ({
         if (places && places.length > 0) {
           const place = places[0];
           if (place.geometry && place.geometry.location) {
+            const placeName = place.name || place.formatted_address;
             handleLocationSelected({
               lat: place.geometry.location.lat(),
               lng: place.geometry.location.lng()
-            }, place.name || place.formatted_address || 'Selected Location');
+            }, (placeName && placeName !== 'undefined') ? placeName : 'Selected Location');
           }
         }
       });

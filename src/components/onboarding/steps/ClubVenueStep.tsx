@@ -130,10 +130,11 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
         map.setCenter(place.geometry.location);
         marker.setPosition(place.geometry.location);
 
+        const address = place.formatted_address;
         onUpdate({
           latitude: place.geometry!.location.lat(),
           longitude: place.geometry!.location.lng(),
-          address: place.formatted_address || data.address
+          ...(address && address !== 'undefined' ? { address } : {}),
         });
       });
     }
