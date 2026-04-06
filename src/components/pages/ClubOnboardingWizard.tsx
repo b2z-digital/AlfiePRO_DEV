@@ -140,7 +140,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         logoPreview: club.logo || '',
         clubIntroduction: club.club_introduction || '',
         featuredImageFile: null,
-        featuredImagePreview: club.featured_image_url || '',
+        featuredImagePreview: club.featured_image_url || club.cover_image_url || '',
         venueName: venue?.name || '',
         venueAddress: venue?.address || '',
         venueDescription: venue?.description || '',
@@ -155,6 +155,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           boat_class_id: sd.boat_class_id,
           description: sd.description || '',
           is_active: sd.is_active,
+          frequency: sd.frequency || 'every_week',
         })),
         membershipTypes: (membershipTypes || []).map(mt => ({
           id: mt.id,
@@ -594,6 +595,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         boat_class_id: day.boat_class_id || null,
         description: day.description || null,
         is_active: day.is_active,
+        frequency: day.frequency || 'every_week',
       }));
       await supabase.from('club_sailing_days').insert(sailingDaysToInsert);
     }
@@ -698,6 +700,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         boat_class_id: day.boat_class_id,
         description: day.description || null,
         is_active: day.is_active,
+        frequency: day.frequency || 'every_week',
       }));
       await supabase.from('club_sailing_days').insert(sailingDaysToInsert);
     }

@@ -16,6 +16,7 @@ export interface SailingDayEntry {
   boat_class_id: string | null;
   description: string;
   is_active: boolean;
+  frequency: 'every_week' | 'week_a' | 'week_b';
 }
 
 export interface ClubOnboardingFormData {
