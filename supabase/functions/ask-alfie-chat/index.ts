@@ -98,15 +98,16 @@ Deno.serve(async (req: Request) => {
     const corrections = correctionsResult.data || [];
     const knowledgeChunks = knowledgeResult.data || [];
 
-    let systemPrompt = buildSystemPrompt(aiInstructions, faqs, corrections, knowledgeChunks);
-
     const { data: profileData } = await supabaseAdmin
       .from("profiles")
       .select("full_name, first_name")
       .eq("id", user.id)
       .maybeSingle();
 
+    const firstName = profileData?.first_name || profileData?.full_name?.split(" ")[0] || "";
     const userName = profileData?.full_name || profileData?.first_name || "there";
+
+    let systemPrompt = buildSystemPrompt(aiInstructions, faqs, corrections, knowledgeChunks, firstName);
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -196,7 +197,8 @@ function buildSystemPrompt(
   aiInstructions: Array<{ category: string; instruction_text: string; priority: number }>,
   faqs: Array<{ question: string; answer: string }>,
   corrections: Array<{ scenario: string; correct_information: string; topic: string }>,
-  knowledgeChunks: Array<{ content: string; source_name: string }>
+  knowledgeChunks: Array<{ content: string; source_name: string }>,
+  firstName: string
 ): string {
   let prompt = "";
 
@@ -209,6 +211,8 @@ function buildSystemPrompt(
   }
 
   prompt += `\nWeb platform context: This user is on the AlfiePRO web platform (not mobile app). Navigation is via the left sidebar. Key sections include Race Management, Membership, Finances, Communications, Events, Media, Meetings, Tasks, Settings, and Support.\n`;
+
+  prompt += `\nIMPORTANT greeting rule: The user's first name is "${firstName || "there"}". When this is the first message in a conversation (no prior conversation history), greet them with "Hi ${firstName || "there"}" — NOT "Hey mate", NOT "G'day mate", NOT "I'm Alfie". Just "Hi ${firstName || "there"}" followed by your helpful response. For follow-up messages, do NOT re-greet — just answer directly.\n`;
 
   if (corrections.length > 0) {
     prompt += "\nKnowledge corrections (use these to avoid past mistakes):\n";

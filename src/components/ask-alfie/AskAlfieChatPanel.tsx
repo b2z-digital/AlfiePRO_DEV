@@ -45,8 +45,10 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userInitials, setUserInitials] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const lastAssistantRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
     loadUserProfile();
@@ -60,7 +62,19 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role === 'user') {
+      const container = messagesContainerRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    } else if (lastMsg.role === 'assistant' && messages.length > prevMessageCountRef.current) {
+      requestAnimationFrame(() => {
+        lastAssistantRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+    prevMessageCountRef.current = messages.length;
   }, [messages]);
 
   useEffect(() => {
@@ -183,12 +197,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     ? 'w-full h-full flex flex-col'
     : 'fixed bottom-24 right-6 z-[9989] w-[400px] max-h-[600px] flex flex-col rounded-2xl shadow-2xl border overflow-hidden';
 
-  const bgClass = darkMode
-    ? 'bg-slate-800 border-slate-700'
-    : 'bg-white border-slate-200';
-
   return (
-    <div className={`${containerClass} ${!embedded ? bgClass : ''}`}>
+    <div className={`${containerClass} ${!embedded ? 'bg-white border-slate-200' : ''}`}>
       {!embedded && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 bg-gradient-to-r from-slate-800 to-slate-900">
           <div className="flex items-center gap-3">
@@ -223,18 +233,18 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         </div>
       )}
 
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${
-        embedded ? '' : darkMode ? 'bg-slate-800/50' : 'bg-slate-50'
+      <div ref={messagesContainerRef} className={`flex-1 overflow-y-auto p-4 space-y-4 ${
+        embedded ? '' : 'bg-white'
       }`} style={!embedded ? { maxHeight: '420px' } : undefined}>
         {messages.length === 0 ? (
           <div className="flex flex-col items-center pt-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center mb-3">
               <AlfieLogo size={24} />
             </div>
-            <p className={`text-sm font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              {userName ? `G'day ${userName}!` : "G'day!"}
+            <p className="text-sm font-medium mb-1 text-slate-900">
+              {userName ? `Hi ${userName}!` : 'Hi there!'}
             </p>
-            <p className={`text-xs text-center mb-5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className="text-xs text-center mb-5 text-slate-500">
               I'm your platform assistant. Ask me anything about using AlfiePRO.
             </p>
             <div className="w-full space-y-2">
@@ -242,11 +252,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 <button
                   key={i}
                   onClick={() => sendMessage(q)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
-                    darkMode
-                      ? 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-cyan-300 border border-slate-600/50'
-                      : 'bg-white text-slate-600 hover:bg-sky-50 hover:text-sky-600 border border-slate-200'
-                  }`}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors bg-slate-50 text-slate-600 hover:bg-sky-50 hover:text-sky-600 border border-slate-200"
                 >
                   {q}
                 </button>
@@ -254,50 +260,53 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             </div>
           </div>
         ) : (
-          messages.map(msg => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'assistant' && (
-                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
-                  <AlfieLogo size={14} />
-                </div>
-              )}
+          messages.map((msg, idx) => {
+            const isLastAssistant = msg.role === 'assistant' && (
+              idx === messages.length - 1 ||
+              !messages.slice(idx + 1).some(m => m.role === 'assistant')
+            );
+            return (
               <div
-                className={`max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-cyan-600 text-white rounded-br-sm'
-                    : darkMode
-                      ? 'bg-slate-700 text-slate-200 border border-slate-600/50 rounded-bl-sm'
-                      : 'bg-white text-slate-700 border border-slate-200 rounded-bl-sm shadow-sm'
-                }`}
+                key={msg.id}
+                ref={isLastAssistant ? lastAssistantRef : undefined}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {formatMessageContent(msg.content)}
-              </div>
-              {msg.role === 'user' && (
-                <div className="w-6 h-6 rounded-full flex items-center justify-center ml-2 mt-1 flex-shrink-0 overflow-hidden">
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="" className="w-full h-full object-cover rounded-full" />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white text-[10px] font-semibold">
-                      {userInitials}
-                    </div>
-                  )}
+                {msg.role === 'assistant' && (
+                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+                    <AlfieLogo size={14} />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-cyan-600 text-white rounded-br-sm'
+                      : 'bg-slate-50 text-slate-700 border border-slate-200 rounded-bl-sm'
+                  }`}
+                >
+                  {formatMessageContent(msg.content)}
                 </div>
-              )}
-            </div>
-          ))
+                {msg.role === 'user' && (
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center ml-2 mt-1 flex-shrink-0 overflow-hidden">
+                    {userAvatar ? (
+                      <img src={userAvatar} alt="" className="w-full h-full object-cover rounded-full" />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white text-[10px] font-semibold">
+                        {userInitials}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
 
         {isLoading && (
           <div className="flex items-start gap-2">
-            <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
               <AlfieLogo size={14} />
             </div>
-            <div className={`px-3 py-2 rounded-xl rounded-bl-sm ${
-              darkMode ? 'bg-slate-700 border border-slate-600/50' : 'bg-white border border-slate-200 shadow-sm'
-            }`}>
+            <div className="px-3 py-2 rounded-xl rounded-bl-sm bg-slate-50 border border-slate-200">
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -306,17 +315,10 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             </div>
           </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      <div className={`p-3 border-t ${
-        darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'
-      }`}>
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors ${
-          darkMode
-            ? 'bg-slate-700/50 border-slate-600 focus-within:border-cyan-500'
-            : 'bg-slate-50 border-slate-200 focus-within:border-sky-400'
-        }`}>
+      <div className="p-3 border-t border-slate-200 bg-white">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors bg-slate-50 border-slate-200 focus-within:border-sky-400">
           <input
             ref={inputRef}
             type="text"
@@ -325,9 +327,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             onKeyDown={handleKeyDown}
             placeholder="Ask Alfie..."
             disabled={isLoading}
-            className={`flex-1 bg-transparent text-sm outline-none ${
-              darkMode ? 'text-white placeholder-slate-500' : 'text-slate-900 placeholder-slate-400'
-            }`}
+            className="flex-1 bg-transparent text-sm outline-none text-slate-900 placeholder-slate-400"
           />
           <button
             onClick={() => sendMessage()}
@@ -335,9 +335,7 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
             className={`p-1.5 rounded-lg transition-all ${
               input.trim() && !isLoading
                 ? 'bg-cyan-500 text-white hover:bg-cyan-600 shadow-sm'
-                : darkMode
-                  ? 'text-slate-600 cursor-not-allowed'
-                  : 'text-slate-300 cursor-not-allowed'
+                : 'text-slate-300 cursor-not-allowed'
             }`}
           >
             {isLoading ? (
