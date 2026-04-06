@@ -40,6 +40,8 @@ import { useCapabilities } from '../hooks/useCapabilities';
 import { YachtClassesRouter } from '../pages/YachtClassesRouter';
 import { BugReportButton } from './bug-report/BugReportButton';
 import { BugReportDashboard } from './bug-report/BugReportDashboard';
+import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
+import SupportPage from '../pages/SupportPage';
 
 // Import Website section components
 import WebsiteOverview from './pages/WebsiteOverview';
@@ -1491,6 +1493,27 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             {/* Bottom Actions */}
             <div className={`space-y-1 mt-3 ${(collapsed && !isHoveringNav) ? 'flex flex-col items-center' : ''}`}>
+              {(currentOrganization?.type !== 'platform') && (
+                <button
+                  onClick={() => handleSectionChange('/support')}
+                  className={`
+                    ${(collapsed && !isHoveringNav) ? 'flex items-center justify-center' : 'w-full flex items-center gap-3'} px-3 py-2.5
+                    rounded-lg transition-colors
+                    ${location.pathname === '/support'
+                      ? 'bg-cyan-600 text-white shadow-lg'
+                      : lightMode
+                        ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                        : darkMode
+                          ? 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                          : 'text-slate-200 hover:text-white hover:bg-white/10'
+                    }
+                  `}
+                  title={(collapsed && !isHoveringNav) ? "Support" : ""}
+                >
+                  <LifeBuoy size={16} className={location.pathname === '/support' ? '!text-white' : ''} />
+                  {(!collapsed || isHoveringNav) && <span className={`text-sm ${location.pathname === '/support' ? '!text-white' : ''}`}>Support</span>}
+                </button>
+              )}
               <button
                 onClick={() => handleSectionChange('/settings')}
                 className={`
@@ -1899,6 +1922,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/results" element={<ResultsPage />} />
               <Route path="/results/:id" element={<ResultsPage />} />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
+              <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={
                 <FormBuilderPage 
@@ -2044,6 +2068,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
       {(isSuperAdmin || can('membership.manage')) && (
         <BugReportButton darkMode={darkMode} />
+      )}
+
+      {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && (
+        <AskAlfieOrb darkMode={darkMode} />
       )}
     </div>
   );
