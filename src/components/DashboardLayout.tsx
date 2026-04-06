@@ -2066,10 +2066,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         />
       )}
 
-      {(isSuperAdmin || can('membership.manage')) && (
-        <BugReportButton darkMode={darkMode} />
-      )}
-
       {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && (
         <AskAlfieOrb darkMode={darkMode} />
       )}

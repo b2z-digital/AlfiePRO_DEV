@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Circle as HelpCircle, BookOpen, Search, ChevronRight, ChevronDown, MessageCircle, ExternalLink, LifeBuoy, Sparkles } from 'lucide-react';
+import { Circle as HelpCircle, BookOpen, Search, ChevronRight, ChevronDown, MessageCircle, ExternalLink, LifeBuoy, Sparkles, Bug } from 'lucide-react';
 import { supabase } from '../utils/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { AskAlfieChatPanel } from '../components/ask-alfie/AskAlfieChatPanel';
+import { BugReportModal } from '../components/bug-report/BugReportModal';
+import { BugReportList } from '../components/bug-report/BugReportList';
 
 const AlfieLogo: React.FC<{ size?: number }> = ({ size = 16 }) => (
   <svg viewBox="0 0 129.34 201.37" width={size} height={size * 1.56}>
@@ -38,7 +41,8 @@ interface Tutorial {
 }
 
 const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
-  const [activeTab, setActiveTab] = useState<'alfie' | 'faqs' | 'tutorials'>('alfie');
+  const { user, isSuperAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<'alfie' | 'faqs' | 'tutorials' | 'bugs'>('alfie');
   const [categories, setCategories] = useState<FaqCategory[]>([]);
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [tutorials, setTutorials] = useState<Tutorial[]>([]);
@@ -46,9 +50,12 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showBugSubmitModal, setShowBugSubmitModal] = useState(false);
+  const [bugCount, setBugCount] = useState(0);
 
   useEffect(() => {
     loadContent();
+    loadBugCount();
   }, []);
 
   const loadContent = async () => {
@@ -62,6 +69,19 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
     setFaqs(faqResult.data || []);
     setTutorials(tutResult.data || []);
     setLoading(false);
+  };
+
+  const loadBugCount = async () => {
+    if (!user) return;
+    const query = supabase
+      .from('bug_reports')
+      .select('*', { count: 'exact', head: true })
+      .in('status', ['open', 'in_progress']);
+    if (!isSuperAdmin) {
+      query.eq('reported_by', user.id);
+    }
+    const { count } = await query;
+    setBugCount(count || 0);
   };
 
   const filteredFaqs = faqs.filter(faq => {
@@ -108,6 +128,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
             { id: 'alfie' as const, label: 'Ask Alfie', icon: Sparkles },
             { id: 'faqs' as const, label: 'FAQs & Guides', icon: HelpCircle },
             { id: 'tutorials' as const, label: 'Video Tutorials', icon: BookOpen },
+            { id: 'bugs' as const, label: 'Bug Reports', icon: Bug, badge: bugCount > 0 ? bugCount : undefined },
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -123,6 +144,11 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
               >
                 <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
+                {'badge' in tab && tab.badge && (
+                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded-full leading-none">
+                    {tab.badge > 9 ? '9+' : tab.badge}
+                  </span>
+                )}
                 {isActive && (
                   <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t ${darkMode ? 'bg-cyan-500' : 'bg-sky-500'}`} />
                 )}
@@ -395,6 +421,41 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'bugs' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                Report issues or track the status of your submitted bug reports.
+              </p>
+              <button
+                onClick={() => setShowBugSubmitModal(true)}
+                className="px-4 py-2 bg-cyan-500 text-white text-sm font-medium rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2"
+              >
+                <Bug size={14} />
+                Report a Bug
+              </button>
+            </div>
+            <BugReportList
+              darkMode={darkMode}
+              onClose={() => {}}
+              onNewReport={() => setShowBugSubmitModal(true)}
+              onRefresh={loadBugCount}
+              embedded
+            />
+          </div>
+        )}
+
+        {showBugSubmitModal && (
+          <BugReportModal
+            darkMode={darkMode}
+            onClose={() => setShowBugSubmitModal(false)}
+            onSubmitted={() => {
+              setShowBugSubmitModal(false);
+              loadBugCount();
+            }}
+          />
         )}
       </div>
     </div>
