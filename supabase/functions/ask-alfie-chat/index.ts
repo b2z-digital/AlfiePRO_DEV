@@ -198,65 +198,34 @@ function buildSystemPrompt(
   corrections: Array<{ scenario: string; correct_information: string; topic: string }>,
   knowledgeChunks: Array<{ content: string; source_name: string }>
 ): string {
-  let prompt = `You are Alfie, the AI assistant for AlfiePRO - a comprehensive yacht racing club management platform. You help club administrators and editors use the platform effectively.
-
-Your personality:
-- Friendly and approachable Australian sailing assistant
-- Use "G'day" occasionally but don't overdo the slang
-- Be concise and helpful - get straight to the answer
-- Use step-by-step instructions when explaining how to do things
-- Reference specific menu paths and button names in the platform
-- If you don't know something specific, suggest checking the Help & Support section or contacting support
-
-Key platform areas you help with:
-- Race Management (creating events, series, scoring, results, HMS heat racing, touch mode)
-- Membership Management (adding members, applications, renewals, fees, remittances)
-- Club Settings & Website (setup, branding, domain, pages)
-- Communications (conversations, marketing campaigns, notifications)
-- Finances (transactions, invoices, budgets, Stripe integration)
-- Events (event websites, registrations, command center)
-- Media & News (articles, AlfieTV, media library)
-- Meetings (scheduling, agendas, minutes, attendance)
-- Tasks (assignment, tracking, comments)
-- Live Tracking (real-time race tracking)
-- Livestreaming (setting up streams for events)
-- Venues (managing race venues)
-- Yacht Classes (boat class management)
-- Documents (NOR generation, race documents)
-- Community & Social features
-- Classifieds marketplace
-
-Navigation guide for AlfiePRO platform:
-- Left sidebar contains all main navigation sections
-- "Race Management" section includes race events, series, scoring
-- "Membership" section handles member management, applications, fees
-- "Settings" cog at bottom of sidebar for club/profile settings
-- "Support" in sidebar links to Help & Support resources
-`;
+  let prompt = "";
 
   if (aiInstructions.length > 0) {
-    prompt += "\n\nAdditional AI behavioral instructions:\n";
     for (const inst of aiInstructions) {
-      prompt += `[${inst.category}]: ${inst.instruction_text}\n`;
+      prompt += `[${inst.category}]: ${inst.instruction_text}\n\n`;
     }
+  } else {
+    prompt = `You are Alfie, the AI assistant for AlfiePRO - a comprehensive yacht racing club management platform. You help club administrators and editors use the platform effectively. Be friendly, concise, and use step-by-step instructions when explaining how to do things.\n\n`;
   }
 
+  prompt += `\nWeb platform context: This user is on the AlfiePRO web platform (not mobile app). Navigation is via the left sidebar. Key sections include Race Management, Membership, Finances, Communications, Events, Media, Meetings, Tasks, Settings, and Support.\n`;
+
   if (corrections.length > 0) {
-    prompt += "\n\nKnowledge corrections (use these to avoid past mistakes):\n";
+    prompt += "\nKnowledge corrections (use these to avoid past mistakes):\n";
     for (const corr of corrections.slice(0, 10)) {
       prompt += `- Topic: ${corr.topic} | Scenario: ${corr.scenario} | Correct info: ${corr.correct_information}\n`;
     }
   }
 
   if (faqs.length > 0) {
-    prompt += "\n\nPlatform FAQ knowledge (reference these when answering platform questions):\n";
+    prompt += "\nPlatform FAQ knowledge (reference these when answering platform questions):\n";
     for (const faq of faqs) {
       prompt += `Q: ${faq.question}\nA: ${faq.answer.substring(0, 500)}\n\n`;
     }
   }
 
   if (knowledgeChunks.length > 0) {
-    prompt += "\n\nRelevant knowledge from documents:\n";
+    prompt += "\nRelevant knowledge from documents:\n";
     for (const chunk of knowledgeChunks) {
       prompt += `[${chunk.source_name}]: ${chunk.content.substring(0, 400)}\n\n`;
     }

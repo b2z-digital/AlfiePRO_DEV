@@ -1,7 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader as Loader2, Sailboat, Trash2, History, ArrowLeft } from 'lucide-react';
+import { Send, Loader as Loader2, Trash2, ArrowLeft } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+
+const AlfieLogo: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = '' }) => (
+  <svg viewBox="0 0 129.34 201.37" width={size} height={size * 1.56} className={className}>
+    <path fill="#0066b4" d="M92.55,0s-33.42,35.95-46.9,76.95-17.97,123.01-17.97,123.01c53.92-26.12,87.06-5.06,101.66,1.42C75.98,145.19,92.55,0,92.55,0Z"/>
+    <path fill="#01a2e9" d="M45.37,35.39s-23.87,31.11-37.35,61.22c-13.48,30.11-5.9,88.18-5.9,88.18,22.19-23.87,68.8-19.1,68.8-19.1C33.86,122.72,45.37,35.39,45.37,35.39Z"/>
+  </svg>
+);
 
 interface ChatMessage {
   id: string;
@@ -35,12 +42,14 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [userName, setUserName] = useState('');
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userInitials, setUserInitials] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadUserName();
+    loadUserProfile();
     const saved = sessionStorage.getItem('askAlfie_messages');
     if (saved) {
       try {
@@ -60,15 +69,19 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     }
   }, [messages]);
 
-  const loadUserName = async () => {
+  const loadUserProfile = async () => {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, first_name')
+      .select('full_name, first_name, avatar_url')
       .eq('id', user.id)
       .maybeSingle();
     if (data) {
       setUserName(data.first_name || data.full_name?.split(' ')[0] || '');
+      setUserAvatar(data.avatar_url || null);
+      const first = (data.first_name || data.full_name?.split(' ')[0] || '').charAt(0).toUpperCase();
+      const last = data.full_name?.split(' ').pop()?.charAt(0).toUpperCase() || '';
+      setUserInitials(first + last || '?');
     }
   };
 
@@ -184,8 +197,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
                 <ArrowLeft size={18} />
               </button>
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                <Sailboat size={16} className="text-white" />
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <AlfieLogo size={18} />
               </div>
             )}
             <div>
@@ -215,8 +228,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       }`} style={!embedded ? { maxHeight: '420px' } : undefined}>
         {messages.length === 0 ? (
           <div className="flex flex-col items-center pt-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mb-3">
-              <Sailboat size={22} className="text-white" />
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center mb-3">
+              <AlfieLogo size={24} />
             </div>
             <p className={`text-sm font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
               {userName ? `G'day ${userName}!` : "G'day!"}
@@ -247,8 +260,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
-                  <Sailboat size={12} className="text-white" />
+                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+                  <AlfieLogo size={14} />
                 </div>
               )}
               <div
@@ -262,14 +275,25 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
               >
                 {formatMessageContent(msg.content)}
               </div>
+              {msg.role === 'user' && (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center ml-2 mt-1 flex-shrink-0 overflow-hidden">
+                  {userAvatar ? (
+                    <img src={userAvatar} alt="" className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white text-[10px] font-semibold">
+                      {userInitials}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))
         )}
 
         {isLoading && (
           <div className="flex items-start gap-2">
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center flex-shrink-0">
-              <Sailboat size={12} className="text-white" />
+            <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+              <AlfieLogo size={14} />
             </div>
             <div className={`px-3 py-2 rounded-xl rounded-bl-sm ${
               darkMode ? 'bg-slate-700 border border-slate-600/50' : 'bg-white border border-slate-200 shadow-sm'

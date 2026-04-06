@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Circle as HelpCircle, BookOpen, Search, ChevronRight, ChevronDown, Sailboat, MessageCircle, ExternalLink, LifeBuoy, Sparkles } from 'lucide-react';
+import { Circle as HelpCircle, BookOpen, Search, ChevronRight, ChevronDown, MessageCircle, ExternalLink, LifeBuoy, Sparkles } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { AskAlfieChatPanel } from '../components/ask-alfie/AskAlfieChatPanel';
+
+const AlfieLogo: React.FC<{ size?: number }> = ({ size = 16 }) => (
+  <svg viewBox="0 0 129.34 201.37" width={size} height={size * 1.56}>
+    <path fill="#0066b4" d="M92.55,0s-33.42,35.95-46.9,76.95-17.97,123.01-17.97,123.01c53.92-26.12,87.06-5.06,101.66,1.42C75.98,145.19,92.55,0,92.55,0Z"/>
+    <path fill="#01a2e9" d="M45.37,35.39s-23.87,31.11-37.35,61.22c-13.48,30.11-5.9,88.18-5.9,88.18,22.19-23.87,68.8-19.1,68.8-19.1C33.86,122.72,45.37,35.39,45.37,35.39Z"/>
+  </svg>
+);
 
 interface SupportPageProps {
   darkMode: boolean;
@@ -132,8 +139,8 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
               }`} style={{ height: '600px' }}>
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 border-slate-700/50">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                      <Sailboat size={16} className="text-white" />
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <AlfieLogo size={18} />
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-white">Ask Alfie</h3>
