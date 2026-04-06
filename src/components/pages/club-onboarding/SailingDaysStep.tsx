@@ -38,7 +38,8 @@ export const SailingDaysStep: React.FC<StepProps> = ({ formData, updateFormData,
       end_time: '16:00',
       boat_class_id: null,
       description: '',
-      is_active: true
+      is_active: true,
+      frequency: 'every_week'
     };
     updateFormData({
       sailingDays: [...formData.sailingDays, newDay]
@@ -91,8 +92,7 @@ export const SailingDaysStep: React.FC<StepProps> = ({ formData, updateFormData,
               key={index}
               className={`p-4 rounded-lg border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}
             >
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Day of Week */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Day
@@ -112,7 +112,21 @@ export const SailingDaysStep: React.FC<StepProps> = ({ formData, updateFormData,
                   </select>
                 </div>
 
-                {/* Start Time */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Frequency
+                  </label>
+                  <select
+                    value={day.frequency || 'every_week'}
+                    onChange={(e) => updateSailingDay(index, 'frequency', e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  >
+                    <option value="every_week">Every Week</option>
+                    <option value="week_a">Week A (Odd Weeks)</option>
+                    <option value="week_b">Week B (Even Weeks)</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Start Time
@@ -125,7 +139,6 @@ export const SailingDaysStep: React.FC<StepProps> = ({ formData, updateFormData,
                   />
                 </div>
 
-                {/* End Time */}
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     End Time
@@ -138,7 +151,6 @@ export const SailingDaysStep: React.FC<StepProps> = ({ formData, updateFormData,
                   />
                 </div>
 
-                {/* Boat Class */}
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                     Boat Class

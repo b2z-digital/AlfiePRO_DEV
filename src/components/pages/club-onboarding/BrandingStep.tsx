@@ -109,7 +109,10 @@ export const BrandingStep: React.FC<StepProps> = ({
             ref={logoInputRef}
             type="file"
             accept="image/*"
-            onChange={handleLogoUpload}
+            onChange={(e) => {
+              handleLogoUpload(e);
+              if (logoInputRef.current) logoInputRef.current.value = '';
+            }}
             className="hidden"
           />
         </div>
@@ -195,7 +198,10 @@ export const BrandingStep: React.FC<StepProps> = ({
           ref={featuredInputRef}
           type="file"
           accept="image/*"
-          onChange={handleFeaturedUpload}
+          onChange={(e) => {
+            handleFeaturedUpload(e);
+            if (featuredInputRef.current) featuredInputRef.current.value = '';
+          }}
           className="hidden"
         />
       </div>

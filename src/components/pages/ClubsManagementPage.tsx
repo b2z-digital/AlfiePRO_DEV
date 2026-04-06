@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, SquarePen as Edit2, Trash2, MoveVertical as MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
+import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, Pencil, Trash2, EllipsisVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
@@ -15,6 +15,7 @@ interface SailingDay {
   start_time: string;
   end_time: string;
   boat_class_name?: string;
+  frequency?: string;
 }
 
 interface Club {
@@ -237,6 +238,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                 start_time,
                 end_time,
                 boat_class_id,
+                frequency,
                 boat_classes(name)
               `)
               .eq('club_id', club.id)
@@ -292,7 +294,8 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             day_of_week: sd.day_of_week,
             start_time: sd.start_time,
             end_time: sd.end_time,
-            boat_class_name: sd.boat_classes?.name || null
+            boat_class_name: sd.boat_classes?.name || null,
+            frequency: sd.frequency || 'every_week'
           }));
 
           // Log all query results for debugging
@@ -1044,7 +1047,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                           : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <MoreVertical size={18} />
+                      <EllipsisVertical size={18} />
                     </button>
                     {openMenuId === club.id && (
                       <>
@@ -1079,7 +1082,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                                 : 'text-slate-700 hover:bg-slate-50'
                             }`}
                           >
-                            <Edit2 size={14} />
+                            <Pencil size={14} />
                             Edit Club
                           </button>
                           <button
@@ -1105,12 +1108,17 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                         <Calendar size={14} className="text-blue-400" />
                         <span className="text-xs font-medium text-blue-400">REGULAR SAILING</span>
                       </div>
-                      {club.sailing_days.slice(0, 2).map((day) => (
-                        <div key={day.id} className="flex items-center gap-2 text-xs">
+                      {club.sailing_days.slice(0, 3).map((day) => (
+                        <div key={day.id} className="flex items-center gap-2 text-xs flex-wrap">
                           <Clock size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
                           <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                             {day.day_of_week}
                           </span>
+                          {day.frequency && day.frequency !== 'every_week' && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-xs">
+                              {day.frequency === 'week_a' ? 'Wk A' : 'Wk B'}
+                            </span>
+                          )}
                           <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
                             {day.start_time.substring(0, 5)} - {day.end_time.substring(0, 5)}
                           </span>
@@ -1121,9 +1129,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                           )}
                         </div>
                       ))}
-                      {club.sailing_days.length > 2 && (
+                      {club.sailing_days.length > 3 && (
                         <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                          +{club.sailing_days.length - 2} more
+                          +{club.sailing_days.length - 3} more
                         </div>
                       )}
                     </div>
@@ -1372,7 +1380,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                             : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        <MoreVertical size={18} />
+                        <EllipsisVertical size={18} />
                       </button>
                       {openMenuId === club.id && (
                         <>
@@ -1407,7 +1415,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                                   : 'text-slate-700 hover:bg-slate-50'
                               }`}
                             >
-                              <Edit2 size={14} />
+                              <Pencil size={14} />
                               Edit Club
                             </button>
                             <button
@@ -1435,9 +1443,10 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       <ClubOnboardingWizard
         isOpen={showAddClubModal}
         onClose={() => setShowAddClubModal(false)}
-        onSuccess={() => {
-          loadClubs();
+        onSuccess={async () => {
           setShowAddClubModal(false);
+          await loadClubs();
+          await loadPendingClubs();
         }}
         stateAssociationId={currentOrganization?.id || ''}
         darkMode={darkMode}
@@ -1451,10 +1460,10 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             setShowEditModal(false);
             setSelectedClubId(null);
           }}
-          onSuccess={() => {
-            loadClubs();
+          onSuccess={async () => {
             setShowEditModal(false);
             setSelectedClubId(null);
+            await loadClubs();
           }}
           stateAssociationId={currentOrganization?.id || ''}
           darkMode={darkMode}
