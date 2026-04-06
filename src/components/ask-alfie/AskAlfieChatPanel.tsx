@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader as Loader2, Trash2, ArrowLeft } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Send, Loader as Loader2, Trash2, ArrowLeft, Clock } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -9,6 +9,71 @@ const AlfieLogo: React.FC<{ size?: number; className?: string }> = ({ size = 16,
     <path fill="#01a2e9" d="M45.37,35.39s-23.87,31.11-37.35,61.22c-13.48,30.11-5.9,88.18-5.9,88.18,22.19-23.87,68.8-19.1,68.8-19.1C33.86,122.72,45.37,35.39,45.37,35.39Z"/>
   </svg>
 );
+
+const MiniOrb: React.FC<{ size?: number }> = ({ size = 48 }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = size * 2;
+    canvas.height = size * 2;
+    ctx.scale(2, 2);
+    let time = 0;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, size, size);
+      const cx = size / 2;
+      const cy = size / 2;
+      const radius = size / 2 - 2;
+
+      const gradient = ctx.createRadialGradient(
+        cx - 3 + Math.sin(time * 0.8) * 1.5,
+        cy - 4 + Math.cos(time * 0.6) * 1.5,
+        1,
+        cx, cy, radius + 1
+      );
+      gradient.addColorStop(0, 'rgba(180, 230, 255, 0.95)');
+      gradient.addColorStop(0.3, 'rgba(56, 189, 248, 0.9)');
+      gradient.addColorStop(0.6, 'rgba(14, 165, 233, 0.85)');
+      gradient.addColorStop(1, 'rgba(2, 132, 199, 0.8)');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      const shineGrad = ctx.createRadialGradient(
+        cx - 4 + Math.sin(time * 0.5) * 2,
+        cy - 5 + Math.cos(time * 0.7) * 1.5,
+        1, cx - 3, cy - 4, 10
+      );
+      shineGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+      shineGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
+      shineGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+      ctx.fillStyle = shineGrad;
+      ctx.fill();
+
+      time += 0.03;
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [size]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: size, height: size, imageRendering: 'auto' }}
+    />
+  );
+};
 
 interface ChatMessage {
   id: string;
@@ -27,9 +92,6 @@ const QUICK_QUESTIONS = [
   'How do I create a race series?',
   'How do I add a new member?',
   'How do I set up a committee meeting?',
-  'How do I manage membership fees?',
-  'How do I create an event website?',
-  'How do I import race results?',
 ];
 
 export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
@@ -52,13 +114,6 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
 
   useEffect(() => {
     loadUserProfile();
-    const saved = sessionStorage.getItem('askAlfie_messages');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setMessages(parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
-      } catch {}
-    }
   }, []);
 
   useEffect(() => {
@@ -75,12 +130,6 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       });
     }
     prevMessageCountRef.current = messages.length;
-  }, [messages]);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      sessionStorage.setItem('askAlfie_messages', JSON.stringify(messages));
-    }
   }, [messages]);
 
   const loadUserProfile = async () => {
@@ -102,6 +151,8 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   const sendMessage = async (text?: string) => {
     const messageText = text || input.trim();
     if (!messageText || isLoading) return;
+
+    if (showHistory) setShowHistory(false);
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -177,10 +228,40 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
     }
   };
 
-  const clearConversation = () => {
+  const clearConversation = useCallback(() => {
     setMessages([]);
+    setShowHistory(false);
     sessionStorage.removeItem('askAlfie_messages');
+  }, []);
+
+  const handleViewHistory = () => {
+    const saved = sessionStorage.getItem('askAlfie_messages');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const restored = parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+        if (restored.length > 0) {
+          setMessages(restored);
+          setShowHistory(true);
+        }
+      } catch {}
+    }
   };
+
+  const hasHistory = (() => {
+    try {
+      const saved = sessionStorage.getItem('askAlfie_messages');
+      if (!saved) return false;
+      const parsed = JSON.parse(saved);
+      return parsed.length > 0;
+    } catch { return false; }
+  })();
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      sessionStorage.setItem('askAlfie_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const formatMessageContent = (content: string) => {
     const parts = content.split(/(\*\*.*?\*\*|\n)/g);
@@ -200,14 +281,15 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
   return (
     <div className={`${containerClass} ${!embedded ? 'bg-white border-slate-200' : ''}`}>
       {!embedded && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50 bg-gradient-to-r from-slate-800 to-slate-900">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-cyan-700/30 bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent" />
+          <div className="flex items-center gap-3 relative z-10">
             {showHistory ? (
-              <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => { setShowHistory(false); setMessages([]); }} className="text-white/70 hover:text-white">
                 <ArrowLeft size={18} />
               </button>
             ) : (
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
                 <AlfieLogo size={18} />
               </div>
             )}
@@ -215,15 +297,15 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
               <h3 className="text-sm font-semibold text-white">Ask Alfie</h3>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[11px] text-slate-400">Online</span>
+                <span className="text-[11px] text-white/70">Online</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 relative z-10">
             {messages.length > 0 && (
               <button
                 onClick={clearConversation}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700/50 transition-colors"
+                className="p-1.5 rounded-lg text-white/60 hover:text-red-300 hover:bg-white/10 transition-colors"
                 title="Clear conversation"
               >
                 <Trash2 size={14} />
@@ -236,16 +318,16 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
       <div ref={messagesContainerRef} className={`flex-1 overflow-y-auto p-4 space-y-4 ${
         embedded ? '' : 'bg-white'
       }`} style={!embedded ? { maxHeight: '420px' } : undefined}>
-        {messages.length === 0 ? (
+        {messages.length === 0 && !showHistory ? (
           <div className="flex flex-col items-center pt-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center mb-3">
-              <AlfieLogo size={24} />
+            <div className="mb-3">
+              <MiniOrb size={52} />
             </div>
             <p className="text-sm font-medium mb-1 text-slate-900">
               {userName ? `Hi ${userName}!` : 'Hi there!'}
             </p>
             <p className="text-xs text-center mb-5 text-slate-500">
-              I'm your platform assistant. Ask me anything about using AlfiePRO.
+              I'm Alfie. Ask me anything about using AlfiePRO.
             </p>
             <div className="w-full space-y-2">
               {QUICK_QUESTIONS.map((q, i) => (
@@ -317,33 +399,58 @@ export const AskAlfieChatPanel: React.FC<AskAlfieChatPanelProps> = ({
         )}
       </div>
 
-      <div className="p-3 border-t border-slate-200 bg-white">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors bg-slate-50 border-slate-200 focus-within:border-sky-400">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Alfie..."
-            disabled={isLoading}
-            className="flex-1 bg-transparent text-sm outline-none text-slate-900 placeholder-slate-400"
-          />
+      <div className="px-3 pt-2 pb-3 bg-white border-t border-slate-100">
+        {messages.length === 0 && !showHistory && hasHistory && (
           <button
-            onClick={() => sendMessage()}
-            disabled={!input.trim() || isLoading}
-            className={`p-1.5 rounded-lg transition-all ${
-              input.trim() && !isLoading
-                ? 'bg-cyan-500 text-white hover:bg-cyan-600 shadow-sm'
-                : 'text-slate-300 cursor-not-allowed'
-            }`}
+            onClick={handleViewHistory}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 mb-2 text-xs text-slate-400 hover:text-cyan-500 transition-colors"
           >
-            {isLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
+            <Clock size={12} />
+            View conversation history
           </button>
+        )}
+        {showHistory && messages.length > 0 && (
+          <button
+            onClick={() => { setMessages([]); setShowHistory(false); }}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 mb-2 text-xs text-slate-400 hover:text-cyan-500 transition-colors"
+          >
+            <ArrowLeft size={12} />
+            Start new conversation
+          </button>
+        )}
+        <div
+          className="rounded-xl p-[1.5px]"
+          style={{
+            background: 'linear-gradient(135deg, rgba(56,189,248,0.5), rgba(14,165,233,0.3), rgba(6,182,212,0.5), rgba(56,189,248,0.3))',
+          }}
+        >
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-[10px] bg-slate-50">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Alfie..."
+              disabled={isLoading}
+              className="flex-1 bg-transparent text-sm outline-none text-slate-900 placeholder-slate-400"
+            />
+            <button
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || isLoading}
+              className={`p-1.5 rounded-lg transition-all ${
+                input.trim() && !isLoading
+                  ? 'bg-cyan-500 text-white hover:bg-cyan-600 shadow-sm'
+                  : 'text-slate-300 cursor-not-allowed'
+              }`}
+            >
+              {isLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Send size={16} />
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

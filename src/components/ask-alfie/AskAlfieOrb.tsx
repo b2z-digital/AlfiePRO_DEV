@@ -12,6 +12,7 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [orbKey, setOrbKey] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
 
@@ -90,6 +91,9 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
   }, [isOpen]);
 
   const handleToggle = () => {
+    if (!isOpen) {
+      setOrbKey(prev => prev + 1);
+    }
     setIsOpen(!isOpen);
     if (!hasInteracted) setHasInteracted(true);
   };
@@ -130,6 +134,7 @@ export const AskAlfieOrb: React.FC<AskAlfieOrbProps> = ({ darkMode }) => {
 
       {isOpen && (
         <AskAlfieChatPanel
+          key={orbKey}
           darkMode={darkMode}
           onClose={() => setIsOpen(false)}
         />
