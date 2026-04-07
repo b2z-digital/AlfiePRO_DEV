@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Sparkles, Bug, X, ArrowLeft,
   BookMarked, Video, MessageSquare, ChevronRight,
@@ -25,34 +25,101 @@ interface SupportPageProps {
 
 type ActiveView = 'home' | 'faqs' | 'tutorials' | 'bugs' | 'alfie';
 
+const MiniAlfieOrb: React.FC<{ size?: number }> = ({ size = 48 }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = size * 2;
+    canvas.height = size * 2;
+    ctx.scale(2, 2);
+
+    let time = 0;
+    const draw = () => {
+      ctx.clearRect(0, 0, size, size);
+      const cx = size / 2;
+      const cy = size / 2;
+      const radius = size * 0.4;
+
+      const gradient = ctx.createRadialGradient(
+        cx - 3 + Math.sin(time * 0.8) * 1.5, cy - 4 + Math.cos(time * 0.6) * 1.5, 1,
+        cx, cy, radius + 1
+      );
+      gradient.addColorStop(0, 'rgba(180, 230, 255, 0.95)');
+      gradient.addColorStop(0.3, 'rgba(56, 189, 248, 0.9)');
+      gradient.addColorStop(0.6, 'rgba(14, 165, 233, 0.85)');
+      gradient.addColorStop(1, 'rgba(2, 132, 199, 0.8)');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      const shineGrad = ctx.createRadialGradient(
+        cx - 4 + Math.sin(time * 0.5) * 2, cy - 5 + Math.cos(time * 0.7) * 1.5, 0.5,
+        cx - 3, cy - 4, radius * 0.4
+      );
+      shineGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+      shineGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
+      shineGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = shineGrad;
+      ctx.fill();
+
+      const pulseRadius = radius + 2.5 + Math.sin(time * 2) * 2;
+      const pulseAlpha = 0.1 + Math.sin(time * 2) * 0.06;
+      ctx.beginPath();
+      ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(56, 189, 248, ${pulseAlpha})`;
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+
+      time += 0.03;
+      animationRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+  }, [size]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: size, height: size, imageRendering: 'auto' }}
+    />
+  );
+};
+
 const TILE_CONFIG = [
   {
     id: 'faqs' as const,
     label: 'FAQs & Guides',
     icon: BookMarked,
     gradient: 'from-cyan-500 to-blue-600',
-    bgGlow: 'bg-cyan-500/10',
   },
   {
     id: 'tutorials' as const,
     label: 'Video Tutorials',
     icon: Video,
     gradient: 'from-emerald-500 to-teal-600',
-    bgGlow: 'bg-emerald-500/10',
   },
   {
     id: 'bugs' as const,
     label: 'Bug Reports',
     icon: Bug,
     gradient: 'from-amber-500 to-orange-600',
-    bgGlow: 'bg-amber-500/10',
   },
   {
     id: 'alfie' as const,
     label: 'Ask Alfie',
     icon: Sparkles,
     gradient: 'from-blue-500 to-cyan-500',
-    bgGlow: 'bg-blue-500/10',
+    useOrb: true,
   },
 ];
 
@@ -161,28 +228,30 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
               {TILE_CONFIG.map(tile => {
                 const Icon = tile.icon;
                 const meta = tileCounts[tile.id];
+                const isOrb = 'useOrb' in tile && tile.useOrb;
                 return (
                   <button
                     key={tile.id}
                     onClick={() => setActiveView(tile.id)}
-                    className="group relative rounded-xl p-4 sm:p-5 text-left transition-all border border-slate-700/50 hover:border-slate-600/80 bg-slate-800/50 hover:bg-slate-800/80"
+                    className="group relative rounded-xl p-4 sm:p-5 transition-all border border-slate-700/50 hover:border-slate-600/80 bg-slate-800/50 hover:bg-slate-800/80 flex flex-col items-center text-center"
                   >
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${tile.gradient} flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform`}>
-                      <Icon size={20} className="text-white" />
-                    </div>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      {meta.count !== undefined && meta.count > 0 && (
-                        <span className="text-[11px] font-medium text-cyan-400">
-                          {meta.count} {meta.countLabel}
-                        </span>
-                      )}
-                      {meta.count === undefined && (
-                        <span className="text-[11px] font-medium text-cyan-400">
-                          {meta.countLabel}
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-white font-semibold text-sm sm:text-base flex items-center gap-1.5">
+                    {isOrb ? (
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 mb-3 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <MiniAlfieOrb size={48} />
+                      </div>
+                    ) : (
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${tile.gradient} flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform`}>
+                        <Icon size={20} className="text-white" />
+                      </div>
+                    )}
+                    <span className="text-[11px] font-medium text-cyan-400 h-4 flex items-center">
+                      {meta.count !== undefined && meta.count > 0
+                        ? `${meta.count} ${meta.countLabel}`
+                        : meta.count === undefined
+                          ? meta.countLabel
+                          : '\u00A0'}
+                    </span>
+                    <h3 className="text-white font-semibold text-sm sm:text-base flex items-center gap-1.5 mt-0.5">
                       {tile.label}
                       <ChevronRight size={14} className="text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all" />
                     </h3>
