@@ -20,6 +20,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { TrialStatusBanner } from './TrialStatusBanner';
 import { getBoatClassBadge, getRaceFormatBadge, getEventTypeBadge } from '../constants/colors';
 import { CustomizableDashboard } from './dashboard/CustomizableDashboard';
+import { ClubSetupChecklist } from './dashboard/ClubSetupChecklist';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -1443,6 +1444,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       <div className="p-4 sm:p-6 lg:p-16">
         {/* Trial Status Banner */}
         <TrialStatusBanner />
+
+        {/* Club Setup Checklist - shown for new clubs until dismissed */}
+        <ClubSetupChecklist />
 
         {/* Customizable Dashboard - Full Widget System (includes all widgets) */}
         <CustomizableDashboard />
