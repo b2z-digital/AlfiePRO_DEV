@@ -209,7 +209,7 @@ export function ClubSetupChecklist() {
   const location = useLocation();
   const { isAdmin } = usePermissions();
   const setupStatus = useClubSetupStatus();
-  const hasAutoExpanded = useRef(false);
+  const pendingRefresh = useRef(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     membership: true,
     finance: false,
@@ -218,17 +218,24 @@ export function ClubSetupChecklist() {
   const [isMinimized, setIsMinimized] = useState(false);
 
   useEffect(() => {
-    if (location.state?.fromSetupChecklist && !setupStatus.loading && setupStatus.categories.length > 0 && !hasAutoExpanded.current) {
-      hasAutoExpanded.current = true;
+    if (location.state?.fromSetupChecklist && !pendingRefresh.current) {
+      pendingRefresh.current = true;
+      window.history.replaceState({}, '');
+      setupStatus.refresh();
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (pendingRefresh.current && !setupStatus.loading && setupStatus.categories.length > 0) {
+      pendingRefresh.current = false;
       const expanded: Record<string, boolean> = {};
       const firstIncomplete = setupStatus.categories.find(c => c.completedCount < c.totalCount);
       for (const cat of setupStatus.categories) {
         expanded[cat.id] = cat.id === firstIncomplete?.id;
       }
       setExpandedCategories(expanded);
-      window.history.replaceState({}, '');
     }
-  }, [location.state, setupStatus.loading, setupStatus.categories]);
+  }, [setupStatus.loading, setupStatus.categories]);
 
   if (!isAdmin || setupStatus.loading || setupStatus.isDismissed || setupStatus.isFullyComplete) {
     return null;
