@@ -1309,7 +1309,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             ${(collapsed && !isHoveringNav) ? 'justify-center' : 'gap-3'}
                             ${section.collapsible && (!collapsed || isHoveringNav) ? 'pl-5' : ''}
                             ${isActive
-                              ? 'bg-blue-600 text-white shadow-lg'
+                              ? 'bg-cyan-600 text-white shadow-lg'
                               : lightMode
                                 ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                                 : darkMode
@@ -1520,7 +1520,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   ${(collapsed && !isHoveringNav) ? 'flex items-center justify-center' : 'w-full flex items-center gap-3'} px-3 py-2.5
                   rounded-lg transition-colors
                   ${location.pathname === '/settings'
-                    ? 'bg-blue-600 text-white shadow-lg'
+                    ? 'bg-cyan-600 text-white shadow-lg'
                     : lightMode
                       ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                       : darkMode
