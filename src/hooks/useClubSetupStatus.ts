@@ -8,7 +8,7 @@ export interface SetupTask {
   description: string;
   completed: boolean;
   route: string;
-  routeState?: Record<string, string>;
+  routeState?: Record<string, string | boolean>;
 }
 
 export interface SetupCategory {
@@ -129,7 +129,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Define your membership categories (e.g. Full, Associate, Junior)',
             completed: hasMembershipTypes,
             route: '/settings',
-            routeState: { activeTab: 'membership-types' },
+            routeState: { activeTab: 'membership-types', fromSetupChecklist: true },
           },
           {
             id: 'renewal-settings',
@@ -137,7 +137,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Configure how and when memberships renew',
             completed: hasRenewalSettings,
             route: '/settings',
-            routeState: { activeTab: 'membership-renewals' },
+            routeState: { activeTab: 'membership-renewals', fromSetupChecklist: true },
           },
           {
             id: 'code-of-conduct',
@@ -145,7 +145,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Add your club\'s code of conduct for new members',
             completed: hasCodeOfConduct,
             route: '/settings',
-            routeState: { activeTab: 'membership-conduct' },
+            routeState: { activeTab: 'membership-conduct', fromSetupChecklist: true },
           },
         ],
         completedCount: 0,
@@ -164,7 +164,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Create income and expense categories for tracking',
             completed: hasFinanceCategories,
             route: '/settings',
-            routeState: { activeTab: 'finance-categories' },
+            routeState: { activeTab: 'finance-categories', fromSetupChecklist: true },
           },
           {
             id: 'bank-details',
@@ -172,7 +172,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Add your bank account details for invoices and payments',
             completed: hasBankDetails,
             route: '/settings',
-            routeState: { activeTab: 'finance-payment-settings' },
+            routeState: { activeTab: 'finance-payment-settings', fromSetupChecklist: true },
           },
           {
             id: 'opening-balance',
@@ -180,7 +180,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Set your starting bank balance for accurate reporting',
             completed: hasOpeningBalance,
             route: '/settings',
-            routeState: { activeTab: 'finance-opening-balance' },
+            routeState: { activeTab: 'finance-opening-balance', fromSetupChecklist: true },
           },
         ],
         completedCount: 0,
@@ -198,7 +198,8 @@ export function useClubSetupStatus(): ClubSetupStatus {
             label: 'Create or Import Club Members',
             description: 'Add members manually or import from a CSV file',
             completed: hasMembers,
-            route: '/members',
+            route: '/membership-dashboard',
+            routeState: { activeTab: 'members' },
           },
           {
             id: 'committee-members',
@@ -206,7 +207,7 @@ export function useClubSetupStatus(): ClubSetupStatus {
             description: 'Assign committee roles to your club members',
             completed: hasCommittee,
             route: '/settings',
-            routeState: { activeTab: 'team' },
+            routeState: { activeTab: 'team', fromSetupChecklist: true },
           },
         ],
         completedCount: 0,

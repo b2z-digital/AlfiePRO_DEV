@@ -59,6 +59,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<'active' | 'expired' | 'none'>('none');
+  const fromSetupChecklist = location.state?.fromSetupChecklist === true;
   const [renewalDate, setRenewalDate] = useState<string | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState(false);
   const { addNotification } = useNotifications();
@@ -379,6 +380,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       console.error('Error installing PWA:', error);
       addNotification('Failed to install app', 'error');
     }
+  };
+
+  const handleSetupSaveComplete = () => {
+    navigate('/', { state: { fromSetupChecklist: true } });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1751,7 +1756,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'team' && (
-            <CommitteeManagement darkMode={darkMode} />
+            <CommitteeManagement darkMode={darkMode} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'dashboard-templates' && (
@@ -1775,7 +1780,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-categories' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'finance-documents' && (
@@ -1787,27 +1792,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-payment-settings' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'finance-opening-balance' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="opening-balance" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="opening-balance" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'membership-types' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="types" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="types" onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'membership-renewals' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'membership-emails' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="emails" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="emails" />
           )}
 
           {activeTab === 'membership-conduct' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'race-documents' && (

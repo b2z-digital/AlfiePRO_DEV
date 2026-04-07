@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Users, DollarSign, UserPlus, ChevronRight, ChevronDown, CircleCheck as CheckCircle2, Circle, X, Rocket, Sparkles } from 'lucide-react';
 import { useClubSetupStatus, SetupCategory, SetupTask } from '../../hooks/useClubSetupStatus';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -206,14 +206,29 @@ function TaskItem({
 
 export function ClubSetupChecklist() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin } = usePermissions();
   const setupStatus = useClubSetupStatus();
+  const hasAutoExpanded = useRef(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     membership: true,
     finance: false,
     members: false,
   });
   const [isMinimized, setIsMinimized] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.fromSetupChecklist && !setupStatus.loading && setupStatus.categories.length > 0 && !hasAutoExpanded.current) {
+      hasAutoExpanded.current = true;
+      const expanded: Record<string, boolean> = {};
+      const firstIncomplete = setupStatus.categories.find(c => c.completedCount < c.totalCount);
+      for (const cat of setupStatus.categories) {
+        expanded[cat.id] = cat.id === firstIncomplete?.id;
+      }
+      setExpandedCategories(expanded);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state, setupStatus.loading, setupStatus.categories]);
 
   if (!isAdmin || setupStatus.loading || setupStatus.isDismissed || setupStatus.isFullyComplete) {
     return null;
