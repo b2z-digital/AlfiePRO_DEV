@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -1508,10 +1508,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           : 'text-slate-200 hover:text-white hover:bg-white/10'
                     }
                   `}
-                  title={(collapsed && !isHoveringNav) ? "Support" : ""}
+                  title={(collapsed && !isHoveringNav) ? "Quick Start Guide" : ""}
                 >
-                  <LifeBuoy size={16} className={location.pathname === '/support' ? '!text-white' : ''} />
-                  {(!collapsed || isHoveringNav) && <span className={`text-sm ${location.pathname === '/support' ? '!text-white' : ''}`}>Support</span>}
+                  <Rocket size={16} className={location.pathname === '/support' ? '!text-white' : ''} />
+                  {(!collapsed || isHoveringNav) && <span className={`text-sm ${location.pathname === '/support' ? '!text-white' : ''}`}>Quick Start Guide</span>}
                 </button>
               )}
               <button
