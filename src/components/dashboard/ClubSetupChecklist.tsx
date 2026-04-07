@@ -72,9 +72,9 @@ function ProgressRing({ percent, size = 120 }: { percent: number; size?: number 
           </linearGradient>
         </defs>
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-white">{percent}%</span>
-        <span className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">Complete</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+        <span className="text-xl font-bold text-white">{percent}%</span>
+        <span className="text-[8px] text-slate-400 uppercase tracking-widest font-medium mt-1">Complete</span>
       </div>
     </div>
   );
@@ -89,7 +89,7 @@ function CategorySection({
   category: SetupCategory;
   isExpanded: boolean;
   onToggle: () => void;
-  onNavigate: (route: string) => void;
+  onNavigate: (task: SetupTask) => void;
 }) {
   const Icon = CATEGORY_ICONS[category.icon] || Users;
   const colors = CATEGORY_COLORS[category.id] || CATEGORY_COLORS.membership;
@@ -166,11 +166,11 @@ function TaskItem({
   onNavigate,
 }: {
   task: SetupTask;
-  onNavigate: (route: string) => void;
+  onNavigate: (task: SetupTask) => void;
 }) {
   return (
     <button
-      onClick={() => !task.completed && onNavigate(task.route)}
+      onClick={() => !task.completed && onNavigate(task)}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150 group ${
         task.completed
           ? 'opacity-70'
@@ -225,8 +225,12 @@ export function ClubSetupChecklist() {
     setExpandedCategories(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleNavigate = (route: string) => {
-    navigate(route);
+  const handleNavigate = (task: SetupTask) => {
+    if (task.routeState) {
+      navigate(task.route, { state: task.routeState });
+    } else {
+      navigate(task.route);
+    }
   };
 
   const firstIncompleteCategory = setupStatus.categories.find(
@@ -322,7 +326,7 @@ export function ClubSetupChecklist() {
             onClick={() => {
               const firstIncompleteTask = firstIncompleteCategory.tasks.find(t => !t.completed);
               if (firstIncompleteTask) {
-                handleNavigate(firstIncompleteTask.route);
+                handleNavigate(firstIncompleteTask);
               }
             }}
             className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
