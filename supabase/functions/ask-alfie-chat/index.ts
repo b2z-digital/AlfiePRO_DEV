@@ -20,6 +20,14 @@ interface RequestPayload {
   source?: string;
 }
 
+interface FaqMatch {
+  question: string;
+  answer: string;
+  category_name: string;
+  parent_category_name: string | null;
+  relevance_score: number;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -68,7 +76,7 @@ Deno.serve(async (req: Request) => {
 
     const [
       aiInstructionsResult,
-      faqResult,
+      relevantFaqsResult,
       correctionsResult,
       knowledgeResult,
     ] = await Promise.all([
@@ -77,11 +85,10 @@ Deno.serve(async (req: Request) => {
         .select("category, instruction_text, priority")
         .eq("is_active", true)
         .order("priority", { ascending: false }),
-      supabaseAdmin
-        .from("support_faqs")
-        .select("question, answer")
-        .eq("is_published", true)
-        .limit(50),
+      supabaseAdmin.rpc("search_faqs_by_relevance", {
+        search_query: message,
+        match_count: 15,
+      }),
       supabaseAdmin
         .from("alfie_knowledge_corrections")
         .select("scenario, correct_information, topic")
@@ -94,7 +101,7 @@ Deno.serve(async (req: Request) => {
     ]);
 
     const aiInstructions = aiInstructionsResult.data || [];
-    const faqs = faqResult.data || [];
+    const relevantFaqs: FaqMatch[] = relevantFaqsResult.data || [];
     const corrections = correctionsResult.data || [];
     const knowledgeChunks = knowledgeResult.data || [];
 
@@ -107,7 +114,7 @@ Deno.serve(async (req: Request) => {
     const firstName = profileData?.first_name || profileData?.full_name?.split(" ")[0] || "";
     const userName = profileData?.full_name || profileData?.first_name || "there";
 
-    let systemPrompt = buildSystemPrompt(aiInstructions, faqs, corrections, knowledgeChunks, firstName);
+    let systemPrompt = buildSystemPrompt(aiInstructions, relevantFaqs, corrections, knowledgeChunks, firstName);
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -195,7 +202,7 @@ Deno.serve(async (req: Request) => {
 
 function buildSystemPrompt(
   aiInstructions: Array<{ category: string; instruction_text: string; priority: number }>,
-  faqs: Array<{ question: string; answer: string }>,
+  relevantFaqs: FaqMatch[],
   corrections: Array<{ scenario: string; correct_information: string; topic: string }>,
   knowledgeChunks: Array<{ content: string; source_name: string }>,
   firstName: string
@@ -221,15 +228,39 @@ function buildSystemPrompt(
     }
   }
 
-  if (faqs.length > 0) {
-    prompt += "\nPlatform FAQ knowledge (reference these when answering platform questions):\n";
-    for (const faq of faqs) {
-      prompt += `Q: ${faq.question}\nA: ${faq.answer.substring(0, 500)}\n\n`;
+  if (relevantFaqs.length > 0) {
+    prompt += `\n--- ALFIEPRO KNOWLEDGE BASE ---\n`;
+    prompt += `The following FAQ entries are from the official AlfiePRO knowledge base and are directly relevant to the user's question. USE this information as your PRIMARY source of truth when answering platform-related questions.\n\n`;
+    prompt += `IMPORTANT RULES for using this knowledge:\n`;
+    prompt += `- Base your answer on the FAQ content below — it is accurate and up to date.\n`;
+    prompt += `- Do NOT just copy-paste the FAQ text. Rephrase it in your own conversational, friendly voice.\n`;
+    prompt += `- Present step-by-step instructions naturally, as if you're walking a friend through it.\n`;
+    prompt += `- If multiple FAQs are relevant, synthesise the information into one cohesive answer.\n`;
+    prompt += `- Add helpful context or tips where appropriate (e.g., "A handy trick is..." or "You'll find this under...").\n`;
+    prompt += `- If the FAQ gives numbered steps, you can keep that structure but make it feel personal.\n`;
+    prompt += `- Keep answers focused and avoid overwhelming the user with information they didn't ask for.\n\n`;
+
+    const groupedBySection: Record<string, FaqMatch[]> = {};
+    for (const faq of relevantFaqs) {
+      const section = faq.parent_category_name
+        ? `${faq.parent_category_name} > ${faq.category_name}`
+        : faq.category_name;
+      if (!groupedBySection[section]) groupedBySection[section] = [];
+      groupedBySection[section].push(faq);
     }
+
+    for (const [section, faqs] of Object.entries(groupedBySection)) {
+      prompt += `[Section: ${section}]\n`;
+      for (const faq of faqs) {
+        prompt += `Q: ${faq.question}\nA: ${faq.answer}\n\n`;
+      }
+    }
+
+    prompt += `--- END KNOWLEDGE BASE ---\n`;
   }
 
   if (knowledgeChunks.length > 0) {
-    prompt += "\nRelevant knowledge from documents:\n";
+    prompt += "\nRelevant knowledge from uploaded documents:\n";
     for (const chunk of knowledgeChunks) {
       prompt += `[${chunk.source_name}]: ${chunk.content.substring(0, 400)}\n\n`;
     }
