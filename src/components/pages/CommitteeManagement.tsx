@@ -28,6 +28,7 @@ interface CommitteeManagementProps {
   darkMode: boolean;
   associationId?: string;
   associationType?: 'state' | 'national';
+  onSaveComplete?: () => void;
 }
 
 interface PositionDefinition {
@@ -61,7 +62,7 @@ interface Member {
   avatar_url?: string | null;
 }
 
-export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode, associationId, associationType }) => {
+export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode, associationId, associationType, onSaveComplete }) => {
   const { currentClub, currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
   const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
@@ -380,6 +381,9 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
       addNotification('success', 'Member assigned successfully');
       fetchData();
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (error: any) {
       console.error('Error assigning member:', error);
       console.error('Error details:', error?.message, error?.code, error?.details, error?.hint);

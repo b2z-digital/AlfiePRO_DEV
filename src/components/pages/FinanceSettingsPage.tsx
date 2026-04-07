@@ -49,9 +49,10 @@ interface FinanceSettingsPageProps {
   associationType?: 'state' | 'national';
   initialTab?: 'taxes' | 'transactions' | 'categories' | 'membership';
   initialSection?: 'payment' | 'opening-balance';
+  onSaveComplete?: () => void;
 }
 
-export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMode, associationId, associationType, initialTab = 'taxes', initialSection }) => {
+export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMode, associationId, associationType, initialTab = 'taxes', initialSection, onSaveComplete }) => {
   const { currentClub } = useAuth();
   const isAssociation = !!associationId && !!associationType;
   const [activeTab, setActiveTab] = useState<'taxes' | 'transactions' | 'categories' | 'membership'>(initialTab);
@@ -717,7 +718,9 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
       }
 
       addNotification('success', 'Transaction settings saved successfully');
-      
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (err) {
       console.error('Error saving transaction settings:', err);
       setError(err instanceof Error ? err.message : 'Failed to save transaction settings');
@@ -760,6 +763,9 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
         }, { onConflict: 'club_id' });
 
       addNotification('success', 'Bank details saved successfully');
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (err) {
       console.error('Error saving bank details:', err);
       setError(err instanceof Error ? err.message : 'Failed to save bank details');
@@ -824,6 +830,9 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
       setShowCategoryModal(false);
       setEditingCategory(null);
       setCategoryForm({ name: '', type: 'expense', description: '', tax_rate_id: '' });
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (err) {
       console.error('Error saving category:', err);
       setError(err instanceof Error ? err.message : 'Failed to save category');

@@ -10,9 +10,10 @@ import { EmailTemplateEditor } from '../ui/EmailTemplateEditor';
 interface MembershipSettingsPageProps {
   darkMode: boolean;
   initialView?: 'types' | 'renewals' | 'emails' | 'conduct';
+  onSaveComplete?: () => void;
 }
 
-export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ darkMode, initialView }) => {
+export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ darkMode, initialView, onSaveComplete }) => {
   const { currentClub } = useAuth();
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
   const [memberCountsByType, setMemberCountsByType] = useState<Record<string, number>>({});
@@ -238,6 +239,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       setTimeout(() => setSuccess(null), 3000);
       setHasUnsavedChanges(false);
       setShowConfirmFixedDate(false);
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
@@ -300,6 +304,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       
       setSuccess('Code of Conduct saved successfully');
       setTimeout(() => setSuccess(null), 3000);
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (error) {
       console.error('Error saving Code of Conduct:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
@@ -367,9 +374,10 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       });
       setSuccess('Membership type added successfully');
 
-      // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
-      
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (err) {
       console.error('Error adding membership type:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, CheckSquare, Camera, DollarSign, AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
+import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, SquareCheck as CheckSquare, Camera, DollarSign, CircleAlert as AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
 import { getStoredRaceEvents, getStoredRaceSeries, combineAllDayResults } from '../utils/raceStorage';
 import { getTopFinishers } from '../utils/standingsCalculator';
 import { getStoredMembers } from '../utils/storage';
@@ -20,6 +20,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { TrialStatusBanner } from './TrialStatusBanner';
 import { getBoatClassBadge, getRaceFormatBadge, getEventTypeBadge } from '../constants/colors';
 import { CustomizableDashboard } from './dashboard/CustomizableDashboard';
+import { ClubSetupChecklist } from './dashboard/ClubSetupChecklist';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -1443,6 +1444,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       <div className="p-4 sm:p-6 lg:p-16">
         {/* Trial Status Banner */}
         <TrialStatusBanner />
+
+        {/* Club Setup Checklist - shown for new clubs until dismissed */}
+        <ClubSetupChecklist />
 
         {/* Customizable Dashboard - Full Widget System (includes all widgets) */}
         <CustomizableDashboard />

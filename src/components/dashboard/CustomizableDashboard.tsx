@@ -280,10 +280,17 @@ export const CustomizableDashboard: React.FC = () => {
             clearTimeout(loadTimeout);
             handleApplyTemplate(roleTemplate.template_id);
             return;
+          } else {
+            console.log('🎨 No role template found, applying Full Overview default');
+            clearTimeout(loadTimeout);
+            handleApplyTemplate('e5555555-5555-5555-5555-555555555555');
+            return;
           }
         } catch (templateError) {
-          console.warn('Could not load role template:', templateError);
-          // Continue with empty layout
+          console.warn('Could not load role template, applying Full Overview default:', templateError);
+          clearTimeout(loadTimeout);
+          handleApplyTemplate('e5555555-5555-5555-5555-555555555555');
+          return;
         }
       }
 

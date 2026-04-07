@@ -53,7 +53,7 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({ darkMode }) =>
     <>
       <button
         onClick={() => setShowPanel(!showPanel)}
-        className={`fixed bottom-6 right-6 z-[9990] w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 group ${
+        className={`fixed bottom-24 right-6 z-[9990] w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 group ${
           showPanel
             ? 'bg-slate-600 hover:bg-slate-700 rotate-0'
             : 'bg-red-500 hover:bg-red-600'
@@ -61,10 +61,10 @@ export const BugReportButton: React.FC<BugReportButtonProps> = ({ darkMode }) =>
         title="Bug Report"
       >
         {showPanel ? (
-          <X className="w-6 h-6 text-white" />
+          <X className="w-4 h-4 text-white" />
         ) : (
           <>
-            <Bug className="w-6 h-6 text-white" />
+            <Bug className="w-4 h-4 text-white" />
             {openCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                 {openCount > 9 ? '9+' : openCount}
