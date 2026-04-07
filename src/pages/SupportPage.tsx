@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Circle as HelpCircle, BookOpen, Search, ChevronRight, ChevronDown, MessageCircle, ExternalLink, LifeBuoy, Sparkles, Bug } from 'lucide-react';
+import { Circle as HelpCircle, BookOpen, Search, ChevronRight, ChevronDown, MessageCircle, ExternalLink, LifeBuoy, Sparkles, Bug, Play, FolderOpen } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AskAlfieChatPanel } from '../components/ask-alfie/AskAlfieChatPanel';
@@ -37,6 +37,7 @@ interface Tutorial {
   title: string;
   description: string;
   video_url: string;
+  category_id: string;
   group_id: string;
 }
 
@@ -48,7 +49,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
   const [tutorials, setTutorials] = useState<Tutorial[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showBugSubmitModal, setShowBugSubmitModal] = useState(false);
   const [bugCount, setBugCount] = useState(0);
@@ -84,13 +85,39 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
     setBugCount(count || 0);
   };
 
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
   const filteredFaqs = faqs.filter(faq => {
-    const matchesSearch = !searchQuery ||
-      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    if (!searchQuery) return true;
+    return faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
       faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = !selectedCategory || faq.category_id === selectedCategory;
-    return matchesSearch && matchesCategory;
   });
+
+  const faqsByCategory = categories.map(cat => ({
+    category: cat,
+    items: filteredFaqs.filter(faq => faq.category_id === cat.id),
+  })).filter(group => group.items.length > 0);
+
+  const uncategorizedFaqs = filteredFaqs.filter(faq => !categories.some(c => c.id === faq.category_id));
+
+  const tutorialsByCategory = categories.map(cat => ({
+    category: cat,
+    items: tutorials.filter(t => t.category_id === cat.id || t.group_id === cat.id),
+  })).filter(group => group.items.length > 0);
+
+  const uncategorizedTutorials = tutorials.filter(t =>
+    !categories.some(c => c.id === t.category_id || c.id === t.group_id)
+  );
 
   const formatAnswer = (answer: string) => {
     return answer.split('\n').map((line, i) => {
@@ -108,18 +135,16 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-6 sm:p-8 lg:p-10 max-w-7xl mx-auto">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-              <LifeBuoy className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Support</h1>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Get help using AlfiePRO - ask Alfie or browse our guides
-              </p>
-            </div>
+      <div className="p-16">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600">
+            <LifeBuoy className="text-white" size={28} />
+          </div>
+          <div>
+            <h2 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Support</h2>
+            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Get help using AlfiePRO - ask Alfie or browse our guides
+            </p>
           </div>
         </div>
 
@@ -160,19 +185,25 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
         {activeTab === 'alfie' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <div className={`rounded-2xl border overflow-hidden ${
-                darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+              <div className={`rounded-xl border overflow-hidden ${
+                darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
               }`} style={{ height: '600px' }}>
-                <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-slate-800 to-slate-900 border-slate-700/50">
+                <div className={`flex items-center justify-between px-4 py-3 border-b ${
+                  darkMode
+                    ? 'bg-gradient-to-r from-slate-700/80 to-slate-800/80 border-slate-700/50'
+                    : 'bg-gradient-to-r from-slate-100 to-slate-50 border-slate-200'
+                }`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      darkMode ? 'bg-slate-600/50' : 'bg-white'
+                    }`}>
                       <AlfieLogo size={18} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-white">Ask Alfie</h3>
+                      <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ask Alfie</h3>
                       <div className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[11px] text-slate-400">Your platform assistant</span>
+                        <span className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Your platform assistant</span>
                       </div>
                     </div>
                   </div>
@@ -189,7 +220,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
 
             <div className="space-y-4">
               <div className={`p-5 rounded-xl border ${
-                darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
+                darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
               }`}>
                 <div className="flex items-center gap-2 mb-3">
                   <MessageCircle size={16} className="text-cyan-400" />
@@ -198,38 +229,21 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
                   </h3>
                 </div>
                 <ul className={`space-y-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Setting up race events and series
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Managing club members and memberships
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Scoring races and entering results
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Creating event websites
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Setting up meetings and agendas
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Managing finances and invoices
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    HMS heat racing setup
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                    Live tracking and livestreaming
-                  </li>
+                  {[
+                    'Setting up race events and series',
+                    'Managing club members and memberships',
+                    'Scoring races and entering results',
+                    'Creating event websites',
+                    'Setting up meetings and agendas',
+                    'Managing finances and invoices',
+                    'HMS heat racing setup',
+                    'Live tracking and livestreaming',
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
                 </ul>
               </div>
 
@@ -251,7 +265,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
                 onClick={() => setActiveTab('faqs')}
                 className={`w-full p-4 rounded-xl border text-left transition-colors ${
                   darkMode
-                    ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-700/50'
+                    ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/50'
                     : 'bg-white border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -274,107 +288,206 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
 
         {activeTab === 'faqs' && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={16} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search FAQs..."
-                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
-                    darkMode
-                      ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500'
-                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-sky-400'
-                  } focus:outline-none focus:ring-2 focus:ring-cyan-500/20`}
-                />
-              </div>
-              {categories.length > 1 && (
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => setSelectedCategory(null)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                      !selectedCategory
-                        ? 'bg-cyan-500 text-white'
-                        : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    All
-                  </button>
-                  {categories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                        selectedCategory === cat.id
-                          ? 'bg-cyan-500 text-white'
-                          : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="relative">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={16} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search FAQs & Guides..."
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                  darkMode
+                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500'
+                    : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-sky-400'
+                } focus:outline-none focus:ring-2 focus:ring-cyan-500/20`}
+              />
             </div>
 
             {loading ? (
               <div className="text-center py-12">
                 <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
               </div>
-            ) : filteredFaqs.length === 0 ? (
-              <div className="text-center py-12">
-                <HelpCircle size={40} className={`mx-auto mb-3 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+            ) : faqsByCategory.length === 0 && uncategorizedFaqs.length === 0 ? (
+              <div className={`text-center py-12 rounded-lg border ${
+                darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+              }`}>
+                <HelpCircle size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+                <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {searchQuery ? 'No FAQs found matching your search' : 'No FAQs available yet'}
+                </h3>
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  No FAQs found matching your search.
+                  {searchQuery ? 'Try a different search term or ask Alfie directly.' : 'Check back soon for helpful guides and FAQs.'}
                 </p>
+                {searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(''); setActiveTab('alfie'); }}
+                    className="mt-4 px-4 py-2 bg-cyan-500 text-white text-sm font-medium rounded-lg hover:bg-cyan-600 transition-colors"
+                  >
+                    Ask Alfie Instead
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="space-y-2">
-                {filteredFaqs.map(faq => (
-                  <div
-                    key={faq.id}
-                    className={`rounded-xl border overflow-hidden transition-colors ${
-                      darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'
-                    }`}
-                  >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {faqsByCategory.map(({ category, items }) => {
+                  const isExpanded = expandedCategories.has(category.id);
+                  return (
+                    <div
+                      key={category.id}
+                      className={`rounded-xl border overflow-hidden transition-all ${
+                        isExpanded ? 'md:col-span-2' : ''
+                      } ${
+                        darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      <button
+                        onClick={() => toggleCategory(category.id)}
+                        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${
+                          darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            darkMode ? 'bg-cyan-500/10' : 'bg-cyan-50'
+                          }`}>
+                            <FolderOpen size={20} className="text-cyan-500" />
+                          </div>
+                          <div>
+                            <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {category.name}
+                            </h3>
+                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {items.length} {items.length === 1 ? 'article' : 'articles'}
+                              {category.description ? ` - ${category.description}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronDown size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        ) : (
+                          <ChevronRight size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        )}
+                      </button>
+
+                      {isExpanded && (
+                        <div className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                          {items.map(faq => (
+                            <div key={faq.id} className={`border-b last:border-b-0 ${
+                              darkMode ? 'border-slate-700/30' : 'border-slate-100'
+                            }`}>
+                              <button
+                                onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
+                                className={`w-full flex items-center justify-between px-5 py-3 text-left transition-colors ${
+                                  darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                <span className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                                  {faq.question}
+                                </span>
+                                {expandedFaq === faq.id ? (
+                                  <ChevronDown size={14} className={`flex-shrink-0 ml-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                                ) : (
+                                  <ChevronRight size={14} className={`flex-shrink-0 ml-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                                )}
+                              </button>
+                              {expandedFaq === faq.id && (
+                                <div className={`px-5 pb-4 text-sm leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                  <div className={`pt-2 border-t ${darkMode ? 'border-slate-700/30' : 'border-slate-100'}`}>
+                                    {formatAnswer(faq.answer)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {uncategorizedFaqs.length > 0 && (
+                  <div className={`rounded-xl border overflow-hidden ${
+                    expandedCategories.has('uncategorized') ? 'md:col-span-2' : ''
+                  } ${
+                    darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+                  }`}>
                     <button
-                      onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
-                      className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+                      onClick={() => toggleCategory('uncategorized')}
+                      className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${
                         darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'
                       }`}
                     >
-                      <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {faq.question}
-                      </span>
-                      {expandedFaq === faq.id ? (
-                        <ChevronDown size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          darkMode ? 'bg-slate-600/50' : 'bg-slate-100'
+                        }`}>
+                          <HelpCircle size={20} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        </div>
+                        <div>
+                          <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            General
+                          </h3>
+                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {uncategorizedFaqs.length} {uncategorizedFaqs.length === 1 ? 'article' : 'articles'}
+                          </p>
+                        </div>
+                      </div>
+                      {expandedCategories.has('uncategorized') ? (
+                        <ChevronDown size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
                       ) : (
-                        <ChevronRight size={16} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        <ChevronRight size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
                       )}
                     </button>
-                    {expandedFaq === faq.id && (
-                      <div className={`px-4 pb-4 text-sm leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                        <div className={`pt-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-100'}`}>
-                          {formatAnswer(faq.answer)}
-                        </div>
+
+                    {expandedCategories.has('uncategorized') && (
+                      <div className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                        {uncategorizedFaqs.map(faq => (
+                          <div key={faq.id} className={`border-b last:border-b-0 ${
+                            darkMode ? 'border-slate-700/30' : 'border-slate-100'
+                          }`}>
+                            <button
+                              onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
+                              className={`w-full flex items-center justify-between px-5 py-3 text-left transition-colors ${
+                                darkMode ? 'hover:bg-slate-700/30' : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className={`text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                                {faq.question}
+                              </span>
+                              {expandedFaq === faq.id ? (
+                                <ChevronDown size={14} className={`flex-shrink-0 ml-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                              ) : (
+                                <ChevronRight size={14} className={`flex-shrink-0 ml-2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                              )}
+                            </button>
+                            {expandedFaq === faq.id && (
+                              <div className={`px-5 pb-4 text-sm leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                <div className={`pt-2 border-t ${darkMode ? 'border-slate-700/30' : 'border-slate-100'}`}>
+                                  {formatAnswer(faq.answer)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
         )}
 
         {activeTab === 'tutorials' && (
-          <div>
+          <div className="space-y-6">
             {loading ? (
               <div className="text-center py-12">
                 <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
               </div>
-            ) : tutorials.length === 0 ? (
-              <div className="text-center py-16">
+            ) : tutorialsByCategory.length === 0 && uncategorizedTutorials.length === 0 ? (
+              <div className={`text-center py-16 rounded-lg border ${
+                darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+              }`}>
                 <BookOpen size={48} className={`mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
                 <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                   Video Tutorials Coming Soon
@@ -390,34 +503,159 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tutorials.map(tutorial => (
-                  <a
-                    key={tutorial.id}
-                    href={tutorial.video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`p-4 rounded-xl border transition-colors group ${
-                      darkMode
-                        ? 'bg-slate-800/50 border-slate-700 hover:bg-slate-700/50'
-                        : 'bg-white border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {tutorial.title}
-                      </h3>
-                      <ExternalLink size={14} className={`flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity ${
-                        darkMode ? 'text-slate-400' : 'text-slate-400'
-                      }`} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tutorialsByCategory.map(({ category, items }) => {
+                  const isExpanded = expandedCategories.has(`tut-${category.id}`);
+                  return (
+                    <div
+                      key={category.id}
+                      className={`rounded-xl border overflow-hidden transition-all ${
+                        isExpanded ? 'md:col-span-2' : ''
+                      } ${
+                        darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      <button
+                        onClick={() => toggleCategory(`tut-${category.id}`)}
+                        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${
+                          darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            darkMode ? 'bg-red-500/10' : 'bg-red-50'
+                          }`}>
+                            <Play size={20} className="text-red-500" />
+                          </div>
+                          <div>
+                            <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {category.name}
+                            </h3>
+                            <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {items.length} {items.length === 1 ? 'video' : 'videos'}
+                              {category.description ? ` - ${category.description}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronDown size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        ) : (
+                          <ChevronRight size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        )}
+                      </button>
+
+                      {isExpanded && (
+                        <div className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                            {items.map(tutorial => (
+                              <a
+                                key={tutorial.id}
+                                href={tutorial.video_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`p-4 rounded-lg border transition-colors group ${
+                                  darkMode
+                                    ? 'bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/60'
+                                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Play size={14} className="text-red-500 flex-shrink-0" />
+                                    <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                      {tutorial.title}
+                                    </h4>
+                                  </div>
+                                  <ExternalLink size={14} className={`flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                    darkMode ? 'text-slate-400' : 'text-slate-400'
+                                  }`} />
+                                </div>
+                                {tutorial.description && (
+                                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    {tutorial.description}
+                                  </p>
+                                )}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {tutorial.description && (
-                      <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {tutorial.description}
-                      </p>
+                  );
+                })}
+
+                {uncategorizedTutorials.length > 0 && (
+                  <div className={`rounded-xl border overflow-hidden ${
+                    expandedCategories.has('tut-uncategorized') ? 'md:col-span-2' : ''
+                  } ${
+                    darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'
+                  }`}>
+                    <button
+                      onClick={() => toggleCategory('tut-uncategorized')}
+                      className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${
+                        darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          darkMode ? 'bg-slate-600/50' : 'bg-slate-100'
+                        }`}>
+                          <Play size={20} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                        </div>
+                        <div>
+                          <h3 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            General
+                          </h3>
+                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {uncategorizedTutorials.length} {uncategorizedTutorials.length === 1 ? 'video' : 'videos'}
+                          </p>
+                        </div>
+                      </div>
+                      {expandedCategories.has('tut-uncategorized') ? (
+                        <ChevronDown size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                      ) : (
+                        <ChevronRight size={18} className={darkMode ? 'text-slate-400' : 'text-slate-500'} />
+                      )}
+                    </button>
+
+                    {expandedCategories.has('tut-uncategorized') && (
+                      <div className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-100'}`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                          {uncategorizedTutorials.map(tutorial => (
+                            <a
+                              key={tutorial.id}
+                              href={tutorial.video_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`p-4 rounded-lg border transition-colors group ${
+                                darkMode
+                                  ? 'bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/60'
+                                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Play size={14} className="text-red-500 flex-shrink-0" />
+                                  <h4 className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    {tutorial.title}
+                                  </h4>
+                                </div>
+                                <ExternalLink size={14} className={`flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                  darkMode ? 'text-slate-400' : 'text-slate-400'
+                                }`} />
+                              </div>
+                              {tutorial.description && (
+                                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {tutorial.description}
+                                </p>
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </a>
-                ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
