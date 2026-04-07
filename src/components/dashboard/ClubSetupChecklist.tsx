@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Users, DollarSign, UserPlus, ChevronRight, ChevronDown, CircleCheck as CheckCircle2, Circle, X, Rocket, Sparkles } from 'lucide-react';
+import { Users, DollarSign, UserPlus, ChevronRight, ChevronDown, CircleCheck as CheckCircle2, Circle, X, Rocket, Sparkles, CheckCheck } from 'lucide-react';
 import { useClubSetupStatus, SetupCategory, SetupTask } from '../../hooks/useClubSetupStatus';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -371,8 +371,8 @@ export function ClubSetupChecklist() {
         ))}
       </div>
 
-      {firstIncompleteCategory && (
-        <div className="px-6 pb-6">
+      <div className="px-6 pb-6 flex gap-3">
+        {firstIncompleteCategory && (
           <button
             onClick={() => {
               const firstIncompleteTask = firstIncompleteCategory.tasks.find(t => !t.completed);
@@ -380,14 +380,21 @@ export function ClubSetupChecklist() {
                 handleNavigate(firstIncompleteTask);
               }
             }}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
           >
             <Sparkles size={16} />
             Continue Setup
             <ChevronRight size={16} />
           </button>
-        </div>
-      )}
+        )}
+        <button
+          onClick={setupStatus.completeAll}
+          className="flex items-center justify-center gap-2 py-3 px-5 rounded-xl border border-slate-600 hover:border-slate-500 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 hover:text-white font-semibold text-sm transition-all"
+        >
+          <CheckCheck size={16} />
+          Complete Setup
+        </button>
+      </div>
     </div>
   );
 }

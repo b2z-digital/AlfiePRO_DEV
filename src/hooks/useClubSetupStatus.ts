@@ -31,6 +31,7 @@ export interface ClubSetupStatus {
   refresh: () => Promise<void>;
   dismiss: () => Promise<void>;
   toggleTask: (taskId: string) => Promise<void>;
+  completeAll: () => Promise<void>;
 }
 
 const SETUP_TASKS: { categoryId: string; title: string; icon: string; tasks: Omit<SetupTask, 'completed'>[] }[] = [
@@ -79,7 +80,7 @@ const SETUP_TASKS: { categoryId: string; title: string; icon: string; tasks: Omi
         label: 'Add Bank Details',
         description: 'Add your bank account details for invoices and payments',
         route: '/settings',
-        routeState: { activeTab: 'finance-payment-settings', fromSetupChecklist: true },
+        routeState: { activeTab: 'finance-payment', fromSetupChecklist: true },
       },
       {
         id: 'opening-balance',
@@ -233,6 +234,39 @@ export function useClubSetupStatus(): ClubSetupStatus {
     }
   }, [currentClub?.clubId, user?.id]);
 
+  const completeAll = useCallback(async () => {
+    if (!currentClub?.clubId || !user?.id) return;
+
+    const allTaskIds = SETUP_TASKS.flatMap(cat => cat.tasks.map(t => t.id));
+
+    setCompletedTaskIds(allTaskIds);
+    setCategories(prev =>
+      prev.map(cat => ({
+        ...cat,
+        tasks: cat.tasks.map(t => ({ ...t, completed: true })),
+        completedCount: cat.totalCount,
+      }))
+    );
+
+    try {
+      await supabase
+        .from('club_setup_checklists')
+        .upsert({
+          club_id: currentClub.clubId,
+          completed_tasks: allTaskIds,
+          dismissed_at: new Date().toISOString(),
+          dismissed_by: user.id,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'club_id' });
+
+      setIsDismissed(true);
+    } catch (error) {
+      console.error('Error completing all tasks:', error);
+      checkSetupStatus();
+    }
+  }, [currentClub?.clubId, user?.id, checkSetupStatus]);
+
   const totalTasks = categories.reduce((sum, cat) => sum + cat.totalCount, 0);
   const completedTaskCount = categories.reduce((sum, cat) => sum + cat.completedCount, 0);
   const progressPercent = totalTasks > 0 ? Math.round((completedTaskCount / totalTasks) * 100) : 0;
@@ -249,5 +283,6 @@ export function useClubSetupStatus(): ClubSetupStatus {
     refresh: checkSetupStatus,
     dismiss,
     toggleTask,
+    completeAll,
   };
 }
