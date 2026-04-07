@@ -25,12 +25,36 @@ interface SupportPageProps {
 
 type ActiveView = 'home' | 'faqs' | 'tutorials' | 'bugs' | 'alfie';
 
-const TILE_IMAGES = {
-  faqs: 'https://images.pexels.com/photos/3184639/pexels-photo-3184639.jpeg?auto=compress&cs=tinysrgb&w=600',
-  tutorials: 'https://images.pexels.com/photos/4144923/pexels-photo-4144923.jpeg?auto=compress&cs=tinysrgb&w=600',
-  bugs: 'https://images.pexels.com/photos/1181671/pexels-photo-1181671.jpeg?auto=compress&cs=tinysrgb&w=600',
-  alfie: 'https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=600',
-};
+const TILE_CONFIG = [
+  {
+    id: 'faqs' as const,
+    label: 'FAQs & Guides',
+    icon: BookMarked,
+    gradient: 'from-cyan-500 to-blue-600',
+    bgGlow: 'bg-cyan-500/10',
+  },
+  {
+    id: 'tutorials' as const,
+    label: 'Video Tutorials',
+    icon: Video,
+    gradient: 'from-emerald-500 to-teal-600',
+    bgGlow: 'bg-emerald-500/10',
+  },
+  {
+    id: 'bugs' as const,
+    label: 'Bug Reports',
+    icon: Bug,
+    gradient: 'from-amber-500 to-orange-600',
+    bgGlow: 'bg-amber-500/10',
+  },
+  {
+    id: 'alfie' as const,
+    label: 'Ask Alfie',
+    icon: Sparkles,
+    gradient: 'from-blue-500 to-cyan-500',
+    bgGlow: 'bg-blue-500/10',
+  },
+];
 
 const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
   const { user, isSuperAdmin } = useAuth();
@@ -106,106 +130,75 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
 
   const firstName = (user as any)?.firstName || 'there';
 
-  const tiles = [
-    {
-      id: 'faqs' as const,
-      label: 'FAQs & Guides',
-      icon: BookMarked,
-      image: TILE_IMAGES.faqs,
-      count: faqs.length,
-      countLabel: 'articles',
-    },
-    {
-      id: 'tutorials' as const,
-      label: 'Video Tutorials',
-      icon: Video,
-      image: TILE_IMAGES.tutorials,
-      count: tutorials.length,
-      countLabel: 'videos',
-    },
-    {
-      id: 'bugs' as const,
-      label: 'Bug Reports',
-      icon: Bug,
-      image: TILE_IMAGES.bugs,
-      count: bugCount,
-      countLabel: 'active',
-    },
-    {
-      id: 'alfie' as const,
-      label: 'Ask Alfie',
-      icon: Sparkles,
-      image: TILE_IMAGES.alfie,
-      count: undefined,
-      countLabel: 'AI Assistant',
-    },
-  ];
+  const tileCounts: Record<string, { count?: number; countLabel: string }> = {
+    faqs: { count: faqs.length, countLabel: 'articles' },
+    tutorials: { count: tutorials.length, countLabel: 'videos' },
+    bugs: { count: bugCount, countLabel: 'active' },
+    alfie: { count: undefined, countLabel: 'AI Assistant' },
+  };
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-6 sm:p-8 lg:p-12 max-w-7xl mx-auto">
 
-        {activeView === 'home' && (
-          <>
-            <div className="text-center mb-10">
+      {activeView === 'home' && (
+        <>
+          <div className="px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 lg:pt-10 pb-6">
+            <div className="text-center mb-8">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/20 flex items-center justify-center">
                   <AlfieLogo size={22} />
                 </div>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
                 Hi {firstName}, need some help?
               </h1>
-              <p className="text-slate-400 text-base max-w-lg mx-auto">
+              <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto">
                 Explore short tutorials and guides to help you master AlfiePRO.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-              {tiles.map(tile => {
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto">
+              {TILE_CONFIG.map(tile => {
                 const Icon = tile.icon;
+                const meta = tileCounts[tile.id];
                 return (
                   <button
                     key={tile.id}
                     onClick={() => setActiveView(tile.id)}
-                    className="group relative rounded-2xl overflow-hidden aspect-[4/3] text-left transition-all hover:ring-2 hover:ring-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10"
+                    className="group relative rounded-xl p-4 sm:p-5 text-left transition-all border border-slate-700/50 hover:border-slate-600/80 bg-slate-800/50 hover:bg-slate-800/80"
                   >
-                    <img
-                      src={tile.image}
-                      alt={tile.label}
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
-                    <div className="absolute inset-0 p-5 flex flex-col justify-end">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon size={16} className="text-cyan-400" />
-                        {tile.count !== undefined && tile.count > 0 && (
-                          <span className="text-[11px] font-medium text-cyan-400">
-                            {tile.count} {tile.countLabel}
-                          </span>
-                        )}
-                        {tile.count === undefined && (
-                          <span className="text-[11px] font-medium text-cyan-400">
-                            {tile.countLabel}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-white font-semibold text-base flex items-center gap-2">
-                        {tile.label}
-                        <ChevronRight size={16} className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                      </h3>
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${tile.gradient} flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform`}>
+                      <Icon size={20} className="text-white" />
                     </div>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {meta.count !== undefined && meta.count > 0 && (
+                        <span className="text-[11px] font-medium text-cyan-400">
+                          {meta.count} {meta.countLabel}
+                        </span>
+                      )}
+                      {meta.count === undefined && (
+                        <span className="text-[11px] font-medium text-cyan-400">
+                          {meta.countLabel}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-white font-semibold text-sm sm:text-base flex items-center gap-1.5">
+                      {tile.label}
+                      <ChevronRight size={14} className="text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all" />
+                    </h3>
                   </button>
                 );
               })}
             </div>
+          </div>
 
+          <div className="px-4 sm:px-6 lg:px-10 pb-8">
             {loading ? (
               <div className="space-y-10">
                 {[1, 2].map(i => (
                   <div key={i}>
                     <div className="h-6 w-48 bg-slate-800/50 rounded mb-4 animate-pulse" />
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 overflow-hidden">
                       {[1, 2, 3, 4].map(j => (
                         <div key={j} className="flex-shrink-0 w-72">
                           <div className="aspect-video rounded-xl bg-slate-800/50 animate-pulse" />
@@ -244,195 +237,197 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
                 )}
               </>
             )}
-          </>
-        )}
+          </div>
+        </>
+      )}
 
-        {activeView === 'faqs' && (
+      {activeView === 'faqs' && (
+        <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
           <SupportFaqSection
             categories={categories}
             faqs={faqs}
             onBack={() => setActiveView('home')}
           />
-        )}
+        </div>
+      )}
 
-        {activeView === 'tutorials' && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setActiveView('home')}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white">Video Tutorials</h2>
-                <p className="text-sm text-slate-400">
-                  {tutorials.length} tutorials across {groups.length} categories
-                </p>
-              </div>
+      {activeView === 'tutorials' && (
+        <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setActiveView('home')}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white">Video Tutorials</h2>
+              <p className="text-sm text-slate-400">
+                {tutorials.length} tutorials across {groups.length} categories
+              </p>
             </div>
-
-            <div className="relative max-w-xl">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search tutorials..."
-                className="w-full pl-12 pr-4 py-3 rounded-xl border bg-slate-800/80 border-slate-700/50 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-sm"
-              />
-            </div>
-
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
-              </div>
-            ) : filteredTutorialsByGroup.length === 0 && filteredUncategorized.length === 0 ? (
-              <div className="text-center py-16 rounded-2xl border bg-slate-800/30 border-slate-700/50">
-                <Video size={48} className="mx-auto mb-4 text-slate-600" />
-                <h3 className="text-lg font-semibold mb-2 text-white">
-                  {searchQuery ? 'No tutorials found' : 'No video tutorials yet'}
-                </h3>
-                <p className="text-sm text-slate-400">
-                  {searchQuery ? 'Try a different search term.' : 'Video tutorials will appear here once added.'}
-                </p>
-              </div>
-            ) : (
-              <>
-                {filteredTutorialsByGroup.map(({ group, items }) => (
-                  <SupportVideoRow
-                    key={group.id}
-                    title={group.name}
-                    description={group.description}
-                    tutorials={items}
-                    onPlay={setPlayingTutorial}
-                  />
-                ))}
-                {filteredUncategorized.length > 0 && (
-                  <SupportVideoRow
-                    title="More Tutorials"
-                    tutorials={filteredUncategorized}
-                    onPlay={setPlayingTutorial}
-                  />
-                )}
-              </>
-            )}
           </div>
-        )}
 
-        {activeView === 'bugs' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 mb-2">
-              <button
-                onClick={() => setActiveView('home')}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white">Bug Reports</h2>
-                <p className="text-sm text-slate-400">
-                  Report issues or track the status of your submitted bug reports.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowBugSubmitModal(true)}
-                className="px-4 py-2 bg-cyan-500 text-white text-sm font-medium rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2"
-              >
-                <Bug size={14} />
-                Report a Bug
-              </button>
-            </div>
-            <BugReportList
-              darkMode={darkMode}
-              onClose={() => {}}
-              onNewReport={() => setShowBugSubmitModal(true)}
-              onRefresh={loadBugCount}
-              embedded
+          <div className="relative max-w-xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search tutorials..."
+              className="w-full pl-12 pr-4 py-3 rounded-xl border bg-slate-800/80 border-slate-700/50 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-sm"
             />
           </div>
-        )}
 
-        {activeView === 'alfie' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 mb-2">
-              <button
-                onClick={() => setActiveView('home')}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-              >
-                <ArrowLeft size={18} />
-              </button>
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white">Ask Alfie</h2>
-                <p className="text-sm text-slate-400">
-                  Your AI-powered platform assistant
-                </p>
-              </div>
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <div className="rounded-xl border overflow-hidden bg-slate-800/50 border-slate-700/50" style={{ height: '600px' }}>
-                  <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-slate-700/80 to-slate-800/80 border-slate-700/50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-600/50">
-                        <AlfieLogo size={18} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-white">Ask Alfie</h3>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          <span className="text-[11px] text-slate-400">Your platform assistant</span>
-                        </div>
+          ) : filteredTutorialsByGroup.length === 0 && filteredUncategorized.length === 0 ? (
+            <div className="text-center py-16 rounded-2xl border bg-slate-800/30 border-slate-700/50">
+              <Video size={48} className="mx-auto mb-4 text-slate-600" />
+              <h3 className="text-lg font-semibold mb-2 text-white">
+                {searchQuery ? 'No tutorials found' : 'No video tutorials yet'}
+              </h3>
+              <p className="text-sm text-slate-400">
+                {searchQuery ? 'Try a different search term.' : 'Video tutorials will appear here once added.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              {filteredTutorialsByGroup.map(({ group, items }) => (
+                <SupportVideoRow
+                  key={group.id}
+                  title={group.name}
+                  description={group.description}
+                  tutorials={items}
+                  onPlay={setPlayingTutorial}
+                />
+              ))}
+              {filteredUncategorized.length > 0 && (
+                <SupportVideoRow
+                  title="More Tutorials"
+                  tutorials={filteredUncategorized}
+                  onPlay={setPlayingTutorial}
+                />
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {activeView === 'bugs' && (
+        <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-4">
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => setActiveView('home')}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white">Bug Reports</h2>
+              <p className="text-sm text-slate-400">
+                Report issues or track the status of your submitted bug reports.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowBugSubmitModal(true)}
+              className="px-4 py-2 bg-cyan-500 text-white text-sm font-medium rounded-lg hover:bg-cyan-600 transition-colors flex items-center gap-2"
+            >
+              <Bug size={14} />
+              Report a Bug
+            </button>
+          </div>
+          <BugReportList
+            darkMode={darkMode}
+            onClose={() => {}}
+            onNewReport={() => setShowBugSubmitModal(true)}
+            onRefresh={loadBugCount}
+            embedded
+          />
+        </div>
+      )}
+
+      {activeView === 'alfie' && (
+        <div className="px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-4">
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => setActiveView('home')}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white">Ask Alfie</h2>
+              <p className="text-sm text-slate-400">
+                Your AI-powered platform assistant
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <div className="rounded-xl border overflow-hidden bg-slate-800/50 border-slate-700/50" style={{ height: '600px' }}>
+                <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-slate-700/80 to-slate-800/80 border-slate-700/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-600/50">
+                      <AlfieLogo size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">Ask Alfie</h3>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[11px] text-slate-400">Your platform assistant</span>
                       </div>
                     </div>
                   </div>
-                  <div style={{ height: 'calc(100% - 52px)' }}>
-                    <AskAlfieChatPanel
-                      darkMode={darkMode}
-                      onClose={() => {}}
-                      embedded={true}
-                    />
-                  </div>
                 </div>
-              </div>
-              <div className="space-y-4">
-                <div className="p-5 rounded-xl border bg-slate-800/50 border-slate-700/50">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare size={16} className="text-cyan-400" />
-                    <h3 className="text-sm font-semibold text-white">What can Alfie help with?</h3>
-                  </div>
-                  <ul className="space-y-2 text-xs text-slate-400">
-                    {[
-                      'Setting up race events and series',
-                      'Managing club members and memberships',
-                      'Scoring races and entering results',
-                      'Creating event websites',
-                      'Setting up meetings and agendas',
-                      'Managing finances and invoices',
-                      'HMS heat racing setup',
-                      'Live tracking and livestreaming',
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="p-5 rounded-xl border bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border-cyan-800/30">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles size={16} className="text-cyan-400" />
-                    <h3 className="text-sm font-semibold text-white">Powered by AI</h3>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Alfie is trained on AlfiePRO documentation, sailing rules, tuning guides, and platform knowledge to give you accurate, contextual answers.
-                  </p>
+                <div style={{ height: 'calc(100% - 52px)' }}>
+                  <AskAlfieChatPanel
+                    darkMode={darkMode}
+                    onClose={() => {}}
+                    embedded={true}
+                  />
                 </div>
               </div>
             </div>
+            <div className="space-y-4">
+              <div className="p-5 rounded-xl border bg-slate-800/50 border-slate-700/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare size={16} className="text-cyan-400" />
+                  <h3 className="text-sm font-semibold text-white">What can Alfie help with?</h3>
+                </div>
+                <ul className="space-y-2 text-xs text-slate-400">
+                  {[
+                    'Setting up race events and series',
+                    'Managing club members and memberships',
+                    'Scoring races and entering results',
+                    'Creating event websites',
+                    'Setting up meetings and agendas',
+                    'Managing finances and invoices',
+                    'HMS heat racing setup',
+                    'Live tracking and livestreaming',
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <ChevronRight size={12} className="text-cyan-400 mt-0.5 flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="p-5 rounded-xl border bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border-cyan-800/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles size={16} className="text-cyan-400" />
+                  <h3 className="text-sm font-semibold text-white">Powered by AI</h3>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Alfie is trained on AlfiePRO documentation, sailing rules, tuning guides, and platform knowledge to give you accurate, contextual answers.
+                </p>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {playingTutorial && (
         <div
