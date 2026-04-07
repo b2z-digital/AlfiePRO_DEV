@@ -262,7 +262,17 @@ export function ClubSetupChecklist() {
   if (setupStatus.totalTasks === 0) return null;
 
   const toggleCategory = (id: string) => {
-    setExpandedCategories(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedCategories(prev => {
+      const isCurrentlyExpanded = prev[id];
+      const next: Record<string, boolean> = {};
+      for (const key of Object.keys(prev)) {
+        next[key] = false;
+      }
+      if (!isCurrentlyExpanded) {
+        next[id] = true;
+      }
+      return next;
+    });
   };
 
   const handleNavigate = (task: SetupTask) => {
