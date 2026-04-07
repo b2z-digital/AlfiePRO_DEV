@@ -212,8 +212,8 @@ export default function SupportFaqSection({ categories, faqs, onBack }: Props) {
                                   )}
                                 </button>
                                 {expandedFaq === faq.id && (
-                                  <div className="pl-12 pr-5 pb-4 text-sm leading-relaxed text-slate-300">
-                                    <div className="pt-2 border-t border-slate-700/30">
+                                  <div className="pl-12 pr-5 pb-4 text-sm leading-relaxed text-slate-300 bg-slate-900/40">
+                                    <div className="pt-3 pb-1 border-t border-slate-700/30">
                                       {formatAnswer(faq.answer)}
                                     </div>
                                   </div>
@@ -238,8 +238,8 @@ export default function SupportFaqSection({ categories, faqs, onBack }: Props) {
                             )}
                           </button>
                           {expandedFaq === faq.id && (
-                            <div className="px-5 pb-4 text-sm leading-relaxed text-slate-300">
-                              <div className="pt-2 border-t border-slate-700/30">
+                            <div className="px-5 pb-4 text-sm leading-relaxed text-slate-300 bg-slate-900/40">
+                              <div className="pt-3 pb-1 border-t border-slate-700/30">
                                 {formatAnswer(faq.answer)}
                               </div>
                             </div>
