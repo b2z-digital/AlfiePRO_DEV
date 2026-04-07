@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, CheckSquare, Camera, DollarSign, AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
+import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, SquareCheck as CheckSquare, Camera, DollarSign, CircleAlert as AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
 import { getStoredRaceEvents, getStoredRaceSeries, combineAllDayResults } from '../utils/raceStorage';
 import { getTopFinishers } from '../utils/standingsCalculator';
 import { getStoredMembers } from '../utils/storage';
