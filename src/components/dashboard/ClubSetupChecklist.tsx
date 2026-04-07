@@ -85,11 +85,13 @@ function CategorySection({
   isExpanded,
   onToggle,
   onNavigate,
+  onToggleTask,
 }: {
   category: SetupCategory;
   isExpanded: boolean;
   onToggle: () => void;
   onNavigate: (task: SetupTask) => void;
+  onToggleTask: (taskId: string) => void;
 }) {
   const Icon = CATEGORY_ICONS[category.icon] || Users;
   const colors = CATEGORY_COLORS[category.id] || CATEGORY_COLORS.membership;
@@ -153,7 +155,7 @@ function CategorySection({
       {isExpanded && (
         <div className="px-4 pb-4 space-y-1">
           {category.tasks.map((task) => (
-            <TaskItem key={task.id} task={task} onNavigate={onNavigate} />
+            <TaskItem key={task.id} task={task} onNavigate={onNavigate} onToggleComplete={() => onToggleTask(task.id)} />
           ))}
         </div>
       )}
@@ -164,26 +166,39 @@ function CategorySection({
 function TaskItem({
   task,
   onNavigate,
+  onToggleComplete,
 }: {
   task: SetupTask;
   onNavigate: (task: SetupTask) => void;
+  onToggleComplete: () => void;
 }) {
   return (
-    <button
-      onClick={() => !task.completed && onNavigate(task)}
+    <div
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all duration-150 group ${
         task.completed
           ? 'opacity-70'
-          : 'hover:bg-slate-700/50 cursor-pointer'
+          : 'hover:bg-slate-700/50'
       }`}
     >
-      {task.completed ? (
-        <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
-      ) : (
-        <Circle size={18} className="text-slate-600 flex-shrink-0 group-hover:text-slate-400 transition-colors" />
-      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleComplete();
+        }}
+        className="flex-shrink-0 p-0.5 rounded-full hover:bg-slate-600/50 transition-colors"
+        title={task.completed ? 'Mark as incomplete' : 'Mark as complete'}
+      >
+        {task.completed ? (
+          <CheckCircle2 size={18} className="text-emerald-500" />
+        ) : (
+          <Circle size={18} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        )}
+      </button>
 
-      <div className="flex-1 min-w-0">
+      <button
+        onClick={() => onNavigate(task)}
+        className="flex-1 min-w-0 text-left"
+      >
         <p className={`text-sm font-medium ${
           task.completed ? 'text-slate-500 line-through' : 'text-slate-200'
         }`}>
@@ -192,15 +207,18 @@ function TaskItem({
         <p className="text-xs text-slate-500 mt-0.5 truncate">
           {task.description}
         </p>
-      </div>
+      </button>
 
-      {!task.completed && (
+      <button
+        onClick={() => onNavigate(task)}
+        className="flex-shrink-0"
+      >
         <ChevronRight
           size={16}
-          className="text-slate-600 flex-shrink-0 group-hover:text-slate-400 transition-colors"
+          className="text-slate-600 group-hover:text-slate-400 transition-colors"
         />
-      )}
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -338,6 +356,7 @@ export function ClubSetupChecklist() {
             isExpanded={!!expandedCategories[category.id]}
             onToggle={() => toggleCategory(category.id)}
             onNavigate={handleNavigate}
+            onToggleTask={setupStatus.toggleTask}
           />
         ))}
       </div>
