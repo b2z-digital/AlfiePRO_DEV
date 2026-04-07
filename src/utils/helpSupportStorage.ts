@@ -96,6 +96,13 @@ export const faqStorage = {
     if (error) throw error;
   },
 
+  async reorderFaqs(orderedIds: { id: string; sort_order: number }[]): Promise<void> {
+    const updates = orderedIds.map(({ id, sort_order }) =>
+      supabase.from('support_faqs').update({ sort_order, updated_at: new Date().toISOString() }).eq('id', id)
+    );
+    await Promise.all(updates);
+  },
+
   async incrementViewCount(faqId: string): Promise<void> {
     await supabase.rpc('increment_faq_view_count', { faq_id: faqId });
   },

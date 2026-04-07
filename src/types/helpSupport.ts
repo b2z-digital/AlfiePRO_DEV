@@ -6,9 +6,11 @@ export interface SupportFaqCategory {
   icon: string;
   sort_order: number;
   is_active: boolean;
+  parent_id: string | null;
   created_at: string;
   updated_at: string;
   faqs?: SupportFaq[];
+  children?: SupportFaqCategory[];
 }
 
 export interface SupportFaq {

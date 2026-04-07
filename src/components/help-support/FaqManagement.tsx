@@ -1,9 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Circle as HelpCircle, Plus, CreditCard as Edit2, Trash2, ChevronDown, ChevronRight, Eye, EyeOff, GripVertical, Search, FolderPlus, Save, X, ThumbsUp, ThumbsDown, Tag } from 'lucide-react';
 import {
-  HelpCircle, Plus, Edit2, Trash2, ChevronDown, ChevronRight,
-  Eye, EyeOff, GripVertical, Search, FolderPlus, Save, X,
-  ThumbsUp, ThumbsDown, Tag,
-} from 'lucide-react';
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../../contexts/AuthContext';
 import { faqStorage } from '../../utils/helpSupportStorage';
 import { PLATFORM_AREAS } from '../../types/helpSupport';
@@ -26,7 +37,7 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
   const [editingCategory, setEditingCategory] = useState<SupportFaqCategory | null>(null);
   const [editingFaq, setEditingFaq] = useState<SupportFaq | null>(null);
 
-  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', icon: 'HelpCircle', is_active: true });
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '', icon: 'HelpCircle', is_active: true, parent_id: null as string | null });
   const [faqForm, setFaqForm] = useState({
     category_id: '' as string | null,
     question: '',
@@ -37,6 +48,10 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
     sort_order: 0,
   });
   const [tagInput, setTagInput] = useState('');
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   useEffect(() => { loadData(); }, []);
 
@@ -59,6 +74,11 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
     }
   };
 
+  const topLevelCategories = categories.filter(c => !c.parent_id);
+  const getChildren = useCallback((parentId: string) =>
+    categories.filter(c => c.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order),
+  [categories]);
+
   const toggleCategory = (id: string) => {
     setExpandedCategories(prev => {
       const next = new Set(prev);
@@ -67,13 +87,13 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
     });
   };
 
-  const openCategoryModal = (cat?: SupportFaqCategory) => {
+  const openCategoryModal = (cat?: SupportFaqCategory, parentId?: string) => {
     if (cat) {
       setEditingCategory(cat);
-      setCategoryForm({ name: cat.name, description: cat.description, icon: cat.icon, is_active: cat.is_active });
+      setCategoryForm({ name: cat.name, description: cat.description, icon: cat.icon, is_active: cat.is_active, parent_id: cat.parent_id });
     } else {
       setEditingCategory(null);
-      setCategoryForm({ name: '', description: '', icon: 'HelpCircle', is_active: true });
+      setCategoryForm({ name: '', description: '', icon: 'HelpCircle', is_active: true, parent_id: parentId || null });
     }
     setShowCategoryModal(true);
   };
@@ -186,6 +206,30 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent, categoryFaqs: SupportFaq[]) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = categoryFaqs.findIndex(f => f.id === active.id);
+    const newIndex = categoryFaqs.findIndex(f => f.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(categoryFaqs, oldIndex, newIndex);
+    const updates = reordered.map((faq, idx) => ({ id: faq.id, sort_order: idx + 1 }));
+
+    setFaqs(prev => {
+      const otherFaqs = prev.filter(f => !reordered.some(r => r.id === f.id));
+      return [...otherFaqs, ...reordered.map((f, idx) => ({ ...f, sort_order: idx + 1 }))];
+    });
+
+    try {
+      await faqStorage.reorderFaqs(updates);
+    } catch (err: any) {
+      onNotify('Failed to save new order', 'error');
+      loadData();
+    }
+  };
+
   const filteredFaqs = searchQuery
     ? faqs.filter(f =>
         f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -196,6 +240,17 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
 
   const uncategorizedFaqs = filteredFaqs.filter(f => !f.category_id);
 
+  const allCategoryIds = new Set(categories.map(c => c.id));
+  const getAllCategoryFaqIds = (catId: string): string[] => {
+    const childIds = getChildren(catId).flatMap(c => getAllCategoryFaqIds(c.id));
+    return [catId, ...childIds];
+  };
+
+  const getCategoryFaqCount = (catId: string): number => {
+    const ids = getAllCategoryFaqIds(catId);
+    return filteredFaqs.filter(f => f.category_id && ids.includes(f.category_id)).length;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -203,6 +258,76 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
       </div>
     );
   }
+
+  const renderCategorySection = (cat: SupportFaqCategory, isChild = false) => {
+    const children = getChildren(cat.id);
+    const directFaqs = filteredFaqs.filter(f => f.category_id === cat.id).sort((a, b) => a.sort_order - b.sort_order);
+    const isExpanded = expandedCategories.has(cat.id);
+    const totalCount = getCategoryFaqCount(cat.id);
+
+    return (
+      <div key={cat.id} className={`rounded-xl border border-slate-700/50 bg-slate-800/50 overflow-hidden ${isChild ? 'ml-6 mt-2' : ''}`}>
+        <div
+          className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-700/30 transition-colors"
+          onClick={() => toggleCategory(cat.id)}
+        >
+          <div className="flex items-center gap-3">
+            {isExpanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
+            <HelpCircle size={18} className={isChild ? 'text-cyan-400' : 'text-sky-400'} />
+            <span className="font-semibold text-white">{cat.name}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{totalCount}</span>
+            {!cat.is_active && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">Hidden</span>}
+          </div>
+          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+            {!isChild && (
+              <button onClick={() => openCategoryModal(undefined, cat.id)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors" title="Add sub-category">
+                <FolderPlus size={16} />
+              </button>
+            )}
+            <button onClick={() => openFaqModal(undefined, cat.id)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors" title="Add FAQ">
+              <Plus size={16} />
+            </button>
+            <button onClick={() => openCategoryModal(cat)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
+              <Edit2 size={16} />
+            </button>
+            <button onClick={() => deleteCategory(cat.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+        {isExpanded && (
+          <div className="border-t border-slate-700/50">
+            {children.length > 0 && (
+              <div className="px-2 py-2 space-y-2">
+                {children.map(child => renderCategorySection(child, true))}
+              </div>
+            )}
+            {directFaqs.length === 0 && children.length === 0 ? (
+              <div className="px-5 py-8 text-center text-slate-500 text-sm">
+                No FAQs in this category yet.
+                <button onClick={() => openFaqModal(undefined, cat.id)} className="text-sky-400 hover:text-sky-300 ml-1">Add one</button>
+              </div>
+            ) : directFaqs.length > 0 ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, directFaqs)}>
+                <SortableContext items={directFaqs.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                  <div className="divide-y divide-slate-700/30">
+                    {directFaqs.map(faq => (
+                      <SortableFaqRow key={faq.id} faq={faq} onEdit={() => openFaqModal(faq)} onDelete={() => deleteFaq(faq.id)} onTogglePublish={() => togglePublished(faq)} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : null}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const allSelectableCategories = categories.filter(c => {
+    const hasChildren = categories.some(ch => ch.parent_id === c.id);
+    return !hasChildren || c.parent_id !== null;
+  });
 
   return (
     <div className="space-y-6">
@@ -234,64 +359,22 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
       </div>
 
       <div className="space-y-3">
-        {categories.map(cat => {
-          const catFaqs = filteredFaqs.filter(f => f.category_id === cat.id);
-          const isExpanded = expandedCategories.has(cat.id);
-          return (
-            <div key={cat.id} className="rounded-xl border border-slate-700/50 bg-slate-800/50 overflow-hidden">
-              <div
-                className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-700/30 transition-colors"
-                onClick={() => toggleCategory(cat.id)}
-              >
-                <div className="flex items-center gap-3">
-                  {isExpanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
-                  <HelpCircle size={18} className="text-sky-400" />
-                  <span className="font-semibold text-white">{cat.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{catFaqs.length}</span>
-                  {!cat.is_active && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">Hidden</span>}
-                </div>
-                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openFaqModal(undefined, cat.id)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
-                    <Plus size={16} />
-                  </button>
-                  <button onClick={() => openCategoryModal(cat)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => deleteCategory(cat.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              {isExpanded && (
-                <div className="border-t border-slate-700/50">
-                  {catFaqs.length === 0 ? (
-                    <div className="px-5 py-8 text-center text-slate-500 text-sm">
-                      No FAQs in this category yet.
-                      <button onClick={() => openFaqModal(undefined, cat.id)} className="text-sky-400 hover:text-sky-300 ml-1">Add one</button>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-slate-700/30">
-                      {catFaqs.map(faq => (
-                        <FaqRow key={faq.id} faq={faq} onEdit={() => openFaqModal(faq)} onDelete={() => deleteFaq(faq.id)} onTogglePublish={() => togglePublished(faq)} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {topLevelCategories.map(cat => renderCategorySection(cat))}
 
         {uncategorizedFaqs.length > 0 && (
           <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-700/50">
               <span className="font-semibold text-slate-400">Uncategorized ({uncategorizedFaqs.length})</span>
             </div>
-            <div className="divide-y divide-slate-700/30">
-              {uncategorizedFaqs.map(faq => (
-                <FaqRow key={faq.id} faq={faq} onEdit={() => openFaqModal(faq)} onDelete={() => deleteFaq(faq.id)} onTogglePublish={() => togglePublished(faq)} />
-              ))}
-            </div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, uncategorizedFaqs)}>
+              <SortableContext items={uncategorizedFaqs.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                <div className="divide-y divide-slate-700/30">
+                  {uncategorizedFaqs.map(faq => (
+                    <SortableFaqRow key={faq.id} faq={faq} onEdit={() => openFaqModal(faq)} onDelete={() => deleteFaq(faq.id)} onTogglePublish={() => togglePublished(faq)} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         )}
       </div>
@@ -304,6 +387,17 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
               <button onClick={() => setShowCategoryModal(false)} className="p-1 rounded-lg hover:bg-slate-700 text-slate-400"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Parent Category</label>
+                <select
+                  value={categoryForm.parent_id || ''}
+                  onChange={e => setCategoryForm(prev => ({ ...prev, parent_id: e.target.value || null }))}
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="">None (top-level)</option>
+                  {topLevelCategories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                 <input
@@ -361,7 +455,15 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
                     className="w-full px-4 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600 text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
                     <option value="">Uncategorized</option>
-                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                    {categories.map(cat => {
+                      const isChild = !!cat.parent_id;
+                      const parentName = isChild ? categories.find(p => p.id === cat.parent_id)?.name : null;
+                      return (
+                        <option key={cat.id} value={cat.id}>
+                          {parentName ? `${parentName} > ${cat.name}` : cat.name}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div>
@@ -453,16 +555,26 @@ export default function FaqManagement({ darkMode = false, onNotify }: Props) {
   );
 }
 
-function FaqRow({ faq, onEdit, onDelete, onTogglePublish }: {
+function SortableFaqRow({ faq, onEdit, onDelete, onTogglePublish }: {
   faq: SupportFaq;
   onEdit: () => void;
   onDelete: () => void;
   onTogglePublish: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: faq.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
   return (
-    <div className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-700/20 transition-colors group">
+    <div ref={setNodeRef} style={style} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-700/20 transition-colors group">
       <div className="flex items-start gap-3 flex-1 min-w-0">
-        <GripVertical size={16} className="text-slate-600 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+        <button {...attributes} {...listeners} className="mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing touch-none">
+          <GripVertical size={16} className="text-slate-600" />
+        </button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{faq.question}</p>
           <p className="text-xs text-slate-400 mt-0.5 truncate">{faq.answer.replace(/<[^>]*>/g, '').slice(0, 100)}</p>

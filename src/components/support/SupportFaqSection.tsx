@@ -27,25 +27,75 @@ export default function SupportFaqSection({ categories, faqs, onBack }: Props) {
       faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const faqsByCategory = categories.map(cat => ({
-    category: cat,
-    items: filteredFaqs.filter(faq => faq.category_id === cat.id),
-  })).filter(group => group.items.length > 0);
+  const topLevelCategories = categories.filter(c => !c.parent_id);
+  const getChildren = (parentId: string) =>
+    categories.filter(c => c.parent_id === parentId).sort((a, b) => a.sort_order - b.sort_order);
 
-  const uncategorizedFaqs = filteredFaqs.filter(faq => !categories.some(c => c.id === faq.category_id));
+  const getAllDescendantIds = (catId: string): string[] => {
+    const childIds = getChildren(catId).flatMap(c => getAllDescendantIds(c.id));
+    return [catId, ...childIds];
+  };
+
+  const faqsByCategory = topLevelCategories.map(cat => {
+    const allIds = getAllDescendantIds(cat.id);
+    return {
+      category: cat,
+      items: filteredFaqs.filter(faq => faq.category_id && allIds.includes(faq.category_id)),
+      children: getChildren(cat.id),
+    };
+  }).filter(group => group.items.length > 0);
+
+  const allCategoryIds = categories.map(c => c.id);
+  const uncategorizedFaqs = filteredFaqs.filter(faq => !faq.category_id || !allCategoryIds.includes(faq.category_id));
 
   const formatAnswer = (answer: string) => {
-    return answer.split('\n').map((line, i) => {
-      if (line.startsWith('**') && line.endsWith('**')) {
-        return <p key={i} className="font-semibold mt-3 mb-1">{line.slice(2, -2)}</p>;
+    const lines = answer.split('\n');
+    const elements: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+        elements.push(<p key={i} className="font-semibold mt-3 mb-1">{trimmed.slice(2, -2)}</p>);
+        i++;
+        continue;
       }
-      const boldFormatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      if (line.trim().startsWith('- ') || line.trim().match(/^\d+\./)) {
-        return <li key={i} className="ml-4" dangerouslySetInnerHTML={{ __html: boldFormatted }} />;
+
+      if (trimmed.match(/^\d+\.\s/)) {
+        const olItems: React.ReactNode[] = [];
+        while (i < lines.length && lines[i].trim().match(/^\d+\.\s/)) {
+          const text = lines[i].trim().replace(/^\d+\.\s+/, '');
+          const boldFormatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+          olItems.push(<li key={i} dangerouslySetInnerHTML={{ __html: boldFormatted }} />);
+          i++;
+        }
+        elements.push(<ol key={`ol-${i}`} className="list-decimal ml-6 space-y-1 my-2">{olItems}</ol>);
+        continue;
       }
-      if (!line.trim()) return <br key={i} />;
-      return <p key={i} dangerouslySetInnerHTML={{ __html: boldFormatted }} />;
-    });
+
+      if (trimmed.startsWith('- ')) {
+        const ulItems: React.ReactNode[] = [];
+        while (i < lines.length && lines[i].trim().startsWith('- ')) {
+          const text = lines[i].trim().slice(2);
+          const boldFormatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+          ulItems.push(<li key={i} dangerouslySetInnerHTML={{ __html: boldFormatted }} />);
+          i++;
+        }
+        elements.push(<ul key={`ul-${i}`} className="list-disc ml-6 space-y-1 my-2">{ulItems}</ul>);
+        continue;
+      }
+
+      if (!trimmed) {
+        elements.push(<br key={i} />);
+      } else {
+        const boldFormatted = trimmed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        elements.push(<p key={i} dangerouslySetInnerHTML={{ __html: boldFormatted }} />);
+      }
+      i++;
+    }
+    return elements;
   };
 
   return (
@@ -88,8 +138,9 @@ export default function SupportFaqSection({ categories, faqs, onBack }: Props) {
         </div>
       ) : (
         <div className="space-y-3">
-          {faqsByCategory.map(({ category, items }) => {
+          {faqsByCategory.map(({ category, items, children }) => {
             const isExpanded = expandedCategories.has(category.id);
+            const hasSubCategories = children.length > 0;
             return (
               <div
                 key={category.id}
@@ -107,6 +158,7 @@ export default function SupportFaqSection({ categories, faqs, onBack }: Props) {
                       <h3 className="text-sm font-semibold text-white">{category.name}</h3>
                       <p className="text-xs text-slate-400">
                         {items.length} {items.length === 1 ? 'article' : 'articles'}
+                        {hasSubCategories ? ` in ${children.length} sections` : ''}
                         {category.description ? ` -- ${category.description}` : ''}
                       </p>
                     </div>
@@ -120,28 +172,81 @@ export default function SupportFaqSection({ categories, faqs, onBack }: Props) {
 
                 {isExpanded && (
                   <div className="border-t border-slate-700/50">
-                    {items.map(faq => (
-                      <div key={faq.id} className="border-b last:border-b-0 border-slate-700/30">
-                        <button
-                          onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
-                          className="w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:bg-slate-700/30"
-                        >
-                          <span className="text-sm text-slate-200">{faq.question}</span>
-                          {expandedFaq === faq.id ? (
-                            <ChevronDown size={14} className="flex-shrink-0 ml-2 text-slate-500" />
-                          ) : (
-                            <ChevronRight size={14} className="flex-shrink-0 ml-2 text-slate-500" />
-                          )}
-                        </button>
-                        {expandedFaq === faq.id && (
-                          <div className="px-5 pb-4 text-sm leading-relaxed text-slate-300">
-                            <div className="pt-2 border-t border-slate-700/30">
-                              {formatAnswer(faq.answer)}
-                            </div>
+                    {hasSubCategories ? (
+                      children.map(subCat => {
+                        const subFaqs = filteredFaqs
+                          .filter(faq => faq.category_id === subCat.id)
+                          .sort((a, b) => a.sort_order - b.sort_order);
+                        if (subFaqs.length === 0) return null;
+                        const isSubExpanded = expandedCategories.has(subCat.id);
+                        return (
+                          <div key={subCat.id} className="border-b last:border-b-0 border-slate-700/30">
+                            <button
+                              onClick={() => toggleCategory(subCat.id)}
+                              className="w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:bg-slate-700/30"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <FolderOpen size={16} className="text-cyan-400/70" />
+                                <span className="text-sm font-medium text-slate-200">{subCat.name}</span>
+                                <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-700/80 text-slate-400">
+                                  {subFaqs.length}
+                                </span>
+                              </div>
+                              {isSubExpanded ? (
+                                <ChevronDown size={14} className="flex-shrink-0 ml-2 text-slate-500" />
+                              ) : (
+                                <ChevronRight size={14} className="flex-shrink-0 ml-2 text-slate-500" />
+                              )}
+                            </button>
+                            {isSubExpanded && subFaqs.map(faq => (
+                              <div key={faq.id} className="border-t border-slate-700/20">
+                                <button
+                                  onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
+                                  className="w-full flex items-center justify-between pl-12 pr-5 py-3 text-left transition-colors hover:bg-slate-700/20"
+                                >
+                                  <span className="text-sm text-slate-300">{faq.question}</span>
+                                  {expandedFaq === faq.id ? (
+                                    <ChevronDown size={14} className="flex-shrink-0 ml-2 text-slate-500" />
+                                  ) : (
+                                    <ChevronRight size={14} className="flex-shrink-0 ml-2 text-slate-500" />
+                                  )}
+                                </button>
+                                {expandedFaq === faq.id && (
+                                  <div className="pl-12 pr-5 pb-4 text-sm leading-relaxed text-slate-300">
+                                    <div className="pt-2 border-t border-slate-700/30">
+                                      {formatAnswer(faq.answer)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        );
+                      })
+                    ) : (
+                      items.map(faq => (
+                        <div key={faq.id} className="border-b last:border-b-0 border-slate-700/30">
+                          <button
+                            onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
+                            className="w-full flex items-center justify-between px-5 py-3 text-left transition-colors hover:bg-slate-700/30"
+                          >
+                            <span className="text-sm text-slate-200">{faq.question}</span>
+                            {expandedFaq === faq.id ? (
+                              <ChevronDown size={14} className="flex-shrink-0 ml-2 text-slate-500" />
+                            ) : (
+                              <ChevronRight size={14} className="flex-shrink-0 ml-2 text-slate-500" />
+                            )}
+                          </button>
+                          {expandedFaq === faq.id && (
+                            <div className="px-5 pb-4 text-sm leading-relaxed text-slate-300">
+                              <div className="pt-2 border-t border-slate-700/30">
+                                {formatAnswer(faq.answer)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
