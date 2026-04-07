@@ -1,0 +1,26 @@
+First Name,Last Name,Email,Phone,Street,City,State,Postcode,Date Joined,Membership Level,Financial,Amount Paid,Renewal Date,Emergency Contact Name,Emergency Contact Phone,Emergency Contact Relationship,Boat Type,Sail Number,Hull,Handicap
+James,Mitchell,james.mitchell@example.com,0412 345 678,14 Harbour View Rd,Sydney,NSW,2000,2025-03-15,Full,Yes,250.00,2026-07-01,Sarah Mitchell,0412 345 679,Spouse,10R,42,White,1.05
+Emma,Richardson,emma.richardson@example.com,0423 456 789,7 Marina Cres,Melbourne,VIC,3000,2024-11-01,Full,Yes,250.00,2026-07-01,David Richardson,0423 456 780,Spouse,DF95,118,Blue,0.98
+Liam,O'Brien,liam.obrien@example.com,0434 567 890,22 Lakeside Dr,Brisbane,QLD,4000,2025-01-20,Full,Yes,250.00,2026-07-01,Kate O'Brien,0434 567 891,Partner,IOM,33,Red,1.02
+Sophie,Turner,sophie.turner@example.com,0445 678 901,9 Regatta Way,Perth,WA,6000,2025-06-10,Associate,Yes,150.00,2026-07-01,Mark Turner,0445 678 902,Husband,,,,
+Noah,Campbell,noah.campbell@example.com,0456 789 012,31 Yacht Club Rd,Adelaide,SA,5000,2024-08-22,Full,Yes,250.00,2026-07-01,Lisa Campbell,0456 789 013,Wife,10R,87,Yellow,1.08
+Olivia,Morgan,olivia.morgan@example.com,0467 890 123,5 Windward Ln,Hobart,TAS,7000,2025-04-05,Full,Yes,250.00,2026-07-01,Ben Morgan,0467 890 124,Spouse,Marblehead,2205,White,0.95
+William,Harris,william.harris@example.com,0478 901 234,18 Portside Ave,Gold Coast,QLD,4217,2025-02-14,Full,No,0.00,2026-07-01,Jenny Harris,0478 901 235,Wife,10R,55,Green,1.10
+Charlotte,Walker,charlotte.walker@example.com,0489 012 345,42 Compass St,Newcastle,NSW,2300,2024-07-01,Full,Yes,250.00,2026-07-01,Peter Walker,0489 012 346,Father,DF95,201,Black,0.92
+Jack,Thompson,jack.thompson@example.com,0490 123 456,11 Spinnaker Rd,Geelong,VIC,3220,2025-05-18,Full,Yes,250.00,2026-07-01,Mary Thompson,0490 123 457,Mother,IOM,16,White,1.00
+Amelia,Roberts,amelia.roberts@example.com,0401 234 567,67 Anchorage Dr,Manly,NSW,2095,2025-08-30,Associate,Yes,150.00,2026-07-01,Tom Roberts,0401 234 568,Husband,,,,
+Henry,Stewart,henry.stewart@example.com,0412 876 543,3 Helm Close,Wollongong,NSW,2500,2024-12-10,Full,Yes,250.00,2026-07-01,Fiona Stewart,0412 876 544,Wife,10R,71,Orange,1.04
+Grace,Edwards,grace.edwards@example.com,0423 987 654,29 Starboard Pl,Cairns,QLD,4870,2025-09-01,Junior,Yes,100.00,2026-07-01,Robert Edwards,0423 987 655,Father,DF95,330,Pink,0.88
+Thomas,Cooper,thomas.cooper@example.com,0434 098 765,55 Bowline Crt,Darwin,NT,0800,2025-07-12,Full,Yes,250.00,2026-07-01,Linda Cooper,0434 098 766,Wife,Marblehead,1847,Blue,0.97
+Isabella,Kelly,isabella.kelly@example.com,0445 109 876,8 Mizzen Way,Canberra,ACT,2600,2024-09-25,Full,Yes,250.00,2026-07-01,Michael Kelly,0445 109 877,Husband,10R,29,Red,1.06
+Oscar,Martin,oscar.martin@example.com,0456 210 987,16 Tiller Rd,Sunshine Coast,QLD,4556,2025-10-15,Full,No,0.00,2026-07-01,Sue Martin,0456 210 988,Wife,IOM,44,Green,1.01
+Mia,Taylor,mia.taylor@example.com,0467 321 098,74 Jib St,Fremantle,WA,6160,2025-03-28,Associate,Yes,150.00,2026-07-01,Greg Taylor,0467 321 099,Partner,,,,
+Alexander,White,alexander.white@example.com,0478 432 109,20 Keel Ln,Launceston,TAS,7250,2024-06-15,Full,Yes,250.00,2026-07-01,Diane White,0478 432 110,Wife,10R,63,White,1.03
+Emily,Anderson,emily.anderson@example.com,0489 543 210,33 Rudder Ave,Townsville,QLD,4810,2025-11-20,Full,Yes,250.00,2026-07-01,Craig Anderson,0489 543 211,Husband,DF95,445,Yellow,0.94
+Daniel,Clark,daniel.clark@example.com,0490 654 321,1 Halyard Cres,Ballarat,VIC,3350,2025-01-05,Full,Yes,250.00,2026-07-01,Helen Clark,0490 654 322,Wife,10R,91,Black,1.12
+Chloe,Lewis,chloe.lewis@example.com,0401 765 432,48 Mainsheet Dr,Bendigo,VIC,3550,2024-10-08,Full,Yes,250.00,2026-07-01,Steve Lewis,0401 765 433,Husband,IOM,8,Blue,0.99
+Samuel,Young,samuel.young@example.com,0412 654 098,12 Cleat Way,Rockhampton,QLD,4700,2025-04-22,Full,No,0.00,2026-07-01,Karen Young,0412 654 099,Wife,Marblehead,3100,White,0.96
+Ava,King,ava.king@example.com,0423 543 987,61 Winch St,Bunbury,WA,6230,2025-08-14,Junior,Yes,100.00,2026-07-01,Paul King,0423 543 988,Father,DF95,512,Red,0.90
+Patrick,Scott,patrick.scott@example.com,0434 432 876,25 Boom Rd,Maitland,NSW,2320,2024-05-30,Full,Yes,250.00,2026-07-01,Louise Scott,0434 432 877,Wife,10R,105,Green,1.07
+Rebecca,Hall,rebecca.hall@example.com,0445 321 765,39 Shroud Pl,Toowoomba,QLD,4350,2025-06-25,Full,Yes,250.00,2026-07-01,Andrew Hall,0445 321 766,Husband,10R,78,Orange,1.09
+George,Wright,george.wright@example.com,0456 210 654,7 Forestay Crt,Albury,NSW,2640,2025-02-08,Associate,Yes,150.00,2026-07-01,Margaret Wright,0456 210 655,Wife,,,,
