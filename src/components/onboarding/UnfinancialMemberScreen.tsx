@@ -245,6 +245,14 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
             window.location.reload();
           }, 2000);
         } else {
+          await supabase
+            .from('members')
+            .update({
+              payment_status: 'pending',
+              membership_level: selectedType.name,
+            })
+            .eq('id', memberData.member_id);
+
           setPendingPayment({
             id: '',
             amount: effectiveAmount,

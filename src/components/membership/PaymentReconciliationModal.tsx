@@ -141,6 +141,12 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
 
       await markMembersAsPaid(memberIds);
 
+      await supabase
+        .from('membership_payments')
+        .update({ status: 'completed' })
+        .in('member_id', memberIds)
+        .eq('status', 'pending');
+
       let financeErrors = 0;
       for (const memberId of memberIds) {
         const result = await updateMembershipTransactionStatus(memberId, 'paid');
