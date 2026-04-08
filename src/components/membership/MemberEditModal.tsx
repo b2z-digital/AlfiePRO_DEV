@@ -8,6 +8,7 @@ import { AvatarCropModal } from '../ui/AvatarCropModal';
 import imageCompression from 'browser-image-compression';
 import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
 import { AdminAddToClubModal } from './AdminAddToClubModal';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 
 interface MemberEditModalProps {
   isOpen: boolean;
@@ -67,7 +68,8 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string; amount: number }>>([]);
+  const [originalMembershipLevel, setOriginalMembershipLevel] = useState<string | null>(null);
   const [linkEmail, setLinkEmail] = useState('');
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [linkedUserEmail, setLinkedUserEmail] = useState<string | null>(null);
@@ -134,6 +136,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       }
 
       setMemberData(member);
+      setOriginalMembershipLevel(member.membership_level || null);
       setBoats(memberBoats || [{ boat_type: '', sail_number: '', hull: '' }]);
     } catch (error: any) {
       console.error('Error fetching member:', error);
@@ -147,13 +150,13 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
     try {
       const { data, error } = await supabase
         .from('membership_types')
-        .select('id, name')
+        .select('id, name, amount')
         .eq('club_id', clubId)
         .order('name', { ascending: true });
 
       if (error) throw error;
 
-      setMembershipTypes(data || []);
+      setMembershipTypes((data || []).map(t => ({ ...t, amount: t.amount || 0 })));
     } catch (error: any) {
       console.error('Error fetching membership types:', error);
     }
@@ -341,6 +344,36 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
         .eq('id', memberId);
 
       if (updateError) throw updateError;
+
+      const membershipChanged = memberData.membership_level &&
+        memberData.membership_level !== originalMembershipLevel;
+
+      if (membershipChanged) {
+        const selectedType = membershipTypes.find(t => t.name === memberData.membership_level);
+        if (selectedType && selectedType.amount > 0) {
+          const { data: existingTx } = await supabase
+            .from('membership_transactions')
+            .select('id')
+            .eq('member_id', memberId)
+            .eq('club_id', clubId)
+            .eq('membership_type_id', selectedType.id)
+            .in('payment_status', ['pending', 'paid'])
+            .limit(1);
+
+          if (!existingTx || existingTx.length === 0) {
+            const memberName = `${memberData.first_name} ${memberData.last_name}`;
+            await createMembershipTransaction({
+              clubId,
+              memberId,
+              membershipTypeId: selectedType.id,
+              memberName,
+              membershipTypeName: selectedType.name,
+              amount: selectedType.amount,
+              paymentMethod: 'bank_transfer',
+            }, 'pending');
+          }
+        }
+      }
 
       const existingBoatIds = boats.filter(b => b.id).map(b => b.id);
       const { data: currentBoats } = await supabase

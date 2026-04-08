@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
+import { CirclePlay as PlayCircle, Plus, CreditCard as Edit2, Trash2, Search, FolderPlus, Save, X, Eye, EyeOff, Video, Clock, Tag, ExternalLink, ChevronDown, ChevronRight, GripVertical, Monitor, Smartphone, Globe } from 'lucide-react';
 import {
-  PlayCircle, Plus, Edit2, Trash2, Search, FolderPlus, Save, X,
-  Eye, EyeOff, Video, Clock, Tag, ExternalLink, ChevronDown, ChevronRight,
-  GripVertical, Monitor, Smartphone, Globe,
-} from 'lucide-react';
+  DndContext, closestCenter, KeyboardSensor, PointerSensor,
+  useSensor, useSensors, DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates,
+  useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../../contexts/AuthContext';
 import { tutorialStorage } from '../../utils/helpSupportStorage';
 import { PLATFORM_AREAS, DIFFICULTY_LEVELS } from '../../types/helpSupport';
@@ -12,6 +17,121 @@ import type { SupportTutorialGroup, SupportTutorial } from '../../types/helpSupp
 interface Props {
   darkMode?: boolean;
   onNotify: (message: string, type: 'success' | 'error') => void;
+}
+
+function SortableGroupRow({
+  group,
+  isExpanded,
+  tutorialCount,
+  onToggle,
+  onAddTutorial,
+  onEdit,
+  onDelete,
+}: {
+  group: SupportTutorialGroup;
+  isExpanded: boolean;
+  tutorialCount: number;
+  onToggle: () => void;
+  onAddTutorial: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined, opacity: isDragging ? 0.5 : 1 };
+
+  const platformIcon = (p: string) => {
+    if (p === 'web') return <Monitor size={14} />;
+    if (p === 'mobile') return <Smartphone size={14} />;
+    return <Globe size={14} />;
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-700/30 transition-colors">
+      <div className="flex items-center gap-3 flex-1 min-w-0" onClick={onToggle}>
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 -ml-2 text-slate-500 hover:text-slate-300" onClick={e => e.stopPropagation()}>
+          <GripVertical size={16} />
+        </div>
+        {isExpanded ? <ChevronDown size={18} className="text-slate-400 shrink-0" /> : <ChevronRight size={18} className="text-slate-400 shrink-0" />}
+        <PlayCircle size={18} className="text-sky-400 shrink-0" />
+        <span className="font-semibold text-white truncate">{group.name}</span>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 shrink-0">{tutorialCount}</span>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700/50 text-slate-400 flex items-center gap-1 shrink-0">
+          {platformIcon(group.target_platform)} {group.target_platform === 'both' ? 'All' : group.target_platform}
+        </span>
+        {!group.is_active && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 shrink-0">Hidden</span>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+        <button onClick={onAddTutorial} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"><Plus size={16} /></button>
+        <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"><Edit2 size={16} /></button>
+        <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
+      </div>
+    </div>
+  );
+}
+
+function SortableTutorialRow({
+  tutorial,
+  onEdit,
+  onDelete,
+  onTogglePublish,
+  onPreview,
+  formatDuration,
+}: {
+  tutorial: SupportTutorial;
+  onEdit: () => void;
+  onDelete: () => void;
+  onTogglePublish: () => void;
+  onPreview: () => void;
+  formatDuration: (s: number) => string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tutorial.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : undefined, opacity: isDragging ? 0.5 : 1 };
+  const diffLevel = DIFFICULTY_LEVELS.find(d => d.value === tutorial.difficulty_level);
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-700/30 transition-colors group border-b border-slate-700/30 last:border-b-0">
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-0.5 text-slate-500 hover:text-slate-300 shrink-0">
+        <GripVertical size={14} />
+      </div>
+      <div className="w-16 h-10 rounded overflow-hidden bg-slate-900 shrink-0 cursor-pointer" onClick={onPreview}>
+        {tutorial.thumbnail_url ? (
+          <img src={tutorial.thumbnail_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="flex items-center justify-center h-full"><Video size={14} className="text-slate-600" /></div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-white truncate">{tutorial.title}</span>
+          {!tutorial.is_published && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 shrink-0">Draft</span>
+          )}
+        </div>
+        {tutorial.description && (
+          <p className="text-xs text-slate-500 truncate mt-0.5">{tutorial.description}</p>
+        )}
+      </div>
+      <span className={`text-[10px] px-2 py-0.5 rounded text-white shrink-0 ${diffLevel?.color || 'bg-slate-500'}`}>
+        {tutorial.difficulty_level}
+      </span>
+      {tutorial.duration_seconds > 0 && (
+        <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
+          <Clock size={12} /> {formatDuration(tutorial.duration_seconds)}
+        </span>
+      )}
+      <span className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
+        <Eye size={12} /> {tutorial.view_count}
+      </span>
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={onTogglePublish} className={`p-1 rounded transition-colors ${tutorial.is_published ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-slate-500 hover:bg-slate-600'}`}>
+          {tutorial.is_published ? <Eye size={14} /> : <EyeOff size={14} />}
+        </button>
+        <button onClick={onPreview} className="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"><ExternalLink size={14} /></button>
+        <button onClick={onEdit} className="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"><Edit2 size={14} /></button>
+        <button onClick={onDelete} className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+      </div>
+    </div>
+  );
 }
 
 export default function TutorialManagement({ darkMode = false, onNotify }: Props) {
@@ -42,6 +162,11 @@ export default function TutorialManagement({ darkMode = false, onNotify }: Props
   });
   const [tagInput, setTagInput] = useState('');
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
@@ -69,6 +194,51 @@ export default function TutorialManagement({ darkMode = false, onNotify }: Props
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const handleGroupDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = groups.findIndex(g => g.id === active.id);
+    const newIndex = groups.findIndex(g => g.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(groups, oldIndex, newIndex);
+    setGroups(reordered);
+
+    try {
+      const updates = reordered.map((g, i) => ({ id: g.id, sort_order: i }));
+      await tutorialStorage.updateGroupSortOrders(updates);
+    } catch (err: any) {
+      onNotify('Failed to save group order', 'error');
+      loadData();
+    }
+  };
+
+  const handleTutorialDragEnd = async (event: DragEndEvent, groupId: string) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const groupTuts = tutorials.filter(t => t.group_id === groupId).sort((a, b) => a.sort_order - b.sort_order);
+    const oldIndex = groupTuts.findIndex(t => t.id === active.id);
+    const newIndex = groupTuts.findIndex(t => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(groupTuts, oldIndex, newIndex);
+
+    setTutorials(prev => {
+      const others = prev.filter(t => t.group_id !== groupId);
+      return [...others, ...reordered.map((t, i) => ({ ...t, sort_order: i }))];
+    });
+
+    try {
+      const updates = reordered.map((t, i) => ({ id: t.id, sort_order: i }));
+      await tutorialStorage.updateTutorialSortOrders(updates);
+    } catch (err: any) {
+      onNotify('Failed to save tutorial order', 'error');
+      loadData();
+    }
   };
 
   const openGroupModal = (group?: SupportTutorialGroup) => {
@@ -212,12 +382,6 @@ export default function TutorialManagement({ darkMode = false, onNotify }: Props
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const platformIcon = (p: string) => {
-    if (p === 'web') return <Monitor size={14} />;
-    if (p === 'mobile') return <Smartphone size={14} />;
-    return <Globe size={14} />;
-  };
-
   const filteredTutorials = searchQuery
     ? tutorials.filter(t =>
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -239,7 +403,7 @@ export default function TutorialManagement({ darkMode = false, onNotify }: Props
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white">Tutorial Management</h2>
-          <p className="text-sm text-slate-400 mt-1">{tutorials.length} tutorials in {groups.length} groups</p>
+          <p className="text-sm text-slate-400 mt-1">{tutorials.length} tutorials in {groups.length} groups -- drag to reorder</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -263,66 +427,64 @@ export default function TutorialManagement({ darkMode = false, onNotify }: Props
         </div>
       </div>
 
-      <div className="space-y-3">
-        {groups.map(group => {
-          const groupTutorials = filteredTutorials.filter(t => t.group_id === group.id);
-          const isExpanded = expandedGroups.has(group.id);
-          return (
-            <div key={group.id} className="rounded-xl border border-slate-700/50 bg-slate-800/50 overflow-hidden">
-              <div
-                className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-700/30 transition-colors"
-                onClick={() => toggleGroup(group.id)}
-              >
-                <div className="flex items-center gap-3">
-                  {isExpanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
-                  <PlayCircle size={18} className="text-sky-400" />
-                  <span className="font-semibold text-white">{group.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">{groupTutorials.length}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700/50 text-slate-400 flex items-center gap-1">
-                    {platformIcon(group.target_platform)} {group.target_platform === 'both' ? 'All' : group.target_platform}
-                  </span>
-                  {!group.is_active && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">Hidden</span>}
-                </div>
-                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openTutorialModal(undefined, group.id)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
-                    <Plus size={16} />
-                  </button>
-                  <button onClick={() => openGroupModal(group)} className="p-1.5 rounded-lg hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => deleteGroup(group.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              {isExpanded && (
-                <div className="border-t border-slate-700/50">
-                  {groupTutorials.length === 0 ? (
-                    <div className="px-5 py-8 text-center text-slate-500 text-sm">
-                      No tutorials in this group yet.
-                      <button onClick={() => openTutorialModal(undefined, group.id)} className="text-sky-400 hover:text-sky-300 ml-1">Add one</button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-4">
-                      {groupTutorials.map(tutorial => (
-                        <TutorialCard
-                          key={tutorial.id}
-                          tutorial={tutorial}
-                          onEdit={() => openTutorialModal(tutorial)}
-                          onDelete={() => deleteTutorial(tutorial.id)}
-                          onTogglePublish={() => togglePublished(tutorial)}
-                          onPreview={() => setPreviewVideoId(tutorial.youtube_video_id)}
-                          formatDuration={formatDuration}
-                        />
-                      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupDragEnd}>
+        <SortableContext items={groups.map(g => g.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-3">
+            {groups.map(group => {
+              const groupTutorials = filteredTutorials
+                .filter(t => t.group_id === group.id)
+                .sort((a, b) => a.sort_order - b.sort_order);
+              const isExpanded = expandedGroups.has(group.id);
+
+              return (
+                <div key={group.id} className="rounded-xl border border-slate-700/50 bg-slate-800/50 overflow-hidden">
+                  <SortableGroupRow
+                    group={group}
+                    isExpanded={isExpanded}
+                    tutorialCount={groupTutorials.length}
+                    onToggle={() => toggleGroup(group.id)}
+                    onAddTutorial={() => openTutorialModal(undefined, group.id)}
+                    onEdit={() => openGroupModal(group)}
+                    onDelete={() => deleteGroup(group.id)}
+                  />
+                  {isExpanded && (
+                    <div className="border-t border-slate-700/50">
+                      {groupTutorials.length === 0 ? (
+                        <div className="px-5 py-8 text-center text-slate-500 text-sm">
+                          No tutorials in this group yet.
+                          <button onClick={() => openTutorialModal(undefined, group.id)} className="text-sky-400 hover:text-sky-300 ml-1">Add one</button>
+                        </div>
+                      ) : (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={e => handleTutorialDragEnd(e, group.id)}
+                        >
+                          <SortableContext items={groupTutorials.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                            <div>
+                              {groupTutorials.map(tutorial => (
+                                <SortableTutorialRow
+                                  key={tutorial.id}
+                                  tutorial={tutorial}
+                                  onEdit={() => openTutorialModal(tutorial)}
+                                  onDelete={() => deleteTutorial(tutorial.id)}
+                                  onTogglePublish={() => togglePublished(tutorial)}
+                                  onPreview={() => setPreviewVideoId(tutorial.youtube_video_id)}
+                                  formatDuration={formatDuration}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {previewVideoId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setPreviewVideoId(null)}>
@@ -581,62 +743,6 @@ export default function TutorialManagement({ darkMode = false, onNotify }: Props
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function TutorialCard({ tutorial, onEdit, onDelete, onTogglePublish, onPreview, formatDuration }: {
-  tutorial: SupportTutorial;
-  onEdit: () => void;
-  onDelete: () => void;
-  onTogglePublish: () => void;
-  onPreview: () => void;
-  formatDuration: (s: number) => string;
-}) {
-  const diffColor = DIFFICULTY_LEVELS.find(d => d.value === tutorial.difficulty_level)?.color || 'bg-slate-500';
-  return (
-    <div className="rounded-lg border border-slate-700/50 bg-slate-800/80 overflow-hidden group hover:border-slate-600 transition-colors">
-      <div className="relative aspect-video bg-slate-900 cursor-pointer" onClick={onPreview}>
-        {tutorial.thumbnail_url ? (
-          <img src={tutorial.thumbnail_url} alt={tutorial.title} className="w-full h-full object-cover" />
-        ) : (
-          <div className="flex items-center justify-center h-full"><Video size={32} className="text-slate-600" /></div>
-        )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-          <PlayCircle size={48} className="text-white drop-shadow-lg" />
-        </div>
-        {tutorial.duration_seconds > 0 && (
-          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-xs flex items-center gap-1">
-            <Clock size={12} /> {formatDuration(tutorial.duration_seconds)}
-          </span>
-        )}
-        <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-white text-xs ${diffColor}`}>
-          {tutorial.difficulty_level}
-        </span>
-      </div>
-      <div className="p-3">
-        <h4 className="text-sm font-semibold text-white truncate">{tutorial.title}</h4>
-        {tutorial.description && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{tutorial.description}</p>}
-        <div className="flex items-center justify-between mt-3">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="flex items-center gap-1"><Eye size={12} /> {tutorial.view_count}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button onClick={onTogglePublish} className={`p-1 rounded transition-colors ${tutorial.is_published ? 'text-emerald-400 hover:bg-emerald-500/20' : 'text-slate-500 hover:bg-slate-600'}`}>
-              {tutorial.is_published ? <Eye size={14} /> : <EyeOff size={14} />}
-            </button>
-            <button onClick={onPreview} className="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
-              <ExternalLink size={14} />
-            </button>
-            <button onClick={onEdit} className="p-1 rounded hover:bg-slate-600 text-slate-400 hover:text-white transition-colors">
-              <Edit2 size={14} />
-            </button>
-            <button onClick={onDelete} className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors">
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
