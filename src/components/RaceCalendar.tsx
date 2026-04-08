@@ -2053,19 +2053,69 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 sm:p-6 lg:p-16">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 lg:mb-8">
+        {/* Row 1: Title + Close */}
+        <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
               <Calendar className="text-white" size={28} />
             </div>
-            <div>
-              <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                Race Calendar
-              </h2>
-            </div>
+            <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+              Race Calendar
+            </h2>
           </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className={`
+                rounded-full p-2 transition-colors flex-shrink-0
+                ${darkMode
+                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
+              `}
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+        {/* Row 2: Event Scope Tabs (left) + Year & Upcoming/Past (right) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          {currentOrganization?.type !== 'state' && currentOrganization?.type !== 'national' && (
+            <div className={`flex items-center gap-1 p-1 rounded-xl overflow-x-auto ${
+              darkMode ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-100 border border-slate-200'
+            }`}>
+              {([
+                { key: 'all' as EventScope, label: 'My Events', desc: 'Club + My State + National' },
+                { key: 'club' as EventScope, label: 'Club Events', desc: 'Club events only' },
+                { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', desc: 'Your state events' },
+                { key: 'national' as EventScope, label: 'National Events', desc: 'National events' },
+                { key: 'all_states' as EventScope, label: 'All Events', desc: 'All events across all states' },
+              ]).map(tab => {
+                const isActive = eventScope === tab.key;
+
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleEventScopeChange(tab.key)}
+                    title={tab.desc}
+                    className={`
+                      px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 text-center whitespace-nowrap
+                      ${isActive
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20'
+                        : darkMode
+                          ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                          : 'text-slate-600 hover:text-slate-800 hover:bg-white'
+                      }
+                    `}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Year Filter */}
             <div className="relative">
               <select
@@ -2094,13 +2144,13 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
             {/* Time Filter - Past/Upcoming */}
             <div className={`
-              flex items-center gap-1 rounded-lg overflow-hidden border flex-1 sm:flex-none
+              flex items-center gap-1 rounded-lg overflow-hidden border
               ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
             `}>
               <button
                 onClick={() => setTimeFilter('upcoming')}
                 className={`
-                  flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-medium transition-all whitespace-nowrap
+                  px-3 sm:px-4 py-2 text-sm font-medium transition-all whitespace-nowrap
                   ${timeFilter === 'upcoming'
                     ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
                     : darkMode
@@ -2109,12 +2159,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                   }
                 `}
               >
-                Upcoming Events
+                Upcoming
               </button>
               <button
                 onClick={() => setTimeFilter('past')}
                 className={`
-                  flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap
+                  px-3 sm:px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap
                   ${timeFilter === 'past'
                     ? 'bg-slate-600 text-white'
                     : darkMode
@@ -2123,430 +2173,384 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                   }
                 `}
               >
-                Past Events
+                Past
               </button>
             </div>
-
-            {/* Calendar Type Filter */}
-            {calendarMeetings.length > 0 && (
-              <div className={`
-                flex items-center gap-1 rounded-lg overflow-hidden border flex-1 sm:flex-none
-                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-              `}>
-                <button
-                  onClick={() => setCalendarTypeFilter('all')}
-                  className={`
-                    flex-1 sm:flex-none px-3 py-2 text-sm font-medium transition-all whitespace-nowrap
-                    ${calendarTypeFilter === 'all'
-                      ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white shadow-lg'
-                      : darkMode
-                        ? 'text-slate-300 hover:bg-slate-700'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }
-                  `}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setCalendarTypeFilter('events')}
-                  className={`
-                    flex-1 sm:flex-none px-3 py-2 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
-                    ${calendarTypeFilter === 'events'
-                      ? 'bg-blue-600 text-white'
-                      : darkMode
-                        ? 'text-slate-300 hover:bg-slate-700'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }
-                  `}
-                >
-                  <Trophy size={14} />
-                  Events
-                </button>
-                <button
-                  onClick={() => setCalendarTypeFilter('meetings')}
-                  className={`
-                    flex-1 sm:flex-none px-3 py-2 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
-                    ${calendarTypeFilter === 'meetings'
-                      ? 'bg-teal-600 text-white'
-                      : darkMode
-                        ? 'text-slate-300 hover:bg-slate-700'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }
-                  `}
-                >
-                  <Users size={14} />
-                  Meetings
-                </button>
-              </div>
-            )}
-
-            {/* Location Explorer Button */}
-            <button
-              onClick={handleOpenLocationExplorer}
-              className={`
-                relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border overflow-hidden group
-                ${darkMode
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 border-cyan-500 text-white'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 border-cyan-400 text-white'}
-              `}
-            >
-              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-              <MapIcon size={16} className="relative z-10" />
-              <span className="relative z-10 whitespace-nowrap">Explore Locations</span>
-              <div className="relative z-10 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-            </button>
-
-            {/* Filter Dropdown */}
-            <div className="relative" ref={filterDropdownRef}>
-              <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
-                `}
-              >
-                <Filter size={16} />
-                Filters
-                <ChevronDown size={16} />
-              </button>
-
-              {showFilterDropdown && (
-                <div className={`
-                  absolute right-0 mt-2 w-80 rounded-lg shadow-xl border py-3 z-50
-                  ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-                `}>
-                  {/* Race Format */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Race Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => toggleFilter('raceFormat', 'scratch')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.raceFormat === 'scratch'
-                            ? 'bg-blue-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Scratch
-                      </button>
-                      <button
-                        onClick={() => toggleFilter('raceFormat', 'handicap')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.raceFormat === 'handicap'
-                            ? 'bg-purple-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Handicap
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-700 my-2"></div>
-
-                  {/* Boat Class */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Class
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(new Set(events.map(e => e.raceClass))).map(type => {
-                        if (!type) return null;
-                        const typeColors = boatTypeColors[type] || defaultColorScheme;
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => toggleFilter('raceClass', type)}
-                            className={`
-                              px-3 py-1.5 rounded text-sm transition-colors
-                              ${activeFilters.raceClass === type
-                                ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
-                                : darkMode
-                                  ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                              }
-                            `}
-                          >
-                            {type}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-700 my-2"></div>
-
-                  {/* Event Type */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Event Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => toggleFilter('eventType', 'club')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-all
-                          ${activeFilters.eventType === 'club'
-                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Club
-                      </button>
-                      <button
-                        onClick={() => toggleFilter('eventType', 'public')}
-                        className={`
-                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.eventType === 'public'
-                            ? 'bg-blue-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        <Globe size={14} />
-                        Public
-                      </button>
-                      <button
-                        onClick={() => toggleFilter('eventType', 'state')}
-                        className={`
-                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.eventType === 'state'
-                            ? 'bg-amber-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        <MapPin size={14} />
-                        State
-                      </button>
-                      <button
-                        onClick={() => toggleFilter('eventType', 'national')}
-                        className={`
-                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.eventType === 'national'
-                            ? 'bg-teal-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        <Flag size={14} />
-                        National
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className={`
-              flex items-center gap-1 rounded-lg border flex-1 sm:flex-none
-              ${darkMode
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-white border-slate-200'}
-            `}>
-              <button
-                onClick={() => setView('list')}
-                className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'list'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
-                  }
-                `}
-              >
-                <List size={18} />
-                <span className="text-sm hidden sm:inline">List</span>
-              </button>
-              <button
-                onClick={() => setView('grid')}
-                className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'grid'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
-                  }
-                `}
-              >
-                <Grid size={18} />
-                <span className="text-sm hidden sm:inline">Grid</span>
-              </button>
-              <button
-                onClick={() => setView('month')}
-                className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'month'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
-                  }
-                `}
-              >
-                <CalendarDays size={18} />
-                <span className="text-sm hidden sm:inline">Month</span>
-              </button>
-              <button
-                onClick={() => setView('year')}
-                className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'year'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
-                  }
-                `}
-              >
-                <CalendarRange size={18} />
-                <span className="text-sm">Year</span>
-              </button>
-            </div>
-
-            {/* Subscribe to Calendar */}
-            <div className="relative" ref={subscribeMenuRef}>
-              <button
-                onClick={() => setShowSubscribeMenu(!showSubscribeMenu)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap
-                  ${darkMode
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white'
-                    : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-blue-400 text-white'}
-                `}
-              >
-                <Link2 size={16} />
-                Subscribe
-              </button>
-
-              {showSubscribeMenu && (
-                <div className={`
-                  absolute right-0 mt-2 w-72 rounded-lg shadow-xl border py-2 z-50
-                  ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-                `}>
-                  <div className="px-4 py-2 border-b border-slate-700">
-                    <h4 className={`font-semibold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      Subscribe to Calendar
-                    </h4>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Download an iCal file to sync upcoming events to your calendar app
-                    </p>
-                  </div>
-
-                  <div className="py-2">
-                    <button
-                      onClick={handleSubscribeToCalendar}
-                      className={`
-                        w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors
-                        ${darkMode
-                          ? 'hover:bg-slate-700 text-slate-200'
-                          : 'hover:bg-slate-50 text-slate-800'}
-                      `}
-                    >
-                      <Calendar size={16} />
-                      <div>
-                        <div className="font-medium">Download .ics File</div>
-                        <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Works with Google, Apple, Outlook
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-
-                  <div className={`px-4 py-2 border-t text-xs ${darkMode ? 'border-slate-700 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                    <p className="mb-1 font-medium">How to use:</p>
-                    <ul className="space-y-1 list-disc list-inside">
-                      <li>Google Calendar: Import from Settings</li>
-                      <li>Apple Calendar: Double-click the file</li>
-                      <li>Outlook: Import from File menu</li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {onClose && (
-              <button
-                onClick={onClose}
-                className={`
-                  rounded-full p-2 transition-colors
-                  ${darkMode 
-                    ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-                `}
-              >
-                <X size={20} />
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Event Scope Tabs */}
-        {currentOrganization?.type !== 'state' && currentOrganization?.type !== 'national' && (
-          <div className={`flex items-center gap-1 p-1 rounded-xl mt-4 ${
-            darkMode ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-100 border border-slate-200'
-          }`}>
-            {([
-              { key: 'all' as EventScope, label: 'My Events', desc: 'Club + My State + National' },
-              { key: 'club' as EventScope, label: 'Club Events', desc: 'Club events only' },
-              { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', desc: 'Your state events' },
-              { key: 'national' as EventScope, label: 'National Events', desc: 'National events' },
-              { key: 'all_states' as EventScope, label: 'All Events', desc: 'All events across all states' },
-            ]).map(tab => {
-              const isActive = eventScope === tab.key;
+        {/* Row 3: Secondary controls */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {/* Calendar Type Filter */}
+          {calendarMeetings.length > 0 && (
+            <div className={`
+              flex items-center gap-1 rounded-lg overflow-hidden border
+              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+            `}>
+              <button
+                onClick={() => setCalendarTypeFilter('all')}
+                className={`
+                  px-3 py-2 text-sm font-medium transition-all whitespace-nowrap
+                  ${calendarTypeFilter === 'all'
+                    ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white shadow-lg'
+                    : darkMode
+                      ? 'text-slate-300 hover:bg-slate-700'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }
+                `}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setCalendarTypeFilter('events')}
+                className={`
+                  px-3 py-2 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+                  ${calendarTypeFilter === 'events'
+                    ? 'bg-blue-600 text-white'
+                    : darkMode
+                      ? 'text-slate-300 hover:bg-slate-700'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }
+                `}
+              >
+                <Trophy size={14} />
+                Events
+              </button>
+              <button
+                onClick={() => setCalendarTypeFilter('meetings')}
+                className={`
+                  px-3 py-2 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+                  ${calendarTypeFilter === 'meetings'
+                    ? 'bg-teal-600 text-white'
+                    : darkMode
+                      ? 'text-slate-300 hover:bg-slate-700'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }
+                `}
+              >
+                <Users size={14} />
+                Meetings
+              </button>
+            </div>
+          )}
 
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => handleEventScopeChange(tab.key)}
-                  title={tab.desc}
-                  className={`
-                    px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none text-center whitespace-nowrap
-                    ${isActive
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20'
-                      : darkMode
-                        ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        : 'text-slate-600 hover:text-slate-800 hover:bg-white'
-                    }
-                  `}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+          {/* Location Explorer Button */}
+          <button
+            onClick={handleOpenLocationExplorer}
+            className={`
+              relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border overflow-hidden group
+              ${darkMode
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 border-cyan-500 text-white'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 border-cyan-400 text-white'}
+            `}
+          >
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+            <MapIcon size={16} className="relative z-10" />
+            <span className="relative z-10 whitespace-nowrap">Explore Locations</span>
+            <div className="relative z-10 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+          </button>
+
+          {/* Filter Dropdown */}
+          <div className="relative" ref={filterDropdownRef}>
+            <button
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+                ${darkMode
+                  ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
+                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
+              `}
+            >
+              <Filter size={16} />
+              Filters
+              <ChevronDown size={16} />
+            </button>
+
+            {showFilterDropdown && (
+              <div className={`
+                absolute left-0 sm:right-0 sm:left-auto mt-2 w-80 rounded-lg shadow-xl border py-3 z-50
+                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+              `}>
+                {/* Race Format */}
+                <div className="px-4 py-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                    Race Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => toggleFilter('raceFormat', 'scratch')}
+                      className={`
+                        px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.raceFormat === 'scratch'
+                          ? 'bg-blue-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      Scratch
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('raceFormat', 'handicap')}
+                      className={`
+                        px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.raceFormat === 'handicap'
+                          ? 'bg-purple-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      Handicap
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-700 my-2"></div>
+
+                {/* Boat Class */}
+                <div className="px-4 py-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                    Class
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(new Set(events.map(e => e.raceClass))).map(type => {
+                      if (!type) return null;
+                      const typeColors = boatTypeColors[type] || defaultColorScheme;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => toggleFilter('raceClass', type)}
+                          className={`
+                            px-3 py-1.5 rounded text-sm transition-colors
+                            ${activeFilters.raceClass === type
+                              ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
+                              : darkMode
+                                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }
+                          `}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-700 my-2"></div>
+
+                {/* Event Type */}
+                <div className="px-4 py-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                    Event Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => toggleFilter('eventType', 'club')}
+                      className={`
+                        px-3 py-1.5 rounded text-sm transition-all
+                        ${activeFilters.eventType === 'club'
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      Club
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('eventType', 'public')}
+                      className={`
+                        flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.eventType === 'public'
+                          ? 'bg-blue-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      <Globe size={14} />
+                      Public
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('eventType', 'state')}
+                      className={`
+                        flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.eventType === 'state'
+                          ? 'bg-amber-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      <MapPin size={14} />
+                      State
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('eventType', 'national')}
+                      className={`
+                        flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.eventType === 'national'
+                          ? 'bg-teal-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      <Flag size={14} />
+                      National
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* View Mode Toggle */}
+          <div className={`
+            flex items-center gap-1 rounded-lg border
+            ${darkMode
+              ? 'bg-slate-800 border-slate-700'
+              : 'bg-white border-slate-200'}
+          `}>
+            <button
+              onClick={() => setView('list')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'list'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <List size={18} />
+              <span className="text-sm hidden sm:inline">List</span>
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'grid'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <Grid size={18} />
+              <span className="text-sm hidden sm:inline">Grid</span>
+            </button>
+            <button
+              onClick={() => setView('month')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'month'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <CalendarDays size={18} />
+              <span className="text-sm hidden sm:inline">Month</span>
+            </button>
+            <button
+              onClick={() => setView('year')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'year'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <CalendarRange size={18} />
+              <span className="text-sm">Year</span>
+            </button>
+          </div>
+
+          {/* Subscribe to Calendar */}
+          <div className="relative" ref={subscribeMenuRef}>
+            <button
+              onClick={() => setShowSubscribeMenu(!showSubscribeMenu)}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap
+                ${darkMode
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white'
+                  : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-blue-400 text-white'}
+              `}
+            >
+              <Link2 size={16} />
+              Subscribe
+            </button>
+
+            {showSubscribeMenu && (
+              <div className={`
+                absolute right-0 mt-2 w-72 rounded-lg shadow-xl border py-2 z-50
+                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+              `}>
+                <div className="px-4 py-2 border-b border-slate-700">
+                  <h4 className={`font-semibold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    Subscribe to Calendar
+                  </h4>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Download an iCal file to sync upcoming events to your calendar app
+                  </p>
+                </div>
+
+                <div className="py-2">
+                  <button
+                    onClick={handleSubscribeToCalendar}
+                    className={`
+                      w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors
+                      ${darkMode
+                        ? 'hover:bg-slate-700 text-slate-200'
+                        : 'hover:bg-slate-50 text-slate-800'}
+                    `}
+                  >
+                    <Calendar size={16} />
+                    <div>
+                      <div className="font-medium">Download .ics File</div>
+                      <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Works with Google, Apple, Outlook
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className={`px-4 py-2 border-t text-xs ${darkMode ? 'border-slate-700 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                  <p className="mb-1 font-medium">How to use:</p>
+                  <ul className="space-y-1 list-disc list-inside">
+                    <li>Google Calendar: Import from Settings</li>
+                    <li>Apple Calendar: Double-click the file</li>
+                    <li>Outlook: Import from File menu</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="mt-6">
           {loading ? (
