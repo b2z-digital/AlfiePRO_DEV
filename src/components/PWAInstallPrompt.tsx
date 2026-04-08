@@ -29,6 +29,11 @@ const PWAInstallPrompt: React.FC = () => {
       return;
     }
 
+    const isMobilePhone = window.innerWidth < 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    if (isMobilePhone) {
+      return;
+    }
+
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     const dismissedDate = dismissed ? new Date(dismissed) : null;
     const daysSinceDismissed = dismissedDate
