@@ -1493,7 +1493,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             {/* Bottom Actions */}
             <div className={`space-y-1 mt-3 ${(collapsed && !isHoveringNav) ? 'flex flex-col items-center' : ''}`}>
-              {(currentOrganization?.type !== 'platform') && (
+              {(currentOrganization?.type !== 'platform') && (isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && (
                 <button
                   onClick={() => handleSectionChange('/support')}
                   className={`
