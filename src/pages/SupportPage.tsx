@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Search, Sparkles, Bug, X, ArrowLeft,
   BookMarked, Video, MessageSquare, ChevronRight,
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AskAlfieChatPanel } from '../components/ask-alfie/AskAlfieChatPanel';
@@ -125,6 +126,7 @@ const TILE_CONFIG = [
 
 const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
   const { user, isSuperAdmin } = useAuth();
+  const location = useLocation();
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [categories, setCategories] = useState<SupportFaqCategory[]>([]);
   const [faqs, setFaqs] = useState<SupportFaq[]>([]);
@@ -135,14 +137,10 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
   const [bugCount, setBugCount] = useState(0);
   const [playingTutorial, setPlayingTutorial] = useState<SupportTutorial | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const lastLoadRef = useRef<number>(0);
 
-  useEffect(() => {
-    loadContent();
-    loadBugCount();
-  }, []);
-
-  const loadContent = async () => {
-    setLoading(true);
+  const loadContent = useCallback(async (skipLoadingState = false) => {
+    if (!skipLoadingState) setLoading(true);
     const [catResult, faqResult, tutResult, grpResult] = await Promise.all([
       supabase.from('support_faq_categories').select('*').eq('is_active', true).order('sort_order'),
       supabase.from('support_faqs').select('*').eq('is_published', true),
@@ -154,7 +152,23 @@ const SupportPage: React.FC<SupportPageProps> = ({ darkMode }) => {
     setTutorials(tutResult.data || []);
     setGroups(grpResult.data || []);
     setLoading(false);
-  };
+    lastLoadRef.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    loadContent();
+    loadBugCount();
+  }, [location.key]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastLoadRef.current > 5000) {
+        loadContent(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => { document.removeEventListener('visibilitychange', handleVisibility); };
+  }, [loadContent]);
 
   const loadBugCount = async () => {
     if (!user) return;
