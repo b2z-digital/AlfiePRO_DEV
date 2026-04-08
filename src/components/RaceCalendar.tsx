@@ -1280,9 +1280,9 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {displayTitle}
                             </h4>
                             {isNextEvent && (
-                              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap animate-pulse">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                                Up Next
+                              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold text-white whitespace-nowrap animate-pulse bg-green-500 shadow-lg shadow-green-500/30">
+                                <span className="w-2 h-2 rounded-full bg-white"></span>
+                                UP NEXT
                               </div>
                             )}
                           </div>
@@ -1751,9 +1751,9 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                         {isNextEvent && (
-                          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium text-white animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                            Up Next
+                          <div className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-white animate-pulse bg-green-500 shadow-lg shadow-green-500/30">
+                            <span className="w-2 h-2 rounded-full bg-white"></span>
+                            UP NEXT
                           </div>
                         )}
                         {(event.venue || event.clubName) && (
@@ -2062,33 +2062,6 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                 Race Calendar
               </h2>
-              {sailingDays.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  {sailingDays.map((day) => (
-                    <div
-                      key={day.id}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                        darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'
-                      }`}
-                    >
-                      <Calendar size={14} className="text-blue-500" />
-                      <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                        {day.day_of_week}
-                      </span>
-                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {day.start_time.substring(0, 5)}-{day.end_time.substring(0, 5)}
-                      </span>
-                      {day.boat_class_name && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {day.boat_class_name}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
