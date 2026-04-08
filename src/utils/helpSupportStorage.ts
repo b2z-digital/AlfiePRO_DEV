@@ -210,6 +210,26 @@ export const tutorialStorage = {
     await supabase.rpc('increment_tutorial_view_count', { tutorial_id: tutorialId });
   },
 
+  async updateGroupSortOrders(updates: { id: string; sort_order: number }[]): Promise<void> {
+    for (const u of updates) {
+      const { error } = await supabase
+        .from('support_tutorial_groups')
+        .update({ sort_order: u.sort_order, updated_at: new Date().toISOString() })
+        .eq('id', u.id);
+      if (error) throw error;
+    }
+  },
+
+  async updateTutorialSortOrders(updates: { id: string; sort_order: number }[]): Promise<void> {
+    for (const u of updates) {
+      const { error } = await supabase
+        .from('support_tutorials')
+        .update({ sort_order: u.sort_order, updated_at: new Date().toISOString() })
+        .eq('id', u.id);
+      if (error) throw error;
+    }
+  },
+
   extractYouTubeId(url: string): string | null {
     const patterns = [
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/,
