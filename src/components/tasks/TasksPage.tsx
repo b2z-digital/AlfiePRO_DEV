@@ -252,8 +252,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ darkMode }) => {
     setShowDeleteConfirm(false);
   };
 
-  const handleTaskSaved = () => {
-    fetchTasks();
+  const handleTaskSaved = async () => {
+    await fetchTasks();
     setShowTaskForm(false);
     setEditingTask(null);
     addNotification('success', editingTask ? 'Task updated successfully' : 'Task created successfully');

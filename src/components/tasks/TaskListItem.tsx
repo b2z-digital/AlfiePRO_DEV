@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, CalendarPlus, User, Flag, Users, Paperclip, MessageCircle, Building2, AlertTriangle } from 'lucide-react';
+import { CreditCard as Edit2, Trash2, CalendarPlus, User, Flag, Users, Paperclip, MessageCircle, Building2, TriangleAlert as AlertTriangle } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { Task as TaskType } from '../../types/task';
 import { exportTaskToCalendar } from '../../utils/calendarExport';
@@ -87,11 +87,18 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
       try {
         const { supabase } = await import('../../utils/supabase');
         const { data } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, avatar_url')
-          .in('id', task.followers);
+          .from('members')
+          .select('id, first_name, last_name, avatar_url, user_id')
+          .in('user_id', task.followers);
 
-        setFollowerProfiles(data || []);
+        const mapped = (data || []).map(m => ({
+          id: m.user_id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+          avatar_url: m.avatar_url,
+        }));
+
+        setFollowerProfiles(mapped);
       } catch (err) {
         console.error('Error fetching followers:', err);
       }
