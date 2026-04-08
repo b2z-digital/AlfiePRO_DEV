@@ -233,7 +233,6 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
     try {
       setSaving(true);
 
-      // First save all minutes
       for (const item of agendaItems) {
         await updateAgendaItemMinutes(
           item.id,
@@ -242,18 +241,16 @@ export const MinuteTakingPage: React.FC<MinuteTakingPageProps> = ({ darkMode }) 
           item.minutes_tasks,
           item.minutes_attachments
         );
-        // Note: Tasks are saved directly by AgendaTaskManager, no need to save them again here
       }
 
-      // Then mark the meeting as completed
       await completeMeetingMinutes(meetingId);
-      
+
+      setSaving(false);
       setSuccess('Minutes completed successfully');
-      
-      // Navigate back to meetings page after a short delay
+
       setTimeout(() => {
         navigate('/meetings');
-      }, 2000);
+      }, 1500);
     } catch (err) {
       console.error('Error completing minutes:', err);
       setError(err instanceof Error ? err.message : 'Failed to complete minutes');
