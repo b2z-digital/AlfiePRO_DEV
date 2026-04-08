@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { LogOut, Upload, Download, FileUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { LogOut, Upload, Download, FileUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ChevronDown, ChevronUp, ArrowRight, Link2, TriangleAlert as AlertTriangle, Info } from 'lucide-react';
 import Papa from 'papaparse';
 import { Member, MemberBoat, BoatType, MembershipLevel } from '../types/member';
 import { supabase } from '../utils/supabase';
@@ -26,7 +26,21 @@ interface DuplicateConflict {
   field: string;
 }
 
-type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete';
+interface MembershipTypeOption {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+interface MembershipTypeMapping {
+  csvValue: string;
+  count: number;
+  mappedTypeId: string | null;
+  mappedTypeName: string | null;
+  financialStatus: 'keep_csv' | 'financial' | 'unfinancial';
+}
+
+type ImportStep = 'upload' | 'mapping' | 'membership_mapping' | 'preview' | 'importing' | 'complete';
 
 const FIELD_OPTIONS = [
   { value: 'first_name', label: 'First Name' },
@@ -78,6 +92,8 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   const [skippedCount, setSkippedCount] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [expandedMappings, setExpandedMappings] = useState(true);
+  const [clubMembershipTypes, setClubMembershipTypes] = useState<MembershipTypeOption[]>([]);
+  const [membershipTypeMappings, setMembershipTypeMappings] = useState<MembershipTypeMapping[]>([]);
 
   // Reset modal state when it closes
   const resetModalState = () => {
@@ -95,14 +111,29 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setSkippedCount(0);
     setErrorCount(0);
     setExpandedMappings(true);
+    setMembershipTypeMappings([]);
   };
 
-  // Reset state when modal closes
   React.useEffect(() => {
     if (!isOpen) {
       resetModalState();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && currentClubId) {
+      const fetchTypes = async () => {
+        const { data } = await supabase
+          .from('membership_types')
+          .select('id, name, amount')
+          .eq('club_id', currentClubId)
+          .eq('is_active', true)
+          .order('name');
+        setClubMembershipTypes((data || []).map(t => ({ ...t, amount: t.amount || 0 })));
+      };
+      fetchTypes();
+    }
+  }, [isOpen, currentClubId]);
 
   const autoDetectField = (csvField: string): { mappedTo: string | null; confidence: 'high' | 'medium' | 'low' | 'none' } => {
     const normalized = csvField.toLowerCase().trim().replace(/[_\s-]/g, '');
@@ -302,6 +333,74 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     onClose();
   };
 
+  const buildMembershipTypeMappings = () => {
+    const membershipFieldMapping = fieldMappings.find(
+      m => m.mappedTo === 'membership_level' || m.mappedTo === 'membership_level_custom'
+    );
+
+    if (!membershipFieldMapping) {
+      return [];
+    }
+
+    const csvFieldName = membershipFieldMapping.csvField;
+    const valueCounts: Record<string, number> = {};
+
+    csvData.forEach(row => {
+      const val = (row[csvFieldName] || '').toString().trim();
+      if (val) {
+        valueCounts[val] = (valueCounts[val] || 0) + 1;
+      }
+    });
+
+    return Object.entries(valueCounts).map(([csvValue, count]) => {
+      const normalizedCsv = csvValue.toLowerCase().trim();
+      const autoMatch = clubMembershipTypes.find(
+        t => t.name.toLowerCase().trim() === normalizedCsv
+      );
+
+      return {
+        csvValue,
+        count,
+        mappedTypeId: autoMatch?.id || null,
+        mappedTypeName: autoMatch?.name || null,
+        financialStatus: 'keep_csv' as const,
+      };
+    });
+  };
+
+  const proceedToMembershipMapping = () => {
+    const mappings = buildMembershipTypeMappings();
+    if (mappings.length > 0) {
+      setMembershipTypeMappings(mappings);
+      setImportStep('membership_mapping');
+    } else {
+      processImport();
+    }
+  };
+
+  const updateMembershipTypeMapping = (csvValue: string, typeId: string | null) => {
+    const matchedType = typeId ? clubMembershipTypes.find(t => t.id === typeId) : null;
+    setMembershipTypeMappings(prev =>
+      prev.map(m =>
+        m.csvValue === csvValue
+          ? { ...m, mappedTypeId: typeId, mappedTypeName: matchedType?.name || null }
+          : m
+      )
+    );
+  };
+
+  const updateMembershipFinancialStatus = (csvValue: string, status: MembershipTypeMapping['financialStatus']) => {
+    setMembershipTypeMappings(prev =>
+      prev.map(m =>
+        m.csvValue === csvValue ? { ...m, financialStatus: status } : m
+      )
+    );
+  };
+
+  const getMembershipMappingForValue = (csvValue: string): MembershipTypeMapping | undefined => {
+    return membershipTypeMappings.find(m => m.csvValue === csvValue);
+  };
+
   const processImport = async () => {
     setImportStep('importing');
     setImportProgress(0);
@@ -358,6 +457,26 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           memberData[field] = value;
         }
       });
+
+      if (membershipTypeMappings.length > 0) {
+        const rawMembershipValue = (memberData.membership_level || memberData.membership_level_custom || '').toString().trim();
+        if (rawMembershipValue) {
+          const typeMapping = getMembershipMappingForValue(rawMembershipValue);
+          if (typeMapping?.mappedTypeName) {
+            memberData.membership_level = typeMapping.mappedTypeName;
+            delete memberData.membership_level_custom;
+          } else {
+            memberData.membership_level_custom = rawMembershipValue;
+            delete memberData.membership_level;
+          }
+
+          if (typeMapping?.financialStatus === 'financial') {
+            memberData.is_financial = true;
+          } else if (typeMapping?.financialStatus === 'unfinancial') {
+            memberData.is_financial = false;
+          }
+        }
+      }
 
       console.log(`\n--- Processing row ${i + 1} ---`);
       console.log('Member data built:', memberData);
@@ -483,11 +602,36 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
       <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold">
-            {mode === 'select' && 'Import / Export Members'}
-            {mode === 'import' && 'Import Members'}
-            {mode === 'export' && 'Export Members'}
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold">
+              {mode === 'select' && 'Import / Export Members'}
+              {mode === 'import' && 'Import Members'}
+              {mode === 'export' && 'Export Members'}
+            </h2>
+            {mode === 'import' && importStep !== 'upload' && importStep !== 'complete' && (
+              <div className="flex items-center gap-2 mt-2">
+                {(['mapping', 'membership_mapping', 'importing'] as const).map((step, idx) => {
+                  const labels = ['Field Mapping', 'Membership Types', 'Importing'];
+                  const stepOrder = ['mapping', 'membership_mapping', 'importing'];
+                  const currentIdx = stepOrder.indexOf(importStep);
+                  const isActive = importStep === step;
+                  const isComplete = currentIdx > idx;
+                  return (
+                    <React.Fragment key={step}>
+                      {idx > 0 && <div className={`w-6 h-px ${isComplete || isActive ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'}`} />}
+                      <span className={`text-xs font-medium px-2 py-1 rounded ${
+                        isActive ? 'bg-blue-500/20 text-blue-400' :
+                        isComplete ? (darkMode ? 'text-green-400' : 'text-green-600') :
+                        darkMode ? 'text-gray-500' : 'text-gray-400'
+                      }`}>
+                        {isComplete ? '✓ ' : `${idx + 1}. `}{labels[idx]}
+                      </span>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
@@ -663,9 +807,154 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
                   Back
                 </button>
                 <button
-                  onClick={processImport}
+                  onClick={proceedToMembershipMapping}
                   disabled={!fieldMappings.some(m => m.mappedTo && m.mappedTo !== 'ignore')}
-                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  Next: Review Membership Types
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode === 'import' && importStep === 'membership_mapping' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Link2 size={20} className="text-blue-400" />
+                  Map Membership Types
+                </h3>
+                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Match the membership types found in your CSV to your club's configured membership types.
+                  This ensures imported members are correctly assigned.
+                </p>
+              </div>
+
+              {clubMembershipTypes.length === 0 && (
+                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-yellow-900/20 border-yellow-700/50' : 'bg-yellow-50 border-yellow-200'}`}>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={18} className="text-yellow-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                        No membership types configured
+                      </p>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-yellow-400/70' : 'text-yellow-700'}`}>
+                        Your club has no membership types set up yet. The membership type labels from the CSV will be stored,
+                        but you will need to manually assign proper membership types to each member after import.
+                        You can configure membership types in Settings &gt; Membership.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {membershipTypeMappings.length > 0 && (
+                <div className="space-y-3">
+                  <div className={`grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <div className="col-span-3">CSV Value</div>
+                    <div className="col-span-1 text-center">Count</div>
+                    <div className="col-span-4">Map To Membership Type</div>
+                    <div className="col-span-4">Financial Status</div>
+                  </div>
+
+                  {membershipTypeMappings.map((mapping) => (
+                    <div
+                      key={mapping.csvValue}
+                      className={`grid grid-cols-12 gap-4 items-center p-4 rounded-lg border transition-all ${
+                        darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'
+                      } ${mapping.mappedTypeId ? 'ring-2 ring-green-500/20' : ''}`}
+                    >
+                      <div className="col-span-3">
+                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                          darkMode ? 'bg-slate-700 text-slate-200' : 'bg-gray-200 text-gray-800'
+                        }`}>
+                          {mapping.csvValue}
+                        </span>
+                      </div>
+                      <div className="col-span-1 text-center">
+                        <span className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {mapping.count}
+                        </span>
+                      </div>
+                      <div className="col-span-4">
+                        <select
+                          value={mapping.mappedTypeId || ''}
+                          onChange={(e) => updateMembershipTypeMapping(mapping.csvValue, e.target.value || null)}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            darkMode
+                              ? 'bg-gray-800 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="">Do not assign (manual later)</option>
+                          {clubMembershipTypes.map(type => (
+                            <option key={type.id} value={type.id}>
+                              {type.name} {type.amount > 0 ? `($${type.amount})` : '(Free)'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-4">
+                        <select
+                          value={mapping.financialStatus}
+                          onChange={(e) => updateMembershipFinancialStatus(mapping.csvValue, e.target.value as MembershipTypeMapping['financialStatus'])}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            darkMode
+                              ? 'bg-gray-800 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="keep_csv">Use CSV value (if mapped)</option>
+                          <option value="financial">Set all as Financial</option>
+                          <option value="unfinancial">Set all as Unfinancial</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {membershipTypeMappings.length === 0 && (
+                <div className={`p-6 rounded-lg border text-center ${darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Info size={18} className="text-blue-400" />
+                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      No membership type data found in CSV
+                    </p>
+                  </div>
+                  <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                    You can assign membership types to imported members individually after import.
+                  </p>
+                </div>
+              )}
+
+              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-blue-900/20 border-blue-700/40' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-start gap-3">
+                  <Info size={18} className="text-blue-400 mt-0.5 shrink-0" />
+                  <div className={`text-sm ${darkMode ? 'text-blue-300/80' : 'text-blue-700'}`}>
+                    <p className="font-medium mb-1">How membership mapping works:</p>
+                    <ul className="space-y-0.5 list-disc list-inside">
+                      <li>Matched types will be assigned to members during import</li>
+                      <li>Unmatched types will store the CSV label for you to assign manually later</li>
+                      <li>Members imported from existing systems with paid memberships should use the financial status override to mark them correctly</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setImportStep('mapping')}
+                  className={`px-6 py-3 rounded-lg font-medium ${
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  Back
+                </button>
+                <button
+                  onClick={processImport}
+                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center justify-center gap-2"
                 >
                   Start Import
                 </button>
