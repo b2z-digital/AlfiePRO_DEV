@@ -25,11 +25,11 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
   const [showForm, setShowForm] = useState(false);
   const [showStripeConnect, setShowStripeConnect] = useState(false);
   const [codeOfConduct, setCodeOfConduct] = useState('');
-  const [renewalMode, setRenewalMode] = useState<RenewalMode>('anniversary');
-  const [fixedRenewalDate, setFixedRenewalDate] = useState<string>('07-01'); // Default to July 1st
+  const [renewalMode, setRenewalMode] = useState<RenewalMode>('fixed');
+  const [fixedRenewalDate, setFixedRenewalDate] = useState<string>('07-01');
   const [autoRenewEnabled, setAutoRenewEnabled] = useState(false);
   const [renewalNotificationDays, setRenewalNotificationDays] = useState(30);
-  const [renewalGracePeriodDays, setRenewalGracePeriodDays] = useState(7);
+  const [renewalGracePeriodDays, setRenewalGracePeriodDays] = useState(21);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeEmailTemplate, setActiveEmailTemplate] = useState<string | null>(null);
 
@@ -166,11 +166,11 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       // Set the data
       setMembershipTypes(typesData || []);
       setCodeOfConduct(clubData?.code_of_conduct || '');
-      setRenewalMode(clubData?.renewal_mode || 'anniversary');
-      setFixedRenewalDate(clubData?.fixed_renewal_date || '07-01'); // Default to July 1st
+      setRenewalMode(clubData?.renewal_mode || 'fixed');
+      setFixedRenewalDate(clubData?.fixed_renewal_date || '07-01');
       setAutoRenewEnabled(clubData?.auto_renew_enabled || false);
       setRenewalNotificationDays(clubData?.renewal_notification_days || 30);
-      setRenewalGracePeriodDays(clubData?.renewal_grace_period_days || 7);
+      setRenewalGracePeriodDays(clubData?.renewal_grace_period_days ?? 21);
       setEmailTemplates(loadedTemplates);
 
       // Reset unsaved changes flag after loading data
@@ -1341,12 +1341,12 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                     type="number"
                     value={renewalGracePeriodDays}
                     onChange={(e) => {
-                      setRenewalGracePeriodDays(parseInt(e.target.value) || 7);
+                      setRenewalGracePeriodDays(parseInt(e.target.value) || 0);
                       setHasUnsavedChanges(true);
                     }}
                     className="w-20 px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     min="0"
-                    max="30"
+                    max="90"
                   />
                   <span className="text-slate-300">days</span>
                 </div>
