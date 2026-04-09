@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info } from 'lucide-react';
+import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info, Landmark, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -119,6 +119,8 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [processingPayment, setProcessingPayment] = useState(false);
   const [migrationNotice, setMigrationNotice] = useState<{ from: string; to: string } | null>(null);
+  const [bankDetails, setBankDetails] = useState<{ bank_name: string; bsb: string; account_number: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const effectiveMemberId = isImpersonating ? impersonationSession?.targetMemberId : null;
@@ -218,12 +220,27 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
       }
 
       setMembershipTypes(activeTypes);
+
+      const { data: clubBankData } = await supabase
+        .from('clubs')
+        .select('bank_name, bsb, account_number')
+        .eq('id', currentClub?.clubId)
+        .maybeSingle();
+      if (clubBankData && (clubBankData.bank_name || clubBankData.bsb || clubBankData.account_number)) {
+        setBankDetails(clubBankData);
+      }
     } catch (err) {
       console.error('Error fetching member data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load membership data');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCopyBankField = (value: string, field: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const membershipStatus = useMemo(() => {
@@ -1067,6 +1084,61 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                 </div>
 
+                {selectedPaymentMethod === 'bank_transfer' && bankDetails && (
+                  <div className="mb-6 bg-slate-800/60 border border-sky-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Landmark className="w-5 h-5 text-sky-400" />
+                      <h3 className="text-white font-semibold text-sm">Bank Transfer Details</h3>
+                    </div>
+                    <p className="text-slate-400 text-xs mb-4">
+                      Please transfer the membership fee to the following account using your name as the payment reference:
+                    </p>
+                    <div className="space-y-3">
+                      {bankDetails.bank_name && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">Bank</p>
+                            <p className="text-white text-sm font-medium">{bankDetails.bank_name}</p>
+                          </div>
+                        </div>
+                      )}
+                      {bankDetails.bsb && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">BSB</p>
+                            <p className="text-white text-sm font-medium font-mono">{bankDetails.bsb}</p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-modal')}
+                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            {copiedField === 'bsb-modal' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      )}
+                      {bankDetails.account_number && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">Account Number</p>
+                            <p className="text-white text-sm font-medium font-mono">{bankDetails.account_number}</p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-modal')}
+                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            {copiedField === 'acc-modal' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                      <p className="text-slate-500 text-xs">
+                        Reference: <span className="text-slate-300">Your full name</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowRenewalModal(false)}
@@ -1085,7 +1157,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                         Processing...
                       </div>
                     ) : (
-                      selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Renewal Request'
+                      selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Membership Renewal'
                     )}
                   </button>
                 </div>
