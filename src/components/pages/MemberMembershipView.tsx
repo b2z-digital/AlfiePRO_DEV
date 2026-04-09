@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 import { MyClubMembershipsWidget } from '../membership/MyClubMembershipsWidget';
 import { MemberEditModal } from '../membership/MemberEditModal';
 import { Avatar } from '../ui/Avatar';
@@ -349,6 +350,16 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             membership_level: selectedType.name,
           })
           .eq('id', memberData.id);
+
+        await createMembershipTransaction({
+          clubId: currentClub.clubId,
+          memberId: memberData.id,
+          membershipTypeId: selectedType.id,
+          memberName: `${memberData.first_name} ${memberData.last_name}`,
+          membershipTypeName: selectedType.name,
+          amount: selectedType.amount,
+          paymentMethod: 'bank_transfer',
+        }, 'pending');
 
         addNotification('success', 'Renewal request submitted! Please complete the bank transfer and notify your club administrator.');
         setShowRenewalModal(false);

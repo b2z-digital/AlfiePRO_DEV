@@ -3,6 +3,7 @@ import { X, CreditCard, DollarSign, Calendar, User, TriangleAlert as AlertTriang
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { sendPaymentConfirmation } from '../../utils/membershipUtils';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 
 interface MembershipPaymentModalProps {
   isOpen: boolean;
@@ -111,6 +112,18 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
         .eq('id', memberId);
 
       if (memberError) throw memberError;
+
+      if (currentClub?.clubId) {
+        await createMembershipTransaction({
+          clubId: currentClub.clubId,
+          memberId,
+          membershipTypeId: membershipType.id,
+          memberName,
+          membershipTypeName: membershipType.name,
+          amount: membershipType.amount,
+          paymentMethod: 'cash',
+        }, 'paid');
+      }
 
       const renewalDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const { data: memberData } = await supabase
