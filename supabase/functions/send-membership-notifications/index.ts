@@ -20,6 +20,7 @@ interface EmailRequest {
     currency?: string
     club_id?: string
     user_id?: string
+    member_id?: string
     bank_name?: string
     bsb?: string
     account_number?: string
@@ -27,6 +28,7 @@ interface EmailRequest {
     event_name?: string
     event_date?: string
     event_location?: string
+    app_url?: string
   }
   custom_template?: {
     subject: string
@@ -167,8 +169,12 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
     result = result.replace(/\{\{currency\}\}/g, data.currency)
   }
 
-  result = result.replace(/\{\{renewal_link\}\}/g, '#')
-  result = result.replace(/\{\{renewalLink\}\}/g, '#')
+  const appBaseUrl = data.app_url || 'https://alfiepro.com.au'
+  const renewalUrl = data.club_id && data.member_id
+    ? `${appBaseUrl}/membership/${data.club_id}/renew/${data.member_id}`
+    : `${appBaseUrl}/dashboard/membership`
+  result = result.replace(/\{\{renewal_link\}\}/g, renewalUrl)
+  result = result.replace(/\{\{renewalLink\}\}/g, renewalUrl)
   result = result.replace(/\{\{event_name\}\}/g, data.event_name || '')
   result = result.replace(/\{\{eventName\}\}/g, data.event_name || '')
   result = result.replace(/\{\{event_date\}\}/g, data.event_date || '')

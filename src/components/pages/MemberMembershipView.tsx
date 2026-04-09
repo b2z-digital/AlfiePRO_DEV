@@ -313,6 +313,26 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           });
 
         if (renewalError) throw renewalError;
+
+        await supabase
+          .from('membership_payments')
+          .insert({
+            member_id: memberData.id,
+            membership_type_id: selectedType.id,
+            amount: selectedType.amount,
+            currency: selectedType.currency,
+            status: 'pending',
+            payment_method: 'bank_transfer'
+          });
+
+        await supabase
+          .from('members')
+          .update({
+            payment_status: 'pending',
+            membership_level: selectedType.name,
+          })
+          .eq('id', memberData.id);
+
         addNotification('success', 'Renewal request submitted! Please complete the bank transfer and notify your club administrator.');
         setShowRenewalModal(false);
         setProcessingPayment(false);
