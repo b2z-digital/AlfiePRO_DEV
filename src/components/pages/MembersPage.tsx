@@ -1392,10 +1392,11 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                 e.stopPropagation();
                                 setShowPaymentReconciliation(true);
                               }}
-                              className="p-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 transition-colors animate-pulse"
-                              title="Payment Pending - Click to Confirm"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400 border border-orange-500/30 hover:bg-orange-900/50 transition-colors animate-pulse cursor-pointer"
+                              title="Renewal payment pending - Click to confirm"
                             >
-                              <DollarSign size={14} />
+                              <DollarSign size={12} />
+                              Renewal Pending
                             </button>
                           )}
                           {/* Remittance Status Indicator */}

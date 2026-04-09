@@ -443,12 +443,11 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
 
       setPendingApplicationsCount(appsCount || 0);
 
-      // Count members with outstanding payment issues (payment_pending OR overdue)
       const { count: pendingCount } = await supabase
         .from('members')
         .select('*', { count: 'exact', head: true })
         .eq('club_id', currentClub.clubId)
-        .in('payment_status', ['payment_pending', 'overdue']);
+        .eq('payment_status', 'pending');
 
       setPaymentPendingCount(pendingCount || 0);
 
@@ -1201,6 +1200,11 @@ export const MembershipDashboard: React.FC<MembershipDashboardProps> = ({ darkMo
               <div className="flex items-center gap-2">
                 <AlertTriangle size={16} />
                 <span>Renewals</span>
+                {paymentPendingCount > 0 && (
+                  <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-orange-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    {paymentPendingCount}
+                  </div>
+                )}
               </div>
             </button>
 

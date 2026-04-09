@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CircleAlert as AlertCircle, CreditCard, LogOut, ArrowRight, Building2, Clock, DollarSign, Loader as Loader2, Check, TriangleAlert as AlertTriangle, Banknote, Gift, Landmark, Copy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 
 interface UnfinancialMemberData {
   member_id: string;
@@ -276,6 +277,51 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
               membership_level: selectedType.name,
             })
             .eq('id', memberData.member_id);
+
+          const { data: memberRecord } = await supabase
+            .from('members')
+            .select('first_name, last_name')
+            .eq('id', memberData.member_id)
+            .maybeSingle();
+
+          const memberName = memberRecord
+            ? `${memberRecord.first_name} ${memberRecord.last_name}`
+            : 'Member';
+
+          try {
+            await createMembershipTransaction({
+              clubId: memberData.club_id,
+              memberId: memberData.member_id,
+              memberName,
+              membershipTypeName: selectedType.name,
+              amount: effectiveAmount,
+              paymentMethod: 'bank_transfer',
+            }, 'pending');
+          } catch (finErr) {
+            console.error('Failed to create pending transaction:', finErr);
+          }
+
+          try {
+            const { data: clubAdmins } = await supabase
+              .from('user_clubs')
+              .select('user_id')
+              .eq('club_id', memberData.club_id)
+              .in('role', ['admin', 'owner']);
+
+            if (clubAdmins && clubAdmins.length > 0) {
+              const notifications = clubAdmins.map(admin => ({
+                user_id: admin.user_id,
+                club_id: memberData.club_id,
+                title: 'Membership Renewal Submitted',
+                message: `${memberName} has submitted a membership renewal (${selectedType.name}) with bank transfer payment of $${effectiveAmount.toFixed(2)}. Please confirm payment when received.`,
+                type: 'membership',
+                link_url: '/membership?tab=members',
+              }));
+              await supabase.from('notifications').insert(notifications);
+            }
+          } catch (notifErr) {
+            console.error('Failed to send admin notification:', notifErr);
+          }
 
           setPendingPayment({
             id: '',
