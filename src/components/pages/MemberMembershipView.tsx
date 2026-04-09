@@ -145,7 +145,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         .select(`
           id, first_name, last_name, email, phone,
           street, city, state, postcode,
-          is_financial, renewal_date,
+          is_financial, renewal_date, payment_status,
           membership_level, membership_level_custom,
           emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
           avatar_url, country, category, date_joined
@@ -253,14 +253,18 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   };
 
   const membershipStatus = useMemo(() => {
-    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, daysLeft: 0 };
+    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, pendingPayment: false, daysLeft: 0 };
+
+    if (memberData.payment_status === 'pending') {
+      return { status: 'pending_payment', text: 'Awaiting Payment', color: 'yellow', needsRenewal: false, pendingPayment: true, daysLeft: 0 };
+    }
 
     if (!memberData.is_financial) {
-      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, daysLeft: 0 };
+      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, pendingPayment: false, daysLeft: 0 };
     }
 
     if (!memberData.renewal_date) {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: 365 };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, pendingPayment: false, daysLeft: 365 };
     }
 
     const renewalDate = new Date(memberData.renewal_date);
@@ -268,11 +272,11 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     const daysUntilRenewal = Math.ceil((renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysUntilRenewal < 0) {
-      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, daysLeft: 0 };
+      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, pendingPayment: false, daysLeft: 0 };
     } else if (daysUntilRenewal <= 30) {
-      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, daysLeft: daysUntilRenewal };
+      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, pendingPayment: false, daysLeft: daysUntilRenewal };
     } else {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: daysUntilRenewal };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, pendingPayment: false, daysLeft: daysUntilRenewal };
     }
   }, [memberData]);
 
@@ -594,6 +598,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                           : 'bg-red-500/15 text-red-400 border border-red-500/20'
                       }`}>
                         {membershipStatus.status === 'active' && <CheckCircle size={16} />}
+                        {membershipStatus.status === 'pending_payment' && <Clock size={16} />}
                         {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={16} />}
                         <span className="text-sm font-semibold">{membershipStatus.text}</span>
                       </div>
@@ -601,6 +606,71 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                 </div>
               </div>
+
+              {membershipStatus.pendingPayment && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 overflow-hidden"
+                >
+                  <div className="p-4 flex items-center gap-3">
+                    <Clock size={20} className="text-yellow-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-yellow-400">Renewal Submitted - Awaiting Payment</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Your renewal has been submitted. Please complete the bank transfer below and notify your club administrator.
+                      </p>
+                    </div>
+                  </div>
+                  {bankDetails && (
+                    <div className="px-4 pb-4">
+                      <div className="bg-slate-800/60 rounded-xl p-4 space-y-3 border border-slate-700/40">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Landmark size={16} className="text-blue-400" />
+                          <p className="text-sm font-medium text-slate-200">Bank Transfer Details</p>
+                        </div>
+                        {bankDetails.bank_name && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bank Name</p>
+                              <p className="text-sm text-white font-medium">{bankDetails.bank_name}</p>
+                            </div>
+                          </div>
+                        )}
+                        {bankDetails.bsb && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">BSB</p>
+                              <p className="text-sm text-white font-medium font-mono">{bankDetails.bsb}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-banner')}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === 'bsb-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                        {bankDetails.account_number && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Account Number</p>
+                              <p className="text-sm text-white font-medium font-mono">{bankDetails.account_number}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-banner')}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === 'acc-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
               {membershipStatus.needsRenewal && (
                 <motion.div
