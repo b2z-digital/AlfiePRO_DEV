@@ -43,6 +43,10 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       subject: 'Time to renew your {{clubName}} membership',
       body: `<p>Hi {{firstName}},</p><p>Your {{membershipType}} membership with {{clubName}} is due for renewal.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Renewal Date</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p class="ql-align-center">To keep racing and enjoying all club benefits without interruption,</p><p class="ql-align-center">you can renew your membership in just a few minutes:</p><p class="ql-align-center"><br></p><p class="ql-align-center">\u{1F449} <strong>Renew via AlfiePRO App</strong></p><p class="ql-align-center"><em>Open AlfiePRO \u2192 Tap your profile \u2192 Membership</em></p><p class="ql-align-center"><strong>OR</strong></p><p class="ql-align-center">\u{1F449} <strong>Renew Online</strong></p><p class="ql-align-center"><a href="{{renewalLink}}" rel="noopener noreferrer" target="_blank">Renew My Membership</a></p><h3><br></h3><h3><strong>\u26A0\uFE0F Why renew now?</strong></h3><p>Renewing before your expiry ensures:</p><ul><li>You stay eligible to race</li><li>Your results and rankings continue uninterrupted</li><li>You remain covered under association insurance</li><li>If you have any questions or need help, just email<strong> {{secretaryName}}</strong> - {{secretaryEmail}}</li></ul><p>Thank you for being a valued member of {{clubName}}!</p>`
     },
+    payment_confirmation: {
+      subject: 'Payment confirmation for {{clubName}} membership',
+      body: `<p>Payment Received - Thank you {{firstName}} {{lastName}}!</p><p>We have successfully received your payment of {{amount}} {{currency}} for your <strong>{{clubName}}</strong> membership.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Active Until</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p>Your membership is now active and you can continue enjoying all the benefits of being a member, including participating in racing events and club activities.</p><p>If you have any questions, please contact <strong>{{secretaryName}}</strong> - {{secretaryEmail}}</p><p>Thank you for your continued support of {{clubName}}!</p>`
+    },
     event: {
       subject: 'New Event: {{eventName}}',
       body: `<p>Hi {{firstName}},</p><p>We're excited to announce a new upcoming event at {{clubName}}!</p><h2>{{eventName}}</h2><p>\u{1F4C5} Date{{eventDate}}\u{1F4CD} Location{{eventLocation}}</p><p>We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p><p><a href="{{eventLink}}" rel="noopener noreferrer" target="_blank">View Event Details</a></p><p>For more information and to RSVP, please log in to your account or contact us directly.</p><p>See you on the water!</p><p><br></p><p>Best regards,</p>`
@@ -654,7 +658,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
             last_name: 'User',
             club_name: currentClub.club?.name || 'Your Club',
             membership_type: 'Full Member',
-            renewal_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            renewal_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            amount: 150,
+            currency: 'AUD',
             club_id: currentClub.clubId,
             user_id: user.id
           }
@@ -1119,11 +1125,27 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                 </p>
               </div>
               
+              {/* Renewal Confirmation Template */}
+              <div className="p-4 rounded-lg bg-slate-700/50 border border-slate-600/50">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-medium text-slate-200">Renewal Confirmation</h4>
+                  <button
+                    onClick={() => handleEditEmailTemplate('payment_confirmation')}
+                    className="text-blue-400 hover:text-blue-300 text-sm"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <p className="text-sm text-slate-400">
+                  Sent to members when their membership renewal payment is confirmed
+                </p>
+              </div>
+
               {/* Event Invitation Template */}
               <div className="p-4 rounded-lg bg-slate-700/50 border border-slate-600/50">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium text-slate-200">Event Invitation</h4>
-                  <button 
+                  <button
                     onClick={() => handleEditEmailTemplate('event')}
                     className="text-blue-400 hover:text-blue-300 text-sm"
                   >

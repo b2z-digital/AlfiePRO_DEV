@@ -42,6 +42,8 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
         return 'Welcome Email';
       case 'renewal':
         return 'Renewal Reminder';
+      case 'payment_confirmation':
+        return 'Renewal Confirmation';
       case 'event':
         return 'Event Invitation';
       default:
@@ -55,6 +57,8 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
         return 'Sent to new members when they join the club';
       case 'renewal':
         return 'Sent to members when their membership is about to expire';
+      case 'payment_confirmation':
+        return 'Sent to members when their membership renewal payment is confirmed';
       case 'event':
         return 'Sent to members when a new event is created';
       default:
@@ -198,6 +202,8 @@ export const EmailTemplateEditor: React.FC<EmailTemplateEditorProps> = ({
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{clubName}}'}</code> - Your club name</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{membershipType}}'}</code> - Membership type name</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{renewalDate}}'}</code> - Membership renewal date</li>
+                <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{amount}}'}</code> - Payment amount (for payment confirmation)</li>
+                <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{currency}}'}</code> - Currency code (for payment confirmation)</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400 font-semibold">{'{{renewalLink}}'}</code> - Direct link to renewal page (for buttons)</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{secretaryName}}'}</code> - Club secretary's name</li>
                 <li><code className="bg-slate-800 px-1 py-0.5 rounded text-blue-400">{'{{secretaryEmail}}'}</code> - Club secretary's email address</li>
