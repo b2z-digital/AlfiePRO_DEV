@@ -29,6 +29,14 @@ interface MidCycleCredit {
   notes: string;
 }
 
+interface PendingPayment {
+  id: string;
+  amount: number;
+  payment_method: string | null;
+  created_at: string;
+  membership_type_name: string | null;
+}
+
 interface UnfinancialMemberScreenProps {
   memberData: UnfinancialMemberData;
   darkMode?: boolean;
@@ -48,10 +56,46 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
   const [clubHasStripe, setClubHasStripe] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [midCycleCredit, setMidCycleCredit] = useState<MidCycleCredit | null>(null);
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
 
   useEffect(() => {
+    checkPendingPayments();
     loadMembershipTypes();
-  }, [memberData.club_id]);
+  }, [memberData.club_id, memberData.member_id]);
+
+  const checkPendingPayments = async () => {
+    try {
+      const { data } = await supabase
+        .from('membership_payments')
+        .select('id, amount, payment_method, created_at, membership_type_id')
+        .eq('member_id', memberData.member_id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        let typeName: string | null = null;
+        if (data.membership_type_id) {
+          const { data: typeData } = await supabase
+            .from('membership_types')
+            .select('name')
+            .eq('id', data.membership_type_id)
+            .maybeSingle();
+          typeName = typeData?.name || null;
+        }
+        setPendingPayment({
+          id: data.id,
+          amount: data.amount,
+          payment_method: data.payment_method,
+          created_at: data.created_at,
+          membership_type_name: typeName,
+        });
+      }
+    } catch (err) {
+      console.error('Error checking pending payments:', err);
+    }
+  };
 
   const loadMembershipTypes = async () => {
     try {
@@ -195,10 +239,28 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
             .eq('id', memberData.member_id);
         }
 
-        setSuccess(true);
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+        if (effectiveAmount === 0) {
+          setSuccess(true);
+          setTimeout(() => {
+            window.location.reload();
+          }, 2000);
+        } else {
+          await supabase
+            .from('members')
+            .update({
+              payment_status: 'pending',
+              membership_level: selectedType.name,
+            })
+            .eq('id', memberData.member_id);
+
+          setPendingPayment({
+            id: '',
+            amount: effectiveAmount,
+            payment_method: 'bank_transfer',
+            created_at: new Date().toISOString(),
+            membership_type_name: selectedType.name,
+          });
+        }
         return;
       }
     } catch (err: any) {
@@ -224,6 +286,86 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
   };
 
   const isRenewal = !memberData.is_new_member && memberData.renewal_date;
+
+  if (pendingPayment) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center p-4">
+        <div className="max-w-lg w-full">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-sky-500/10 border border-sky-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-10 h-10 text-sky-400" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-3">
+              Payment Awaiting Confirmation
+            </h1>
+            <p className="text-slate-400 text-base leading-relaxed">
+              Your payment has been recorded and is waiting for your club administrator to confirm receipt.
+            </p>
+          </div>
+
+          <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-5 h-5 text-slate-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium">{memberData.club_name}</p>
+                {pendingPayment.membership_type_name && (
+                  <p className="text-slate-400 text-sm mt-0.5">{pendingPayment.membership_type_name}</p>
+                )}
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-sky-900/30 text-sky-400 flex-shrink-0">
+                Pending
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-5 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Check className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-medium">
+                  {pendingPayment.payment_method === 'bank_transfer' ? 'Bank transfer' : 'Payment'} of ${pendingPayment.amount.toFixed(2)} recorded
+                </p>
+                <p className="text-slate-500 text-xs">
+                  {formatDate(pendingPayment.created_at)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-sky-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 text-sky-400 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-medium">Waiting for admin confirmation</p>
+                <p className="text-slate-500 text-xs">Your club will verify the payment and activate your membership</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 mb-6">
+            <p className="text-slate-400 text-sm text-center leading-relaxed">
+              Once your club confirms your payment, you'll have full access to the platform. You'll be notified when your membership is activated.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSignOut}
+            className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+
+          <p className="text-center text-slate-600 text-xs mt-6">
+            If you believe this is an error, please contact your club administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center p-4">
@@ -272,14 +414,9 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
             <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-emerald-400" />
             </div>
-            <h3 className="text-white font-semibold text-lg mb-2">
-              {paymentMethod === 'bank_transfer' ? 'Payment Pending' : 'Payment Complete'}
-            </h3>
+            <h3 className="text-white font-semibold text-lg mb-2">Payment Complete</h3>
             <p className="text-slate-400 text-sm">
-              {paymentMethod === 'bank_transfer'
-                ? 'Your bank transfer has been recorded. Your club will confirm once payment is received.'
-                : 'Your membership has been activated. Redirecting...'
-              }
+              Your membership has been activated. Redirecting...
             </p>
           </div>
         ) : !showPaymentOptions ? (
