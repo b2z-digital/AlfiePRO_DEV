@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CircleAlert as AlertCircle, CreditCard, LogOut, ArrowRight, Building2, Clock, DollarSign, Loader as Loader2, Check, TriangleAlert as AlertTriangle, Banknote, Gift } from 'lucide-react';
+import { CircleAlert as AlertCircle, CreditCard, LogOut, ArrowRight, Building2, Clock, DollarSign, Loader as Loader2, Check, TriangleAlert as AlertTriangle, Banknote, Gift, Landmark, Copy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -57,11 +57,35 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [midCycleCredit, setMidCycleCredit] = useState<MidCycleCredit | null>(null);
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  const [bankDetails, setBankDetails] = useState<{ bank_name: string; bsb: string; account_number: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     checkPendingPayments();
     loadMembershipTypes();
+    fetchBankDetails();
   }, [memberData.club_id, memberData.member_id]);
+
+  const fetchBankDetails = async () => {
+    try {
+      const { data } = await supabase
+        .from('clubs')
+        .select('bank_name, bsb, account_number')
+        .eq('id', memberData.club_id)
+        .maybeSingle();
+      if (data && (data.bank_name || data.bsb || data.account_number)) {
+        setBankDetails(data);
+      }
+    } catch (err) {
+      console.error('Error fetching bank details:', err);
+    }
+  };
+
+  const handleCopyField = (value: string, field: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   const checkPendingPayments = async () => {
     try {
@@ -345,6 +369,61 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
             </div>
           </div>
 
+          {pendingPayment.payment_method === 'bank_transfer' && bankDetails && (
+            <div className="bg-slate-800/60 border border-sky-500/20 rounded-xl p-5 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Landmark className="w-5 h-5 text-sky-400" />
+                <h3 className="text-white font-semibold text-sm">Bank Transfer Details</h3>
+              </div>
+              <p className="text-slate-400 text-xs mb-4">
+                Please transfer <span className="text-white font-semibold">${pendingPayment.amount.toFixed(2)}</span> to the following account using your name as the payment reference:
+              </p>
+              <div className="space-y-3">
+                {bankDetails.bank_name && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-500 text-xs">Bank</p>
+                      <p className="text-white text-sm font-medium">{bankDetails.bank_name}</p>
+                    </div>
+                  </div>
+                )}
+                {bankDetails.bsb && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-500 text-xs">BSB</p>
+                      <p className="text-white text-sm font-medium font-mono">{bankDetails.bsb}</p>
+                    </div>
+                    <button
+                      onClick={() => handleCopyField(bankDetails.bsb, 'bsb')}
+                      className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                    >
+                      {copiedField === 'bsb' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                )}
+                {bankDetails.account_number && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-500 text-xs">Account Number</p>
+                      <p className="text-white text-sm font-medium font-mono">{bankDetails.account_number}</p>
+                    </div>
+                    <button
+                      onClick={() => handleCopyField(bankDetails.account_number, 'account')}
+                      className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                    >
+                      {copiedField === 'account' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 pt-3 border-t border-slate-700/50">
+                <p className="text-slate-500 text-xs">
+                  Reference: <span className="text-slate-300">Your full name</span>
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 mb-6">
             <p className="text-slate-400 text-sm text-center leading-relaxed">
               Once your club confirms your payment, you'll have full access to the platform. You'll be notified when your membership is activated.
@@ -580,6 +659,61 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
                   </div>
                 )}
 
+                {selectedType && getEffectiveAmount() > 0 && paymentMethod === 'bank_transfer' && bankDetails && (
+                  <div className="mb-2 bg-slate-800/60 border border-sky-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Landmark className="w-5 h-5 text-sky-400" />
+                      <h3 className="text-white font-semibold text-sm">Bank Transfer Details</h3>
+                    </div>
+                    <p className="text-slate-400 text-xs mb-4">
+                      Please transfer <span className="text-white font-semibold">${getEffectiveAmount().toFixed(2)}</span> to the following account:
+                    </p>
+                    <div className="space-y-3">
+                      {bankDetails.bank_name && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">Bank</p>
+                            <p className="text-white text-sm font-medium">{bankDetails.bank_name}</p>
+                          </div>
+                        </div>
+                      )}
+                      {bankDetails.bsb && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">BSB</p>
+                            <p className="text-white text-sm font-medium font-mono">{bankDetails.bsb}</p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyField(bankDetails.bsb, 'bsb-form')}
+                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            {copiedField === 'bsb-form' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      )}
+                      {bankDetails.account_number && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">Account Number</p>
+                            <p className="text-white text-sm font-medium font-mono">{bankDetails.account_number}</p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyField(bankDetails.account_number, 'account-form')}
+                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            {copiedField === 'account-form' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                      <p className="text-slate-500 text-xs">
+                        Reference: <span className="text-slate-300">Your full name</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-3 mt-6">
                   <button
                     onClick={handlePayment}
@@ -595,7 +729,7 @@ export const UnfinancialMemberScreen: React.FC<UnfinancialMemberScreenProps> = (
                       <>
                         <DollarSign className="w-5 h-5" />
                         {getEffectiveAmount() === 0 ? 'Activate Free Membership' :
-                          paymentMethod === 'bank_transfer' ? 'Record Bank Transfer' : `Pay $${getEffectiveAmount().toFixed(2)}`
+                          paymentMethod === 'bank_transfer' ? 'Submit Membership Renewal' : `Pay $${getEffectiveAmount().toFixed(2)}`
                         }
                       </>
                     )}
