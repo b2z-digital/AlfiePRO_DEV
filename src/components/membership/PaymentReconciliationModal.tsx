@@ -4,6 +4,7 @@ import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Avatar } from '../ui/Avatar';
 import { updateMembershipTransactionStatus } from '../../utils/membershipFinanceUtils';
+import { sendPaymentConfirmation } from '../../utils/membershipUtils';
 
 interface PaymentReconciliationModalProps {
   isOpen: boolean;
@@ -153,6 +154,37 @@ export const PaymentReconciliationModal: React.FC<PaymentReconciliationModalProp
         if (!result.success) {
           console.error('Finance transaction failed for member:', memberId, result.error);
           financeErrors++;
+        }
+      }
+
+      const { data: clubData } = await supabase
+        .from('clubs')
+        .select('name')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      const today = new Date();
+      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+
+      for (const memberId of memberIds) {
+        const member = allMembers.find(m => m.id === memberId);
+        if (member?.email) {
+          try {
+            await sendPaymentConfirmation({
+              email: member.email,
+              first_name: member.first_name,
+              last_name: member.last_name,
+              club_name: clubData?.name || 'your club',
+              membership_type: member.membership_level || 'Membership',
+              renewal_date: renewalDate.toISOString().split('T')[0],
+              amount: member.application_data?.membership_amount || 0,
+              currency: 'AUD',
+              club_id: clubId,
+              user_id: member.user_id,
+            });
+          } catch (emailErr) {
+            console.error('Failed to send confirmation email to:', member.email, emailErr);
+          }
         }
       }
 
