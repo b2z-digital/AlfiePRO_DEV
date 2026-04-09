@@ -122,6 +122,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [migrationNotice, setMigrationNotice] = useState<{ from: string; to: string } | null>(null);
   const [bankDetails, setBankDetails] = useState<{ bank_name: string; bsb: string; account_number: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [clubHasStripe, setClubHasStripe] = useState(false);
 
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const effectiveMemberId = isImpersonating ? impersonationSession?.targetMemberId : null;
@@ -224,11 +225,18 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
       const { data: clubBankData } = await supabase
         .from('clubs')
-        .select('bank_name, bsb, account_number')
+        .select('bank_name, bsb, account_number, stripe_account_id, stripe_enabled')
         .eq('id', currentClub?.clubId)
         .maybeSingle();
-      if (clubBankData && (clubBankData.bank_name || clubBankData.bsb || clubBankData.account_number)) {
-        setBankDetails(clubBankData);
+      if (clubBankData) {
+        if (clubBankData.bank_name || clubBankData.bsb || clubBankData.account_number) {
+          setBankDetails({ bank_name: clubBankData.bank_name, bsb: clubBankData.bsb, account_number: clubBankData.account_number });
+        }
+        const hasStripe = !!(clubBankData.stripe_account_id && clubBankData.stripe_enabled);
+        setClubHasStripe(hasStripe);
+        if (!hasStripe) {
+          setSelectedPaymentMethod('bank_transfer');
+        }
       }
     } catch (err) {
       console.error('Error fetching member data:', err);
@@ -1067,19 +1075,21 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-300 mb-3">Payment Method</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setSelectedPaymentMethod('credit_card')}
-                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                        selectedPaymentMethod === 'credit_card'
-                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
-                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
-                      }`}
-                    >
-                      <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
-                      <h4 className="font-medium text-white mb-1">Credit Card</h4>
-                      <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
-                    </button>
+                  <div className={`grid ${clubHasStripe ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+                    {clubHasStripe && (
+                      <button
+                        onClick={() => setSelectedPaymentMethod('credit_card')}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 ${
+                          selectedPaymentMethod === 'credit_card'
+                            ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                            : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                        }`}
+                      >
+                        <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                        <h4 className="font-medium text-white mb-1">Credit Card</h4>
+                        <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
+                      </button>
+                    )}
                     <button
                       onClick={() => setSelectedPaymentMethod('bank_transfer')}
                       className={`p-4 rounded-xl border text-left transition-all duration-200 ${
