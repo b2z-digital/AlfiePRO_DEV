@@ -74,6 +74,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<any[]>([]);
+  const [taxEnabled, setTaxEnabled] = useState(false);
 
   // Quick add category
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -161,10 +162,11 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
       setCategories(categoriesData || []);
 
       // Load tax rates
-      let taxRatesData = [];
+      let taxRatesData: any[] = [];
       let taxRatesError = null;
 
       if (isAssociation) {
+        setTaxEnabled(true);
         const { data, error } = await supabase
           .from('association_tax_rates')
           .select('*')
@@ -172,21 +174,32 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           .eq('association_type', associationType)
           .eq('is_active', true)
           .order('name');
-        taxRatesData = data;
+        taxRatesData = data || [];
         taxRatesError = error;
       } else {
-        const { data, error } = await supabase
-          .from('tax_rates')
-          .select('*')
-          .eq('club_id', currentClub?.clubId)
-          .eq('is_active', true)
-          .order('name');
-        taxRatesData = data;
-        taxRatesError = error;
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('tax_enabled')
+          .eq('id', currentClub?.clubId)
+          .maybeSingle();
+
+        const isTaxEnabled = clubData?.tax_enabled || false;
+        setTaxEnabled(isTaxEnabled);
+
+        if (isTaxEnabled) {
+          const { data, error } = await supabase
+            .from('tax_rates')
+            .select('*')
+            .eq('club_id', currentClub?.clubId)
+            .eq('is_active', true)
+            .order('name');
+          taxRatesData = data || [];
+          taxRatesError = error;
+        }
       }
 
       if (taxRatesError) throw taxRatesError;
-      setTaxRates(taxRatesData || []);
+      setTaxRates(taxRatesData);
 
     } catch (err) {
       console.error('Error loading initial data:', err);
@@ -755,7 +768,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           yPos = 20;
         }
 
-        const gstLabel = invoice.tax_amount > 0 ? 'GST' : '-';
+        const gstLabel = invoice.tax_amount > 0 ? 'Tax' : '-';
 
         doc.text(item.description, colX.description, yPos);
         doc.text(String(item.quantity), colX.quantity, yPos);
@@ -947,16 +960,16 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
             <h3 className="text-lg font-semibold text-white mb-4">Line Items</h3>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 text-sm font-medium text-slate-400">
+              <div className={`grid gap-4 text-sm font-medium text-slate-400 ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                 <div className="col-span-3">Description</div>
                 <div className="col-span-2">Amount</div>
                 <div className="col-span-3">Category</div>
-                <div className="col-span-3">Tax</div>
+                {taxEnabled && <div className="col-span-3">Tax</div>}
                 <div className="col-span-1">Actions</div>
               </div>
 
               {lineItems.map((item, index) => (
-                <div key={item.id} className="grid grid-cols-12 gap-4 items-start">
+                <div key={item.id} className={`grid gap-4 items-start ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                   <div className="col-span-3">
                     <input
                       type="text"
@@ -1006,25 +1019,27 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
                     </select>
                   </div>
 
-                  <div className="col-span-3">
-                    <select
-                      value={item.tax_type}
-                      onChange={(e) => updateLineItem(item.id, 'tax_type', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                    >
-                      <option value="none">No Tax</option>
-                      {taxRates.map(rate => (
-                        <optgroup key={rate.id} label={rate.name}>
-                          <option value="included">
-                            Tax Included
-                          </option>
-                          <option value="excluded">
-                            Tax Excluded
-                          </option>
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                  {taxEnabled && (
+                    <div className="col-span-3">
+                      <select
+                        value={item.tax_type}
+                        onChange={(e) => updateLineItem(item.id, 'tax_type', e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                      >
+                        <option value="none">No Tax</option>
+                        {taxRates.map(rate => (
+                          <optgroup key={rate.id} label={rate.name}>
+                            <option value="included">
+                              Tax Included
+                            </option>
+                            <option value="excluded">
+                              Tax Excluded
+                            </option>
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="col-span-1">
                     {lineItems.length > 1 && (
@@ -1077,15 +1092,19 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
-              <div className="flex justify-between text-slate-300">
-                <span>Sub Total</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Tax</span>
-                <span>${taxAmount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold text-white border-t border-slate-600 pt-2">
+              {taxEnabled && (
+                <>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Sub Total</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Tax</span>
+                    <span>${taxAmount.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              <div className={`flex justify-between text-xl font-bold text-white ${taxEnabled ? 'border-t border-slate-600 pt-2' : ''}`}>
                 <span>TOTAL</span>
                 <span>${total.toFixed(2)} AUD</span>
               </div>

@@ -668,7 +668,7 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
         `}>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gross Income</p>
+              <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{clubTaxSettings.enabled ? 'Gross Income' : 'Total Income'}</p>
               <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {formatCurrency(summary.totalIncome)}
               </p>
@@ -703,8 +703,8 @@ export const FinancesOverview: React.FC<FinancesOverviewProps> = ({
           </div>
           <div className={`flex items-center gap-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             <span>Opening: {formatCurrency(summary.openingBalance)}</span>
-            <span className="mx-1">-</span>
-            <span>Period Net: {formatCurrency(summary.netIncomeAfterTax)}</span>
+            <span className="mx-1">|</span>
+            <span>Period Net: {formatCurrency(clubTaxSettings.enabled ? summary.netIncomeAfterTax : summary.netIncome)}</span>
           </div>
         </div>
 
