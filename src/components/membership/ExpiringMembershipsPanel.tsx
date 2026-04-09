@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter, ArrowRightLeft } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, Calendar, Mail, Phone, Clock, RefreshCw, Download, Search, ListFilter as Filter, ArrowRightLeft, DollarSign, CircleCheck as CheckCircle, Banknote } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
+import { Avatar } from '../ui/Avatar';
+import { sendPaymentConfirmation } from '../../utils/membershipUtils';
+import { updateMembershipTransactionStatus } from '../../utils/membershipFinanceUtils';
 
 interface ExpiringMember {
   member_id: string;
@@ -17,6 +20,19 @@ interface ExpiringMember {
   phone: string;
 }
 
+interface PendingRenewal {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  membership_level: string;
+  avatar_url?: string;
+  payment_amount: number;
+  payment_method: string;
+  payment_date: string;
+  user_id: string;
+}
+
 interface ExpiringMembershipsPanelProps {
   darkMode: boolean;
 }
@@ -27,15 +43,18 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
   const [loading, setLoading] = useState(true);
   const [expiringMembers, setExpiringMembers] = useState<ExpiringMember[]>([]);
   const [overdueMembers, setOverdueMembers] = useState<any[]>([]);
+  const [pendingRenewals, setPendingRenewals] = useState<PendingRenewal[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDays, setFilterDays] = useState(90);
-  const [activeTab, setActiveTab] = useState<'expiring' | 'overdue'>('expiring');
+  const [activeTab, setActiveTab] = useState<'pending' | 'expiring' | 'overdue'>('pending');
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [replacementMap, setReplacementMap] = useState<Record<string, string>>({});
+  const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentClub?.clubId) {
       fetchExpiringMemberships();
+      fetchPendingRenewals();
     }
   }, [currentClub, filterDays]);
 
@@ -88,6 +107,124 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       addNotification('error', 'Failed to load expiring memberships');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingRenewals = async () => {
+    if (!currentClub?.clubId) return;
+
+    try {
+      const { data: members, error } = await supabase
+        .from('members')
+        .select('id, first_name, last_name, email, membership_level, user_id, avatar_url')
+        .eq('club_id', currentClub.clubId)
+        .eq('payment_status', 'pending')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!members || members.length === 0) {
+        setPendingRenewals([]);
+        return;
+      }
+
+      const memberIds = members.map(m => m.id);
+      const { data: payments } = await supabase
+        .from('membership_payments')
+        .select('member_id, amount, payment_method, created_at')
+        .in('member_id', memberIds)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      const paymentMap = new Map<string, any>();
+      payments?.forEach(p => {
+        if (!paymentMap.has(p.member_id)) {
+          paymentMap.set(p.member_id, p);
+        }
+      });
+
+      const renewals: PendingRenewal[] = members.map(m => {
+        const payment = paymentMap.get(m.id);
+        return {
+          id: m.id,
+          first_name: m.first_name,
+          last_name: m.last_name,
+          email: m.email,
+          membership_level: m.membership_level || 'Member',
+          avatar_url: m.avatar_url,
+          payment_amount: payment?.amount || 0,
+          payment_method: payment?.payment_method || 'bank_transfer',
+          payment_date: payment?.created_at || new Date().toISOString(),
+          user_id: m.user_id,
+        };
+      });
+
+      setPendingRenewals(renewals);
+    } catch (error) {
+      console.error('Error fetching pending renewals:', error);
+    }
+  };
+
+  const handleConfirmRenewalPayment = async (member: PendingRenewal) => {
+    try {
+      setConfirmingPayment(member.id);
+
+      const today = new Date();
+      const renewalDate = new Date(today.setFullYear(today.getFullYear() + 1));
+
+      const { error: memberError } = await supabase
+        .from('members')
+        .update({
+          is_financial: true,
+          payment_status: 'paid',
+          payment_confirmed_at: new Date().toISOString(),
+          renewal_date: renewalDate.toISOString().split('T')[0],
+          amount_paid: member.payment_amount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', member.id);
+
+      if (memberError) throw memberError;
+
+      await supabase
+        .from('membership_payments')
+        .update({ status: 'completed' })
+        .eq('member_id', member.id)
+        .eq('status', 'pending');
+
+      try {
+        await updateMembershipTransactionStatus(member.id, 'paid');
+      } catch (finErr) {
+        console.error('Finance update failed:', finErr);
+      }
+
+      if (member.email) {
+        try {
+          await sendPaymentConfirmation({
+            email: member.email,
+            first_name: member.first_name,
+            last_name: member.last_name,
+            club_name: currentClub?.club?.name || 'your club',
+            membership_type: member.membership_level,
+            renewal_date: renewalDate.toISOString().split('T')[0],
+            amount: member.payment_amount,
+            currency: 'AUD',
+            club_id: currentClub?.clubId,
+            user_id: member.user_id,
+          });
+        } catch (emailErr) {
+          console.error('Failed to send confirmation email:', emailErr);
+        }
+      }
+
+      addNotification('success', `Payment confirmed for ${member.first_name} ${member.last_name}. Confirmation email sent.`);
+      await fetchPendingRenewals();
+      await fetchExpiringMemberships();
+    } catch (error) {
+      console.error('Error confirming payment:', error);
+      addNotification('error', 'Failed to confirm payment');
+    } finally {
+      setConfirmingPayment(null);
     }
   };
 
@@ -229,7 +366,26 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {pendingRenewals.length > 0 && (
+          <div
+            className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4 backdrop-blur-sm cursor-pointer hover:bg-orange-900/30 transition-colors"
+            onClick={() => { setActiveTab('pending'); setSelectedMembers(new Set()); }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-400 font-medium">Pending Renewals</p>
+                <p className="text-2xl font-bold text-white mt-1">{pendingRenewals.length}</p>
+                <p className="text-xs text-orange-400/70 mt-1">Awaiting payment confirmation</p>
+              </div>
+              <div className="relative">
+                <Banknote className="text-orange-400" size={32} />
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full animate-pulse" />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -263,6 +419,23 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-700">
+        {pendingRenewals.length > 0 && (
+          <button
+            onClick={() => {
+              setActiveTab('pending');
+              setSelectedMembers(new Set());
+            }}
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
+              activeTab === 'pending'
+                ? 'border-orange-500 text-orange-400'
+                : 'border-transparent text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <DollarSign size={16} />
+            Pending Renewals ({pendingRenewals.length})
+            <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+          </button>
+        )}
         <button
           onClick={() => {
             setActiveTab('expiring');
@@ -332,7 +505,103 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
         )}
       </div>
 
-      {/* Members List */}
+      {/* Pending Renewals List */}
+      {activeTab === 'pending' && (
+        <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
+          {pendingRenewals.length === 0 ? (
+            <div className="text-center py-12">
+              <CheckCircle size={48} className="mx-auto mb-4 text-green-600" />
+              <p className="text-slate-400">No pending renewal payments to confirm</p>
+            </div>
+          ) : (
+            <div>
+              <div className="px-4 py-3 bg-orange-900/20 border-b border-orange-500/20">
+                <p className="text-sm text-orange-300">
+                  These members have submitted renewal payments and are waiting for you to confirm receipt of payment.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-700/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Member</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Membership</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Amount</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Payment Method</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Submitted</th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {pendingRenewals.map((renewal) => (
+                      <tr key={renewal.id} className="hover:bg-slate-700/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              name={`${renewal.first_name} ${renewal.last_name}`}
+                              imageUrl={renewal.avatar_url}
+                              size="sm"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-white font-medium">
+                                {renewal.first_name} {renewal.last_name}
+                              </span>
+                              <span className="text-slate-400 text-sm">{renewal.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-slate-300">{renewal.membership_level}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-green-400 font-medium">${renewal.payment_amount.toFixed(2)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-700 text-slate-300">
+                            <Banknote size={12} />
+                            {renewal.payment_method === 'bank_transfer' ? 'Bank Transfer' : renewal.payment_method}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-slate-300 text-sm">
+                            {new Date(renewal.payment_date).toLocaleDateString('en-AU', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleConfirmRenewalPayment(renewal)}
+                            disabled={confirmingPayment === renewal.id}
+                            className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ml-auto"
+                          >
+                            {confirmingPayment === renewal.id ? (
+                              <>
+                                <RefreshCw size={14} className="animate-spin" />
+                                Confirming...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle size={14} />
+                                Confirm Payment
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Expiring/Overdue Members List */}
+      {activeTab !== 'pending' && (
       <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
         {filteredMembers.length === 0 ? (
           <div className="text-center py-12">
@@ -438,6 +707,7 @@ export const ExpiringMembershipsPanel: React.FC<ExpiringMembershipsPanelProps> =
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
