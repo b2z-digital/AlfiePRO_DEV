@@ -40,6 +40,12 @@ interface MembershipTypeMapping {
   financialStatus: 'keep_csv' | 'financial' | 'unfinancial';
 }
 
+interface ImportError {
+  row: number;
+  name: string;
+  reason: string;
+}
+
 type ImportStep = 'upload' | 'mapping' | 'membership_mapping' | 'preview' | 'importing' | 'complete';
 
 const FIELD_OPTIONS = [
@@ -94,6 +100,8 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   const [expandedMappings, setExpandedMappings] = useState(true);
   const [clubMembershipTypes, setClubMembershipTypes] = useState<MembershipTypeOption[]>([]);
   const [membershipTypeMappings, setMembershipTypeMappings] = useState<MembershipTypeMapping[]>([]);
+  const [importErrors, setImportErrors] = useState<ImportError[]>([]);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
   // Reset modal state when it closes
   const resetModalState = () => {
@@ -112,6 +120,8 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setErrorCount(0);
     setExpandedMappings(true);
     setMembershipTypeMappings([]);
+    setImportErrors([]);
+    setShowErrorDetails(false);
   };
 
   React.useEffect(() => {
@@ -407,6 +417,10 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setImportedCount(0);
     setSkippedCount(0);
     setErrorCount(0);
+    setImportErrors([]);
+    setShowErrorDetails(false);
+
+    const importedEmails = new Set<string>();
 
     console.log('=== STARTING IMPORT ===');
     console.log('Total existing members:', members.length);
@@ -481,14 +495,32 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
       console.log(`\n--- Processing row ${i + 1} ---`);
       console.log('Member data built:', memberData);
 
-      // Skip if no first name or last name (required fields)
       if (!memberData.first_name || !memberData.last_name) {
-        console.log('❌ Skipping row - missing required fields');
-        setSkippedCount(prev => prev + 1);
+        console.log('Skipping row - missing required fields');
+        const missingFields = [];
+        if (!memberData.first_name) missingFields.push('First Name');
+        if (!memberData.last_name) missingFields.push('Last Name');
+        setImportErrors(prev => [...prev, {
+          row: i + 1,
+          name: `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim() || `Row ${i + 1}`,
+          reason: `Missing required field(s): ${missingFields.join(', ')}`
+        }]);
+        setErrorCount(prev => prev + 1);
         continue;
       }
 
       console.log(`Checking for duplicate: ${memberData.first_name} ${memberData.last_name} (${memberData.email || 'no email'})`);
+
+      if (memberData.email && importedEmails.has(memberData.email.toLowerCase())) {
+        console.log(`Skipping duplicate email within CSV: ${memberData.email}`);
+        setImportErrors(prev => [...prev, {
+          row: i + 1,
+          name: `${memberData.first_name} ${memberData.last_name}`,
+          reason: `Duplicate email in CSV - "${memberData.email}" was already imported from an earlier row`
+        }]);
+        setErrorCount(prev => prev + 1);
+        continue;
+      }
 
       const existingMember = members.find(m => {
         // Check email match if both have emails
@@ -565,12 +597,27 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           if (boatError) console.error('Error inserting boat:', boatError);
         }
 
+        if (memberData.email) {
+          importedEmails.add(memberData.email.toLowerCase());
+        }
         setImportedCount(prev => prev + 1);
         console.log('Import count increased');
       } catch (error: any) {
         console.error('Error importing member:', error);
+        const memberName = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
+        let reason = error?.message || 'Unknown error';
+        if (reason.includes('duplicate key') && reason.includes('members_club_email_unique')) {
+          reason = `Duplicate email - a member with email "${memberData.email}" already exists in this club`;
+        } else if (reason.includes('duplicate key')) {
+          reason = `Duplicate entry - a member with this data already exists`;
+        } else if (reason.includes('violates check constraint')) {
+          reason = 'Invalid data format for one or more fields';
+        } else if (reason.includes('permission') || reason.includes('policy')) {
+          reason = 'Permission denied - check your admin access to this club';
+        }
+        setImportErrors(prev => [...prev, { row: i + 1, name: memberName || `Row ${i + 1}`, reason }]);
         setErrorCount(prev => prev + 1);
-        setImportStatus(`Error on row ${i + 1}: ${error?.message || 'Unknown error'}`);
+        setImportStatus(`Error on row ${i + 1}: ${reason}`);
       }
 
       currentResolution = null;
@@ -994,17 +1041,81 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
                 <h3 className="text-xl font-semibold mb-2">
                   {errorCount > 0 && importedCount === 0 ? 'Import Failed' : 'Import Complete!'}
                 </h3>
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Successfully imported {importedCount} member(s)
-                  {skippedCount > 0 && ` | Skipped ${skippedCount} duplicate(s)`}
-                  {errorCount > 0 && ` | ${errorCount} error(s)`}
-                </p>
-                {errorCount > 0 && (
-                  <p className="text-sm text-red-400 mt-2">
-                    Some members could not be imported. Please check that you have admin access to this club and try again.
-                  </p>
-                )}
+                <div className="flex items-center justify-center gap-4 mt-3">
+                  {importedCount > 0 && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
+                    }`}>
+                      <CheckCircle size={14} />
+                      {importedCount} imported
+                    </span>
+                  )}
+                  {skippedCount > 0 && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                    }`}>
+                      {skippedCount} skipped
+                    </span>
+                  )}
+                  {errorCount > 0 && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'
+                    }`}>
+                      <AlertCircle size={14} />
+                      {errorCount} error{errorCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {importErrors.length > 0 && (
+                <div className="text-left max-w-2xl mx-auto">
+                  <button
+                    onClick={() => setShowErrorDetails(!showErrorDetails)}
+                    className={`flex items-center gap-2 text-sm font-medium mb-3 mx-auto ${
+                      darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-500'
+                    }`}
+                  >
+                    {showErrorDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    {showErrorDetails ? 'Hide' : 'Show'} error details ({importErrors.length})
+                  </button>
+
+                  {showErrorDetails && (
+                    <div className={`rounded-lg border overflow-hidden ${
+                      darkMode ? 'border-gray-700' : 'border-gray-200'
+                    }`}>
+                      <div className={`grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium uppercase tracking-wider ${
+                        darkMode ? 'bg-gray-750 text-gray-500' : 'bg-gray-50 text-gray-400'
+                      }`}>
+                        <div className="col-span-1">Row</div>
+                        <div className="col-span-3">Name</div>
+                        <div className="col-span-8">Reason</div>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {importErrors.map((err, idx) => (
+                          <div
+                            key={idx}
+                            className={`grid grid-cols-12 gap-2 px-4 py-2.5 text-sm border-t ${
+                              darkMode ? 'border-gray-700' : 'border-gray-100'
+                            }`}
+                          >
+                            <div className={`col-span-1 font-mono ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                              {err.row}
+                            </div>
+                            <div className={`col-span-3 font-medium truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {err.name}
+                            </div>
+                            <div className={`col-span-8 ${darkMode ? 'text-red-400/80' : 'text-red-600'}`}>
+                              {err.reason}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   onImportComplete();
