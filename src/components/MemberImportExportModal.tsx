@@ -420,6 +420,8 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setImportErrors([]);
     setShowErrorDetails(false);
 
+    const importedEmails = new Set<string>();
+
     console.log('=== STARTING IMPORT ===');
     console.log('Total existing members:', members.length);
     console.log('Total CSV rows to import:', csvData.length);
@@ -509,6 +511,17 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
       console.log(`Checking for duplicate: ${memberData.first_name} ${memberData.last_name} (${memberData.email || 'no email'})`);
 
+      if (memberData.email && importedEmails.has(memberData.email.toLowerCase())) {
+        console.log(`Skipping duplicate email within CSV: ${memberData.email}`);
+        setImportErrors(prev => [...prev, {
+          row: i + 1,
+          name: `${memberData.first_name} ${memberData.last_name}`,
+          reason: `Duplicate email in CSV - "${memberData.email}" was already imported from an earlier row`
+        }]);
+        setErrorCount(prev => prev + 1);
+        continue;
+      }
+
       const existingMember = members.find(m => {
         // Check email match if both have emails
         if (memberData.email && m.email &&
@@ -584,14 +597,19 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           if (boatError) console.error('Error inserting boat:', boatError);
         }
 
+        if (memberData.email) {
+          importedEmails.add(memberData.email.toLowerCase());
+        }
         setImportedCount(prev => prev + 1);
         console.log('Import count increased');
       } catch (error: any) {
         console.error('Error importing member:', error);
         const memberName = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
         let reason = error?.message || 'Unknown error';
-        if (reason.includes('duplicate key')) {
-          reason = 'Duplicate entry - a member with this email already exists';
+        if (reason.includes('duplicate key') && reason.includes('members_club_email_unique')) {
+          reason = `Duplicate email - a member with email "${memberData.email}" already exists in this club`;
+        } else if (reason.includes('duplicate key')) {
+          reason = `Duplicate entry - a member with this data already exists`;
         } else if (reason.includes('violates check constraint')) {
           reason = 'Invalid data format for one or more fields';
         } else if (reason.includes('permission') || reason.includes('policy')) {
