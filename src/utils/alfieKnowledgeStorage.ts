@@ -314,10 +314,25 @@ export const DOCUMENT_CATEGORIES = [
   'general-knowledge'
 ] as const;
 
+export const RO_TRAINING_CATEGORIES = [
+  'race-management',
+  'course-setting',
+  'starting-procedures',
+  'finishing-procedures',
+  'protest-committee',
+  'scoring-systems',
+  'flag-signals',
+  'safety-management',
+  'event-management',
+  'general-ro-training'
+] as const;
+
 export async function getKnowledgeDocuments(): Promise<AlfieKnowledgeDocument[]> {
+  const roCategories = [...RO_TRAINING_CATEGORIES] as string[];
   const { data, error } = await supabase
     .from('alfie_knowledge_documents')
     .select('*')
+    .not('category', 'in', `(${roCategories.join(',')})`)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -499,6 +514,87 @@ export async function triggerDocumentProcessing(documentId: string): Promise<voi
   }
 }
 
+export async function getRoTrainingDocuments(): Promise<AlfieKnowledgeDocument[]> {
+  const { data, error } = await supabase
+    .from('alfie_knowledge_documents')
+    .select('*')
+    .in('category', [...RO_TRAINING_CATEGORIES])
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function uploadRoTrainingDocument(
+  file: File,
+  metadata: {
+    title: string;
+    category: string;
+    source_url?: string;
+  }
+): Promise<AlfieKnowledgeDocument> {
+  const timestamp = Date.now();
+  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const storagePath = `documents/ro-training/${metadata.category || 'general-ro-training'}/${timestamp}_${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('alfie-knowledge')
+    .upload(storagePath, file, {
+      contentType: file.type,
+      upsert: false
+    });
+
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from('alfie_knowledge_documents')
+    .insert({
+      title: metadata.title,
+      category: metadata.category || 'general-ro-training',
+      source_url: metadata.source_url || null,
+      storage_path: storagePath,
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      is_active: true,
+      processing_status: 'pending'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createTextRoTrainingDocument(
+  metadata: {
+    title: string;
+    category: string;
+    source_url?: string;
+    content_text: string;
+  }
+): Promise<AlfieKnowledgeDocument> {
+  const { data, error } = await supabase
+    .from('alfie_knowledge_documents')
+    .insert({
+      title: metadata.title,
+      category: metadata.category || 'general-ro-training',
+      source_url: metadata.source_url || null,
+      content_text: metadata.content_text,
+      storage_path: null,
+      file_name: null,
+      file_size: 0,
+      mime_type: 'text/plain',
+      is_active: true,
+      processing_status: 'pending'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export interface AlfieAiInstruction {
   id: string;
   title: string;
@@ -608,15 +704,18 @@ export async function getKnowledgeStats(): Promise<{
   activeCorrections: number;
   totalDocuments: number;
   activeDocuments: number;
+  totalRoTraining: number;
+  activeRoTraining: number;
   totalChunks: number;
   totalImages: number;
   totalInstructions: number;
   activeInstructions: number;
 }> {
+  const roCategories = [...RO_TRAINING_CATEGORIES] as string[];
   const [guides, corrections, documents, chunks, images, instructions] = await Promise.all([
     supabase.from('alfie_tuning_guides').select('id, is_active'),
     supabase.from('alfie_knowledge_corrections').select('id, status'),
-    supabase.from('alfie_knowledge_documents').select('id, is_active'),
+    supabase.from('alfie_knowledge_documents').select('id, is_active, category'),
     supabase.from('alfie_knowledge_chunks').select('id', { count: 'exact', head: true }),
     supabase.from('alfie_knowledge_images').select('id', { count: 'exact', head: true }),
     supabase.from('alfie_ai_instructions').select('id, is_active')
@@ -624,8 +723,11 @@ export async function getKnowledgeStats(): Promise<{
 
   const guideData = guides.data || [];
   const correctionData = corrections.data || [];
-  const documentData = documents.data || [];
+  const allDocData = documents.data || [];
   const instructionData = instructions.data || [];
+
+  const documentData = allDocData.filter(d => !roCategories.includes(d.category));
+  const roTrainingData = allDocData.filter(d => roCategories.includes(d.category));
 
   return {
     totalGuides: guideData.length,
@@ -634,6 +736,8 @@ export async function getKnowledgeStats(): Promise<{
     activeCorrections: correctionData.filter(c => c.status === 'active').length,
     totalDocuments: documentData.length,
     activeDocuments: documentData.filter(d => d.is_active).length,
+    totalRoTraining: roTrainingData.length,
+    activeRoTraining: roTrainingData.filter(d => d.is_active).length,
     totalChunks: chunks.count || 0,
     totalImages: images.count || 0,
     totalInstructions: instructionData.length,

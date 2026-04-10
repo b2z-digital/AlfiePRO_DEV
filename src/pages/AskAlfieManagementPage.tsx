@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, FileText, MessageSquare, Database, Image, BookOpen, ChevronLeft, ChartBar as BarChart3, Scale, Sparkles } from 'lucide-react';
+import { Bot, FileText, MessageSquare, Database, Image, BookOpen, ChevronLeft, ChartBar as BarChart3, Scale, Sparkles, ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getKnowledgeStats } from '../utils/alfieKnowledgeStorage';
 import TuningGuidesTab from '../components/ask-alfie/TuningGuidesTab';
 import CorrectionsTab from '../components/ask-alfie/CorrectionsTab';
 import SailingRulesTab from '../components/ask-alfie/SailingRulesTab';
+import RoTrainingTab from '../components/ask-alfie/RoTrainingTab';
 import AiInstructionsTab from '../components/ask-alfie/AiInstructionsTab';
 
 interface AskAlfieManagementPageProps {
   darkMode: boolean;
 }
 
-type TabType = 'overview' | 'guides' | 'sailing-rules' | 'corrections' | 'instructions';
+type TabType = 'overview' | 'guides' | 'sailing-rules' | 'ro-training' | 'corrections' | 'instructions';
 
 export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementPageProps) {
   const navigate = useNavigate();
@@ -23,6 +24,8 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
     activeCorrections: 0,
     totalDocuments: 0,
     activeDocuments: 0,
+    totalRoTraining: 0,
+    activeRoTraining: 0,
     totalChunks: 0,
     totalImages: 0,
     totalInstructions: 0,
@@ -50,6 +53,7 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
     { id: 'overview', label: 'Overview', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'guides', label: 'Tuning Guides', icon: <FileText className="w-4 h-4" /> },
     { id: 'sailing-rules', label: 'Sailing Rules', icon: <Scale className="w-4 h-4" /> },
+    { id: 'ro-training', label: 'RO Training', icon: <ClipboardList className="w-4 h-4" /> },
     { id: 'corrections', label: 'Knowledge Corrections', icon: <MessageSquare className="w-4 h-4" /> },
     { id: 'instructions', label: 'AI Instructions', icon: <Sparkles className="w-4 h-4" /> }
   ];
@@ -70,6 +74,14 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
       icon: <Scale className="w-5 h-5" />,
       color: 'teal',
       onClick: () => setActiveTab('sailing-rules')
+    },
+    {
+      label: 'RO Training',
+      value: stats.totalRoTraining,
+      sub: `${stats.activeRoTraining} active`,
+      icon: <ClipboardList className="w-5 h-5" />,
+      color: 'orange',
+      onClick: () => setActiveTab('ro-training')
     },
     {
       label: 'Knowledge Corrections',
@@ -116,6 +128,11 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
       bg: darkMode ? 'bg-amber-900/20 border-amber-800/30' : 'bg-amber-50 border-amber-100',
       text: darkMode ? 'text-amber-400' : 'text-amber-600',
       iconBg: darkMode ? 'bg-amber-900/40' : 'bg-amber-100'
+    },
+    orange: {
+      bg: darkMode ? 'bg-orange-900/20 border-orange-800/30' : 'bg-orange-50 border-orange-100',
+      text: darkMode ? 'text-orange-400' : 'text-orange-600',
+      iconBg: darkMode ? 'bg-orange-900/40' : 'bg-orange-100'
     },
     rose: {
       bg: darkMode ? 'bg-rose-900/20 border-rose-800/30' : 'bg-rose-50 border-rose-100',
@@ -166,7 +183,7 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
 
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {statCards.map(card => {
                 const colors = colorMap[card.color];
                 return (
@@ -225,6 +242,15 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
                     <h3 className={`font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      RO Training
+                    </h3>
+                    <p>Upload Race Officer training documents covering topics like race management, course setting,
+                    starting and finishing procedures, flag signals, scoring systems, and safety management. These
+                    documents are processed and indexed just like tuning guides and sailing rules, so Alfie can draw
+                    on them when answering questions about race officer duties and best practices.</p>
+                  </div>
+                  <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+                    <h3 className={`font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                       Knowledge Corrections
                     </h3>
                     <p>When Alfie gives an incorrect or incomplete answer, add a correction here. Corrections are tagged
@@ -232,13 +258,15 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
                     when a similar question is asked. Over time, this builds a curated knowledge base that makes Alfie
                     increasingly accurate for RC yacht racing.</p>
                   </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
                     <h3 className={`font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                       Knowledge Chunks
                     </h3>
-                    <p>When tuning guides and sailing rules are processed, they are split into smaller text segments
-                    called "chunks". These chunks are what Alfie searches through to find relevant answers. The more
-                    documents you upload and process, the more knowledgeable Alfie becomes.</p>
+                    <p>When tuning guides, sailing rules, and RO training documents are processed, they are split into
+                    smaller text segments called "chunks". These chunks are what Alfie searches through to find relevant
+                    answers. The more documents you upload and process, the more knowledgeable Alfie becomes.</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -265,6 +293,7 @@ export default function AskAlfieManagementPage({ darkMode }: AskAlfieManagementP
 
         {activeTab === 'guides' && <TuningGuidesTab darkMode={darkMode} />}
         {activeTab === 'sailing-rules' && <SailingRulesTab darkMode={darkMode} />}
+        {activeTab === 'ro-training' && <RoTrainingTab darkMode={darkMode} />}
         {activeTab === 'corrections' && <CorrectionsTab darkMode={darkMode} />}
         {activeTab === 'instructions' && <AiInstructionsTab darkMode={darkMode} />}
       </div>

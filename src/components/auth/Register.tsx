@@ -399,9 +399,11 @@ export const Register: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    minLength={6}
                     className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="••••••••"
+                    placeholder="Minimum 6 characters"
                   />
+                  <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
                 </div>
 
                 <div>
