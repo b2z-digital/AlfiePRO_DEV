@@ -91,6 +91,7 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
           id, name, abbreviation, logo, state_association_id,
           state_associations:state_association_id ( name, abbreviation )
         `)
+        .neq('is_test', true)
         .order('name');
 
       if (error) throw error;

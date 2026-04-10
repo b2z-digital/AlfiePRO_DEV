@@ -64,6 +64,7 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
   
   // Data
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
+  const [taxEnabled, setTaxEnabled] = useState(false);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [expenseNumber, setExpenseNumber] = useState('');
 
@@ -111,6 +112,7 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
       console.log('ExpenseCreationPage loadData - isAssociation:', isAssociation, 'associationId:', associationId, 'associationType:', associationType);
 
       if (isAssociation) {
+        setTaxEnabled(true);
         // Load association categories and tax rates
         console.log('Loading association budget categories...');
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -138,15 +140,27 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
         if (taxRatesError) throw taxRatesError;
         setTaxRates(taxRatesData || []);
       } else {
-        // Load club tax rates and categories
-        const { data: taxRatesData, error: taxRatesError } = await supabase
-          .from('tax_rates')
-          .select('id, name, rate, currency')
-          .eq('club_id', currentClub?.clubId)
-          .eq('is_active', true);
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('tax_enabled')
+          .eq('id', currentClub?.clubId)
+          .maybeSingle();
 
-        if (taxRatesError) throw taxRatesError;
-        setTaxRates(taxRatesData || []);
+        const isTaxEnabled = clubData?.tax_enabled || false;
+        setTaxEnabled(isTaxEnabled);
+
+        if (isTaxEnabled) {
+          const { data: taxRatesData, error: taxRatesError } = await supabase
+            .from('tax_rates')
+            .select('id, name, rate, currency')
+            .eq('club_id', currentClub?.clubId)
+            .eq('is_active', true);
+
+          if (taxRatesError) throw taxRatesError;
+          setTaxRates(taxRatesData || []);
+        } else {
+          setTaxRates([]);
+        }
 
         const { data: categoriesData, error: categoriesError} = await supabase
           .from('budget_categories')
@@ -555,16 +569,16 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
             <h3 className="text-lg font-semibold text-white mb-4">Line Items</h3>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 text-sm font-medium text-slate-400">
+              <div className={`grid gap-4 text-sm font-medium text-slate-400 ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                 <div className="col-span-3">Description</div>
                 <div className="col-span-2">Amount</div>
                 <div className="col-span-3">Category</div>
-                <div className="col-span-3">Tax</div>
+                {taxEnabled && <div className="col-span-3">Tax</div>}
                 <div className="col-span-1">Actions</div>
               </div>
 
               {lineItems.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-4 items-start">
+                <div key={index} className={`grid gap-4 items-start ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                   <div className="col-span-3">
                     <input
                       type="text"
@@ -610,25 +624,27 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
                     </select>
                   </div>
 
-                  <div className="col-span-3">
-                    <select
-                      value={getTaxSelectionValue(item)}
-                      onChange={(e) => updateLineItem(index, 'taxSelection', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                    >
-                      <option value="">No Tax</option>
-                      {taxRates.map(taxRate => (
-                        <optgroup key={taxRate.id} label={taxRate.name}>
-                          <option value={`${taxRate.id}|included`}>
-                            Tax Included
-                          </option>
-                          <option value={`${taxRate.id}|excluded`}>
-                            Tax Excluded
-                          </option>
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                  {taxEnabled && (
+                    <div className="col-span-3">
+                      <select
+                        value={getTaxSelectionValue(item)}
+                        onChange={(e) => updateLineItem(index, 'taxSelection', e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                      >
+                        <option value="">No Tax</option>
+                        {taxRates.map(taxRate => (
+                          <optgroup key={taxRate.id} label={taxRate.name}>
+                            <option value={`${taxRate.id}|included`}>
+                              Tax Included
+                            </option>
+                            <option value={`${taxRate.id}|excluded`}>
+                              Tax Excluded
+                            </option>
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="col-span-1">
                     {lineItems.length > 1 && (
@@ -683,15 +699,19 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
-              <div className="flex justify-between text-slate-300">
-                <span>Sub Total</span>
-                <span>${totals.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Tax</span>
-                <span>${totals.tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold text-white border-t border-slate-600 pt-2">
+              {taxEnabled && (
+                <>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Sub Total</span>
+                    <span>${totals.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Tax</span>
+                    <span>${totals.tax.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              <div className={`flex justify-between text-xl font-bold text-white ${taxEnabled ? 'border-t border-slate-600 pt-2' : ''}`}>
                 <span>TOTAL</span>
                 <span>${totals.total.toFixed(2)} AUD</span>
               </div>

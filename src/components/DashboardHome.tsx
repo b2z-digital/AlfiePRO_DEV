@@ -21,6 +21,7 @@ import { TrialStatusBanner } from './TrialStatusBanner';
 import { getBoatClassBadge, getRaceFormatBadge, getEventTypeBadge } from '../constants/colors';
 import { CustomizableDashboard } from './dashboard/CustomizableDashboard';
 import { ClubSetupChecklist } from './dashboard/ClubSetupChecklist';
+import { ProfileCompletionBanner } from './dashboard/ProfileCompletionBanner';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -1447,6 +1448,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
         {/* Club Setup Checklist - shown for new clubs until dismissed */}
         <ClubSetupChecklist />
+
+        {/* Profile completion banner - shown for imported members needing to fill in details */}
+        <ProfileCompletionBanner />
 
         {/* Customizable Dashboard - Full Widget System (includes all widgets) */}
         <CustomizableDashboard />

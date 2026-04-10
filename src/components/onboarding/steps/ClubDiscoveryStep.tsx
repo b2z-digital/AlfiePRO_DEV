@@ -123,6 +123,7 @@ export const ClubDiscoveryStep: React.FC<ClubDiscoveryStepProps> = ({
             is_default
           )
         `)
+        .neq('is_test', true)
         .order('name');
 
       if (error) {

@@ -122,6 +122,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [migrationNotice, setMigrationNotice] = useState<{ from: string; to: string } | null>(null);
   const [bankDetails, setBankDetails] = useState<{ bank_name: string; bsb: string; account_number: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [clubHasStripe, setClubHasStripe] = useState(false);
 
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const effectiveMemberId = isImpersonating ? impersonationSession?.targetMemberId : null;
@@ -144,7 +145,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         .select(`
           id, first_name, last_name, email, phone,
           street, city, state, postcode,
-          is_financial, renewal_date,
+          is_financial, renewal_date, payment_status,
           membership_level, membership_level_custom,
           emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
           avatar_url, country, category, date_joined
@@ -224,11 +225,18 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
       const { data: clubBankData } = await supabase
         .from('clubs')
-        .select('bank_name, bsb, account_number')
+        .select('bank_name, bsb, account_number, stripe_account_id, stripe_enabled')
         .eq('id', currentClub?.clubId)
         .maybeSingle();
-      if (clubBankData && (clubBankData.bank_name || clubBankData.bsb || clubBankData.account_number)) {
-        setBankDetails(clubBankData);
+      if (clubBankData) {
+        if (clubBankData.bank_name || clubBankData.bsb || clubBankData.account_number) {
+          setBankDetails({ bank_name: clubBankData.bank_name, bsb: clubBankData.bsb, account_number: clubBankData.account_number });
+        }
+        const hasStripe = !!(clubBankData.stripe_account_id && clubBankData.stripe_enabled);
+        setClubHasStripe(hasStripe);
+        if (!hasStripe) {
+          setSelectedPaymentMethod('bank_transfer');
+        }
       }
     } catch (err) {
       console.error('Error fetching member data:', err);
@@ -245,14 +253,18 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   };
 
   const membershipStatus = useMemo(() => {
-    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, daysLeft: 0 };
+    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, pendingPayment: false, daysLeft: 0 };
+
+    if (memberData.payment_status === 'pending') {
+      return { status: 'pending_payment', text: 'Awaiting Payment', color: 'yellow', needsRenewal: false, pendingPayment: true, daysLeft: 0 };
+    }
 
     if (!memberData.is_financial) {
-      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, daysLeft: 0 };
+      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, pendingPayment: false, daysLeft: 0 };
     }
 
     if (!memberData.renewal_date) {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: 365 };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, pendingPayment: false, daysLeft: 365 };
     }
 
     const renewalDate = new Date(memberData.renewal_date);
@@ -260,11 +272,11 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     const daysUntilRenewal = Math.ceil((renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysUntilRenewal < 0) {
-      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, daysLeft: 0 };
+      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, pendingPayment: false, daysLeft: 0 };
     } else if (daysUntilRenewal <= 30) {
-      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, daysLeft: daysUntilRenewal };
+      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, pendingPayment: false, daysLeft: daysUntilRenewal };
     } else {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: daysUntilRenewal };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, pendingPayment: false, daysLeft: daysUntilRenewal };
     }
   }, [memberData]);
 
@@ -586,6 +598,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                           : 'bg-red-500/15 text-red-400 border border-red-500/20'
                       }`}>
                         {membershipStatus.status === 'active' && <CheckCircle size={16} />}
+                        {membershipStatus.status === 'pending_payment' && <Clock size={16} />}
                         {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={16} />}
                         <span className="text-sm font-semibold">{membershipStatus.text}</span>
                       </div>
@@ -593,6 +606,71 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                 </div>
               </div>
+
+              {membershipStatus.pendingPayment && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 overflow-hidden"
+                >
+                  <div className="p-4 flex items-center gap-3">
+                    <Clock size={20} className="text-yellow-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-yellow-400">Renewal Submitted - Awaiting Payment</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Your renewal has been submitted. Please complete the bank transfer below and notify your club administrator.
+                      </p>
+                    </div>
+                  </div>
+                  {bankDetails && (
+                    <div className="px-4 pb-4">
+                      <div className="bg-slate-800/60 rounded-xl p-4 space-y-3 border border-slate-700/40">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Landmark size={16} className="text-blue-400" />
+                          <p className="text-sm font-medium text-slate-200">Bank Transfer Details</p>
+                        </div>
+                        {bankDetails.bank_name && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bank Name</p>
+                              <p className="text-sm text-white font-medium">{bankDetails.bank_name}</p>
+                            </div>
+                          </div>
+                        )}
+                        {bankDetails.bsb && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">BSB</p>
+                              <p className="text-sm text-white font-medium font-mono">{bankDetails.bsb}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-banner')}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === 'bsb-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                        {bankDetails.account_number && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Account Number</p>
+                              <p className="text-sm text-white font-medium font-mono">{bankDetails.account_number}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-banner')}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === 'acc-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
               {membershipStatus.needsRenewal && (
                 <motion.div
@@ -1067,19 +1145,21 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-300 mb-3">Payment Method</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setSelectedPaymentMethod('credit_card')}
-                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                        selectedPaymentMethod === 'credit_card'
-                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
-                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
-                      }`}
-                    >
-                      <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
-                      <h4 className="font-medium text-white mb-1">Credit Card</h4>
-                      <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
-                    </button>
+                  <div className={`grid ${clubHasStripe ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+                    {clubHasStripe && (
+                      <button
+                        onClick={() => setSelectedPaymentMethod('credit_card')}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 ${
+                          selectedPaymentMethod === 'credit_card'
+                            ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                            : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                        }`}
+                      >
+                        <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                        <h4 className="font-medium text-white mb-1">Credit Card</h4>
+                        <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
+                      </button>
+                    )}
                     <button
                       onClick={() => setSelectedPaymentMethod('bank_transfer')}
                       className={`p-4 rounded-xl border text-left transition-all duration-200 ${

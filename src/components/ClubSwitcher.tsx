@@ -85,6 +85,7 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
       if (userClubs && userClubs.length > 0) {
         userClubs.forEach(uc => {
           if (uc.club) {
+            if (!isSuperAdmin && (uc.club as any).is_test) return;
             allOrgs.push({
               id: uc.clubId,
               name: uc.club.abbreviation || uc.club.name,
@@ -121,6 +122,32 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
               });
             }
           });
+
+          const stateAdminAssocs = stateAssocs.filter((sa: any) => sa.role === 'state_admin');
+          for (const sa of stateAdminAssocs) {
+            let clubsQuery = supabase
+              .from('clubs')
+              .select('id, name, abbreviation, logo')
+              .eq('state_association_id', sa.state_association_id);
+            if (!isSuperAdmin) clubsQuery = clubsQuery.neq('is_test', true);
+            const { data: assocClubs } = await clubsQuery;
+
+            if (assocClubs) {
+              const existingClubIds = new Set(allOrgs.filter(o => o.type === 'club').map(o => o.id));
+
+              assocClubs.forEach((club: any) => {
+                if (!existingClubIds.has(club.id)) {
+                  allOrgs.push({
+                    id: club.id,
+                    name: club.abbreviation || club.name,
+                    type: 'club',
+                    logo: club.logo || null,
+                    role: 'state_admin'
+                  });
+                }
+              });
+            }
+          }
         }
 
         const { data: nationalAssocs } = await supabase
@@ -162,6 +189,31 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                   });
                 }
               });
+
+              for (const sa of allStateAssocs) {
+                let natClubsQuery = supabase
+                  .from('clubs')
+                  .select('id, name, abbreviation, logo')
+                  .eq('state_association_id', sa.id);
+                if (!isSuperAdmin) natClubsQuery = natClubsQuery.neq('is_test', true);
+                const { data: stateClubs } = await natClubsQuery;
+
+                if (stateClubs) {
+                  const existingClubIds = new Set(allOrgs.filter(o => o.type === 'club').map(o => o.id));
+
+                  stateClubs.forEach((club: any) => {
+                    if (!existingClubIds.has(club.id)) {
+                      allOrgs.push({
+                        id: club.id,
+                        name: club.abbreviation || club.name,
+                        type: 'club',
+                        logo: club.logo || null,
+                        role: 'national_admin'
+                      });
+                    }
+                  });
+                }
+              }
             }
           }
         }

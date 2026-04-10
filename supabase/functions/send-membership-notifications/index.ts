@@ -170,9 +170,7 @@ function replacePlaceholders(template: string, data: EmailRequest['member_data']
   }
 
   const appBaseUrl = data.app_url || 'https://alfiepro.com.au'
-  const renewalUrl = data.club_id && data.member_id
-    ? `${appBaseUrl}/membership/${data.club_id}/renew/${data.member_id}`
-    : `${appBaseUrl}/dashboard/membership`
+  const renewalUrl = `${appBaseUrl}/my-membership`
   result = result.replace(/\{\{renewal_link\}\}/g, renewalUrl)
   result = result.replace(/\{\{renewalLink\}\}/g, renewalUrl)
   result = result.replace(/\{\{event_name\}\}/g, data.event_name || '')

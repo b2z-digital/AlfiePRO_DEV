@@ -1478,7 +1478,78 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       setIsTransitioning(false);
                       navigate('/');
                     } else {
-                      setIsTransitioning(false);
+                      const { data: clubInfo } = await supabase
+                        .from('clubs')
+                        .select('id, name, abbreviation, logo, state_association_id')
+                        .eq('id', orgId)
+                        .maybeSingle();
+
+                      if (clubInfo) {
+                        let adminRole: string | null = null;
+
+                        if (clubInfo.state_association_id) {
+                          const { data: stateRole } = await supabase
+                            .from('user_state_associations')
+                            .select('role')
+                            .eq('user_id', effectiveUserId)
+                            .eq('state_association_id', clubInfo.state_association_id)
+                            .maybeSingle();
+
+                          if (stateRole?.role === 'state_admin') {
+                            adminRole = 'admin';
+                          } else {
+                            const { data: stateAssoc } = await supabase
+                              .from('state_associations')
+                              .select('national_association_id')
+                              .eq('id', clubInfo.state_association_id)
+                              .maybeSingle();
+
+                            if (stateAssoc?.national_association_id) {
+                              const { data: natRole } = await supabase
+                                .from('user_national_associations')
+                                .select('role')
+                                .eq('user_id', effectiveUserId)
+                                .eq('national_association_id', stateAssoc.national_association_id)
+                                .maybeSingle();
+
+                              if (natRole?.role === 'national_admin') {
+                                adminRole = 'admin';
+                              }
+                            }
+                          }
+                        }
+
+                        if (adminRole) {
+                          const virtualClub: typeof userClubs[number] = {
+                            id: `virtual-${clubInfo.id}`,
+                            clubId: clubInfo.id,
+                            role: adminRole as any,
+                            club: {
+                              id: clubInfo.id,
+                              name: clubInfo.name,
+                              abbreviation: clubInfo.abbreviation,
+                              logo: clubInfo.logo,
+                            } as any,
+                          };
+
+                          setLocalSwitchingClub(true);
+                          setCurrentClub(virtualClub);
+                          setCurrentOrganization(null);
+                          setIsTransitioning(false);
+                          navigate('/');
+
+                          setTimeout(() => {
+                            setDashboardRefreshKey(prev => prev + 1);
+                          }, 100);
+                          setTimeout(() => {
+                            setLocalSwitchingClub(false);
+                          }, 1500);
+                        } else {
+                          setIsTransitioning(false);
+                        }
+                      } else {
+                        setIsTransitioning(false);
+                      }
                     }
                   }
                 } catch (error) {

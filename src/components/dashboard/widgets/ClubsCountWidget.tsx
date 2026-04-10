@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, X, BarChart2 } from 'lucide-react';
+import { Building2, X, ChartBar as BarChart2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
@@ -40,7 +40,8 @@ export const ClubsCountWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, 
       const { data, error } = await supabase
         .from('clubs')
         .select('id, subscription_tier, onboarding_completed, created_at')
-        .in('id', orgContext.clubIds);
+        .in('id', orgContext.clubIds)
+        .neq('is_test', true);
 
       if (error) {
         console.error('❌ Error fetching clubs:', error);
