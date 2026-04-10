@@ -1051,7 +1051,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                         Date Joined
                       </label>
                       <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {new Date(memberData.date_joined).toLocaleDateString()}
+                        {memberData.date_joined ? new Date(memberData.date_joined).toLocaleDateString() : 'Not set'}
                       </div>
                     </div>
                     <div>

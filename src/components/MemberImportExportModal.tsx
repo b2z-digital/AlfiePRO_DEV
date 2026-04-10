@@ -411,6 +411,37 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     return membershipTypeMappings.find(m => m.csvValue === csvValue);
   };
 
+  const parseDateValue = (raw: string): string | null => {
+    if (!raw) return null;
+    const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      const d = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    }
+    const slashMatch = raw.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+    if (slashMatch) {
+      let day = parseInt(slashMatch[1]);
+      let month = parseInt(slashMatch[2]);
+      let year = parseInt(slashMatch[3]);
+      if (year < 100) year += 2000;
+      if (day > 12) {
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      } else if (month > 12) {
+        const d = new Date(year, day - 1, month);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      } else {
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      }
+    }
+    const fallback = new Date(raw);
+    if (!isNaN(fallback.getTime()) && fallback.getFullYear() > 1970) {
+      return fallback.toISOString().split('T')[0];
+    }
+    return null;
+  };
+
   const processImport = async () => {
     setImportStep('importing');
     setImportProgress(0);
@@ -438,6 +469,41 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
     const validMappings = fieldMappings.filter(m => m.mappedTo && m.mappedTo !== 'ignore');
     let currentResolution: 'overwrite' | 'skip' | null = null;
+
+    const { data: clubSettings } = await supabase
+      .from('clubs')
+      .select('renewal_mode, fixed_renewal_date')
+      .eq('id', currentClubId)
+      .maybeSingle();
+
+    const getFinancialYearDates = (): { startDate: string; endDate: string } => {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      if (clubSettings?.renewal_mode === 'fixed' && clubSettings?.fixed_renewal_date) {
+        const [monthStr, dayStr] = clubSettings.fixed_renewal_date.split('-');
+        const fyMonth = parseInt(monthStr, 10) - 1;
+        const fyDay = parseInt(dayStr, 10);
+
+        let fyStart = new Date(currentYear, fyMonth, fyDay);
+        if (fyStart > now) {
+          fyStart = new Date(currentYear - 1, fyMonth, fyDay);
+        }
+        const fyEnd = new Date(fyStart.getFullYear() + 1, fyMonth, fyDay - 1);
+
+        return {
+          startDate: fyStart.toISOString().split('T')[0],
+          endDate: fyEnd.toISOString().split('T')[0],
+        };
+      }
+
+      return {
+        startDate: now.toISOString().split('T')[0],
+        endDate: new Date(currentYear + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0],
+      };
+    };
+
+    const fyDates = getFinancialYearDates();
 
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
@@ -467,6 +533,12 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           memberData[field] = ['yes', 'true', '1', 'y'].includes(value.toString().toLowerCase());
         } else if (field === 'amount_paid') {
           memberData[field] = parseFloat(value.toString().replace(/[$,]/g, '')) || null;
+        } else if (field === 'date_joined' || field === 'renewal_date') {
+          const raw = value.toString().trim();
+          const parsed = parseDateValue(raw);
+          if (parsed) {
+            memberData[field] = parsed;
+          }
         } else {
           memberData[field] = value;
         }
@@ -490,6 +562,13 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
             memberData.is_financial = false;
           }
         }
+      }
+
+      if (!memberData.date_joined) {
+        memberData.date_joined = fyDates.startDate;
+      }
+      if (!memberData.renewal_date) {
+        memberData.renewal_date = fyDates.endDate;
       }
 
       console.log(`\n--- Processing row ${i + 1} ---`);
