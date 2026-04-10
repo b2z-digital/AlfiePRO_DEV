@@ -329,6 +329,7 @@ export const ResetPassword: React.FC = () => {
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
+                      <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
                     </div>
 
                     <div>
