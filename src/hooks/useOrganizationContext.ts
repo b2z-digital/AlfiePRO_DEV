@@ -56,7 +56,8 @@ export const useOrganizationContext = (): OrganizationContext => {
         const { data: clubs, error } = await supabase
           .from('clubs')
           .select('id')
-          .eq('state_association_id', currentOrganization.id);
+          .eq('state_association_id', currentOrganization.id)
+          .neq('is_test', true);
 
         if (error) {
           console.error('❌ useOrganizationContext: Error fetching clubs:', error);
@@ -92,7 +93,8 @@ export const useOrganizationContext = (): OrganizationContext => {
         const { data: clubs, error: clubError } = await supabase
           .from('clubs')
           .select('id')
-          .in('state_association_id', stateIds);
+          .in('state_association_id', stateIds)
+          .neq('is_test', true);
 
         if (clubError) throw clubError;
 

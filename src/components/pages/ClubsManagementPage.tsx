@@ -164,6 +164,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         .eq('state_association_id', stateAssociationId)
         .neq('approval_status', 'pending_approval')
         .neq('approval_status', 'rejected')
+        .neq('is_test', true)
         .order('name', { ascending: true });
 
       console.log('ClubsManagementPage: Clubs query result:', { data, error, count: data?.length });
@@ -363,6 +364,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         .select('id, name, abbreviation, location, email, phone, club_introduction, approval_status, registered_by_user_id, created_at')
         .eq('state_association_id', stateAssociationId)
         .eq('approval_status', 'pending_approval')
+        .neq('is_test', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

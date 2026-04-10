@@ -196,6 +196,7 @@ export const PublicStateAssociationHomepage: React.FC = () => {
         .from('clubs')
         .select('id, name, logo_url')
         .eq('state_association_id', associationId)
+        .neq('is_test', true)
         .order('name')
         .limit(6);
 
