@@ -264,7 +264,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
           club_to_state_status: 'paid',
           club_to_state_paid_date: bulkPaymentDetails.paymentDate,
           club_to_state_payment_reference: bulkPaymentDetails.reference || `Bulk payment - ${memberCount} members`,
-          bulk_payment: bulkPaymentDetails.skipFinanceTransactions ? false : true
+          bulk_payment: true
         })
         .in('id', Array.from(selectedIds));
 
