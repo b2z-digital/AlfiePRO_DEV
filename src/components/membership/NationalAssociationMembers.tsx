@@ -232,6 +232,7 @@ export const NationalAssociationMembers: React.FC<NationalAssociationMembersProp
         (m) =>
           m.first_name.toLowerCase().includes(searchLower) ||
           m.last_name.toLowerCase().includes(searchLower) ||
+          `${m.first_name} ${m.last_name}`.toLowerCase().includes(searchLower) ||
           m.email.toLowerCase().includes(searchLower) ||
           m.club_name.toLowerCase().includes(searchLower) ||
           m.state_association_name.toLowerCase().includes(searchLower)

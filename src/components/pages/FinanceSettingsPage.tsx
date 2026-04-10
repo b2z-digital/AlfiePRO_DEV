@@ -668,7 +668,9 @@ export const FinanceSettingsPage: React.FC<FinanceSettingsPageProps> = ({ darkMo
             deposit_next_number: transactionSettings.deposit_next_number,
             expense_next_number: transactionSettings.expense_next_number,
             footer_information: transactionSettings.footer_information,
-            payment_information: transactionSettings.payment_information
+            payment_information: transactionSettings.payment_information,
+            opening_balance: transactionSettings.opening_balance,
+            opening_balance_date: transactionSettings.opening_balance_date
           }, {
             onConflict: 'association_id,association_type'
           });

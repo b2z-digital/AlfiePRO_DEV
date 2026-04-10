@@ -207,6 +207,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         (m) =>
           m.first_name?.toLowerCase().includes(searchLower) ||
           m.last_name?.toLowerCase().includes(searchLower) ||
+          `${m.first_name ?? ''} ${m.last_name ?? ''}`.toLowerCase().includes(searchLower) ||
           m.email?.toLowerCase().includes(searchLower) ||
           m.club_name?.toLowerCase().includes(searchLower) ||
           m.phone?.toLowerCase().includes(searchLower)
