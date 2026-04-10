@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CircleUser as UserCircle, Phone, Heart, Sailboat, ChevronRight, X, Camera, CircleCheck as CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Phone, Heart, Sailboat, ChevronRight, X, Camera, CircleCheck as CheckCircle2, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
@@ -28,7 +28,7 @@ interface ProfileCompleteness {
   };
 }
 
-const TOTAL_FIELDS = 4;
+const TOTAL_FIELDS = 5;
 
 const CircularProgress: React.FC<{ percentage: number }> = ({ percentage }) => {
   const radius = 38;
@@ -89,11 +89,7 @@ export const ProfileCompletionBanner: React.FC = () => {
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkProfileCompleteness();
-  }, [user, currentClub]);
-
-  const checkProfileCompleteness = async () => {
+  const checkProfileCompleteness = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
@@ -108,14 +104,41 @@ export const ProfileCompletionBanner: React.FC = () => {
       }
 
       const { data } = await supabase.rpc('check_member_profile_completeness');
-      if (data?.success && data.needs_completion) {
-        setProfileData(data);
+      if (data?.success) {
+        if (data.needs_completion) {
+          setProfileData(data);
+        } else {
+          setProfileData(null);
+        }
       }
     } catch (err) {
       console.error('Error checking profile completeness:', err);
     }
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    checkProfileCompleteness();
+  }, [user, currentClub, checkProfileCompleteness]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkProfileCompleteness();
+      }
+    };
+    const handleFocus = () => checkProfileCompleteness();
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('popstate', handleFocus);
+    window.addEventListener('profile-updated', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('popstate', handleFocus);
+      window.removeEventListener('profile-updated', handleFocus);
+    };
+  }, [checkProfileCompleteness]);
 
   const handleDismiss = () => {
     if (user) {
@@ -135,6 +158,7 @@ export const ProfileCompletionBanner: React.FC = () => {
   const allItems = [
     { key: 'avatar', icon: Camera, label: 'Profile photo', missing: profileData.missing_fields.includes('avatar') },
     { key: 'phone', icon: Phone, label: 'Phone number', missing: profileData.missing_fields.includes('phone') },
+    { key: 'address', icon: MapPin, label: 'Address', missing: profileData.missing_fields.includes('address') },
     { key: 'emergency', icon: Heart, label: 'Emergency contact', missing: profileData.missing_fields.includes('emergency_contact') },
     { key: 'boats', icon: Sailboat, label: 'Boat information', missing: !profileData.has_boats },
   ];
