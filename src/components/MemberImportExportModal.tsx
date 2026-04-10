@@ -480,26 +480,24 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
       const now = new Date();
       const currentYear = now.getFullYear();
 
-      if (clubSettings?.renewal_mode === 'fixed' && clubSettings?.fixed_renewal_date) {
+      let fyMonth = 6;
+      let fyDay = 1;
+
+      if (clubSettings?.fixed_renewal_date) {
         const [monthStr, dayStr] = clubSettings.fixed_renewal_date.split('-');
-        const fyMonth = parseInt(monthStr, 10) - 1;
-        const fyDay = parseInt(dayStr, 10);
-
-        let fyStart = new Date(currentYear, fyMonth, fyDay);
-        if (fyStart > now) {
-          fyStart = new Date(currentYear - 1, fyMonth, fyDay);
-        }
-        const fyEnd = new Date(fyStart.getFullYear() + 1, fyMonth, fyDay - 1);
-
-        return {
-          startDate: fyStart.toISOString().split('T')[0],
-          endDate: fyEnd.toISOString().split('T')[0],
-        };
+        fyMonth = parseInt(monthStr, 10) - 1;
+        fyDay = parseInt(dayStr, 10);
       }
 
+      let fyStart = new Date(currentYear, fyMonth, fyDay);
+      if (fyStart > now) {
+        fyStart = new Date(currentYear - 1, fyMonth, fyDay);
+      }
+      const fyEnd = new Date(fyStart.getFullYear() + 1, fyMonth, fyDay - 1);
+
       return {
-        startDate: now.toISOString().split('T')[0],
-        endDate: new Date(currentYear + 1, now.getMonth(), now.getDate()).toISOString().split('T')[0],
+        startDate: fyStart.toISOString().split('T')[0],
+        endDate: fyEnd.toISOString().split('T')[0],
       };
     };
 
