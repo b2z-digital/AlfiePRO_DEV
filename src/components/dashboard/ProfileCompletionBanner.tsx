@@ -69,7 +69,7 @@ export const ProfileCompletionBanner: React.FC = () => {
   };
 
   const handleGoToProfile = () => {
-    navigate('/my-membership');
+    navigate('/my-membership', { state: { edit: true } });
   };
 
   if (loading || dismissed || !profileData || !profileData.needs_completion) {

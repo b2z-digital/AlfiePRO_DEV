@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info, Landmark, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
@@ -108,6 +109,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const { currentClub, user } = useAuth();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const { addNotification } = useNotifications();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [boats, setBoats] = useState<BoatData[]>([]);
@@ -134,6 +136,13 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
       setLoading(false);
     }
   }, [currentClub, effectiveUserId, effectiveMemberId]);
+
+  useEffect(() => {
+    if ((location.state as any)?.edit && memberData && !loading) {
+      setShowEditModal(true);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state, memberData, loading]);
 
   const fetchAllData = async () => {
     try {
