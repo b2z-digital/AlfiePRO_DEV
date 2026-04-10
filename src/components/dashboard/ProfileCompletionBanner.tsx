@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CircleUser as UserCircle, Phone, Heart, Sailboat, ChevronRight, X, Loader as Loader2, CircleCheck as CheckCircle2 } from 'lucide-react';
+import { CircleUser as UserCircle, Phone, Heart, Sailboat, ChevronRight, X, Camera, CircleCheck as CheckCircle2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNavigate } from 'react-router-dom';
@@ -23,8 +24,63 @@ interface ProfileCompleteness {
     emergency_contact_name: string;
     emergency_contact_phone: string;
     emergency_contact_relationship: string;
+    avatar_url?: string;
   };
 }
+
+const TOTAL_FIELDS = 4;
+
+const CircularProgress: React.FC<{ percentage: number }> = ({ percentage }) => {
+  const radius = 38;
+  const strokeWidth = 5;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="relative w-24 h-24 flex-shrink-0">
+      <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+        <circle
+          cx="48"
+          cy="48"
+          r={radius}
+          fill="none"
+          stroke="rgba(148, 163, 184, 0.1)"
+          strokeWidth={strokeWidth}
+        />
+        <motion.circle
+          cx="48"
+          cy="48"
+          r={radius}
+          fill="none"
+          stroke="url(#progressGradient)"
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.3 }}
+        />
+        <defs>
+          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#06b6d4" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <motion.span
+          className="text-xl font-bold text-white leading-none"
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.8 }}
+        >
+          {percentage}%
+        </motion.span>
+        <span className="text-[10px] text-slate-400 mt-0.5">complete</span>
+      </div>
+    </div>
+  );
+};
 
 export const ProfileCompletionBanner: React.FC = () => {
   const { user, currentClub } = useAuth();
@@ -76,55 +132,72 @@ export const ProfileCompletionBanner: React.FC = () => {
     return null;
   }
 
-  const missingItems = [];
-  if (profileData.missing_fields.includes('phone')) {
-    missingItems.push({ icon: Phone, label: 'Phone number' });
-  }
-  if (profileData.missing_fields.includes('emergency_contact')) {
-    missingItems.push({ icon: Heart, label: 'Emergency contact' });
-  }
-  if (!profileData.has_boats) {
-    missingItems.push({ icon: Sailboat, label: 'Boat information' });
-  }
+  const allItems = [
+    { key: 'avatar', icon: Camera, label: 'Profile photo', missing: profileData.missing_fields.includes('avatar') },
+    { key: 'phone', icon: Phone, label: 'Phone number', missing: profileData.missing_fields.includes('phone') },
+    { key: 'emergency', icon: Heart, label: 'Emergency contact', missing: profileData.missing_fields.includes('emergency_contact') },
+    { key: 'boats', icon: Sailboat, label: 'Boat information', missing: !profileData.has_boats },
+  ];
 
-  if (missingItems.length === 0) return null;
+  const missingCount = allItems.filter(i => i.missing).length;
+  const completedCount = TOTAL_FIELDS - missingCount;
+  const percentage = Math.round((completedCount / TOTAL_FIELDS) * 100);
+
+  if (missingCount === 0) return null;
 
   return (
-    <div className="mb-6">
-      <div className="bg-gradient-to-r from-blue-600/20 to-sky-600/20 border border-blue-500/30 rounded-xl p-5 relative">
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mb-6"
+    >
+      <div className="bg-gradient-to-r from-slate-800/80 to-slate-800/60 border border-slate-700/50 rounded-2xl p-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-transparent to-cyan-500/5 pointer-events-none" />
+
         <button
           onClick={handleDismiss}
-          className="absolute top-3 right-3 p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-slate-300 transition"
+          className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-500 hover:text-slate-300 transition z-10"
           title="Dismiss"
         >
           <X size={16} />
         </button>
 
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-            <UserCircle size={22} className="text-blue-400" />
-          </div>
+        <div className="flex items-center gap-6 relative">
+          <CircularProgress percentage={percentage} />
+
           <div className="flex-1 min-w-0">
-            <h3 className="text-white font-semibold mb-1">Complete your membership profile</h3>
+            <h3 className="text-white font-semibold text-base mb-1">Complete your profile</h3>
             <p className="text-sm text-slate-400 mb-4">
-              Welcome to {profileData.club_name}! Please take a moment to fill in a few details so your club has your current information on file.
+              {completedCount} of {TOTAL_FIELDS} items done. Finish setting up so {profileData.club_name} has your details on file.
             </p>
 
-            <div className="flex flex-wrap gap-3 mb-4">
-              {missingItems.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/50"
-                >
-                  <item.icon size={14} className="text-amber-400" />
-                  <span className="text-xs text-slate-300">{item.label}</span>
-                </div>
-              ))}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {allItems.map((item) => {
+                const ItemIcon = item.icon;
+                return (
+                  <div
+                    key={item.key}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                      item.missing
+                        ? 'bg-slate-700/50 border border-slate-600/50 text-slate-300'
+                        : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                    }`}
+                  >
+                    {item.missing ? (
+                      <ItemIcon size={13} className="text-amber-400" />
+                    ) : (
+                      <CheckCircle2 size={13} className="text-emerald-400" />
+                    )}
+                    <span>{item.label}</span>
+                  </div>
+                );
+              })}
             </div>
 
             <button
               onClick={handleGoToProfile}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30"
             >
               Update My Details
               <ChevronRight size={16} />
@@ -132,6 +205,6 @@ export const ProfileCompletionBanner: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
