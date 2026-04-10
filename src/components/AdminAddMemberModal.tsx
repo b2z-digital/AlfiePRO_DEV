@@ -323,14 +323,16 @@ export const AdminAddMemberModal: React.FC<AdminAddMemberModalProps> = ({
     setError(null);
     setSuccess(false);
     try {
-      const { data: existingMember, error: checkError } = await supabase
-        .from('members')
-        .select('id')
-        .eq('club_id', clubId)
-        .eq('email', formData.email)
-        .maybeSingle();
-      if (checkError && checkError.code !== 'PGRST116') throw checkError;
-      if (existingMember) { setError('A member with this email already exists in this club.'); return; }
+      if (formData.email && formData.email.trim()) {
+        const { data: existingMember, error: checkError } = await supabase
+          .from('members')
+          .select('id')
+          .eq('club_id', clubId)
+          .eq('email', formData.email.trim())
+          .maybeSingle();
+        if (checkError && checkError.code !== 'PGRST116') throw checkError;
+        if (existingMember) { setError('A member with this email already exists in this club.'); return; }
+      }
       if (!formData.first_name || !formData.last_name) throw new Error('First name and last name are required');
       const newMember = await addAdminMember(formData, clubId);
       if (!newMember) throw new Error('Failed to create member record. Please check your connection and try again.');

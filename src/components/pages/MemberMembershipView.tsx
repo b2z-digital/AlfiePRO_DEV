@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info, Landmark, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -110,6 +110,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const { addNotification } = useNotifications();
   const location = useLocation();
+  const pendingEditOpen = useRef(!!(location.state as any)?.edit);
   const [loading, setLoading] = useState(true);
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [boats, setBoats] = useState<BoatData[]>([]);
@@ -138,11 +139,12 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   }, [currentClub, effectiveUserId, effectiveMemberId]);
 
   useEffect(() => {
-    if ((location.state as any)?.edit && memberData && !loading) {
-      setShowEditModal(true);
+    if (pendingEditOpen.current && memberData && !loading) {
+      pendingEditOpen.current = false;
       window.history.replaceState({}, '');
+      setShowEditModal(true);
     }
-  }, [location.state, memberData, loading]);
+  }, [memberData, loading]);
 
   const fetchAllData = async () => {
     try {
@@ -789,13 +791,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-800/15 border border-blue-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-800/15 border border-blue-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-blue-400/40 transition-colors group/card"
             >
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20">
                   <User size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Contact Details</h3>
+                <Edit2 size={14} className="text-slate-600 group-hover/card:text-blue-400 transition-colors ml-auto" />
               </div>
               <div className="space-y-4">
                 {[
@@ -825,13 +829,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-green-400/40 transition-colors group/card"
             >
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2.5 rounded-xl bg-gradient-to-br shadow-lg">
                   <Shield size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Membership Details</h3>
+                <Edit2 size={14} className="text-slate-600 group-hover/card:text-green-400 transition-colors ml-auto" />
               </div>
               <div className="space-y-4">
                 {[
@@ -861,13 +867,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-rose-600/15 to-rose-800/15 border border-rose-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-rose-600/15 to-rose-800/15 border border-rose-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-rose-400/40 transition-colors group/card"
             >
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-lg shadow-rose-500/20">
                   <Heart size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Emergency Contact</h3>
+                <Edit2 size={14} className="text-slate-600 group-hover/card:text-rose-400 transition-colors ml-auto" />
               </div>
               {memberData.emergency_contact_name ? (
                 <div className="space-y-4">
@@ -912,7 +920,8 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-cyan-600/15 to-cyan-800/15 border border-cyan-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-cyan-600/15 to-cyan-800/15 border border-cyan-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-cyan-400/40 transition-colors group/card"
             >
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
