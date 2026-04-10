@@ -78,6 +78,8 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   const [defaultClubMember, setDefaultClubMember] = useState<MemberWithClub | null>(null);
   const [settingDefaultClub, setSettingDefaultClub] = useState(false);
   const [selectedDefaultClubId, setSelectedDefaultClubId] = useState('');
+  const [deletingMember, setDeletingMember] = useState<MemberWithClub | null>(null);
+  const [deleteProcessing, setDeleteProcessing] = useState(false);
 
   useEffect(() => {
     const state = location.state as { viewClubId?: string } | null;
@@ -285,6 +287,28 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
       console.error('Error bulk deleting:', err);
     }
     setBulkProcessing(false);
+  };
+
+  const handleSingleDelete = async () => {
+    if (!deletingMember) return;
+    setDeleteProcessing(true);
+    try {
+      await supabase.from('membership_remittances').delete().eq('member_id', deletingMember.id);
+      await supabase.from('club_memberships').delete().eq('member_id', deletingMember.id);
+
+      const { error } = await supabase
+        .from('members')
+        .delete()
+        .eq('id', deletingMember.id);
+      if (error) throw error;
+      addNotification('success', `${deletingMember.first_name} ${deletingMember.last_name} has been permanently deleted.`);
+      setDeletingMember(null);
+      loadStateAssociationData();
+    } catch (err: any) {
+      console.error('Error deleting member:', err);
+      addNotification('error', `Failed to delete member: ${err.message || 'Unknown error'}`);
+    }
+    setDeleteProcessing(false);
   };
 
   const unlinkedMembersWithEmail = members.filter(m => !m.user_id && m.email);
@@ -833,6 +857,13 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                           >
                             <Pencil size={16} />
                           </button>
+                          <button
+                            onClick={() => setDeletingMember(member)}
+                            className="p-2 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition"
+                            title="Delete member"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1175,6 +1206,65 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
                   <>
                     <Home size={16} />
                     Set as Default
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deletingMember && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+                  <Trash2 size={20} className="text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Delete Member</h3>
+                  <p className="text-sm text-slate-400">This action cannot be undone</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-300 mb-2">
+                Are you sure you want to permanently delete <span className="font-semibold text-white">{deletingMember.first_name} {deletingMember.last_name}</span>?
+              </p>
+              {deletingMember.club_name && (
+                <p className="text-sm text-slate-400 mb-4">
+                  Club: {deletingMember.club_name}
+                  {deletingMember.email && <> | {deletingMember.email}</>}
+                </p>
+              )}
+              <div className="p-3 bg-red-900/20 border border-red-500/20 rounded-lg mb-4">
+                <p className="text-sm text-red-300">
+                  This will permanently remove this member record and all associated remittances. They will no longer appear in member lists or archive.
+                </p>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setDeletingMember(null)}
+                disabled={deleteProcessing}
+                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSingleDelete}
+                disabled={deleteProcessing}
+                className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50"
+              >
+                {deleteProcessing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Yes, Delete
                   </>
                 )}
               </button>

@@ -3,7 +3,7 @@ import { supabase } from '../../utils/supabase';
 import { OnboardingChoiceScreen } from './OnboardingChoiceScreen';
 import { OnboardingWizard } from './OnboardingWizard';
 import { ClubSetupWizard } from './ClubSetupWizard';
-import { CheckCircle2, Building2, ArrowRight } from 'lucide-react';
+import { CircleCheck as CheckCircle2, Building2, ArrowRight, CircleAlert as AlertCircle, UserCheck, X, Mail, Loader as Loader2 } from 'lucide-react';
 
 interface OnboardingRouterProps {
   darkMode: boolean;
@@ -17,13 +17,28 @@ interface LinkedClub {
   club_logo: string | null;
 }
 
-type OnboardingMode = 'choice' | 'join-club' | 'start-club' | 'already-linked';
+interface NameMatchCandidate {
+  member_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  club_id: string;
+  club_name: string;
+  club_logo: string | null;
+  membership_level: string;
+  date_joined: string;
+}
+
+type OnboardingMode = 'choice' | 'join-club' | 'start-club' | 'already-linked' | 'name-match';
 
 export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) => {
   const [mode, setMode] = useState<OnboardingMode>('choice');
   const [loading, setLoading] = useState(true);
   const [linkedClubs, setLinkedClubs] = useState<LinkedClub[]>([]);
   const [confirmingLink, setConfirmingLink] = useState(false);
+  const [nameMatchCandidates, setNameMatchCandidates] = useState<NameMatchCandidate[]>([]);
+  const [confirmingNameMatch, setConfirmingNameMatch] = useState<string | null>(null);
 
   useEffect(() => {
     checkExistingApplications();
@@ -51,6 +66,14 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
         if (selfLink?.success && selfLink.linked_count > 0) {
           setLinkedClubs(selfLink.clubs);
           setMode('already-linked');
+          setLoading(false);
+          return;
+        }
+
+        const { data: nameMatches } = await supabase.rpc('find_name_match_candidates');
+        if (nameMatches?.success && nameMatches.candidates?.length > 0) {
+          setNameMatchCandidates(nameMatches.candidates);
+          setMode('name-match');
           setLoading(false);
           return;
         }
@@ -120,6 +143,31 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
     }
   };
 
+  const handleConfirmNameMatch = async (memberId: string) => {
+    setConfirmingNameMatch(memberId);
+    try {
+      const { data: result } = await supabase.rpc('confirm_name_match_and_link', {
+        p_member_id: memberId,
+      });
+
+      if (result?.success) {
+        setLinkedClubs([result.linked_club]);
+        setMode('already-linked');
+      } else {
+        console.error('Error confirming name match:', result?.error);
+        setConfirmingNameMatch(null);
+      }
+    } catch (error) {
+      console.error('Error confirming name match:', error);
+      setConfirmingNameMatch(null);
+    }
+  };
+
+  const handleDeclineNameMatch = () => {
+    setNameMatchCandidates([]);
+    setMode('choice');
+  };
+
   const handleComplete = () => {
     window.location.reload();
   };
@@ -129,14 +177,12 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Delete any club setup application drafts
       await supabase
         .from('club_setup_applications')
         .delete()
         .eq('user_id', user.id)
         .eq('is_draft', true);
 
-      // Don't create a membership application draft yet - let OnboardingWizard handle it
       setMode('join-club');
     } catch (error) {
       console.error('Error switching to join club:', error);
@@ -149,14 +195,12 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Delete any membership application drafts
       await supabase
         .from('membership_applications')
         .delete()
         .eq('user_id', user.id)
         .eq('is_draft', true);
 
-      // Don't create a club setup application draft yet - let ClubSetupWizard handle it
       setMode('start-club');
     } catch (error) {
       console.error('Error switching to start club:', error);
@@ -172,7 +216,6 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
         return;
       }
 
-      // Delete both draft applications when going back to choice
       const [memberResult, clubResult] = await Promise.all([
         supabase
           .from('membership_applications')
@@ -200,6 +243,97 @@ export const OnboardingRouter: React.FC<OnboardingRouterProps> = ({ darkMode }) 
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  if (mode === 'name-match') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] flex items-center justify-center p-4">
+        <div className="max-w-lg w-full">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <UserCheck className="w-8 h-8 text-amber-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">
+              Alfie found a member with your name
+            </h1>
+            <p className="text-slate-400">
+              We found an existing membership that matches your name. This may be your record with an older email address. Is this you?
+            </p>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            {nameMatchCandidates.map((candidate) => (
+              <div
+                key={candidate.member_id}
+                className="bg-slate-800/80 border border-slate-700 rounded-xl p-5"
+              >
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 bg-slate-700 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {candidate.club_logo ? (
+                      <img src={candidate.club_logo} alt={candidate.club_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Building2 className="w-6 h-6 text-slate-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-semibold">
+                      {candidate.first_name} {candidate.last_name}
+                    </h3>
+                    <p className="text-slate-400 text-sm">{candidate.club_name}</p>
+                  </div>
+                </div>
+
+                {candidate.email && (
+                  <div className="flex items-center gap-2 text-sm text-slate-400 mb-2 px-1">
+                    <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{candidate.email}</span>
+                    <span className="text-xs text-amber-400 ml-auto flex-shrink-0">(old email on file)</span>
+                  </div>
+                )}
+
+                {candidate.membership_level && (
+                  <div className="text-xs text-slate-500 px-1 mb-4">
+                    Membership: {candidate.membership_level}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleConfirmNameMatch(candidate.member_id)}
+                    disabled={confirmingNameMatch !== null}
+                    className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-colors"
+                  >
+                    {confirmingNameMatch === candidate.member_id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Linking...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Yes, this is me
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleDeclineNameMatch}
+            className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
+          >
+            <X className="w-4 h-4" />
+            None of these are me
+          </button>
+
+          <p className="text-center text-slate-500 text-xs mt-4">
+            If you select a match, your email will be updated on that membership record and your account will be linked.
+          </p>
+        </div>
       </div>
     );
   }
