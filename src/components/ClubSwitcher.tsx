@@ -121,6 +121,30 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
               });
             }
           });
+
+          const stateAdminAssocs = stateAssocs.filter((sa: any) => sa.role === 'state_admin');
+          for (const sa of stateAdminAssocs) {
+            const { data: assocClubs } = await supabase
+              .from('clubs')
+              .select('id, name, abbreviation, logo')
+              .eq('state_association_id', sa.state_association_id);
+
+            if (assocClubs) {
+              const existingClubIds = new Set(allOrgs.filter(o => o.type === 'club').map(o => o.id));
+
+              assocClubs.forEach((club: any) => {
+                if (!existingClubIds.has(club.id)) {
+                  allOrgs.push({
+                    id: club.id,
+                    name: club.abbreviation || club.name,
+                    type: 'club',
+                    logo: club.logo || null,
+                    role: 'state_admin'
+                  });
+                }
+              });
+            }
+          }
         }
 
         const { data: nationalAssocs } = await supabase
@@ -162,6 +186,29 @@ export const ClubSwitcher: React.FC<ClubSwitcherProps> = ({
                   });
                 }
               });
+
+              for (const sa of allStateAssocs) {
+                const { data: stateClubs } = await supabase
+                  .from('clubs')
+                  .select('id, name, abbreviation, logo')
+                  .eq('state_association_id', sa.id);
+
+                if (stateClubs) {
+                  const existingClubIds = new Set(allOrgs.filter(o => o.type === 'club').map(o => o.id));
+
+                  stateClubs.forEach((club: any) => {
+                    if (!existingClubIds.has(club.id)) {
+                      allOrgs.push({
+                        id: club.id,
+                        name: club.abbreviation || club.name,
+                        type: 'club',
+                        logo: club.logo || null,
+                        role: 'national_admin'
+                      });
+                    }
+                  });
+                }
+              }
             }
           }
         }
