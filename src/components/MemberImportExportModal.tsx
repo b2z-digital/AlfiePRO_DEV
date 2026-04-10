@@ -619,7 +619,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
       if (!existingMember && memberData.email) {
         const { data: otherClubMembers } = await supabase
           .from('members')
-          .select('id, first_name, last_name, email, phone, street, city, state, postcode, country, country_code, category, user_id, club_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
+          .select('id, first_name, last_name, email, phone, street, city, state, postcode, country, country_code, category, user_id, club_id, avatar_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
           .neq('club_id', currentClubId)
           .ilike('email', memberData.email)
           .limit(1);
@@ -628,7 +628,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           crossClubMember = otherClubMembers[0];
           console.log(`Multi-club member detected: ${memberData.first_name} ${memberData.last_name} already exists in another club`);
 
-          const enrichFields = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
+          const enrichFields = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'avatar_url', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
           for (const field of enrichFields) {
             if (!memberData[field] && crossClubMember[field]) {
               memberData[field] = crossClubMember[field];
@@ -745,9 +745,9 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
             }
           }
 
-          const enrichFields = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
+          const enrichFieldsReverse = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'avatar_url', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
           const enrichUpdates: any = {};
-          for (const field of enrichFields) {
+          for (const field of enrichFieldsReverse) {
             if (!crossClubMember[field] && memberData[field]) {
               enrichUpdates[field] = memberData[field];
             }
