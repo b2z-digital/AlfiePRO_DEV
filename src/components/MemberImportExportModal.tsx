@@ -600,13 +600,11 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
       }
 
       const existingMember = members.find(m => {
-        // Check email match if both have emails
         if (memberData.email && m.email &&
             memberData.email.toLowerCase() === m.email.toLowerCase()) {
           return true;
         }
 
-        // Check name match if both have first and last names
         if (memberData.first_name && m.first_name &&
             memberData.last_name && m.last_name &&
             memberData.first_name.toLowerCase() === m.first_name.toLowerCase() &&
@@ -617,9 +615,34 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
         return false;
       });
 
+      let crossClubMember: any = null;
+      if (!existingMember && memberData.email) {
+        const { data: otherClubMembers } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, phone, street, city, state, postcode, country, country_code, category, user_id, club_id, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
+          .neq('club_id', currentClubId)
+          .ilike('email', memberData.email)
+          .limit(1);
+
+        if (otherClubMembers && otherClubMembers.length > 0) {
+          crossClubMember = otherClubMembers[0];
+          console.log(`Multi-club member detected: ${memberData.first_name} ${memberData.last_name} already exists in another club`);
+
+          const enrichFields = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
+          for (const field of enrichFields) {
+            if (!memberData[field] && crossClubMember[field]) {
+              memberData[field] = crossClubMember[field];
+            }
+          }
+
+          if (crossClubMember.user_id) {
+            memberData.user_id = crossClubMember.user_id;
+          }
+        }
+      }
+
       if (existingMember) {
-        console.log(`🔄 DUPLICATE FOUND: ${memberData.first_name} ${memberData.last_name} matches existing member ID ${existingMember.id}`);
-        console.log('Existing member:', existingMember);
+        console.log(`Duplicate found in same club: ${memberData.first_name} ${memberData.last_name}`);
         setDuplicateConflict({
           existing: existingMember,
           incoming: memberData,
@@ -638,22 +661,16 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
         delete (window as any).__conflictResolutionCallback;
 
         if (currentResolution === 'skip') {
-          console.log(`⏭️  User SKIPPED: ${memberData.first_name} ${memberData.last_name}`);
           setSkippedCount(prev => prev + 1);
           currentResolution = null;
           continue;
         }
-        console.log(`✏️  User chose OVERWRITE for: ${memberData.first_name} ${memberData.last_name}`);
-      } else {
-        console.log(`✅ NO DUPLICATE - Will import: ${memberData.first_name} ${memberData.last_name}`);
       }
 
       try {
         if (existingMember && currentResolution === 'overwrite') {
           memberData.id = existingMember.id;
         }
-
-        console.log('Attempting to insert/update member:', memberData);
 
         const { data: insertedMember, error: memberError } = await supabase
           .from('members')
@@ -663,7 +680,85 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
         if (memberError) throw memberError;
 
-        console.log('Successfully inserted member:', insertedMember);
+        if (crossClubMember) {
+          const profileId = crossClubMember.user_id;
+
+          if (profileId) {
+            const existingCm = await supabase
+              .from('club_memberships')
+              .select('id')
+              .eq('member_id', profileId)
+              .eq('club_id', currentClubId)
+              .maybeSingle();
+
+            if (!existingCm.data) {
+              await supabase
+                .from('club_memberships')
+                .insert({
+                  member_id: profileId,
+                  club_id: currentClubId,
+                  relationship_type: 'affiliate',
+                  status: 'active',
+                  payment_status: memberData.is_financial ? 'paid' : 'unpaid',
+                  joined_date: memberData.date_joined,
+                  expiry_date: memberData.renewal_date,
+                  pays_association_fees: false,
+                });
+            }
+
+            const primaryCm = await supabase
+              .from('club_memberships')
+              .select('id')
+              .eq('member_id', profileId)
+              .eq('club_id', crossClubMember.club_id)
+              .maybeSingle();
+
+            if (!primaryCm.data) {
+              await supabase
+                .from('club_memberships')
+                .insert({
+                  member_id: profileId,
+                  club_id: crossClubMember.club_id,
+                  relationship_type: 'primary',
+                  status: 'active',
+                  payment_status: 'paid',
+                  joined_date: memberData.date_joined,
+                  pays_association_fees: true,
+                });
+            }
+
+            const existingUserClub = await supabase
+              .from('user_clubs')
+              .select('id')
+              .eq('user_id', profileId)
+              .eq('club_id', currentClubId)
+              .maybeSingle();
+
+            if (!existingUserClub.data) {
+              await supabase
+                .from('user_clubs')
+                .insert({
+                  user_id: profileId,
+                  club_id: currentClubId,
+                  role: 'member',
+                });
+            }
+          }
+
+          const enrichFields = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
+          const enrichUpdates: any = {};
+          for (const field of enrichFields) {
+            if (!crossClubMember[field] && memberData[field]) {
+              enrichUpdates[field] = memberData[field];
+            }
+          }
+          if (Object.keys(enrichUpdates).length > 0) {
+            await supabase
+              .from('members')
+              .update(enrichUpdates)
+              .eq('id', crossClubMember.id);
+          }
+        }
 
         if (Object.keys(boatData).length > 0 && boatData.boat_type) {
           boatData.member_id = insertedMember.id;
@@ -678,7 +773,6 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           importedEmails.add(memberData.email.toLowerCase());
         }
         setImportedCount(prev => prev + 1);
-        console.log('Import count increased');
       } catch (error: any) {
         console.error('Error importing member:', error);
         const memberName = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
