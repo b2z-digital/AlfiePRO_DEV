@@ -328,11 +328,11 @@ export const RO_TRAINING_CATEGORIES = [
 ] as const;
 
 export async function getKnowledgeDocuments(): Promise<AlfieKnowledgeDocument[]> {
-  const roCategories = [...RO_TRAINING_CATEGORIES] as string[];
+  const excludeCategories = [...RO_TRAINING_CATEGORIES, 'tuning-guide'] as string[];
   const { data, error } = await supabase
     .from('alfie_knowledge_documents')
     .select('*')
-    .not('category', 'in', `(${roCategories.join(',')})`)
+    .not('category', 'in', `(${excludeCategories.join(',')})`)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
