@@ -1393,11 +1393,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
                     if (isActualSwitch) {
                       setTimeout(() => {
-                        setDashboardRefreshKey(prev => prev + 1);
-                        setTimeout(() => {
-                          setLocalSwitchingClub(false);
-                        }, 800);
-                      }, 50);
+                        setLocalSwitchingClub(false);
+                      }, 600);
                     }
                     return;
                   }
@@ -1547,11 +1544,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         navigate('/');
 
                         setTimeout(() => {
-                          setDashboardRefreshKey(prev => prev + 1);
-                          setTimeout(() => {
-                            setLocalSwitchingClub(false);
-                          }, 800);
-                        }, 50);
+                          setLocalSwitchingClub(false);
+                        }, 600);
                       } else {
                         clearTimeout(transitionTimeout);
                         setIsTransitioning(false);

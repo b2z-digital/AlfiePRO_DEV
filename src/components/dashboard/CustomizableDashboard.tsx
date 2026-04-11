@@ -198,6 +198,7 @@ export const CustomizableDashboard: React.FC = () => {
   const loadCounterRef = useRef(0);
 
   const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
+  const prevClubIdRef = useRef<string | null | undefined>(undefined);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -210,6 +211,17 @@ export const CustomizableDashboard: React.FC = () => {
   useEffect(() => {
     if (!user || !clubsLoaded) return;
     if (!currentClub && !currentOrganization) return;
+
+    const newClubId = currentOrganization?.id || currentClub?.clubId || null;
+    const isClubChange = prevClubIdRef.current !== undefined && prevClubIdRef.current !== newClubId;
+    prevClubIdRef.current = newClubId;
+
+    if (isClubChange) {
+      setWidgets([]);
+      setRows([]);
+      setLoading(true);
+    }
+
     loadLayout();
   }, [user, clubsLoaded, currentClub?.clubId, currentOrganization?.id, currentOrganization?.type]);
 
@@ -305,10 +317,6 @@ export const CustomizableDashboard: React.FC = () => {
       setRows(sortedRows);
     } catch (error) {
       console.error('❌ Error loading layout:', error);
-      if (currentLoad === loadCounterRef.current) {
-        setWidgets([]);
-        setRows([]);
-      }
     } finally {
       if (currentLoad === loadCounterRef.current) {
         clearTimeout(loadTimeout);
