@@ -226,7 +226,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
   const { addNotification } = useNotifications();
 
-  const orgType = currentOrganization?.type === 'national_association' ? 'national' : currentOrganization?.type === 'state_association' ? 'state' : null;
+  const orgType = currentOrganization?.type === 'national' ? 'national' : currentOrganization?.type === 'state' ? 'state' : null;
   const { trackPageView } = usePlatformTracking(
     currentClub?.clubId || null,
     currentOrganization?.id || null,
@@ -1373,45 +1373,40 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     });
                     setCurrentClub(null);
                     setIsTransitioning(false);
+                    setLocalSwitchingClub(false);
                     navigate('/');
+                    setDashboardRefreshKey(prev => prev + 1);
                     return;
                   }
 
                   const club = userClubs.find(c => c.clubId === orgId);
                   if (club) {
-                    // Check if we're actually switching clubs (not just selecting the current one)
-                    const isActualSwitch = currentClub?.clubId !== club.clubId;
+                    const isActualSwitch = currentClub?.clubId !== club.clubId || currentOrganization !== null;
 
                     if (isActualSwitch) {
-                      // Show switching overlay
                       setLocalSwitchingClub(true);
                     }
 
-                    // Switching to a club
                     setCurrentClub(club);
                     setCurrentOrganization(null);
-
-                    // Always navigate to home when switching contexts
                     navigate('/');
 
                     if (isActualSwitch) {
-                      // Force dashboard refresh with new key after a brief moment
-                      // This ensures the overlay is visible before the content remounts
-                      setTimeout(() => {
-                        setDashboardRefreshKey(prev => prev + 1);
-                      }, 100);
-
-                      // Clear the switching overlay after content loads
                       setTimeout(() => {
                         setLocalSwitchingClub(false);
-                      }, 1500);
+                      }, 600);
                     }
-                  } else {
-                    // Only show loader when fetching association data from database
-                    setIsTransitioning(true);
+                    return;
+                  }
 
-                    // First, check what type of organization this is
-                    // Check if it's a state association (direct lookup)
+                  setLocalSwitchingClub(true);
+
+                  const transitionTimeout = setTimeout(() => {
+                    setLocalSwitchingClub(false);
+                    setIsTransitioning(false);
+                  }, 8000);
+
+                  try {
                     const { data: stateAssocInfo } = await supabase
                       .from('state_associations')
                       .select('id, name, short_name, national_association_id')
@@ -1419,8 +1414,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       .maybeSingle();
 
                     if (stateAssocInfo) {
-                      // It's a state association - check if user has access
-                      // 1. Check for direct role
                       const { data: directRole } = await supabase
                         .from('user_state_associations')
                         .select('role')
@@ -1430,7 +1423,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
                       let userRole = directRole?.role;
 
-                      // 2. If no direct role, check if user is national admin of parent
                       if (!userRole && stateAssocInfo.national_association_id) {
                         const { data: nationalAdminRole } = await supabase
                           .from('user_national_associations')
@@ -1440,8 +1432,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           .maybeSingle();
 
                         if (nationalAdminRole?.role === 'national_admin') {
-                          userRole = 'national_admin'; // Inherited role
+                          userRole = 'national_admin';
                         }
+                      }
+
+                      if (!userRole && isSuperAdmin) {
+                        userRole = 'super_admin';
                       }
 
                       if (userRole) {
@@ -1452,13 +1448,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           role: userRole
                         });
                         setCurrentClub(null);
+                        clearTimeout(transitionTimeout);
                         setIsTransitioning(false);
+                        setLocalSwitchingClub(false);
                         navigate('/');
+                        setDashboardRefreshKey(prev => prev + 1);
                         return;
                       }
                     }
 
-                    // Check if this is a national association
                     const { data: nationalAssoc } = await supabase
                       .from('user_national_associations')
                       .select('national_association_id, role, national_associations(name, short_name)')
@@ -1475,86 +1473,99 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         role: nationalAssoc.role
                       });
                       setCurrentClub(null);
+                      clearTimeout(transitionTimeout);
                       setIsTransitioning(false);
+                      setLocalSwitchingClub(false);
                       navigate('/');
-                    } else {
-                      const { data: clubInfo } = await supabase
-                        .from('clubs')
-                        .select('id, name, abbreviation, logo, state_association_id')
-                        .eq('id', orgId)
-                        .maybeSingle();
+                      setDashboardRefreshKey(prev => prev + 1);
+                      return;
+                    }
 
-                      if (clubInfo) {
-                        let adminRole: string | null = null;
+                    const { data: clubInfo } = await supabase
+                      .from('clubs')
+                      .select('id, name, abbreviation, logo, state_association_id')
+                      .eq('id', orgId)
+                      .maybeSingle();
 
-                        if (clubInfo.state_association_id) {
-                          const { data: stateRole } = await supabase
-                            .from('user_state_associations')
-                            .select('role')
-                            .eq('user_id', effectiveUserId)
-                            .eq('state_association_id', clubInfo.state_association_id)
+                    if (clubInfo) {
+                      let adminRole: string | null = null;
+
+                      if (isSuperAdmin) {
+                        adminRole = 'admin';
+                      } else if (clubInfo.state_association_id) {
+                        const { data: stateRole } = await supabase
+                          .from('user_state_associations')
+                          .select('role')
+                          .eq('user_id', effectiveUserId)
+                          .eq('state_association_id', clubInfo.state_association_id)
+                          .maybeSingle();
+
+                        if (stateRole?.role === 'state_admin') {
+                          adminRole = 'admin';
+                        } else {
+                          const { data: stateAssoc } = await supabase
+                            .from('state_associations')
+                            .select('national_association_id')
+                            .eq('id', clubInfo.state_association_id)
                             .maybeSingle();
 
-                          if (stateRole?.role === 'state_admin') {
-                            adminRole = 'admin';
-                          } else {
-                            const { data: stateAssoc } = await supabase
-                              .from('state_associations')
-                              .select('national_association_id')
-                              .eq('id', clubInfo.state_association_id)
+                          if (stateAssoc?.national_association_id) {
+                            const { data: natRole } = await supabase
+                              .from('user_national_associations')
+                              .select('role')
+                              .eq('user_id', effectiveUserId)
+                              .eq('national_association_id', stateAssoc.national_association_id)
                               .maybeSingle();
 
-                            if (stateAssoc?.national_association_id) {
-                              const { data: natRole } = await supabase
-                                .from('user_national_associations')
-                                .select('role')
-                                .eq('user_id', effectiveUserId)
-                                .eq('national_association_id', stateAssoc.national_association_id)
-                                .maybeSingle();
-
-                              if (natRole?.role === 'national_admin') {
-                                adminRole = 'admin';
-                              }
+                            if (natRole?.role === 'national_admin') {
+                              adminRole = 'admin';
                             }
                           }
                         }
-
-                        if (adminRole) {
-                          const virtualClub: typeof userClubs[number] = {
-                            id: `virtual-${clubInfo.id}`,
-                            clubId: clubInfo.id,
-                            role: adminRole as any,
-                            club: {
-                              id: clubInfo.id,
-                              name: clubInfo.name,
-                              abbreviation: clubInfo.abbreviation,
-                              logo: clubInfo.logo,
-                            } as any,
-                          };
-
-                          setLocalSwitchingClub(true);
-                          setCurrentClub(virtualClub);
-                          setCurrentOrganization(null);
-                          setIsTransitioning(false);
-                          navigate('/');
-
-                          setTimeout(() => {
-                            setDashboardRefreshKey(prev => prev + 1);
-                          }, 100);
-                          setTimeout(() => {
-                            setLocalSwitchingClub(false);
-                          }, 1500);
-                        } else {
-                          setIsTransitioning(false);
-                        }
-                      } else {
-                        setIsTransitioning(false);
                       }
+
+                      if (adminRole) {
+                        const virtualClub: typeof userClubs[number] = {
+                          id: `virtual-${clubInfo.id}`,
+                          clubId: clubInfo.id,
+                          role: adminRole as any,
+                          club: {
+                            id: clubInfo.id,
+                            name: clubInfo.name,
+                            abbreviation: clubInfo.abbreviation,
+                            logo: clubInfo.logo,
+                          } as any,
+                        };
+
+                        setCurrentClub(virtualClub);
+                        setCurrentOrganization(null);
+                        clearTimeout(transitionTimeout);
+                        setIsTransitioning(false);
+                        navigate('/');
+
+                        setTimeout(() => {
+                          setLocalSwitchingClub(false);
+                        }, 600);
+                      } else {
+                        clearTimeout(transitionTimeout);
+                        setIsTransitioning(false);
+                        setLocalSwitchingClub(false);
+                      }
+                    } else {
+                      clearTimeout(transitionTimeout);
+                      setIsTransitioning(false);
+                      setLocalSwitchingClub(false);
                     }
+                  } catch (innerError) {
+                    console.error('Error during organization lookup:', innerError);
+                    clearTimeout(transitionTimeout);
+                    setIsTransitioning(false);
+                    setLocalSwitchingClub(false);
                   }
                 } catch (error) {
                   console.error('Error switching organization:', error);
                   setIsTransitioning(false);
+                  setLocalSwitchingClub(false);
                 }
               }}
               className={(collapsed && !isHoveringNav) ? "w-10 h-10 overflow-hidden p-0" : "w-full"}

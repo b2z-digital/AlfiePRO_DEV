@@ -86,10 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [clubsLoaded, setClubsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // Check if we're in the middle of a club switch (persists across reload)
-  const [isSwitchingClub, setIsSwitchingClub] = useState(() => {
-    return sessionStorage.getItem('switching_club') === 'true';
-  });
+  const [isSwitchingClub] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
@@ -256,14 +253,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUserClubs(validClubs);
       setClubsLoaded(true);
 
-      // Clear club switching state once clubs are loaded
-      if (sessionStorage.getItem('switching_club') === 'true') {
-        console.log('✅ Club switch completed');
-        sessionStorage.removeItem('switching_club');
-        sessionStorage.removeItem('switching_to_club_name');
-        setIsSwitchingClub(false);
-      }
-
       // During impersonation, skip overwriting currentClub/localStorage
       // The impersonation context and overrides handle club selection
       const isCurrentlyImpersonating = !!sessionStorage.getItem('impersonation_session');
@@ -332,14 +321,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleSetCurrentClub = (club: UserClub | null) => {
     const previousClub = currentClub;
-
-    console.log('🏢 handleSetCurrentClub called');
-    console.log('  Previous club:', previousClub?.clubId, previousClub?.club?.name);
-    console.log('  New club:', club?.clubId, club?.club?.name);
-    console.log('  Is initial load:', isInitialLoad);
-    console.log('  Stack trace:', new Error().stack);
-
-    // Only reload if we're actually CHANGING clubs AND it's not the initial load
     const isActualChange = !isInitialLoad && previousClub?.clubId !== club?.clubId && previousClub !== null;
 
     setCurrentClub(club);
@@ -347,28 +328,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('currentClubId', club.clubId);
 
       if (isActualChange) {
-        console.log('🔄 Club changed by user - reloading page');
-
-        // Set sessionStorage flag to persist across reload
-        sessionStorage.setItem('switching_club', 'true');
-        sessionStorage.setItem('switching_to_club_name', club.club?.name || 'club');
-
-        // Show loading overlay before reload
-        setIsSwitchingClub(true);
-
-        // Clear any cached data from previous club
         localStorage.removeItem(CURRENT_EVENT_KEY);
-
-        // Slightly longer delay to ensure loading overlay renders
-        setTimeout(() => {
-          // Force reload to refresh all data for the new club
-          window.location.reload();
-        }, 150);
-      } else {
-        console.log('✅ No reload needed (initial load or same club)');
       }
 
-      // Mark that initial load is complete
       if (isInitialLoad) {
         setIsInitialLoad(false);
       }
