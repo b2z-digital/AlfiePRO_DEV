@@ -84,7 +84,22 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onSelectHeat,
   isFullscreen
 }) => {
-  const observerEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
+  const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
+  const [resolvedObserverEventId, setResolvedObserverEventId] = React.useState<string | null>(syncObserverEventId);
+
+  React.useEffect(() => {
+    if (syncObserverEventId) {
+      setResolvedObserverEventId(syncObserverEventId);
+      return;
+    }
+    let cancelled = false;
+    resolveObserverEventId(currentEvent).then(id => {
+      if (!cancelled && id) setResolvedObserverEventId(id);
+    });
+    return () => { cancelled = true; };
+  }, [syncObserverEventId, currentEvent?.id, currentEvent?.seriesId, currentEvent?.roundName]);
+
+  const observerEventId = resolvedObserverEventId;
   const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
   const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;

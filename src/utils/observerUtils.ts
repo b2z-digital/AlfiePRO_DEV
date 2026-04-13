@@ -2,17 +2,30 @@ import { supabase } from './supabase';
 import { Skipper } from '../types';
 import { RaceEvent } from '../types/race';
 
+const resolvedIdCache = new Map<string, string>();
+
 export function getObserverEventId(event: RaceEvent | null | undefined): string | null {
   if (!event) return null;
   if (event.isSeriesEvent && event.seriesRoundId) return event.seriesRoundId;
-  if (event.isSeriesEvent) return null;
+  if (event.isSeriesEvent) {
+    const cacheKey = `${event.seriesId || ''}_${event.roundName || ''}`;
+    return resolvedIdCache.get(cacheKey) || null;
+  }
   return event.id || null;
 }
 
 export async function resolveObserverEventId(event: RaceEvent | null | undefined): Promise<string | null> {
   if (!event) return null;
-  if (event.isSeriesEvent && event.seriesRoundId) return event.seriesRoundId;
+  if (event.isSeriesEvent && event.seriesRoundId) {
+    const cacheKey = `${event.seriesId || ''}_${event.roundName || ''}`;
+    resolvedIdCache.set(cacheKey, event.seriesRoundId);
+    return event.seriesRoundId;
+  }
   if (event.isSeriesEvent && event.seriesId && event.roundName) {
+    const cacheKey = `${event.seriesId}_${event.roundName}`;
+    const cached = resolvedIdCache.get(cacheKey);
+    if (cached) return cached;
+
     const { data } = await supabase
       .from('race_series_rounds')
       .select('id')
@@ -20,7 +33,7 @@ export async function resolveObserverEventId(event: RaceEvent | null | undefined
       .eq('round_name', event.roundName)
       .maybeSingle();
     if (data?.id) {
-      event.seriesRoundId = data.id;
+      resolvedIdCache.set(cacheKey, data.id);
       return data.id;
     }
     return null;

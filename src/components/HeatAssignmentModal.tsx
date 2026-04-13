@@ -50,9 +50,22 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
   const [previewRoundIndex, setPreviewRoundIndex] = useState<number | null>(null);
 
-  const observerEventIdMemo = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
-  const resolvedObserverIdRef = useRef<string | null>(null);
-  const observerEventId = observerEventIdMemo || resolvedObserverIdRef.current;
+  const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
+  const [resolvedObserverId, setResolvedObserverId] = useState<string | null>(syncObserverEventId);
+
+  useEffect(() => {
+    if (syncObserverEventId) {
+      setResolvedObserverId(syncObserverEventId);
+      return;
+    }
+    let cancelled = false;
+    resolveObserverEventId(currentEvent).then(id => {
+      if (!cancelled && id) setResolvedObserverId(id);
+    });
+    return () => { cancelled = true; };
+  }, [syncObserverEventId, currentEvent?.id, currentEvent?.seriesId, currentEvent?.roundName]);
+
+  const observerEventId = resolvedObserverId;
 
   const rankedSkipperIndices = useMemo(() => {
     const indices = (heatManagement.configuration as any)?.rankedSkipperIndices;
@@ -290,12 +303,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         return;
       }
 
-      const resolvedEventId = observerEventId || await resolveObserverEventId(currentEvent);
+      let resolvedEventId = observerEventId;
+      if (!resolvedEventId) {
+        resolvedEventId = await resolveObserverEventId(currentEvent);
+        if (resolvedEventId && !cancelled) {
+          setResolvedObserverId(resolvedEventId);
+        }
+      }
       if (!resolvedEventId) {
         setObserversByHeat(new Map());
         return;
       }
-      resolvedObserverIdRef.current = resolvedEventId;
 
       let enableObs = currentEvent?.enable_observers;
       if (enableObs === undefined) {
@@ -981,15 +999,20 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               return (
                 <div
                   key={heatDesignation}
-                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 ${
+                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 relative ${
                     isDropTarget
                       ? 'border-amber-400 ring-2 ring-amber-400/50'
-                      : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
+                      : heatCompleted
+                        ? 'border-emerald-500/60'
+                        : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
                 >
+                  {heatCompleted && (
+                    <div className="absolute inset-0 bg-emerald-900/10 pointer-events-none z-10 rounded-lg" />
+                  )}
                   {/* Heat Header */}
                   <div
-                    className={`p-2 ${getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
+                    className={`p-2 ${heatCompleted ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
                       isDropTarget ? 'cursor-pointer' : ''
                     }`}
                     onClick={() => {
@@ -1020,11 +1043,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
                         {heatCompleted ? (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-white">
-                            Complete
+                          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-sm">
+                            <Check size={10} className="text-white" />
+                            Scored
                           </span>
                         ) : heatResults.length > 0 && !completed && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500 text-white">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/80 text-white animate-pulse">
                             Scoring
                           </span>
                         )}
@@ -1039,7 +1063,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   </div>
 
                   {/* Skipper List - Vertical scroll within column */}
-                  <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
+                  <div className={`flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto relative ${
+                    heatCompleted && !editMode ? 'opacity-75' : ''
+                  }`}>
                     {sortedSkippers.map((skipperIndex, idx) => {
                       const skipper = skippers[skipperIndex];
                       const result = heatResults.find(r => r.skipperIndex === skipperIndex);
