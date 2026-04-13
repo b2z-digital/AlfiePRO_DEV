@@ -475,13 +475,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               );
 
               if (observersForThisHeat.length > 0) {
-                await saveObserverAssignments(
+                const saved = await saveObserverAssignments(
                   resolvedEventId,
                   heatNumber,
                   roundNumberToLoad,
                   observersForThisHeat
                 );
-                newObserversByHeat.set(heatNumber, observersForThisHeat);
+                if (saved) {
+                  newObserversByHeat.set(heatNumber, observersForThisHeat);
+                }
               }
             }
           }
