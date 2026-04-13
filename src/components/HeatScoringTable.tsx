@@ -12,7 +12,7 @@ import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
 import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX } from 'lucide-react';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
-import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment } from '../utils/observerUtils';
+import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId } from '../utils/observerUtils';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface HeatScoringTableProps {
@@ -84,6 +84,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onSelectHeat,
   isFullscreen
 }) => {
+  const observerEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
   const currentRound = heatManagement.rounds[heatManagement.currentRound - 1];
   const isShrs = heatManagement.configuration.scoringSystem === 'shrs';
   const shrsQualifyingRounds = heatManagement.configuration.shrsQualifyingRounds || 0;
@@ -792,10 +793,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   // Load observers for the current heat
   React.useEffect(() => {
     const loadObservers = async () => {
-      if (!currentEvent?.id || !selectedHeat || !currentEvent.enable_observers) {
-        console.log(`🚫 Not loading observers: eventId=${currentEvent?.id}, heat=${selectedHeat}, enable_observers=${currentEvent?.enable_observers}`);
-        // Clear observers if we can't load them
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (!observerEventId || !selectedHeat || !currentEvent?.enable_observers) {
+        console.log(`🚫 Not loading observers: eventId=${observerEventId}, heat=${selectedHeat}, enable_observers=${currentEvent?.enable_observers}`);
         if (currentHeatObservers.length > 0) {
           console.log('🧹 Clearing stale observers');
           setCurrentHeatObservers([]);
@@ -804,13 +803,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       }
 
       try {
-        // Get the heat number (A=1, B=2, C=3, etc.)
         const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
         console.log(`🔍 Loading observers for Heat ${selectedHeat} (heat_number=${heatNumber}, round=${heatManagement.currentRound})`);
         const observers = await getObserverAssignments(
-          currentEvent.id,
-          heatNumber,                    // Heat number goes SECOND
-          heatManagement.currentRound     // Round number goes THIRD
+          observerEventId,
+          heatNumber,
+          heatManagement.currentRound
         );
         console.log(`✅ Loaded ${observers?.length || 0} observers for Round ${heatManagement.currentRound}, Heat ${selectedHeat}:`, observers);
         console.log(`📋 Observer details:`, observers?.map(o => ({
@@ -831,7 +829,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     };
 
     loadObservers();
-  }, [currentEvent?.id, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers, currentRound, observerReloadTrigger]);
+  }, [observerEventId, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers, currentRound, observerReloadTrigger]);
 
   // Don't render until a heat is selected
   if (!selectedHeat) {
@@ -1061,8 +1059,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       showCountry: currentEvent?.show_country ?? false,
                     };
                     let obsMap: Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]> | undefined;
-                    if (currentEvent?.id) {
-                      const rawMap = await getAllObserversForEvent(currentEvent.id);
+                    if (observerEventId) {
+                      const rawMap = await getAllObserversForEvent(observerEventId);
                       obsMap = new Map();
                       rawMap.forEach((observers, key) => {
                         obsMap!.set(key, observers.map(o => {

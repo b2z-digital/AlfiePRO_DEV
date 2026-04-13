@@ -2439,8 +2439,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
         );
         console.log('✅ Heat management saved to database successfully');
 
-        // Save display settings, observer settings, and start sequence if provided
-        if ((settings.displaySettings || settings.observerSettings) && currentEvent.id) {
+        const freshEvent = getCurrentEvent() || currentEvent;
+
+        if ((settings.displaySettings || settings.observerSettings) && freshEvent.id) {
           const updateData: any = {};
 
           if (settings.displaySettings) {
@@ -2456,18 +2457,27 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
           console.log('💾 Final update data to save:', updateData);
 
-          const { error } = await supabase
-            .from('quick_races')
-            .update(updateData)
-            .eq('id', currentEvent.id);
+          let saveError = null;
+          if (freshEvent.isSeriesEvent && freshEvent.seriesRoundId) {
+            const { error } = await supabase
+              .from('race_series_rounds')
+              .update(updateData)
+              .eq('id', freshEvent.seriesRoundId);
+            saveError = error;
+          } else {
+            const { error } = await supabase
+              .from('quick_races')
+              .update(updateData)
+              .eq('id', freshEvent.id);
+            saveError = error;
+          }
 
-          if (error) {
-            console.error('❌ Error saving display/observer settings:', error);
+          if (saveError) {
+            console.error('❌ Error saving display/observer settings:', saveError);
           } else {
             console.log('✅ Display/Observer settings saved successfully to database');
-            // Update the current event in localStorage
             const updatedEvent = {
-              ...currentEvent,
+              ...freshEvent,
               ...(settings.displaySettings && {
                 show_flag: settings.displaySettings.show_flag,
                 show_country: settings.displaySettings.show_country

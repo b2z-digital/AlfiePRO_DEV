@@ -35,6 +35,7 @@ export interface RoundResult {
 }
 
 export interface SeriesRound {
+  id?: string;
   name: string;
   date: string;
   venue: string;
@@ -48,12 +49,14 @@ export interface SeriesRound {
   heatManagement?: HeatManagement;
   numRaces?: number;
   dropRules?: number[];
-  scoringSystem?: 'low-point' | 'hms' | 'shrs'; // Scoring system type
-  skippers?: Skipper[]; // Each round can have its own set of skippers
-  raceResults?: RoundResult[][]; // Stores results for each race in the round
-  averagePointsApplied?: Record<number, number>; // Skipper index -> average points
-  manualScoreOverrides?: Record<number, number>; // Skipper index -> manual score
-  enableLiveStream?: boolean; // Enable YouTube livestreaming for this round
+  scoringSystem?: 'low-point' | 'hms' | 'shrs';
+  skippers?: Skipper[];
+  raceResults?: RoundResult[][];
+  averagePointsApplied?: Record<number, number>;
+  manualScoreOverrides?: Record<number, number>;
+  enableLiveStream?: boolean;
+  enable_observers?: boolean;
+  observers_per_heat?: number;
 }
 
 export interface RaceSeries {
@@ -108,6 +111,7 @@ export interface RaceEvent {
   raceFormat: RaceType;
   isSeriesEvent?: boolean;
   seriesId?: string;
+  seriesRoundId?: string;
   roundName?: string;
   skippers?: Skipper[];
   attendees?: Skipper[]; // Registered attendees before scoring starts

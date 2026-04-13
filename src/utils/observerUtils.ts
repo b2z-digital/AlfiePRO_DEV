@@ -1,5 +1,12 @@
 import { supabase } from './supabase';
 import { Skipper } from '../types';
+import { RaceEvent } from '../types/race';
+
+export function getObserverEventId(event: RaceEvent | null | undefined): string | null {
+  if (!event) return null;
+  if (event.isSeriesEvent && event.seriesRoundId) return event.seriesRoundId;
+  return event.id || null;
+}
 
 export interface ObserverAssignment {
   id?: string;

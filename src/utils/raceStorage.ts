@@ -542,7 +542,9 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
             currentDay: round.current_day || 1,
             averagePointsApplied: round.average_points_applied || {},
             manualScoreOverrides: round.manual_score_overrides || {},
-            enableLiveStream: round.enable_livestream || false
+            enableLiveStream: round.enable_livestream || false,
+            enable_observers: round.enable_observers || false,
+            observers_per_heat: round.observers_per_heat || 2
           });
         });
       }
@@ -1247,10 +1249,12 @@ export const updateEventResults = async (
           completed: completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
           multi_day: updatedEvent.multiDay || false,
           number_of_days: updatedEvent.numberOfDays || 1,
-          current_day: currentDay
+          current_day: currentDay,
+          enable_observers: updatedEvent.enable_observers || false,
+          observers_per_heat: updatedEvent.observers_per_heat || 2
         };
 
         // For multi-day series rounds, store results in day_results ONLY
@@ -1276,7 +1280,6 @@ export const updateEventResults = async (
         }
 
         if (existingRound) {
-          // Update existing round
           console.log('[saveEventResults] About to update round with data:', {
             id: existingRound.id,
             skippers: roundData.skippers?.length || 0,
@@ -1295,10 +1298,13 @@ export const updateEventResults = async (
             throw updateError;
           }
 
+          if (!updatedEvent.seriesRoundId) {
+            updatedEvent.seriesRoundId = existingRound.id;
+            setCurrentEvent(updatedEvent);
+          }
+
           console.log('[saveEventResults] Updated existing series round');
         } else {
-          // Create new round - need to determine round_index
-          // Get max round_index for this series and add 1
           const { data: maxIndexData } = await supabase
             .from('race_series_rounds')
             .select('round_index')
@@ -1309,16 +1315,23 @@ export const updateEventResults = async (
 
           const nextIndex = (maxIndexData?.round_index || 0) + 1;
 
-          const { error: insertError } = await supabase
+          const { data: insertedRow, error: insertError } = await supabase
             .from('race_series_rounds')
             .insert({
               ...roundData,
               round_index: nextIndex
-            });
+            })
+            .select('id')
+            .maybeSingle();
 
           if (insertError) {
             console.error('Error inserting series round:', insertError);
             throw insertError;
+          }
+
+          if (insertedRow?.id) {
+            updatedEvent.seriesRoundId = insertedRow.id;
+            setCurrentEvent(updatedEvent);
           }
 
           console.log('[saveEventResults] Created new series round with index:', nextIndex);
