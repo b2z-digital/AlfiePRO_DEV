@@ -2487,6 +2487,18 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                 .update(updateData)
                 .eq('id', roundId);
               saveError = error;
+
+              if (!saveError && settings.observerSettings && freshEvent.seriesId) {
+                const observerData: any = {
+                  enable_observers: settings.observerSettings.enable_observers,
+                  observers_per_heat: settings.observerSettings.observers_per_heat
+                };
+                await supabase
+                  .from('race_series_rounds')
+                  .update(observerData)
+                  .eq('series_id', freshEvent.seriesId)
+                  .neq('id', roundId);
+              }
             } else {
               console.error('Could not find series round ID for observer settings save');
             }
