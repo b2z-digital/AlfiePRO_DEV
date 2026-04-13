@@ -4,7 +4,7 @@ import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
-import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId } from '../utils/observerUtils';
+import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 
@@ -282,16 +282,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     let cancelled = false;
 
     const loadObservers = async () => {
-      if (!isOpen || !observerEventId) {
+      if (!isOpen) {
+        setObserversByHeat(new Map());
+        return;
+      }
+
+      const resolvedEventId = observerEventId || await resolveObserverEventId(currentEvent);
+      if (!resolvedEventId) {
         setObserversByHeat(new Map());
         return;
       }
 
       let enableObs = currentEvent?.enable_observers;
       if (enableObs === undefined) {
-        const isSeriesWithRoundId = currentEvent?.isSeriesEvent && currentEvent?.seriesRoundId;
-        const tableName = isSeriesWithRoundId ? 'race_series_rounds' : 'quick_races';
-        const queryId = isSeriesWithRoundId ? currentEvent.seriesRoundId : observerEventId;
+        const roundId = currentEvent?.isSeriesEvent
+          ? (currentEvent?.seriesRoundId || resolvedEventId)
+          : null;
+        const tableName = roundId ? 'race_series_rounds' : 'quick_races';
+        const queryId = roundId || resolvedEventId;
         const { data: eventData, error } = await supabase
           .from(tableName)
           .select('enable_observers, observers_per_heat')
@@ -331,7 +339,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         if (shrsPreAssign && !preAllocationDone.current) {
           preAllocationDone.current = true;
           await preAllocateObserversForAllRounds(
-            observerEventId,
+            resolvedEventId,
             rounds.map(r => ({
               round: r.round,
               heatAssignments: r.heatAssignments.map(h => ({
@@ -374,7 +382,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             if (cancelled) return;
             const heatNumber = i + 1;
             const existingObservers = await getObserverAssignments(
-              observerEventId,
+              resolvedEventId,
               heatNumber,
               roundNumberToLoad
             );
@@ -416,7 +424,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             }
 
             const existingObservers = await getObserverAssignments(
-              observerEventId,
+              resolvedEventId,
               heatNumber,
               roundNumberToLoad
             );
@@ -454,7 +462,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               newObserversByHeat.set(heatNumber, existingObservers);
             } else {
               const observersForThisHeat = await selectObservers(
-                observerEventId,
+                resolvedEventId,
                 heatNumber,
                 roundNumberToLoad,
                 heat.skipperIndices,
@@ -465,7 +473,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
               if (observersForThisHeat.length > 0) {
                 await saveObserverAssignments(
-                  observerEventId,
+                  resolvedEventId,
                   heatNumber,
                   roundNumberToLoad,
                   observersForThisHeat
@@ -1743,13 +1751,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     : r
                                 )
                               };
-                              if (currentEvent.isSeriesEvent && currentEvent.seriesRoundId) {
-                                const { error } = await supabase
-                                  .from('race_series_rounds')
-                                  .update({ heat_management: updatedHM })
-                                  .eq('id', currentEvent.seriesRoundId);
-                                if (error) console.error('Error saving assignment changes:', error);
-                                else console.log('Assignment changes saved to database');
+                              if (currentEvent.isSeriesEvent && currentEvent.seriesId) {
+                                let roundId = currentEvent.seriesRoundId;
+                                if (!roundId && currentEvent.roundName) {
+                                  const { data: rr } = await supabase
+                                    .from('race_series_rounds')
+                                    .select('id')
+                                    .eq('series_id', currentEvent.seriesId)
+                                    .eq('round_name', currentEvent.roundName)
+                                    .maybeSingle();
+                                  roundId = rr?.id;
+                                }
+                                if (roundId) {
+                                  const { error } = await supabase
+                                    .from('race_series_rounds')
+                                    .update({ heat_management: updatedHM })
+                                    .eq('id', roundId);
+                                  if (error) console.error('Error saving assignment changes:', error);
+                                  else console.log('Assignment changes saved to database');
+                                }
                               } else {
                                 const { error } = await supabase
                                   .from('quick_races')

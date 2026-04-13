@@ -5,6 +5,27 @@ import { RaceEvent } from '../types/race';
 export function getObserverEventId(event: RaceEvent | null | undefined): string | null {
   if (!event) return null;
   if (event.isSeriesEvent && event.seriesRoundId) return event.seriesRoundId;
+  if (event.isSeriesEvent) return null;
+  return event.id || null;
+}
+
+export async function resolveObserverEventId(event: RaceEvent | null | undefined): Promise<string | null> {
+  if (!event) return null;
+  if (event.isSeriesEvent && event.seriesRoundId) return event.seriesRoundId;
+  if (event.isSeriesEvent && event.seriesId && event.roundName) {
+    const { data } = await supabase
+      .from('race_series_rounds')
+      .select('id')
+      .eq('series_id', event.seriesId)
+      .eq('round_name', event.roundName)
+      .maybeSingle();
+    if (data?.id) {
+      event.seriesRoundId = data.id;
+      return data.id;
+    }
+    return null;
+  }
+  if (event.isSeriesEvent) return null;
   return event.id || null;
 }
 

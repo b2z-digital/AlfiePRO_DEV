@@ -2418,11 +2418,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     console.log('💾 Heat management state updated');
 
-    // CRITICAL: When clearing heat results, explicitly save to database immediately
-    // This ensures the cleared state persists and triggers live tracking updates
     const currentEvent = getCurrentEvent();
     if (currentEvent) {
-      console.log('💾 Explicitly saving cleared heat management to database...');
+      if (settings.observerSettings) {
+        currentEvent.enable_observers = settings.observerSettings.enable_observers;
+        currentEvent.observers_per_heat = settings.observerSettings.observers_per_heat;
+      }
+      if (settings.displaySettings) {
+        currentEvent.show_flag = settings.displaySettings.show_flag;
+        currentEvent.show_country = settings.displaySettings.show_country;
+      }
+      setCurrentEvent(currentEvent);
+
+      console.log('💾 Explicitly saving heat management to database...');
       try {
         await updateEventResults(
           currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
@@ -2431,9 +2439,9 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           lastCompletedRace,
           hasDeterminedInitialHcaps,
           isManualHandicaps,
-          false, // not completed
+          false,
           currentDay,
-          finalHM, // Use the new heat management (with safety-net rounds if needed)
+          finalHM,
           settings.numRaces,
           settings.dropRules as number[]
         );
@@ -2458,12 +2466,30 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           console.log('💾 Final update data to save:', updateData);
 
           let saveError = null;
-          if (freshEvent.isSeriesEvent && freshEvent.seriesRoundId) {
-            const { error } = await supabase
-              .from('race_series_rounds')
-              .update(updateData)
-              .eq('id', freshEvent.seriesRoundId);
-            saveError = error;
+          if (freshEvent.isSeriesEvent && freshEvent.seriesId) {
+            let roundId = freshEvent.seriesRoundId;
+            if (!roundId && freshEvent.roundName) {
+              const { data: roundRow } = await supabase
+                .from('race_series_rounds')
+                .select('id')
+                .eq('series_id', freshEvent.seriesId)
+                .eq('round_name', freshEvent.roundName)
+                .maybeSingle();
+              roundId = roundRow?.id;
+              if (roundId) {
+                freshEvent.seriesRoundId = roundId;
+                setCurrentEvent(freshEvent);
+              }
+            }
+            if (roundId) {
+              const { error } = await supabase
+                .from('race_series_rounds')
+                .update(updateData)
+                .eq('id', roundId);
+              saveError = error;
+            } else {
+              console.error('Could not find series round ID for observer settings save');
+            }
           } else {
             const { error } = await supabase
               .from('quick_races')

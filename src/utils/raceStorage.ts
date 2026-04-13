@@ -961,16 +961,54 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
 
     console.log('🔄 Reloading event from database:', currentEvent.id);
 
-    const { data, error } = await supabase
-      .from('quick_races')
-      .select('*')
-      .eq('id', currentEvent.id)
-      .eq('club_id', currentClubId)
-      .single();
+    let data: any = null;
 
-    if (error) {
-      console.error('❌ Error reloading event:', error);
-      return null;
+    if (currentEvent.isSeriesEvent && currentEvent.seriesId) {
+      let roundId = currentEvent.seriesRoundId;
+      if (!roundId && currentEvent.roundName) {
+        const { data: roundRow } = await supabase
+          .from('race_series_rounds')
+          .select('id')
+          .eq('series_id', currentEvent.seriesId)
+          .eq('round_name', currentEvent.roundName)
+          .maybeSingle();
+        roundId = roundRow?.id;
+        if (roundId) {
+          currentEvent.seriesRoundId = roundId;
+        }
+      }
+      if (roundId) {
+        const { data: roundData, error: roundError } = await supabase
+          .from('race_series_rounds')
+          .select('*')
+          .eq('id', roundId)
+          .maybeSingle();
+        if (roundError) {
+          console.error('❌ Error reloading series round:', roundError);
+          return null;
+        }
+        if (roundData) {
+          data = {
+            ...roundData,
+            event_name: `${roundData.round_name} - ${currentEvent.eventName?.split(' - ').slice(1).join(' - ') || ''}`,
+            club_name: currentEvent.clubName,
+            race_date: roundData.date,
+            race_venue: roundData.venue,
+          };
+        }
+      }
+    } else {
+      const { data: qrData, error } = await supabase
+        .from('quick_races')
+        .select('*')
+        .eq('id', currentEvent.id)
+        .eq('club_id', currentClubId)
+        .maybeSingle();
+      if (error) {
+        console.error('❌ Error reloading event:', error);
+        return null;
+      }
+      data = qrData;
     }
 
     if (!data) {

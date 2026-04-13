@@ -12,7 +12,7 @@ import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
 import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX } from 'lucide-react';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
-import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId } from '../utils/observerUtils';
+import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface HeatScoringTableProps {
@@ -790,13 +790,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     }
   }, [showHeatAssignments]);
 
-  // Load observers for the current heat
   React.useEffect(() => {
     const loadObservers = async () => {
-      if (!observerEventId || !selectedHeat || !currentEvent?.enable_observers) {
-        console.log(`🚫 Not loading observers: eventId=${observerEventId}, heat=${selectedHeat}, enable_observers=${currentEvent?.enable_observers}`);
+      const resolvedId = observerEventId || await resolveObserverEventId(currentEvent);
+      if (!resolvedId || !selectedHeat || !currentEvent?.enable_observers) {
         if (currentHeatObservers.length > 0) {
-          console.log('🧹 Clearing stale observers');
           setCurrentHeatObservers([]);
         }
         return;
@@ -804,9 +802,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
       try {
         const heatNumber = selectedHeat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
-        console.log(`🔍 Loading observers for Heat ${selectedHeat} (heat_number=${heatNumber}, round=${heatManagement.currentRound})`);
         const observers = await getObserverAssignments(
-          observerEventId,
+          resolvedId,
           heatNumber,
           heatManagement.currentRound
         );
@@ -1059,8 +1056,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
                       showCountry: currentEvent?.show_country ?? false,
                     };
                     let obsMap: Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]> | undefined;
-                    if (observerEventId) {
-                      const rawMap = await getAllObserversForEvent(observerEventId);
+                    const pdfEventId = observerEventId || await resolveObserverEventId(currentEvent);
+                    if (pdfEventId) {
+                      const rawMap = await getAllObserversForEvent(pdfEventId);
                       obsMap = new Map();
                       rawMap.forEach((observers, key) => {
                         obsMap!.set(key, observers.map(o => {
