@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
@@ -49,7 +49,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
   const [previewRoundIndex, setPreviewRoundIndex] = useState<number | null>(null);
 
-  const observerEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
+  const observerEventIdMemo = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
+  const resolvedObserverIdRef = useRef<string | null>(null);
+  const observerEventId = observerEventIdMemo || resolvedObserverIdRef.current;
 
   const rankedSkipperIndices = useMemo(() => {
     const indices = (heatManagement.configuration as any)?.rankedSkipperIndices;
@@ -292,6 +294,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         setObserversByHeat(new Map());
         return;
       }
+      resolvedObserverIdRef.current = resolvedEventId;
 
       let enableObs = currentEvent?.enable_observers;
       if (enableObs === undefined) {
