@@ -7,6 +7,7 @@ import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
+import { validateHeatAssignments } from '../utils/hmsHeatSystem';
 
 interface HeatAssignmentModalProps {
   isOpen: boolean;
@@ -1602,6 +1603,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               <button
                 onClick={() => {
                   if (localAssignments && onUpdateAssignments) {
+                    const problems = validateHeatAssignments(localAssignments, skippers.length);
+                    if (problems.length > 0) {
+                      alert('Heat assignment issues:\n' + problems.join('\n'));
+                      return;
+                    }
                     onUpdateAssignments(localAssignments, 1);
                   }
                   setInitialEditMode(false);
@@ -1736,14 +1742,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             configuration.numberOfHeats
                           );
 
-                          // If we're editing mid-round (no nextRound), update CURRENT round
-                          // If between rounds (nextRound exists), update NEXT round
+                          const problems = validateHeatAssignments(updatedAssignments, skippers.length);
+                          if (problems.length > 0) {
+                            alert('Heat assignment issues:\n' + problems.join('\n'));
+                            setIsApplyingChanges(false);
+                            return;
+                          }
+
                           const targetRoundNumber = nextRound ? nextRound.round : roundToDisplay.round;
 
-                          console.log('💾 Applying assignment changes to Round', targetRoundNumber);
-                          console.log('   Updated assignments:', updatedAssignments);
-
-                          // Update in parent state - pass targetRoundNumber so parent knows which round to update
                           onUpdateAssignments(updatedAssignments, targetRoundNumber);
 
                           if (currentEvent?.id) {

@@ -97,15 +97,22 @@ export const completeHeat = (
   const lowerHeatIndex = heatIndex + 1;
   const lowerHeat: HeatDesignation | null = lowerHeatIndex < availableHeats.length ? availableHeats[lowerHeatIndex] : null;
 
+  // Resolve effective promotion count for this round (supports per-race overrides per HMS VBA)
+  const effectivePromotionCount = configuration.promotionCountOverrides?.[currentRound]
+    ?? configuration.promotionCount;
+
   // SCORING SYSTEM SPECIFIC LOGIC
   console.log(`\n🔍 Heat ${heat} complete. Scoring System: ${isShrs ? 'SHR' : 'HMS'}, Round ${currentRound}`);
+  if (effectivePromotionCount !== configuration.promotionCount) {
+    console.log(`  ⚡ Per-race promotion override: ${effectivePromotionCount} (default: ${configuration.promotionCount})`);
+  }
 
   // HMS CRITICAL LOGIC: After a lower heat completes, IMMEDIATELY promote skippers to the HIGHER heat
   // This happens WITHIN the same round, BEFORE the higher heat is scored
   // Applies to Round 2+ (after initial seeding heats)
   // HMS scores LOWER → HIGHER (B → A), so when B completes, promote to A
   // ONLY do this if the higher heat hasn't been scored yet!
-  if (isHms && currentRound >= 2 && higherHeat && configuration.promotionCount) {
+  if (isHms && currentRound >= 2 && higherHeat && effectivePromotionCount) {
     // Check if the higher heat has already been scored
     const higherHeatSkippers = round.heatAssignments.find(a => a.heatDesignation === higherHeat)?.skipperIndices || [];
     const higherHeatAlreadyScored = higherHeatSkippers.length > 0 && higherHeatSkippers.every(skipperIndex => {
@@ -118,16 +125,14 @@ export const completeHeat = (
     });
 
     if (!higherHeatAlreadyScored) {
-      console.log(`\n🔼 HMS PROMOTION: Heat ${heat} complete. Promoting top ${configuration.promotionCount} to Heat ${higherHeat} (same round)`);
+      console.log(`\n🔼 HMS PROMOTION: Heat ${heat} complete. Promoting top ${effectivePromotionCount} to Heat ${higherHeat} (same round)`);
 
-      // Get results from the just-completed heat
       const completedHeatResults = round.results
         .filter(r => r.heatDesignation === heat && r.position !== null && !r.letterScore)
         .sort((a, b) => (a.position || 999) - (b.position || 999));
 
-      // Top N skippers get promoted
       const promotedSkippers = completedHeatResults
-        .slice(0, configuration.promotionCount)
+        .slice(0, effectivePromotionCount)
         .map(r => r.skipperIndex);
 
       if (promotedSkippers.length > 0) {
@@ -194,8 +199,7 @@ export const completeHeat = (
   // This happens WITHIN the same round, AFTER the higher heat is scored
   // Applies to Round 2+ (after initial seeding heats)
   // Only do this if there's a lower heat available and it hasn't been scored yet
-  if (isHms && currentRound >= 2 && lowerHeat && configuration.promotionCount) {
-    // Check if the lower heat has already been scored
+  if (isHms && currentRound >= 2 && lowerHeat && effectivePromotionCount) {
     const lowerHeatSkippers = round.heatAssignments.find(a => a.heatDesignation === lowerHeat)?.skipperIndices || [];
     const lowerHeatAlreadyScored = lowerHeatSkippers.length > 0 && lowerHeatSkippers.every(skipperIndex => {
       const result = round.results.find(
@@ -206,22 +210,20 @@ export const completeHeat = (
       return result && (result.position !== null || result.letterScore);
     });
 
-    // Get results from the just-completed heat
     const completedHeatResults = round.results
       .filter(r => r.heatDesignation === heat && r.position !== null && !r.letterScore)
       .sort((a, b) => (a.position || 999) - (b.position || 999));
 
-    // Bottom N skippers get relegated
     const totalInHeat = completedHeatResults.length;
     const relegatedSkippers = completedHeatResults
-      .slice(Math.max(0, totalInHeat - configuration.promotionCount))
+      .slice(Math.max(0, totalInHeat - effectivePromotionCount))
       .map(r => r.skipperIndex);
 
     if (relegatedSkippers.length > 0) {
       if (!lowerHeatAlreadyScored) {
-        console.log(`\n🔽 HMS RELEGATION: Heat ${heat} complete. Relegating bottom ${configuration.promotionCount} to Heat ${lowerHeat} (same round)`);
+        console.log(`\n🔽 HMS RELEGATION: Heat ${heat} complete. Relegating bottom ${effectivePromotionCount} to Heat ${lowerHeat} (same round)`);
       } else {
-        console.log(`\n🔽 HMS RELEGATION: Heat ${heat} complete. Relegating bottom ${configuration.promotionCount} to Heat ${lowerHeat} (Heat ${lowerHeat} already scored, relegation will apply to next round)`);
+        console.log(`\n🔽 HMS RELEGATION: Heat ${heat} complete. Relegating bottom ${effectivePromotionCount} to Heat ${lowerHeat} (Heat ${lowerHeat} already scored, relegation will apply to next round)`);
       }
 
       console.log(`  Relegating skippers:`, relegatedSkippers);
