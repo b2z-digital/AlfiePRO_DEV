@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, CalendarRange, Upload, DollarSign, Users, Globe, Clock, Map, ChevronDown, Wand2, Download, Edit, Radio, Video, Info, Link2 } from 'lucide-react';
+import { Trophy, Calendar, Building, Sailboat, Plus, Trash2, X, FileText, CalendarRange, Upload, DollarSign, Users, Globe, Clock, Map, ChevronDown, Wand as Wand2, Download, CreditCard as Edit, Radio, Video, Info, Link2 } from 'lucide-react';
 import { RaceType, BoatType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { storeRaceEvent, storeRaceSeries } from '../../utils/raceStorage';
@@ -8,7 +8,7 @@ import { addPublicEvent, updatePublicEvent, checkEventDateClashes, ClashingEvent
 import { EventClashWarningModal } from '../events/EventClashWarningModal';
 import { getStoredClubs } from '../../utils/clubStorage';
 import { getStoredVenues } from '../../utils/venueStorage';
-import { getClubBoatClasses } from '../../utils/boatClassStorage';
+import { getClubBoatClasses, getBoatClasses } from '../../utils/boatClassStorage';
 import { Club } from '../../types/club';
 import { Venue } from '../../types/venue';
 import { BoatClass } from '../../types/boatClass';
@@ -49,7 +49,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   ];
 
   const findBoatClassForOption = (opt: typeof raceClassOptions[number]): BoatClass | undefined => {
-    return boatClasses.find(bc => {
+    const searchList = allBoatClasses.length > 0 ? allBoatClasses : boatClasses;
+    return searchList.find(bc => {
       const dbName = bc.name.toLowerCase();
       return opt.keywords.some(kw => dbName.includes(kw));
     });
@@ -130,6 +131,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
   const [showVenueDropdown, setShowVenueDropdown] = useState(false);
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [boatClasses, setBoatClasses] = useState<BoatClass[]>([]);
+  const [allBoatClasses, setAllBoatClasses] = useState<BoatClass[]>([]);
   const clubDropdownRef = useRef<HTMLDivElement>(null);
   const venueDropdownRef = useRef<HTMLDivElement>(null);
   const classDropdownRef = useRef<HTMLDivElement>(null);
@@ -180,6 +182,13 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           console.error('Error fetching state associations:', stateAssocError);
         } else {
           setStateAssociations(stateAssocData || []);
+        }
+
+        try {
+          const allClasses = await getBoatClasses();
+          setAllBoatClasses(allClasses);
+        } catch (e) {
+          console.error('Error fetching all boat classes:', e);
         }
 
         if (currentClub?.clubId) {
@@ -1082,7 +1091,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
       `}>
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -3024,7 +3033,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddRound}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium transition-colors"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   >
                     <Plus size={16} />
                     Add Round

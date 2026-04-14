@@ -95,7 +95,7 @@ export const PendingApplicationsWidget: React.FC<WidgetProps> = ({ widgetId, isE
           </p>
           <p className="text-xs text-slate-400">
             {pendingCount > 0
-              ? `${pendingCount === 1 ? '1 application' : `${pendingCount} applications`} awaiting review`
+              ? `${pendingCount} pending ${pendingCount === 1 ? 'application' : 'applications'}`
               : 'No pending applications'}
           </p>
         </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, UserMinus, Search, Check, XCircle, Users, Clock, UserCheck } from 'lucide-react';
+import { X, UserPlus, UserMinus, Search, Check, Circle as XCircle, Users, Clock, UserCheck, MessageCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { socialStorage } from '../../utils/socialStorage';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -16,6 +17,7 @@ type TabType = 'connections' | 'requests' | 'find';
 
 export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: ConnectionsModalProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { addNotification } = useNotification();
   const lightMode = !darkMode;
   const [activeTab, setActiveTab] = useState<TabType>('connections');
@@ -185,7 +187,7 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
           <div className="relative z-10">
             <h2 className="text-2xl font-bold text-white drop-shadow-lg">Connections</h2>
@@ -258,13 +260,26 @@ export default function ConnectionsModal({ isOpen, onClose, darkMode = false }: 
                           </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDisconnectClick(connUser?.id || conn.connected_user_id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                      >
-                        <UserMinus className="w-4 h-4" />
-                        Remove
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const userId = connUser?.id || conn.connected_user_id;
+                            onClose();
+                            navigate(`/comms?compose=true&recipientId=${userId}`);
+                          }}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Chat
+                        </button>
+                        <button
+                          onClick={() => handleDisconnectClick(connUser?.id || conn.connected_user_id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                        >
+                          <UserMinus className="w-4 h-4" />
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

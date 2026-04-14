@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { DollarSign, AlertCircle, CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, CheckSquare, Square, Wallet, AlertTriangle, ChevronDown, Calendar, Filter } from 'lucide-react';
+import { DollarSign, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Clock, Download, RefreshCw, ArrowUpRight, Check, X, SquareCheck as CheckSquare, Square, Wallet, TriangleAlert as AlertTriangle, ChevronDown, Calendar, ListFilter as Filter } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -145,7 +145,8 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
     paymentDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'bank_transfer',
     reference: '',
-    notes: ''
+    notes: '',
+    skipFinanceTransactions: false
   });
 
   useEffect(() => {
@@ -257,7 +258,6 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
       const totalAmount = stateTotal; // Club only pays state fee, which includes national portion
       const memberCount = selectedRemittances.length;
 
-      // Update remittances as paid with bulk_payment flag to prevent trigger from creating individual transactions
       const { error: remittanceError } = await supabase
         .from('membership_remittances')
         .update({
@@ -270,171 +270,176 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
 
       if (remittanceError) throw remittanceError;
 
-      // Find or create "Association Fees" category
-      let categoryId: string | null = null;
+      if (!bulkPaymentDetails.skipFinanceTransactions) {
+        // Find or create "Association Fees" category
+        let categoryId: string | null = null;
 
-      const { data: categories } = await supabase
-        .from('budget_categories')
-        .select('id')
-        .eq('club_id', currentClub.clubId)
-        .eq('name', 'Association Fees')
-        .maybeSingle();
-
-      if (categories) {
-        categoryId = categories.id;
-      } else {
-        // Create the category
-        const { data: newCategory, error: categoryError } = await supabase
+        const { data: categories } = await supabase
           .from('budget_categories')
-          .insert({
-            club_id: currentClub.clubId,
-            name: 'Association Fees',
-            type: 'expense',
-            is_system: true,
-            system_key: 'association_fees'
-          })
           .select('id')
-          .single();
-
-        if (categoryError) throw categoryError;
-        categoryId = newCategory.id;
-      }
-
-      // Get state association details for payee field
-      const stateAssociationId = selectedRemittances[0]?.state_association_id;
-      let stateAssociationName = 'State Association';
-
-      if (stateAssociationId) {
-        const { data: stateAssoc } = await supabase
-          .from('state_associations')
-          .select('name, short_name')
-          .eq('id', stateAssociationId)
+          .eq('club_id', currentClub.clubId)
+          .eq('name', 'Association Fees')
           .maybeSingle();
 
-        if (stateAssoc) {
-          stateAssociationName = stateAssoc.short_name || stateAssoc.name;
-        }
-      }
-
-      // Map payment method to valid values (cash, card, cheque, bank, other)
-      const paymentMethodMap: Record<string, string> = {
-        'bank_transfer': 'bank',
-        'credit_card': 'card',
-        'check': 'cheque'
-      };
-      const mappedPaymentMethod = paymentMethodMap[bulkPaymentDetails.paymentMethod] || bulkPaymentDetails.paymentMethod;
-
-      const paymentReference = bulkPaymentDetails.reference || `ASSOC-${new Date().getTime()}`;
-
-      // Create finance transaction for the bulk payment (club expense)
-      const { error: financeError } = await supabase
-        .from('transactions')
-        .insert({
-          club_id: currentClub.clubId,
-          description: `State Association fees - ${memberCount} members (includes $${nationalTotal.toFixed(2)} for National Association)`,
-          amount: totalAmount,
-          type: 'expense',
-          category_id: categoryId,
-          date: bulkPaymentDetails.paymentDate,
-          payment_method: mappedPaymentMethod,
-          payment_status: 'paid',
-          payee: stateAssociationName,
-          reference: paymentReference,
-          notes: bulkPaymentDetails.notes || `Payment to State Association for ${memberCount} member fees. State will remit $${nationalTotal.toFixed(2)} to National Association.`,
-          linked_entity_type: 'bulk_remittance',
-          linked_entity_id: null
-        });
-
-      if (financeError) throw financeError;
-
-      // Create corresponding deposit in state association finances
-      if (stateAssociationId) {
-        // Find or create "Club Remittances" income category for state association
-        const { data: stateCategories } = await supabase
-          .from('association_budget_categories')
-          .select('id')
-          .eq('association_id', stateAssociationId)
-          .eq('association_type', 'state')
-          .eq('system_key', 'club_remittances')
-          .maybeSingle();
-
-        let stateCategoryId = stateCategories?.id;
-
-        if (!stateCategoryId) {
+        if (categories) {
+          categoryId = categories.id;
+        } else {
           const { data: newCategory, error: categoryError } = await supabase
-            .from('association_budget_categories')
+            .from('budget_categories')
             .insert({
-              association_id: stateAssociationId,
-              association_type: 'state',
-              name: 'Club Remittances',
-              type: 'income',
+              club_id: currentClub.clubId,
+              name: 'Association Fees',
+              type: 'expense',
               is_system: true,
-              system_key: 'club_remittances',
-              description: 'Membership fee remittances from clubs'
+              system_key: 'association_fees'
             })
             .select('id')
             .single();
 
           if (categoryError) throw categoryError;
-          stateCategoryId = newCategory.id;
+          categoryId = newCategory.id;
         }
 
-        // Get club name
-        const clubName = currentClub.club?.name || 'Unknown Club';
+        // Get state association details for payee field
+        const stateAssociationId = selectedRemittances[0]?.state_association_id;
+        let stateAssociationName = 'State Association';
 
-        // Create the deposit transaction in association finances
-        const { error: associationFinanceError } = await supabase
-          .from('association_transactions')
+        if (stateAssociationId) {
+          const { data: stateAssoc } = await supabase
+            .from('state_associations')
+            .select('name, short_name')
+            .eq('id', stateAssociationId)
+            .maybeSingle();
+
+          if (stateAssoc) {
+            stateAssociationName = stateAssoc.short_name || stateAssoc.name;
+          }
+        }
+
+        // Map payment method to valid values (cash, card, cheque, bank, other)
+        const paymentMethodMap: Record<string, string> = {
+          'bank_transfer': 'bank',
+          'credit_card': 'card',
+          'check': 'cheque'
+        };
+        const mappedPaymentMethod = paymentMethodMap[bulkPaymentDetails.paymentMethod] || bulkPaymentDetails.paymentMethod;
+
+        const paymentReference = bulkPaymentDetails.reference || `ASSOC-${new Date().getTime()}`;
+
+        // Create finance transaction for the bulk payment (club expense)
+        const { error: financeError } = await supabase
+          .from('transactions')
           .insert({
-            association_id: stateAssociationId,
-            association_type: 'state',
-            description: `Membership Remittance from ${clubName} - ${memberCount} members`,
+            club_id: currentClub.clubId,
+            description: `State Association fees - ${memberCount} members (includes $${nationalTotal.toFixed(2)} for National Association)`,
             amount: totalAmount,
-            type: 'income',
-            category_id: stateCategoryId,
+            type: 'expense',
+            category_id: categoryId,
             date: bulkPaymentDetails.paymentDate,
             payment_method: mappedPaymentMethod,
-            payment_status: 'completed',
-            payer: clubName,
+            payment_status: 'paid',
+            payee: stateAssociationName,
             reference: paymentReference,
-            notes: `Bulk remittance for ${memberCount} members (includes $${nationalTotal.toFixed(2)} for National Association)`,
-            linked_entity_type: 'club',
-            linked_entity_id: currentClub.clubId
+            notes: bulkPaymentDetails.notes || `Payment to State Association for ${memberCount} member fees. State will remit $${nationalTotal.toFixed(2)} to National Association.`,
+            linked_entity_type: 'bulk_remittance',
+            linked_entity_id: null
           });
 
-        if (associationFinanceError) throw associationFinanceError;
+        if (financeError) throw financeError;
 
-        // Create remittance_payments entry for Payment History tracking
-        const { error: remittancePaymentError } = await supabase
-          .from('remittance_payments')
-          .insert({
-            from_club_id: currentClub.clubId,
-            from_type: 'club',
-            to_state_id: stateAssociationId,
-            to_type: 'state',
-            payment_date: bulkPaymentDetails.paymentDate,
-            total_amount: totalAmount,
-            allocated_amount: totalAmount, // Fully allocated to the members who paid
-            payment_method: mappedPaymentMethod,
-            payment_reference: paymentReference,
-            notes: `Bulk remittance for ${memberCount} members (includes $${nationalTotal.toFixed(2)} for National Association)`,
-            reconciliation_status: 'completed'
-          });
+        // Create corresponding deposit in state association finances
+        if (stateAssociationId) {
+          // Find or create "Club Remittances" income category for state association
+          const { data: stateCategories } = await supabase
+            .from('association_budget_categories')
+            .select('id')
+            .eq('association_id', stateAssociationId)
+            .eq('association_type', 'state')
+            .eq('system_key', 'club_remittances')
+            .maybeSingle();
 
-        if (remittancePaymentError) {
-          console.error('Error creating remittance payment:', remittancePaymentError);
-          throw remittancePaymentError;
+          let stateCategoryId = stateCategories?.id;
+
+          if (!stateCategoryId) {
+            const { data: newCategory, error: categoryError } = await supabase
+              .from('association_budget_categories')
+              .insert({
+                association_id: stateAssociationId,
+                association_type: 'state',
+                name: 'Club Remittances',
+                type: 'income',
+                is_system: true,
+                system_key: 'club_remittances',
+                description: 'Membership fee remittances from clubs'
+              })
+              .select('id')
+              .single();
+
+            if (categoryError) throw categoryError;
+            stateCategoryId = newCategory.id;
+          }
+
+          // Get club name
+          const clubName = currentClub.club?.name || 'Unknown Club';
+
+          // Create the deposit transaction in association finances
+          const { error: associationFinanceError } = await supabase
+            .from('association_transactions')
+            .insert({
+              association_id: stateAssociationId,
+              association_type: 'state',
+              description: `Membership Remittance from ${clubName} - ${memberCount} members`,
+              amount: totalAmount,
+              type: 'income',
+              category_id: stateCategoryId,
+              date: bulkPaymentDetails.paymentDate,
+              payment_method: mappedPaymentMethod,
+              payment_status: 'completed',
+              payer: clubName,
+              reference: paymentReference,
+              notes: `Bulk remittance for ${memberCount} members (includes $${nationalTotal.toFixed(2)} for National Association)`,
+              linked_entity_type: 'club',
+              linked_entity_id: currentClub.clubId
+            });
+
+          if (associationFinanceError) throw associationFinanceError;
+
+          // Create remittance_payments entry for Payment History tracking
+          const { error: remittancePaymentError } = await supabase
+            .from('remittance_payments')
+            .insert({
+              from_club_id: currentClub.clubId,
+              from_type: 'club',
+              to_state_id: stateAssociationId,
+              to_type: 'state',
+              payment_date: bulkPaymentDetails.paymentDate,
+              total_amount: totalAmount,
+              allocated_amount: totalAmount,
+              payment_method: mappedPaymentMethod,
+              payment_reference: paymentReference,
+              notes: `Bulk remittance for ${memberCount} members (includes $${nationalTotal.toFixed(2)} for National Association)`,
+              reconciliation_status: 'completed'
+            });
+
+          if (remittancePaymentError) {
+            console.error('Error creating remittance payment:', remittancePaymentError);
+            throw remittancePaymentError;
+          }
         }
       }
 
-      addNotification('success', `Marked ${selectedIds.size} remittances as paid and recorded in finances`);
+      const successMsg = bulkPaymentDetails.skipFinanceTransactions
+        ? `Marked ${selectedIds.size} remittances as previously paid (no finance transactions created)`
+        : `Marked ${selectedIds.size} remittances as paid and recorded in finances`;
+      addNotification('success', successMsg);
       setSelectedIds(new Set());
       setShowBulkPaymentModal(false);
       setBulkPaymentDetails({
         paymentDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'bank_transfer',
         reference: '',
-        notes: ''
+        notes: '',
+        skipFinanceTransactions: false
       });
       await loadData();
     } catch (error: any) {
@@ -677,7 +682,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
               <button
                 onClick={handleBulkMarkAsPaid}
                 disabled={bulkActionInProgress}
-                className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green px-4 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Check className="w-4 h-4" />
                 Mark as Paid
@@ -995,18 +1000,60 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
                 </div>
               </div>
 
-              {/* Finance Integration Notice */}
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                <div className="flex gap-3">
-                  <Wallet className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              {/* Already Paid Externally Toggle */}
+              <div
+                onClick={() => setBulkPaymentDetails({...bulkPaymentDetails, skipFinanceTransactions: !bulkPaymentDetails.skipFinanceTransactions})}
+                className={`rounded-xl p-4 border cursor-pointer transition-colors ${
+                  bulkPaymentDetails.skipFinanceTransactions
+                    ? 'bg-amber-500/10 border-amber-500/30'
+                    : 'bg-slate-900/30 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    bulkPaymentDetails.skipFinanceTransactions
+                      ? 'bg-amber-500 border-amber-500'
+                      : 'border-slate-500'
+                  }`}>
+                    {bulkPaymentDetails.skipFinanceTransactions && <Check className="w-3 h-3 text-white" />}
+                  </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-300">Finance Integration</p>
-                    <p className="text-sm text-blue-400/80 mt-1">
-                      This payment will be automatically recorded in your finances as an expense under "Association Fees" category.
+                    <p className={`text-sm font-medium ${bulkPaymentDetails.skipFinanceTransactions ? 'text-amber-300' : 'text-slate-300'}`}>
+                      Already paid externally (before import)
+                    </p>
+                    <p className={`text-xs mt-1 ${bulkPaymentDetails.skipFinanceTransactions ? 'text-amber-400/70' : 'text-slate-500'}`}>
+                      Check this if the club already paid these association fees before being imported into the system. This will mark remittances as paid without creating duplicate finance transactions.
                     </p>
                   </div>
                 </div>
               </div>
+
+              {/* Finance Integration Notice */}
+              {!bulkPaymentDetails.skipFinanceTransactions ? (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                  <div className="flex gap-3">
+                    <Wallet className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-300">Finance Integration</p>
+                      <p className="text-sm text-blue-400/80 mt-1">
+                        This payment will be automatically recorded in your finances as an expense under "Association Fees" category.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                  <div className="flex gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-300">No Finance Transactions</p>
+                      <p className="text-sm text-amber-400/80 mt-1">
+                        Remittances will be marked as paid but no expense or income transactions will be created. Use this when fees were already recorded in finances before the system import.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-slate-700 flex gap-3 justify-end">
@@ -1028,7 +1075,7 @@ export const ClubRemittanceDashboard: React.FC<ClubRemittanceDashboardProps> = (
               <button
                 onClick={confirmBulkPayment}
                 disabled={bulkActionInProgress}
-                className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bulkActionInProgress ? (
                   <>

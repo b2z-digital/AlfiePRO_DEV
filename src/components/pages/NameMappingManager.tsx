@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Search } from 'lucide-react';
+import { CircleCheck as CheckCircle, Circle as XCircle, TriangleAlert as AlertTriangle, RefreshCw, Search } from 'lucide-react';
 import type { SkipperNameMapping, NationalRanking, FuzzyMatchResult } from '../../types/rankings';
 import type { Member } from '../../types/member';
 import {
@@ -246,7 +246,7 @@ export const NameMappingManager: React.FC<NameMappingManagerProps> = ({
                   <div className="flex items-center space-x-2 ml-4">
                     <button
                       onClick={() => ranking && handleAcceptMapping(suggestion, ranking.id)}
-                      className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+                      className="btn-primary-green px-3 py-1.5 text-white text-sm rounded-lg"
                     >
                       Accept
                     </button>

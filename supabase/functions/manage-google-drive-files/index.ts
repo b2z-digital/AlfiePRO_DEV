@@ -33,82 +33,91 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get access token function
+    // Get access token function - uses unified integrations table
     async function getAccessToken(organizationId: string, organizationType: string) {
-      const tableName = organizationType === 'club' ? 'club_integrations' :
-                        organizationType === 'state' ? 'state_association_integrations' :
-                        'national_association_integrations';
       const idColumn = organizationType === 'club' ? 'club_id' :
                        organizationType === 'state' ? 'state_association_id' :
                        'national_association_id';
 
       const { data: integration } = await supabase
-        .from(tableName)
-        .select('google_drive_refresh_token, google_drive_access_token, google_drive_token_expiry')
+        .from('integrations')
+        .select('id, credentials')
         .eq(idColumn, organizationId)
-        .eq('provider', 'google_drive')
+        .eq('platform', 'google_drive')
         .maybeSingle();
 
-      if (!integration?.google_drive_refresh_token) {
+      if (!integration?.credentials?.refresh_token) {
         throw new Error('Google Drive not connected');
       }
 
+      const creds = integration.credentials;
+
       // Check if token is expired
-      const isExpired = !integration.google_drive_token_expiry ||
-        new Date(integration.google_drive_token_expiry) <= new Date();
+      const isExpired = !creds.token_expires_at ||
+        new Date(creds.token_expires_at) <= new Date();
 
       if (isExpired) {
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            refresh_token: integration.google_drive_refresh_token,
+            client_id: clientId!,
+            client_secret: clientSecret!,
+            refresh_token: creds.refresh_token,
             grant_type: 'refresh_token',
           }),
         });
 
         const tokenData = await tokenResponse.json();
+
+        if (!tokenResponse.ok || !tokenData.access_token) {
+          console.error('Token refresh failed:', JSON.stringify(tokenData));
+          throw new Error(`Google Drive token refresh failed: ${tokenData.error_description || tokenData.error || 'unknown error'}. Please reconnect Google Drive in Integrations.`);
+        }
+
         const newAccessToken = tokenData.access_token;
         const expiresIn = tokenData.expires_in || 3600;
         const newExpiry = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-        await supabase.from(tableName).update({
-          google_drive_access_token: newAccessToken,
-          google_drive_token_expiry: newExpiry,
-        }).eq(idColumn, organizationId).eq('provider', 'google_drive');
+        await supabase.from('integrations').update({
+          credentials: { ...creds, access_token: newAccessToken, token_expires_at: newExpiry },
+        }).eq('id', integration.id);
 
         return newAccessToken;
       }
 
-      return integration.google_drive_access_token;
+      return creds.access_token;
     }
 
-    if (action === 'create_folder') {
-      const { organizationId, organizationType, folderName } = body;
-      
-      if (!folderName) {
-        throw new Error('Folder name is required');
-      }
-
-      const accessToken = await getAccessToken(organizationId, organizationType);
-
-      const tableName = organizationType === 'club' ? 'club_integrations' :
-                        organizationType === 'state' ? 'state_association_integrations' :
-                        'national_association_integrations';
+    // Get root folder id from unified integrations table
+    async function getRootFolderId(organizationId: string, organizationType: string) {
       const idColumn = organizationType === 'club' ? 'club_id' :
                        organizationType === 'state' ? 'state_association_id' :
                        'national_association_id';
 
       const { data: integration } = await supabase
-        .from(tableName)
-        .select('google_drive_folder_id')
+        .from('integrations')
+        .select('credentials')
         .eq(idColumn, organizationId)
-        .eq('provider', 'google_drive')
+        .eq('platform', 'google_drive')
         .maybeSingle();
 
-      if (!integration?.google_drive_folder_id) {
+      return integration?.credentials?.folder_id || integration?.credentials?.root_folder_id || null;
+    }
+
+    if (action === 'create_folder') {
+      const { organizationId, organizationType, folderName, parentFolderId } = body;
+
+      if (!folderName) {
+        throw new Error('Folder name is required');
+      }
+
+      const accessToken = await getAccessToken(organizationId, organizationType);
+      const rootFolderId = await getRootFolderId(organizationId, organizationType);
+
+      const targetParentId = parentFolderId || rootFolderId;
+
+      if (!targetParentId) {
         throw new Error('Google Drive folder not configured');
       }
 
@@ -123,7 +132,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder',
-            parents: [integration.google_drive_folder_id]
+            parents: [targetParentId]
           }),
         }
       );
@@ -205,8 +214,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (action === 'sync') {
-      const { organizationId, organizationType, folderId } = body;
+    if (action === 'sync' || action === 'list_folder') {
+      const { organizationId, organizationType, folderId: bodyFolderId } = body;
+
+      let folderId = bodyFolderId;
+
+      // If no folderId provided, use the root folder from integration
+      if (!folderId) {
+        folderId = await getRootFolderId(organizationId, organizationType);
+      }
 
       if (!folderId) {
         throw new Error('folderId is required');
@@ -215,7 +231,7 @@ Deno.serve(async (req: Request) => {
       const accessToken = await getAccessToken(organizationId, organizationType);
 
       const listResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink,createdTime,modifiedTime,size)`,
+        `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,webViewLink,webContentLink,createdTime,modifiedTime,size,thumbnailLink,iconLink)&orderBy=folder,name`,
         {
           method: 'GET',
           headers: {
@@ -227,7 +243,10 @@ Deno.serve(async (req: Request) => {
       if (!listResponse.ok) {
         const error = await listResponse.text();
         console.error('List error:', error);
-        throw new Error('Failed to list files from Google Drive');
+        if (listResponse.status === 401 || listResponse.status === 403) {
+          throw new Error('Google Drive access denied. Your token may have been revoked. Please reconnect Google Drive in Integrations.');
+        }
+        throw new Error(`Failed to list files from Google Drive: ${listResponse.status}`);
       }
 
       const listData = await listResponse.json();
@@ -235,7 +254,8 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          files: listData.files || []
+          files: listData.files || [],
+          folderId
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
@@ -305,6 +325,75 @@ Deno.serve(async (req: Request) => {
           success: true,
           message: 'Folder deleted from Google Drive'
         }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    if (action === 'rename_file') {
+      const { organizationId, organizationType, fileId, newName } = body;
+
+      if (!fileId || !newName) {
+        throw new Error('fileId and newName are required');
+      }
+
+      const accessToken = await getAccessToken(organizationId, organizationType);
+
+      const renameResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: newName }),
+        }
+      );
+
+      if (!renameResponse.ok) {
+        const error = await renameResponse.text();
+        console.error('Rename error:', error);
+        throw new Error('Failed to rename file in Google Drive');
+      }
+
+      const renamed = await renameResponse.json();
+      return new Response(
+        JSON.stringify({ success: true, file: renamed }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    if (action === 'move_file') {
+      const { organizationId, organizationType, fileId, targetFolderId, currentParentId } = body;
+
+      if (!fileId || !targetFolderId) {
+        throw new Error('fileId and targetFolderId are required');
+      }
+
+      const accessToken = await getAccessToken(organizationId, organizationType);
+
+      const removeParents = currentParentId ? `&removeParents=${currentParentId}` : '';
+      const moveResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${targetFolderId}${removeParents}&fields=id,name,parents`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!moveResponse.ok) {
+        const error = await moveResponse.text();
+        console.error('Move error:', error);
+        throw new Error('Failed to move file in Google Drive');
+      }
+
+      const moved = await moveResponse.json();
+      return new Response(
+        JSON.stringify({ success: true, file: moved }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }

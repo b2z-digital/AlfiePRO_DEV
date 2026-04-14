@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Loader2, Trophy, Upload, LogOut, ExternalLink, Image as ImageIcon, Check, Sparkles } from 'lucide-react';
+import { Plus, SquarePen as Edit2, Trash2, Loader as Loader2, Trophy, Upload, LogOut, ExternalLink, Image as ImageIcon, Check, Sparkles } from 'lucide-react';
 import type { EventSponsor } from '../../types/eventWebsite';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
 import { supabase } from '../../utils/supabase';
@@ -174,7 +174,7 @@ export const EventWebsiteSponsorManager: React.FC<EventWebsiteSponsorManagerProp
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+          className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
         >
           <Plus size={20} />
           <span className="font-semibold">Add Sponsor</span>
@@ -193,7 +193,7 @@ export const EventWebsiteSponsorManager: React.FC<EventWebsiteSponsorManagerProp
             </p>
             <button
               onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
+              className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold"
             >
               <Sparkles size={20} />
               Add Your First Sponsor
@@ -424,7 +424,7 @@ export const EventWebsiteSponsorManager: React.FC<EventWebsiteSponsorManagerProp
               <button
                 onClick={handleSave}
                 disabled={!name || !logoUrl}
-                className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                className="btn-primary-green flex items-center gap-2 px-8 py-3 text-white rounded-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               >
                 <Check size={18} />
                 {editingSponsor ? 'Update Sponsor' : 'Add Sponsor'}

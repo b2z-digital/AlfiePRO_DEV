@@ -103,7 +103,7 @@ export const LiveStatusControl: React.FC<LiveStatusControlProps> = ({ eventId, d
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
-          <div className={`absolute top-full mt-2 right-0 w-64 rounded-lg shadow-xl z-20 overflow-hidden ${
+          <div className={`absolute top-full mt-2 left-0 w-64 rounded-lg shadow-xl z-20 overflow-hidden ${
             darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'
           }`}>
             <div className={`px-3 py-2 text-xs font-semibold ${
@@ -142,7 +142,7 @@ export const LiveStatusControl: React.FC<LiveStatusControlProps> = ({ eventId, d
             <div className={`px-3 py-2 text-xs ${
               darkMode ? 'text-slate-500 bg-slate-900/50' : 'text-slate-500 bg-slate-50'
             }`}>
-              Status visible to all skippers in live tracking
+              Auto-managed based on scoring activity. Visible to all skippers in live tracking.
             </div>
           </div>
         </>

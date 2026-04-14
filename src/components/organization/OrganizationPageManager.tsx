@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Eye, Trash2, Home, Globe, GripVertical, FileText, CheckCircle2, Clock, MoreVertical } from 'lucide-react';
+import { Plus, CreditCard as Edit, Eye, Trash2, Hop as Home, Globe, GripVertical, FileText, CircleCheck as CheckCircle2, Clock, MoveVertical as MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { OrganizationType, OrganizationPageLayout } from '../../types/organizationWidgets';
 import {
@@ -126,7 +126,7 @@ const OrganizationPageManager: React.FC<Props> = ({
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
           >
             <Plus size={20} />
             New Page
@@ -148,7 +148,7 @@ const OrganizationPageManager: React.FC<Props> = ({
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="btn-primary-green px-6 py-3 text-white rounded-lg transition-colors"
             >
               Create Your First Page
             </button>
@@ -330,7 +330,7 @@ const OrganizationPageManager: React.FC<Props> = ({
               <button
                 onClick={handleCreatePage}
                 disabled={!newPageTitle.trim() || creating}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="btn-primary-green px-4 py-2 text-white rounded-lg disabled:opacity-50"
               >
                 {creating ? 'Creating...' : 'Create Page'}
               </button>

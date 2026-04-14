@@ -32,6 +32,40 @@ export interface OverlayStyle {
   fontSize: number;
 }
 
+export type SegmentUploadStatus = 'pending' | 'uploading' | 'uploaded' | 'failed' | 'cleanup_complete';
+export type SegmentTriggerType = 'race_scored' | 'on_hold' | 'manual' | 'stream_end';
+
+export interface LivestreamRaceSegment {
+  id: string;
+  session_id: string;
+  club_id: string;
+  event_id?: string;
+  race_number: number;
+  heat_number?: number;
+  segment_title: string;
+  cloudflare_video_id?: string;
+  cloudflare_input_id?: string;
+  segment_start_time: string;
+  segment_end_time?: string;
+  duration?: number;
+  youtube_video_id?: string;
+  youtube_playlist_id?: string;
+  upload_status: SegmentUploadStatus;
+  upload_error?: string;
+  trigger_type: SegmentTriggerType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LivestreamYouTubePlaylist {
+  id: string;
+  club_id: string;
+  event_id: string;
+  youtube_playlist_id: string;
+  playlist_title: string;
+  created_at: string;
+}
+
 export interface LivestreamSession {
   id: string;
   club_id: string;
@@ -46,6 +80,7 @@ export interface LivestreamSession {
   cloudflare_whip_url?: string;
   cloudflare_whip_playback_url?: string;
   cloudflare_output_id?: string;
+  cloudflare_customer_code?: string;
 
   streaming_mode: 'direct_youtube' | 'cloudflare_relay';
 
@@ -56,7 +91,7 @@ export interface LivestreamSession {
   end_time?: string;
 
   event_id?: string;
-  event_day?: number; // For multi-day events: which day this stream covers (1, 2, 3, etc.)
+  event_day?: number;
   heat_number?: number;
 
   status: LivestreamStatus;
@@ -67,6 +102,7 @@ export interface LivestreamSession {
   sponsor_rotation_interval: number;
 
   is_public: boolean;
+  is_paused: boolean;
 
   audio_source: AudioSource;
   enable_commentary: boolean;
@@ -75,6 +111,11 @@ export interface LivestreamSession {
 
   viewer_count: number;
   peak_viewers: number;
+
+  auto_segment_enabled: boolean;
+  current_race_number: number;
+  current_segment_start?: string;
+  youtube_playlist_id?: string;
 
   created_at: string;
   updated_at: string;
@@ -154,9 +195,14 @@ export interface LivestreamArchive {
   session_id: string;
   club_id: string;
 
-  youtube_video_id: string;
-  youtube_url: string;
+  youtube_video_id?: string;
+  youtube_url?: string;
   thumbnail_url?: string;
+
+  cloudflare_video_id?: string;
+  cloudflare_customer_code?: string;
+  cloudflare_playback_url?: string;
+  source?: 'youtube' | 'cloudflare';
 
   event_id?: string;
   heat_number?: number;

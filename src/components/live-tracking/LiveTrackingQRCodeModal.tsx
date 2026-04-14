@@ -381,7 +381,7 @@ export default function LiveTrackingQRCodeModal({
                   setLoading(true);
                   initializeLiveTracking();
                 }}
-                className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-medium transition-all"
+                className="px-6 py-3 from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl font-medium transition-all"
               >
                 Try Again
               </button>
@@ -404,7 +404,7 @@ export default function LiveTrackingQRCodeModal({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto animate-fadeIn">
       <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl shadow-2xl max-w-4xl w-full my-8 border border-slate-700/50 overflow-hidden animate-slideUp">
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -483,14 +483,14 @@ export default function LiveTrackingQRCodeModal({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={handleDownloadQR}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
+                  className="btn-primary-green flex items-center justify-center gap-2 px-4 py-3 from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
                 >
                   <Download size={16} />
                   QR Code
                 </button>
                 <button
                   onClick={handleDownloadPoster}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-emerald-500/20"
+                  className="btn-primary-green flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl transition-all text-sm font-medium shadow-lg"
                 >
                   <Download size={16} />
                   Poster
@@ -504,7 +504,7 @@ export default function LiveTrackingQRCodeModal({
                 </button>
                 <button
                   onClick={handleShare}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
+                  className="btn-primary-green flex items-center justify-center gap-2 px-4 py-3 from-cyan-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-xl transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
                   title="Select members to notify about live tracking"
                 >
                   <Share2 size={16} />
@@ -579,7 +579,7 @@ export default function LiveTrackingQRCodeModal({
                 </div>
                 <button
                   onClick={handleCopyLink}
-                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium shrink-0"
+                  className="btn-primary-green px-5 py-2.5 from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl transition-all text-sm font-medium shrink-0"
                 >
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
@@ -590,7 +590,7 @@ export default function LiveTrackingQRCodeModal({
 
         {/* Success/Error Messages */}
         {successMessage && (
-          <div className="absolute bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
+          <div className="absolute bottom-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg">
             {successMessage}
           </div>
         )}

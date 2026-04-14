@@ -142,7 +142,7 @@ Action Required: Please review this club request and add the club to the platfor
         'Authorization': `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'Alfie <noreply@alfie.pro>',
+        from: 'AlfiePRO <noreply@alfiepro.com.au>',
         to: 'stephenwalshdigital@gmail.com',
         subject: `New Club Request: ${club_name}`,
         html: emailHtml,

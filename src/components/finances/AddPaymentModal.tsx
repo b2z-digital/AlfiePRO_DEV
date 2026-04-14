@@ -251,7 +251,7 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             <button
               type="submit"
               disabled={loading || amount <= 0}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary-green flex-1 px-4 py-2 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Saving...' : 'Save'}
             </button>

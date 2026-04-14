@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Search, Award, MapPin, Flag, Loader2, UserCircle2, Trophy, Building2, DollarSign, Download, FileImage, FileText, FileSpreadsheet, Upload, Trash2 } from 'lucide-react';
+import { Users, Search, Award, MapPin, Flag, Loader as Loader2, CircleUser as UserCircle2, Trophy, Building2, DollarSign, Download, FileImage, FileText, FileSpreadsheet, Upload, Trash2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -387,7 +387,7 @@ export const EventWebsiteCompetitorManager: React.FC<EventWebsiteCompetitorManag
               console.log('Opening import modal with events:', events);
               setShowImportModal(true);
             }}
-            className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-all flex items-center gap-2 font-medium shadow-lg"
+            className="btn-primary-green px-4 py-2 text-white rounded-lg transition-all flex items-center gap-2 font-medium shadow-lg"
           >
             <Upload className="w-4 h-4" />
             Import Registrations
@@ -398,7 +398,7 @@ export const EventWebsiteCompetitorManager: React.FC<EventWebsiteCompetitorManag
             <div className="relative export-menu-container">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg transition-all flex items-center gap-2 font-medium shadow-lg"
+                className="btn-primary-green px-4 py-2 from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg transition-all flex items-center gap-2 font-medium shadow-lg"
               >
                 <Download className="w-4 h-4" />
                 Export
@@ -661,7 +661,7 @@ export const EventWebsiteCompetitorManager: React.FC<EventWebsiteCompetitorManag
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl max-w-md w-full overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border-b border-red-500/20 px-6 py-4">
+            <div className="from-red-500/10 to-orange-500/10 border-b border-red-500/20 px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-red-500/20 rounded-lg">
                   <Trash2 className="w-5 h-5 text-red-400" />
@@ -695,7 +695,7 @@ export const EventWebsiteCompetitorManager: React.FC<EventWebsiteCompetitorManag
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white rounded-lg transition-all font-medium shadow-lg"
+                className="btn-primary-green px-4 py-2 from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white rounded-lg transition-all font-medium shadow-lg"
               >
                 Remove Competitor
               </button>

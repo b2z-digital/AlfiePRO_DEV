@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X, Search, MapPin, Sailboat, CheckCircle2, AlertCircle, Loader2,
-  CreditCard, Building2, Crown, Users, Copy, Check
-} from 'lucide-react';
+import { X, Search, MapPin, Sailboat, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, Loader as Loader2, CreditCard, Building2, Crown, Users, Copy, Check } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -94,6 +91,7 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
           id, name, abbreviation, logo, state_association_id,
           state_associations:state_association_id ( name, abbreviation )
         `)
+        .neq('is_test', true)
         .order('name');
 
       if (error) throw error;
@@ -333,7 +331,7 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col bg-slate-800 border border-slate-700 shadow-2xl">
-        <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 flex justify-between items-center flex-shrink-0">
+        <div className="px-6 py-4 from-blue-600 to-cyan-600 flex justify-between items-center flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-white/15">
               <Users className="w-5 h-5 text-white" />
@@ -636,7 +634,7 @@ export const JoinAnotherClubModal: React.FC<JoinAnotherClubModalProps> = ({
                 <button
                   onClick={handleApply}
                   disabled={!selectedMembershipType}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary-green flex-1 px-4 py-3 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Submit Application
                 </button>

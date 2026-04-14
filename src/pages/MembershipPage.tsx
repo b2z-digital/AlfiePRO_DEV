@@ -3,13 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { MembershipForm } from '../components/membership/MembershipForm';
 
 export const MembershipPage: React.FC = () => {
-  const { clubId } = useParams<{ clubId: string }>();
+  const { clubId, memberId: routeMemberId } = useParams<{ clubId: string; memberId?: string }>();
   const { user, currentClub } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clubName, setClubName] = useState('');
@@ -45,25 +48,26 @@ export const MembershipPage: React.FC = () => {
           return;
         }
         
-        // Check if user is already a member of this club
-        if (user) {
+        if (routeMemberId) {
+          setExistingMemberId(routeMemberId);
+          setIsRenewal(true);
+        } else if (user) {
           const { data: memberData, error: memberError } = await supabase
             .from('members')
             .select('id, is_financial, renewal_date')
             .eq('club_id', targetClubId)
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId!)
             .maybeSingle();
-          
+
           if (memberError) throw memberError;
-          
+
           if (memberData) {
             setExistingMemberId(memberData.id);
-            
-            // Check if this is a renewal (member exists but not financial or renewal date is past)
-            const isExpired = memberData.renewal_date 
-              ? new Date(memberData.renewal_date) < new Date() 
+
+            const isExpired = memberData.renewal_date
+              ? new Date(memberData.renewal_date) < new Date()
               : false;
-              
+
             setIsRenewal(!memberData.is_financial || isExpired);
           }
         }
@@ -76,7 +80,7 @@ export const MembershipPage: React.FC = () => {
     };
     
     fetchData();
-  }, [clubId, currentClub, user]);
+  }, [clubId, currentClub, user, routeMemberId]);
   
   if (loading) {
     return (

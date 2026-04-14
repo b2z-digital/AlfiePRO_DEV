@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, PanelBottom, Eye, EyeOff, Save, Loader2, CheckCircle } from 'lucide-react';
+import { LayoutGrid as Layout, PanelBottom, Eye, EyeOff, Save, Loader as Loader2, CircleCheck as CheckCircle } from 'lucide-react';
 import { eventPageBuilderStorage } from '../../utils/eventPageBuilderStorage';
 import type { EventGlobalSection } from '../../types/eventWidgets';
 import { UnifiedHeaderNavigationEditor } from './UnifiedHeaderNavigationEditor';
@@ -161,7 +161,7 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
             <Layout size={16} />
             Header & Navigation
             {(sections.header?.enabled || sections.menu?.enabled) && (
-              <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+              <div className="w-1.5 h-1.5 rounded-full"></div>
             )}
           </button>
 
@@ -176,7 +176,7 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
             <PanelBottom size={16} />
             Footer
             {sections.footer?.enabled && (
-              <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+              <div className="w-1.5 h-1.5 rounded-full"></div>
             )}
           </button>
         </div>
@@ -212,7 +212,7 @@ export const EventWebsiteGlobalSectionsManager: React.FC<Props> = ({ websiteId, 
               <button
                 onClick={() => handleSaveHeaderNavigation(localHeaderConfig, localMenuConfig)}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2.5 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-lg"
               >
                 {saving ? (
                   <>

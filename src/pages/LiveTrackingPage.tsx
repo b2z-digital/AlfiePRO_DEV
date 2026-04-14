@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Search, CheckCircle, Loader, Users, MonitorPlay } from 'lucide-react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Search, CircleCheck as CheckCircle, Loader, Users, MonitorPlay } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import {
   getLiveTrackingEventByToken,
@@ -8,13 +8,18 @@ import {
   getCurrentTrackingSession,
 } from '../utils/liveTrackingStorage';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import type { LiveTrackingEvent } from '../types/liveTracking';
 import { format } from 'date-fns';
 
 export default function LiveTrackingPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePrefix = location.pathname.startsWith('/t/') ? `/t/${token}` : `/live/${token}`;
   const { user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
 
   const [loading, setLoading] = useState(true);
   const [trackingEvent, setTrackingEvent] = useState<LiveTrackingEvent | null>(null);
@@ -38,12 +43,12 @@ export default function LiveTrackingPage() {
   // Look up member_id from user_id when user is authenticated
   useEffect(() => {
     const lookupMemberId = async () => {
-      if (user?.id) {
+      if (effectiveUserId) {
         try {
           const { data, error } = await supabase
             .from('members')
             .select('id')
-            .eq('user_id', user.id)
+            .eq('user_id', effectiveUserId)
             .maybeSingle();
 
           if (data) {
@@ -63,7 +68,7 @@ export default function LiveTrackingPage() {
     };
 
     lookupMemberId();
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   const loadTrackingEvent = async () => {
     try {
@@ -232,7 +237,7 @@ export default function LiveTrackingPage() {
       const existingSession = await getCurrentTrackingSession(event.event_id);
       if (existingSession) {
         // Redirect to dashboard
-        navigate(`/live/${token}/dashboard`);
+        navigate(`${basePrefix}/dashboard`);
         return;
       }
 
@@ -354,7 +359,7 @@ export default function LiveTrackingPage() {
       console.log('✅ Session created successfully:', session.id);
 
       // Navigate to dashboard
-      navigate(`/live/${token}/dashboard`);
+      navigate(`${basePrefix}/dashboard`);
     } catch (error: any) {
       console.error('❌ Error starting tracking:', error);
 
@@ -520,7 +525,7 @@ export default function LiveTrackingPage() {
 
                 {/* PRO Broadcast Tile */}
                 <button
-                  onClick={() => navigate(`/live/${token}/pro-broadcast`)}
+                  onClick={() => navigate(`${basePrefix}/pro-broadcast`)}
                   className="group relative overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-8 text-white shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                 >
                   <div className="relative z-10">
@@ -542,7 +547,7 @@ export default function LiveTrackingPage() {
             </div>
 
             {/* Info Card */}
-            <div className="mt-6 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
+            <div className="mt-6 from-slate-700 via-slate-800 to-slate-900 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
               <h3 className="text-2xl font-bold mb-4">Live Tracking Features</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
@@ -682,7 +687,7 @@ export default function LiveTrackingPage() {
             </div>
 
             {/* Info Card */}
-            <div className="mt-6 bg-gradient-to-r from-cyan-500 via-blue-500 to-blue-600 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
+            <div className="mt-6 from-cyan-500 via-blue-500 to-blue-600 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
               <h3 className="text-2xl font-bold mb-4">What You'll Get</h3>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">

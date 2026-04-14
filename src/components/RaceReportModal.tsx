@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader, FileText, Edit, Save, Send, Sparkles, CheckCircle2, Clock } from 'lucide-react';
+import { X, Loader, FileText, CreditCard as Edit, Save, Send, Sparkles, CircleCheck as CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
 interface RaceReportModalProps {
@@ -309,7 +309,7 @@ export const RaceReportModal: React.FC<RaceReportModalProps> = ({
         `}
       >
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -467,7 +467,7 @@ export const RaceReportModal: React.FC<RaceReportModalProps> = ({
                         <button
                           onClick={handleGenerateDraft}
                           disabled={isGenerating}
-                          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-all bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="btn-primary-green w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-all from-cyan-600 to-blue-700 hover:from-cyan-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {isGenerating ? (
                             <>
@@ -636,7 +636,7 @@ export const RaceReportModal: React.FC<RaceReportModalProps> = ({
                 <button
                   onClick={handleSaveDraft}
                   disabled={isGenerating}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all bg-gradient-to-r from-blue-600 to-cyan-700 hover:from-blue-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all from-blue-600 to-cyan-700 hover:from-blue-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <>
@@ -657,7 +657,7 @@ export const RaceReportModal: React.FC<RaceReportModalProps> = ({
               <button
                 onClick={handlePublish}
                 disabled={isPublishing}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white shadow-lg hover:shadow-xl disabled:opacity-50"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all text-white shadow-lg hover:shadow-xl disabled:opacity-50"
               >
                 {isPublishing ? (
                   <>

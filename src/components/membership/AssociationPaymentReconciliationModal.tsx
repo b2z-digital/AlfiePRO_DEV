@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, DollarSign, Check, AlertCircle, ArrowRight, Search, Filter, Calendar, Zap } from 'lucide-react';
+import { LogOut, DollarSign, Check, CircleAlert as AlertCircle, ArrowRight, Search, ListFilter as Filter, Calendar, Zap } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface RemittancePayment {
@@ -309,7 +309,7 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
               </div>
               <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-300"
+                  className="h-full transition-all duration-300"
                   style={{ width: `${getProgressPercentage()}%` }}
                 />
               </div>
@@ -515,7 +515,7 @@ export const AssociationPaymentReconciliationModal: React.FC<AssociationPaymentR
               <button
                 onClick={handleAllocate}
                 disabled={selectedRemittances.size === 0 || getRemainingAmount() < 0 || processing}
-                className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green px-6 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {processing ? (
                   <>

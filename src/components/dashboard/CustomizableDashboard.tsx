@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
   arrayMove
 } from '@dnd-kit/sortable';
-import { Edit2, Check, Plus, RotateCcw, Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
+import { SquarePen as Edit2, Check, Plus, RotateCcw, Columns2 as Columns, LayoutGrid, GripVertical, Sparkles, Pencil, Save, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { WidgetConfig, DashboardLayout, DashboardRow } from '../../types/dashboard';
 import { loadDashboardLayout, saveDashboardLayout, resetDashboardLayout, getTemplateForUser } from '../../utils/dashboardStorage';
@@ -179,7 +179,7 @@ const SortableRow: React.FC<SortableRowProps> = ({
 };
 
 export const CustomizableDashboard: React.FC = () => {
-  const { user, currentClub, currentOrganization } = useAuth();
+  const { user, currentClub, currentOrganization, clubsLoaded } = useAuth();
   const { addNotification } = useNotifications();
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [rows, setRows] = useState<DashboardRow[]>([]);
@@ -195,8 +195,10 @@ export const CustomizableDashboard: React.FC = () => {
   const [originalLayoutBeforeEdit, setOriginalLayoutBeforeEdit] = useState<{ widgets: WidgetConfig[], rows: DashboardRow[] } | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const newRowRef = useRef<HTMLDivElement | null>(null);
+  const loadCounterRef = useRef(0);
 
   const isSuperAdmin = user?.user_metadata?.is_super_admin || false;
+  const prevClubIdRef = useRef<string | null | undefined>(undefined);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -207,10 +209,21 @@ export const CustomizableDashboard: React.FC = () => {
   );
 
   useEffect(() => {
-    if (user) {
-      loadLayout();
+    if (!user || !clubsLoaded) return;
+    if (!currentClub && !currentOrganization) return;
+
+    const newClubId = currentOrganization?.id || currentClub?.clubId || null;
+    const isClubChange = prevClubIdRef.current !== undefined && prevClubIdRef.current !== newClubId;
+    prevClubIdRef.current = newClubId;
+
+    if (isClubChange) {
+      setWidgets([]);
+      setRows([]);
+      setLoading(true);
     }
-  }, [user, currentClub?.clubId, currentOrganization?.id, currentOrganization?.type]);
+
+    loadLayout();
+  }, [user, clubsLoaded, currentClub?.clubId, currentOrganization?.id, currentOrganization?.type]);
 
   const loadLayout = async () => {
     if (!user) {
@@ -219,9 +232,10 @@ export const CustomizableDashboard: React.FC = () => {
       return;
     }
 
+    const currentLoad = ++loadCounterRef.current;
+
     setLoading(true);
 
-    // Set a fallback timeout - if loading takes more than 10 seconds, stop loading state
     const loadTimeout = setTimeout(() => {
       console.warn('⚠️ Dashboard layout loading timeout - completing with empty state');
       setLoading(false);
@@ -278,31 +292,36 @@ export const CustomizableDashboard: React.FC = () => {
             clearTimeout(loadTimeout);
             handleApplyTemplate(roleTemplate.template_id);
             return;
+          } else {
+            console.log('🎨 No role template found, applying Full Overview default');
+            clearTimeout(loadTimeout);
+            handleApplyTemplate('e5555555-5555-5555-5555-555555555555');
+            return;
           }
         } catch (templateError) {
-          console.warn('Could not load role template:', templateError);
-          // Continue with empty layout
+          console.warn('Could not load role template, applying Full Overview default:', templateError);
+          clearTimeout(loadTimeout);
+          handleApplyTemplate('e5555555-5555-5555-5555-555555555555');
+          return;
         }
       }
 
-      // Ensure rows have order field
+      if (currentLoad !== loadCounterRef.current) return;
+
       const sortedRows = layout.rows.map((row, index) => ({
         ...row,
         order: row.order ?? index
       })).sort((a, b) => a.order - b.order);
 
-      console.log('📋 Setting rows after load:', sortedRows.map(r => ({ id: r.id, height: r.height })));
-
       setWidgets(layout.widgets);
       setRows(sortedRows);
     } catch (error) {
       console.error('❌ Error loading layout:', error);
-      // Set empty state on error so dashboard doesn't hang
-      setWidgets([]);
-      setRows([]);
     } finally {
-      clearTimeout(loadTimeout);
-      setLoading(false);
+      if (currentLoad === loadCounterRef.current) {
+        clearTimeout(loadTimeout);
+        setLoading(false);
+      }
     }
   };
 
@@ -1143,7 +1162,7 @@ export const CustomizableDashboard: React.FC = () => {
             {isAdmin && (
               <button
                 onClick={() => setShowSaveTemplate(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/80 hover:bg-green-600 text-white transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/80 text-white transition-colors"
               >
                 <Save size={16} />
                 <span className="text-sm">Save as Template</span>
@@ -1168,7 +1187,7 @@ export const CustomizableDashboard: React.FC = () => {
                 <button
                   onClick={handleSaveSystemTemplate}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
                 >
                   <Check size={16} />
                   <span className="text-sm">{saving ? 'Saving Template...' : 'Save System Template'}</span>
@@ -1185,7 +1204,7 @@ export const CustomizableDashboard: React.FC = () => {
                 <button
                   onClick={handleSaveAndExit}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
                 >
                   <Check size={16} />
                   <span className="text-sm">{saving ? 'Saving...' : 'Save'}</span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, MapPin, Star, ExternalLink, Eye, EyeOff, Award } from 'lucide-react';
+import { Plus, SquarePen as Edit2, Trash2, MapPin, Star, ExternalLink, Eye, EyeOff, Award } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { AccommodationFormModal } from './AccommodationFormModal';
 
@@ -292,7 +292,7 @@ export const EventWebsiteAccommodationManager: React.FC<EventWebsiteAccommodatio
                         href={accommodation.booking_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 px-3 py-2 text-sm bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 px-3 py-2 text-sm text-green-700 rounded transition-colors flex items-center justify-center gap-2"
                       >
                         <ExternalLink className="w-4 h-4" />
                         Book

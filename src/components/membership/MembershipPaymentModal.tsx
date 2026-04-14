@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, CreditCard, DollarSign, Calendar, User, AlertTriangle, Check } from 'lucide-react';
+import { X, CreditCard, DollarSign, Calendar, User, TriangleAlert as AlertTriangle, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
+import { sendPaymentConfirmation } from '../../utils/membershipUtils';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 
 interface MembershipPaymentModalProps {
   isOpen: boolean;
@@ -111,8 +113,46 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
 
       if (memberError) throw memberError;
 
+      if (currentClub?.clubId) {
+        await createMembershipTransaction({
+          clubId: currentClub.clubId,
+          memberId,
+          membershipTypeId: membershipType.id,
+          memberName,
+          membershipTypeName: membershipType.name,
+          amount: membershipType.amount,
+          paymentMethod: 'cash',
+        }, 'paid');
+      }
+
+      const renewalDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const { data: memberData } = await supabase
+        .from('members')
+        .select('email, first_name, last_name, user_id, club_id')
+        .eq('id', memberId)
+        .maybeSingle();
+
+      if (memberData?.email) {
+        try {
+          await sendPaymentConfirmation({
+            email: memberData.email,
+            first_name: memberData.first_name,
+            last_name: memberData.last_name,
+            club_name: currentClub?.club?.name || 'your club',
+            membership_type: membershipType.name,
+            renewal_date: renewalDate,
+            amount: membershipType.amount,
+            currency: membershipType.currency || 'AUD',
+            club_id: memberData.club_id,
+            user_id: memberData.user_id,
+          });
+        } catch (emailErr) {
+          console.error('Failed to send confirmation email:', emailErr);
+        }
+      }
+
       setSuccess(true);
-      
+
       setTimeout(() => {
         onClose();
         if (onPaymentComplete) onPaymentComplete();
@@ -156,7 +196,7 @@ export const MembershipPaymentModal: React.FC<MembershipPaymentModalProps> = ({
         <div className="p-6">
           {success ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Check size={32} className="text-white" />
               </div>
               <h3 className={`text-lg font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-800'}`}>

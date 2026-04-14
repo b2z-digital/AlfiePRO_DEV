@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Building, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, Building, CircleCheck as CheckCircle, Circle as XCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Logo } from '../Logo';
@@ -92,7 +92,7 @@ export const ClubApplicationPendingScreen: React.FC<ClubApplicationPendingScreen
           <p className="text-slate-300 mb-4">No pending club registration found</p>
           <button
             onClick={() => navigate('/')}
-            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+            className="btn-primary-green px-6 py-2 text-white rounded-lg transition-colors"
           >
             Go to Dashboard
           </button>

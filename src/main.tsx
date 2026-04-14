@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ImpersonationProvider } from './contexts/ImpersonationContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import MobileStreamPage from './pages/MobileStreamPage';
@@ -44,11 +45,13 @@ function Root() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <NotificationProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </NotificationProvider>
+        <ImpersonationProvider>
+          <NotificationProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </NotificationProvider>
+        </ImpersonationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

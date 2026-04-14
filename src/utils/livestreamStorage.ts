@@ -5,6 +5,8 @@ import type {
   LivestreamOverlay,
   LivestreamSponsorRotation,
   LivestreamArchive,
+  LivestreamRaceSegment,
+  LivestreamYouTubePlaylist,
   OverlayConfig
 } from '../types/livestream';
 
@@ -358,6 +360,100 @@ export const livestreamStorage = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+
+  // Race Segments
+  async getSegments(sessionId: string): Promise<LivestreamRaceSegment[]> {
+    const { data, error } = await supabase
+      .from('livestream_race_segments')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('race_number', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createSegment(segment: Partial<LivestreamRaceSegment>): Promise<LivestreamRaceSegment> {
+    const { data, error } = await supabase
+      .from('livestream_race_segments')
+      .insert([segment])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateSegment(id: string, updates: Partial<LivestreamRaceSegment>): Promise<void> {
+    const { error } = await supabase
+      .from('livestream_race_segments')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async getActiveSegment(sessionId: string): Promise<LivestreamRaceSegment | null> {
+    const { data, error } = await supabase
+      .from('livestream_race_segments')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('upload_status', 'pending')
+      .is('segment_end_time', null)
+      .order('created_at', { ascending: false })
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async finalizeSegment(
+    segmentId: string,
+    triggerType: 'race_scored' | 'on_hold' | 'manual' | 'stream_end'
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('livestream_race_segments')
+      .update({
+        segment_end_time: new Date().toISOString(),
+        trigger_type: triggerType,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', segmentId);
+
+    if (error) throw error;
+  },
+
+  // YouTube Playlists
+  async getPlaylistForEvent(clubId: string, eventId: string): Promise<LivestreamYouTubePlaylist | null> {
+    const { data, error } = await supabase
+      .from('livestream_youtube_playlists')
+      .select('*')
+      .eq('club_id', clubId)
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async triggerSegmentProcessing(segmentId: string): Promise<void> {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-race-segment`;
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ segmentId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[Segment] Processing trigger failed:', err);
+    }
   },
 
   // Realtime subscriptions

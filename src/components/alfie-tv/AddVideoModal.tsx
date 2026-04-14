@@ -217,7 +217,7 @@ export default function AddVideoModal({ isOpen, onClose, onSuccess, darkMode = f
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary-green px-6 py-3 rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Adding...' : 'Add Video'}
           </button>

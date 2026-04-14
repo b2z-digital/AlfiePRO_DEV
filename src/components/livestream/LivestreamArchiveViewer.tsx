@@ -137,13 +137,28 @@ export function LivestreamArchiveViewer({ clubId, eventId }: LivestreamArchiveVi
             onClick={(e) => e.stopPropagation()}
           >
             <div className="aspect-video bg-black">
-              <iframe
-                src={`https://www.youtube.com/embed/${selectedArchive.youtube_video_id}?autoplay=1`}
-                title={selectedArchive.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full"
-              />
+              {(selectedArchive as any).source === 'cloudflare' && (selectedArchive as any).cloudflare_playback_url ? (
+                <iframe
+                  src={`${(selectedArchive as any).cloudflare_playback_url}?autoplay=true&muted=false&preload=auto`}
+                  title={selectedArchive.title}
+                  allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  className="w-full h-full"
+                  style={{ border: 'none' }}
+                />
+              ) : selectedArchive.youtube_video_id ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${selectedArchive.youtube_video_id}?autoplay=1`}
+                  title={selectedArchive.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Video className="w-16 h-16 text-slate-600" />
+                </div>
+              )}
             </div>
 
             <div className="p-6">
@@ -163,20 +178,6 @@ export function LivestreamArchiveViewer({ clubId, eventId }: LivestreamArchiveVi
                   <span>{selectedArchive.view_count.toLocaleString()} views</span>
                 </div>
 
-                {selectedArchive.like_count > 0 && (
-                  <div className="flex items-center gap-2">
-                    <ThumbsUp className="w-4 h-4" />
-                    <span>{selectedArchive.like_count.toLocaleString()} likes</span>
-                  </div>
-                )}
-
-                {selectedArchive.comment_count > 0 && (
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4" />
-                    <span>{selectedArchive.comment_count.toLocaleString()} comments</span>
-                  </div>
-                )}
-
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   <span>{new Date(selectedArchive.recorded_at).toLocaleDateString()}</span>
@@ -191,15 +192,17 @@ export function LivestreamArchiveViewer({ clubId, eventId }: LivestreamArchiveVi
               </div>
 
               <div className="mt-6 flex gap-3">
-                <a
-                  href={selectedArchive.youtube_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  Watch on YouTube
-                </a>
+                {selectedArchive.youtube_url && (
+                  <a
+                    href={selectedArchive.youtube_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Watch on YouTube
+                  </a>
+                )}
 
                 <button
                   onClick={() => setSelectedArchive(null)}

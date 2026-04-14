@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, GripVertical, Settings as SettingsIcon, Eye, Columns as ColumnsIcon, Layout as LayoutIcon } from 'lucide-react';
+import { X, Save, Plus, Trash2, GripVertical, Settings as SettingsIcon, Eye, Columns2 as ColumnsIcon, LayoutGrid as LayoutIcon } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -312,7 +312,7 @@ export const EventPageBuilderEditor: React.FC<Props> = ({ websiteId, pageSlug, p
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-6 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium disabled:opacity-50"
+                className="btn-primary-green px-6 py-2 from-cyan-600 to-blue-600 text-white rounded-lg hover:shadow-lg hover:shadow-cyan-500/30 transition-all hover:scale-[1.02] font-medium disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Page'}
               </button>

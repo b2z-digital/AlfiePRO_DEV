@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Trophy, Plus, Edit2, Trash2, Calendar, MapPin, Search, Filter, ChevronDown, ChevronUp, Grid, List, AlertTriangle, Flag, ArrowUpDown, Users, CheckCircle2, Clock, XCircle, PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, Edit, Send } from 'lucide-react';
+import { Trophy, Plus, SquarePen as Edit2, Trash2, Calendar, MapPin, Search, ListFilter as Filter, ChevronDown, ChevronUp, Grid2x2 as Grid, List, TriangleAlert as AlertTriangle, Flag, ArrowUpDown, Users, CircleCheck as CheckCircle2, Clock, Circle as XCircle, CirclePlay as PlayCircle, Sailboat, TrendingUp, QrCode, FileText, Globe, RotateCcw, SquarePen as Edit, Send, Radio } from 'lucide-react';
 import { RaceType } from '../../types';
 import { RaceEvent, RaceSeries } from '../../types/race';
 import { getStoredRaceEvents, getStoredRaceSeries, deleteRaceEvent, deleteRaceSeries, setCurrentEvent } from '../../utils/raceStorage';
@@ -1082,7 +1082,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
       cancellationReason: round.cancellationReason,
       media: seriesItem.media || [],
       livestreamUrl: seriesItem.livestreamUrl,
-      clubId: seriesItem.clubId
+      clubId: seriesItem.clubId,
+      heatManagement: round.heatManagement || null,
+      numRaces: round.numRaces,
+      dropRules: round.dropRules || [4, 8, 16, 24, 32, 40],
+      enableLiveTracking: seriesItem.enableLiveTracking,
+      enableLiveStream: round.enableLiveStream || seriesItem.enableLiveStream
     };
 
     onEventSelect(event);
@@ -1182,9 +1187,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
     return name.toLowerCase().includes(search) || venue.toLowerCase().includes(search);
   };
 
-  // Get unique years from all events and series rounds
+  // Get unique years from all events and series rounds, always including current year
   const availableYears = React.useMemo(() => {
     const years = new Set<number>();
+
+    // Always include current year
+    years.add(new Date().getFullYear());
 
     quickRaces.forEach(race => {
       const year = new Date(race.date).getFullYear();
@@ -1450,8 +1458,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                       : 'bg-white/50 text-slate-400 cursor-not-allowed'
                     : darkMode
-                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
-                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
+                      ? 'bg-amber-900/90 hover:bg-amber-800 text-amber-400'
+                      : 'bg-amber-50/90 hover:bg-amber-100 text-amber-600'
                 }`}
                 title={hasEventStartedScoring(race) ? "Cannot edit - scoring has commenced" : "Edit event"}
                 disabled={hasEventStartedScoring(race)}
@@ -1496,7 +1504,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                 )}
                 {/* Completion badge for cards without images */}
                 {!venueImage && race.completed && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500 text-white text-xs font-medium">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium">
                     <CheckCircle2 size={12} className="text-white" />
                     <span className="text-white">Completed</span>
                   </div>
@@ -1722,8 +1730,8 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                       ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
                       : 'bg-white/50 text-slate-400 cursor-not-allowed'
                     : darkMode
-                      ? 'bg-slate-700/90 hover:bg-slate-600 text-slate-300'
-                      : 'bg-white/90 hover:bg-slate-100 text-slate-600'
+                      ? 'bg-amber-900/90 hover:bg-amber-800 text-amber-400'
+                      : 'bg-amber-50/90 hover:bg-amber-100 text-amber-600'
                 }`}
                 title={isSeriesFullyCompleted(s) ? "Cannot edit - all rounds completed" : "Edit series"}
                 disabled={isSeriesFullyCompleted(s)}
@@ -1758,7 +1766,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                 </div>
                 {/* Completion badge for cards without images */}
                 {!venueImage && s.completed && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500 text-white text-xs font-medium">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full text-white text-xs font-medium">
                     <CheckCircle2 size={12} className="text-white" />
                     <span className="text-white">Completed</span>
                   </div>
@@ -1783,7 +1791,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             <div className="mb-3">
               <div className={`h-2 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
                 <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500"
+                  className="h-full from-purple-500 to-blue-500 transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
                 ></div>
               </div>
@@ -1879,6 +1887,12 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                           {round.name}
                         </div>
                         <div className="flex items-center gap-2">
+                          {s.enableLiveTracking && !round.completed && !round.cancelled && isToday && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/30 text-cyan-400" title="Live Tracking enabled">
+                              <Radio size={12} />
+                              Live
+                            </div>
+                          )}
                           {round.completed ? (
                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/30 text-green-400">
                               <CheckCircle2 size={12} />
@@ -1941,7 +1955,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                             className="w-full h-full object-cover"
                                           />
                                         ) : (
-                                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-500 text-white">
+                                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br text-white">
                                             {initials}
                                           </div>
                                         )}
@@ -2305,7 +2319,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 !text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl animate-pulse"
+                className="btn-primary-green flex items-center justify-center gap-2 px-5 py-2.5 !text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl animate-pulse"
               >
                 <Plus size={20} strokeWidth={2.5} className="!text-white" />
                 <span className="!text-white">New Event</span>
@@ -2383,9 +2397,9 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {[
               { value: 'all', label: 'All Events', count: sortedQuickRaces.length + sortedSeries.length },
-              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces, ...series.flatMap(s => s.rounds)].filter(e => !isDatePast(e.date) && !e.completed).length },
-              { value: 'past', label: 'Past', count: [...quickRaces, ...series.flatMap(s => s.rounds)].filter(e => isDatePast(e.date) && !e.completed).length },
-              { value: 'completed', label: 'Completed', count: [...quickRaces, ...series.flatMap(s => s.rounds)].filter(e => e.completed).length },
+              { value: 'upcoming', label: 'Upcoming', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => !isDatePast(e.date) && !e.completed).length },
+              { value: 'past', label: 'Past', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => isDatePast(e.date) && !e.completed).length },
+              { value: 'completed', label: 'Completed', count: [...quickRaces.filter(r => new Date(r.date).getFullYear() === selectedYear), ...series.flatMap(s => s.rounds.filter(r => new Date(r.date).getFullYear() === selectedYear))].filter(e => e.completed).length },
               { value: 'pending', label: 'Pending', count: pendingEvents.length },
             ].map((tab) => (
               <button
@@ -2604,7 +2618,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                     console.log('Approve button clicked for event:', event);
                                     handleApproveEvent(event.id, event.event_level);
                                   }}
-                                  className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                  className="px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
                                 >
                                   <CheckCircle2 size={16} />
                                   Approve
@@ -2666,7 +2680,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                         e.stopPropagation();
                                         handleResubmitEvent(event.id);
                                       }}
-                                      className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                      className="btn-primary-green px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
                                       title="Resubmit for approval"
                                     >
                                       <Send size={16} />
@@ -2702,7 +2716,7 @@ export const RaceManagementPage: React.FC<RaceManagementPageProps> = ({
                                         e.stopPropagation();
                                         handleResubmitEvent(event.id);
                                       }}
-                                      className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                      className="btn-primary-green px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
                                       title="Resubmit for approval"
                                     >
                                       <Send size={16} />

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Search, Filter, Mail, Phone, Edit2, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CheckCircle2, X, MapIcon, Save, Trash, Link, Zap, UserX } from 'lucide-react';
+import { Users, Plus, Search, ListFilter as Filter, Mail, Phone, Pencil, Trash2, ChevronRight, Eye, ChevronDown, FileDown, Send, UserCheck, Clock, MailOpen, ArrowUpDown, User, Crown, Shield, Calendar, DollarSign, ArchiveRestore, ArrowUpRight, CircleCheck as CheckCircle2, X, Map as MapIcon, Save, Trash, Link, Zap, UserX, Smartphone, Loader as Loader2, KeyRound, RefreshCw, MoveVertical as MoreVertical, SquareCheck as CheckSquare, Square, Tag } from 'lucide-react';
 import { MemberImportExportModal } from '../MemberImportExportModal';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { Member } from '../../types/member';
 import { MembershipFormModal } from '../membership/MembershipFormModal';
 import { MemberEditModal } from '../membership/MemberEditModal';
@@ -18,6 +19,7 @@ import { SaveFilterModal } from '../membership/SaveFilterModal';
 import { ManageFiltersModal } from '../membership/ManageFiltersModal';
 import { MemberFilterConfig, FilterPreset } from '../../types/memberFilters';
 import { filterMembers, createEmptyFilter } from '../../utils/memberFilters';
+import { activateMembers, ActivationResponse } from '../../utils/memberActivation';
 
 interface MembersPageProps {
   darkMode: boolean;
@@ -25,12 +27,14 @@ interface MembersPageProps {
 }
 
 export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateToRemittances }) => {
-  const { currentClub } = useAuth();
+  const { currentClub, isSuperAdmin, isStateOrgAdmin, isNationalOrgAdmin } = useAuth();
+  const { startImpersonation, isImpersonating } = useImpersonation();
+  const canImpersonate = isSuperAdmin || isStateOrgAdmin || isNationalOrgAdmin;
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'archived'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired' | 'cancelled'>('all');
   const [filterBoatClass, setFilterBoatClass] = useState<string>('all');
   const [boatClasses, setBoatClasses] = useState<string[]>([]);
   const [showMembershipForm, setShowMembershipForm] = useState(false);
@@ -69,6 +73,37 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
   const [showManageFiltersModal, setShowManageFiltersModal] = useState(false);
   const [hasActiveFilter, setHasActiveFilter] = useState(false);
 
+  const [showActivateConfirmModal, setShowActivateConfirmModal] = useState(false);
+  const [membersToActivate, setMembersToActivate] = useState<Member[]>([]);
+  const [activating, setActivating] = useState(false);
+  const [activationResults, setActivationResults] = useState<ActivationResponse | null>(null);
+  const [activatingMemberId, setActivatingMemberId] = useState<string | null>(null);
+  const [showActivationTestEmail, setShowActivationTestEmail] = useState(false);
+  const [activationTestEmail, setActivationTestEmail] = useState('');
+  const [sendingActivationTest, setSendingActivationTest] = useState(false);
+  const [activationMenuMemberId, setActivationMenuMemberId] = useState<string | null>(null);
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+  const [setPasswordMember, setSetPasswordMember] = useState<Member | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [resendingActivation, setResendingActivation] = useState<string | null>(null);
+  const activationMenuRef = useRef<HTMLDivElement>(null);
+
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [bulkMembershipType, setBulkMembershipType] = useState('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (activationMenuRef.current && !activationMenuRef.current.contains(e.target as Node)) {
+        setActivationMenuMemberId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     if (currentClub?.clubId) {
       fetchMembers();
@@ -76,6 +111,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       fetchRemittanceStatuses();
       fetchFilterPresets();
       fetchEmailMatches();
+      fetchMembershipTypes();
     }
   }, [currentClub, filterStatus]);
 
@@ -160,6 +196,64 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       }
     } catch (err) {
       console.error('Error checking email matches:', err);
+    }
+  };
+
+  const fetchMembershipTypes = async () => {
+    if (!currentClub?.clubId) return;
+    try {
+      const { data, error } = await supabase
+        .from('membership_types')
+        .select('id, name')
+        .eq('club_id', currentClub.clubId)
+        .order('name', { ascending: true });
+      if (error) throw error;
+      setMembershipTypes(data || []);
+    } catch (err) {
+      console.error('Error fetching membership types:', err);
+    }
+  };
+
+  const toggleMemberSelection = (memberId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(memberId)) {
+        next.delete(memberId);
+      } else {
+        next.add(memberId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedMemberIds.size === filteredMembers.length) {
+      setSelectedMemberIds(new Set());
+    } else {
+      setSelectedMemberIds(new Set(filteredMembers.map(m => m.id)));
+    }
+  };
+
+  const handleBulkAssignMembershipType = async () => {
+    if (!bulkMembershipType || selectedMemberIds.size === 0) return;
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('members')
+        .update({ membership_level: bulkMembershipType })
+        .in('id', Array.from(selectedMemberIds));
+
+      if (error) throw error;
+
+      addNotification('success', `Membership type updated for ${selectedMemberIds.size} member${selectedMemberIds.size === 1 ? '' : 's'}`);
+      setSelectedMemberIds(new Set());
+      setBulkMembershipType('');
+      await fetchMembers();
+    } catch (err: any) {
+      addNotification('error', err.message || 'Failed to update membership types');
+    } finally {
+      setBulkUpdating(false);
     }
   };
 
@@ -332,11 +426,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
         `)
         .eq('club_id', currentClub?.clubId);
 
-      // Filter by membership status
-      if (filterStatus === 'archived') {
-        query = query.eq('membership_status', 'archived');
+      // Filter by membership status at DB level
+      if (filterStatus === 'cancelled') {
+        query = query.or('membership_status.eq.cancelled,membership_status.eq.archived');
       } else {
-        // For non-archived views, exclude archived members
+        // For all, active, and expired tabs - exclude cancelled/archived at DB level
+        // The active vs expired distinction is handled client-side via is_financial
         query = query.or('membership_status.eq.active,membership_status.is.null');
       }
 
@@ -346,24 +441,25 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
 
       // Fetch avatar URLs from profiles for members with user_id (only if member doesn't have one)
       if (data && data.length > 0) {
-        const userIds = data.filter(m => m.user_id && !m.avatar_url).map(m => m.user_id);
-        if (userIds.length > 0) {
+        const linkedUserIds = data.filter(m => m.user_id).map(m => m.user_id);
+        const unlinkedWithoutAvatar = data.filter(m => !m.user_id && !m.avatar_url);
+        if (linkedUserIds.length > 0) {
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, avatar_url')
-            .in('id', userIds);
+            .select('id, avatar_url, last_seen')
+            .in('id', linkedUserIds);
 
-          // Merge avatar data only for members without their own avatar
-          const membersWithAvatars = data.map(member => {
-            if (member.avatar_url) return member; // Keep existing member avatar
+          const membersWithProfiles = data.map(member => {
+            if (!member.user_id) return member;
             const profile = profiles?.find(p => p.id === member.user_id);
             return {
               ...member,
-              avatar_url: profile?.avatar_url || member.avatar_url
+              avatar_url: member.avatar_url || profile?.avatar_url || null,
+              last_seen: profile?.last_seen || null,
             };
           });
 
-          setMembers(membersWithAvatars);
+          setMembers(membersWithProfiles);
         } else {
           setMembers(data);
         }
@@ -395,7 +491,16 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     // Step 1: Apply advanced filter if active
     let filtered = hasActiveFilter ? filterMembers(members, filterConfig) : members;
 
-    // Step 2: Apply search filter
+    // Step 2: Apply tab-level status filter client-side
+    if (filterStatus === 'active') {
+      filtered = filtered.filter(m => m.is_financial === true);
+    } else if (filterStatus === 'expired') {
+      // Expired = active membership status but not financial (renewal overdue)
+      filtered = filtered.filter(m => m.is_financial === false || m.is_financial === null);
+    }
+    // 'all' and 'cancelled' use the data already scoped by the DB query
+
+    // Step 3: Apply search filter
     filtered = filtered.filter(member => {
       const matchesSearch =
         `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -500,6 +605,32 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     }
   };
 
+  const handleReactivateMember = async (memberId: string) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+
+    if (!confirm(`Reactivate ${member.first_name} ${member.last_name}?\n\nThis will set their status to active and allow them to log in again.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('members').update({
+        membership_status: 'active',
+        is_financial: true,
+        cancelled_at: null,
+        cancelled_reason: null,
+      }).eq('id', memberId);
+
+      if (error) throw error;
+
+      addNotification(`${member.first_name} ${member.last_name} reactivated successfully`, 'success');
+      fetchMembers();
+    } catch (err) {
+      console.error('Error reactivating member:', err);
+      addNotification(err instanceof Error ? err.message : 'Failed to reactivate member', 'error');
+    }
+  };
+
   const handleConfirmArchive = async (removeAuthAccess: boolean, reason?: string) => {
     if (!memberToArchive) return;
 
@@ -594,6 +725,195 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
     setInvitingMemberId(null);
   };
 
+  const unlinkedMembersWithEmail = members.filter(m => !m.user_id && m.email);
+
+  const handleActivateSingle = (member: Member) => {
+    setMembersToActivate([member]);
+    setActivationResults(null);
+    setShowActivateConfirmModal(true);
+  };
+
+  const handleActivateBulk = () => {
+    setMembersToActivate(unlinkedMembersWithEmail);
+    setActivationResults(null);
+    setShowActivateConfirmModal(true);
+  };
+
+  const handleConfirmActivation = async () => {
+    const clubName = currentClub?.club?.name || '';
+    if (!currentClub?.clubId || !clubName || membersToActivate.length === 0) return;
+
+    setActivating(true);
+    const memberIds = membersToActivate.map(m => m.id);
+
+    const result = await activateMembers(memberIds, currentClub.clubId, clubName);
+
+    setActivating(false);
+    setActivationResults(result);
+
+    if (result.success) {
+      if (result.summary.created > 0) {
+        addNotification(
+          `${result.summary.created} member${result.summary.created === 1 ? '' : 's'} activated and invited to AlfiePRO`,
+          'success'
+        );
+      }
+      fetchMembers();
+    } else {
+      addNotification(result.error || 'Activation failed', 'error');
+    }
+  };
+
+  const handleSendActivationTestEmail = async () => {
+    if (!showActivationTestEmail) {
+      setShowActivationTestEmail(true);
+      setActivationTestEmail('');
+      return;
+    }
+
+    if (!activationTestEmail || !activationTestEmail.includes('@')) {
+      addNotification('Please enter a valid email address', 'error');
+      return;
+    }
+
+    const clubName = currentClub?.club?.name || '';
+    if (!currentClub?.clubId || !clubName) {
+      addNotification('Club information not available', 'error');
+      return;
+    }
+
+    setSendingActivationTest(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-member-account`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_ids: membersToActivate.map(m => m.id),
+          club_id: currentClub.clubId,
+          club_name: clubName,
+          activate_on_behalf: true,
+          behalf_email_recipient: activationTestEmail,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to send test email');
+
+      addNotification(`Test activation email sent to ${activationTestEmail}`, 'success');
+      setShowActivationTestEmail(false);
+      setActivationTestEmail('');
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to send test email', 'error');
+    } finally {
+      setSendingActivationTest(false);
+    }
+  };
+
+  const handleResendActivation = async (member: Member) => {
+    const clubName = currentClub?.club?.name || '';
+    if (!currentClub?.clubId || !clubName || !member.email) return;
+
+    setResendingActivation(member.id);
+    setActivationMenuMemberId(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/activate-member-account`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_ids: [member.id],
+          club_id: currentClub.clubId,
+          club_name: clubName,
+          resend: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to resend activation');
+
+      addNotification(`Activation email resent to ${member.first_name} ${member.last_name}`, 'success');
+      fetchMembers();
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to resend activation email', 'error');
+    } finally {
+      setResendingActivation(null);
+    }
+  };
+
+  const handleSetPasswordForMember = async () => {
+    if (!setPasswordMember || !newPassword || newPassword.length < 6) {
+      addNotification('Password must be at least 6 characters', 'error');
+      return;
+    }
+
+    setSettingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/set-member-password`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          member_id: setPasswordMember.id,
+          email: setPasswordMember.email,
+          password: newPassword,
+          admin_set: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to set password');
+
+      addNotification(`Password set for ${setPasswordMember.first_name} ${setPasswordMember.last_name}`, 'success');
+      setShowSetPasswordModal(false);
+      setSetPasswordMember(null);
+      setNewPassword('');
+      fetchMembers();
+    } catch (err: any) {
+      addNotification(err.message || 'Failed to set password', 'error');
+    } finally {
+      setSettingPassword(false);
+    }
+  };
+
+  const getActivationIcon = (member: Member) => {
+    const hasUserId = !!member.user_id;
+    const activationStatus = member.activation_status;
+
+    if (hasUserId && activationStatus === 'activated') {
+      return { icon: 'activated', label: 'Account active - click for options', color: 'text-green-500 bg-green-900/20' };
+    }
+    if (hasUserId && activationStatus === 'pending') {
+      return { icon: 'pending-linked', label: 'Account created, awaiting password setup - click for options', color: 'text-sky-400 bg-sky-900/20' };
+    }
+    if (hasUserId) {
+      return { icon: 'connected', label: 'Connected - click for options', color: 'text-green-500 bg-green-900/20' };
+    }
+    if (activationStatus === 'pending') {
+      return { icon: 'pending', label: 'Activation sent - click for options', color: 'text-sky-400 bg-sky-900/20' };
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -611,11 +931,16 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <p className="text-slate-400 text-sm">
-            {filteredMembers.filter(m => m.is_financial).length} {filteredMembers.filter(m => m.is_financial).length === 1 ? 'Member' : 'Members'} Active
+            {members.filter(m => m.is_financial === true).length} {members.filter(m => m.is_financial === true).length === 1 ? 'Member' : 'Members'} Financial
+            {members.filter(m => m.is_financial === false || m.is_financial === null).length > 0 && (
+              <span className="ml-2 text-yellow-400">
+                · {members.filter(m => m.is_financial === false || m.is_financial === null).length} Overdue
+              </span>
+            )}
           </p>
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5 text-green-400">
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              <span className="w-2 h-2 rounded-full"></span>
               {members.filter(m => m.user_id).length} Connected
             </span>
             {Object.keys(emailMatches).length > 0 && (
@@ -636,6 +961,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
               <span className="w-2 h-2 rounded-full bg-slate-500"></span>
               {members.filter(m => !m.user_id && !emailMatches[m.id]).length} Unlinked
             </span>
+            {members.filter(m => (m as any).activation_status === 'pending').length > 0 && (
+              <span className="flex items-center gap-1.5 text-sky-400">
+                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                {members.filter(m => (m as any).activation_status === 'pending').length} Invite Sent
+              </span>
+            )}
+            {unlinkedMembersWithEmail.length > 0 && (
+              <span className="flex items-center gap-1.5 text-sky-400/70 text-xs">
+                <Smartphone size={12} />
+                {unlinkedMembersWithEmail.length} ready to activate
+              </span>
+            )}
           </div>
         </div>
 
@@ -679,7 +1016,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             {/* Payment Reconciliation Button */}
             <button
               onClick={() => setShowPaymentReconciliation(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white transition-all shadow-lg hover:shadow-xl font-medium"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-all shadow-lg hover:shadow-xl font-medium"
               title="Payment Reconciliation"
             >
               <DollarSign size={18} />
@@ -762,14 +1099,14 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                   className="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm hover:bg-slate-600 transition-colors"
                   title="Manage Filters"
                 >
-                  <Edit2 size={16} />
+                  <Pencil size={16} />
                 </button>
               </div>
             )}
 
             <button
               onClick={handleAddMember}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
+              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
             >
               <Plus size={20} strokeWidth={2.5} />
               Add Member
@@ -777,11 +1114,129 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
           </div>
       </div>
 
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-1 border-b border-slate-700/50 pb-0">
+        {(['all', 'active', 'expired', 'cancelled'] as const).map((status) => {
+          const allNonCancelled = members;
+          const activeCnt = allNonCancelled.filter(m => m.is_financial === true).length;
+          const expiredCnt = allNonCancelled.filter(m => m.is_financial === false || m.is_financial === null).length;
+
+          const labels: Record<string, string> = {
+            all: `All Members`,
+            active: `Active (${activeCnt})`,
+            expired: `Overdue (${expiredCnt})`,
+            cancelled: 'Cancelled',
+          };
+          const activeStyles: Record<string, string> = {
+            all: 'border-blue-500 text-blue-400',
+            active: 'border-green-500 text-green-400',
+            expired: 'border-yellow-500 text-yellow-400',
+            cancelled: 'border-red-500 text-red-400',
+          };
+          const isActive = filterStatus === status;
+          return (
+            <button
+              key={status}
+              onClick={() => setFilterStatus(status as typeof filterStatus)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                isActive
+                  ? activeStyles[status]
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {labels[status]}
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedMemberIds.size > 0 && (() => {
+        const selectedUnlinkedWithEmail = members.filter(m => selectedMemberIds.has(m.id) && !m.user_id && m.email);
+        return (
+          <div className="flex items-center gap-4 px-4 py-3 bg-blue-600/15 border border-blue-500/30 rounded-xl flex-wrap">
+            <div className="flex items-center gap-2">
+              <CheckSquare size={18} className="text-blue-400" />
+              <span className="text-sm font-medium text-blue-300">
+                {selectedMemberIds.size} member{selectedMemberIds.size === 1 ? '' : 's'} selected
+              </span>
+            </div>
+            <div className="h-5 w-px bg-slate-600" />
+            <div className="flex items-center gap-2">
+              <Tag size={16} className="text-slate-400" />
+              <select
+                value={bulkMembershipType}
+                onChange={(e) => setBulkMembershipType(e.target.value)}
+                className="px-3 py-1.5 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Assign membership type...</option>
+                {membershipTypes.map(type => (
+                  <option key={type.id} value={type.name}>{type.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkAssignMembershipType}
+                disabled={!bulkMembershipType || bulkUpdating}
+                className="btn-primary-green flex items-center gap-2 px-4 py-1.5 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkUpdating ? (
+                  <><Loader2 size={14} className="animate-spin" /> Updating...</>
+                ) : (
+                  'Apply'
+                )}
+              </button>
+            </div>
+            {selectedUnlinkedWithEmail.length > 0 && (
+              <>
+                <div className="h-5 w-px bg-slate-600" />
+                <button
+                  onClick={() => {
+                    setMembersToActivate(selectedUnlinkedWithEmail);
+                    setActivationResults(null);
+                    setShowActivateConfirmModal(true);
+                  }}
+                  disabled={activating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  {activating ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Smartphone size={14} />
+                  )}
+                  Activate {selectedUnlinkedWithEmail.length} for App
+                </button>
+              </>
+            )}
+            <div className="ml-auto">
+              <button
+                onClick={() => { setSelectedMemberIds(new Set()); setBulkMembershipType(''); }}
+                className="text-slate-400 hover:text-white transition-colors p-1"
+                title="Clear selection"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-700/50">
               <tr>
+                <th className="px-3 py-3 w-10">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="text-slate-400 hover:text-white transition-colors"
+                    title={selectedMemberIds.size === filteredMembers.length ? 'Deselect all' : 'Select all'}
+                  >
+                    {selectedMemberIds.size > 0 && selectedMemberIds.size === filteredMembers.length ? (
+                      <CheckSquare size={18} className="text-blue-400" />
+                    ) : (
+                      <Square size={18} />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
                   <button
                     onClick={toggleSort}
@@ -802,27 +1257,40 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
             <tbody className="divide-y divide-slate-700/50">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     Loading members...
                   </td>
                 </tr>
               ) : filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                     No members found
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map(member => {
-                  const isExpired = !member.is_financial || 
+                  const isExpired = !member.is_financial ||
                     (member.renewal_date && new Date(member.renewal_date) < new Date());
-                  
+                  const isSelected = selectedMemberIds.has(member.id);
+
                   return (
                     <tr
                       key={member.id}
                       onClick={() => handleEditMember(member.id)}
-                      className="hover:bg-slate-700/30 cursor-pointer transition-colors"
+                      className={`hover:bg-slate-700/30 cursor-pointer transition-colors ${isSelected ? 'bg-blue-600/10' : ''}`}
                     >
+                      <td className="px-3 py-4 w-10">
+                        <button
+                          onClick={(e) => toggleMemberSelection(member.id, e)}
+                          className="text-slate-400 hover:text-white transition-colors"
+                        >
+                          {isSelected ? (
+                            <CheckSquare size={18} className="text-blue-400" />
+                          ) : (
+                            <Square size={18} />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="relative flex-shrink-0">
@@ -837,22 +1305,21 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                 {member.first_name?.[0]}{member.last_name?.[0]}
                               </div>
                             )}
-                            <div
-                              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
-                                member.user_id
-                                  ? 'bg-green-500'
-                                  : emailMatches[member.id]
-                                    ? 'bg-amber-500'
-                                    : 'bg-slate-500'
-                              }`}
-                              title={
-                                member.user_id
-                                  ? 'Connected - has login account'
-                                  : emailMatches[member.id]
-                                    ? 'Match found - click to link'
-                                    : 'Not connected'
-                              }
-                            />
+                            {member.user_id && (() => {
+                              const isOnline = (member as any).last_seen && (Date.now() - new Date((member as any).last_seen).getTime()) < 15 * 60 * 1000;
+                              return (
+                                <div className="group/status absolute -bottom-0.5 -right-0.5">
+                                  <div
+                                    className={`w-3.5 h-3.5 rounded-full border-2 border-slate-800 ${
+                                      isOnline ? 'bg-green-500' : 'bg-orange-400'
+                                    }`}
+                                  />
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded shadow-lg whitespace-nowrap opacity-0 group-hover/status:opacity-100 pointer-events-none transition-opacity z-50">
+                                    {isOnline ? 'Online' : 'Offline'}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                           <span className="text-white font-medium">
                             {member.first_name} {member.last_name}
@@ -904,6 +1371,12 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
+                          {(member as any).membership_status === 'cancelled' ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-900/30 text-red-400">
+                              <UserX size={11} />
+                              Cancelled
+                            </span>
+                          ) : (
                           <span className={`
                             inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                             ${member.is_financial
@@ -912,16 +1385,18 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                           `}>
                             {member.is_financial ? 'Financial' : 'Unfinancial'}
                           </span>
+                          )}
                           {(member as any).payment_status === 'pending' && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setShowPaymentReconciliation(true);
                               }}
-                              className="p-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 transition-colors animate-pulse"
-                              title="Payment Pending - Click to Confirm"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-900/30 text-orange-400 border border-orange-500/30 hover:bg-orange-900/50 transition-colors animate-pulse cursor-pointer"
+                              title="Renewal payment pending - Click to confirm"
                             >
-                              <DollarSign size={14} />
+                              <DollarSign size={12} />
+                              Renewal Pending
                             </button>
                           )}
                           {/* Remittance Status Indicator */}
@@ -966,69 +1441,154 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                       </td>
                       <td className="px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewMember(member.id);
-                            }}
-                            className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-900/30 transition-colors"
-                            title="View member details"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          {!member.user_id ? (
-                            emailMatches[member.id] ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleLinkSingleMember(member.id);
-                                }}
-                                disabled={linkingMemberId === member.id}
-                                className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
-                                title="Account found - click to link"
+                          {(() => {
+                            const iconState = getActivationIcon(member);
+                            if (iconState) {
+                              return (
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActivationMenuMemberId(activationMenuMemberId === member.id ? null : member.id);
+                                    }}
+                                    className={`p-1.5 rounded-lg ${iconState.color} transition-colors hover:ring-1 hover:ring-slate-500`}
+                                    title={iconState.label}
+                                  >
+                                    {resendingActivation === member.id ? (
+                                      <Loader2 size={16} className="animate-spin" />
+                                    ) : iconState.icon === 'activated' || iconState.icon === 'connected' ? (
+                                      <UserCheck size={16} />
+                                    ) : (
+                                      <Smartphone size={16} />
+                                    )}
+                                  </button>
+                                  {activationMenuMemberId === member.id && (
+                                    <div
+                                      ref={activationMenuRef}
+                                      className="absolute right-0 top-full mt-1 w-56 bg-slate-700 border border-slate-600 rounded-lg shadow-xl z-50 py-1"
+                                    >
+                                      <div className="px-3 py-2 border-b border-slate-600">
+                                        <p className="text-xs text-slate-400 font-medium">Account Status</p>
+                                        <p className="text-sm text-white">
+                                          {iconState.icon === 'activated' ? 'Active' :
+                                           iconState.icon === 'connected' ? 'Connected' :
+                                           'Pending Activation'}
+                                        </p>
+                                        {member.activation_sent_at && (
+                                          <p className="text-xs text-slate-500 mt-0.5">
+                                            Sent {new Date(member.activation_sent_at).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                      </div>
+                                      {member.email && (iconState.icon === 'pending' || iconState.icon === 'pending-linked') && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResendActivation(member);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
+                                        >
+                                          <RefreshCw size={14} className="text-sky-400" />
+                                          Resend activation email
+                                        </button>
+                                      )}
+                                      {member.email && (iconState.icon === 'activated' || iconState.icon === 'connected') && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleResendActivation(member);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
+                                        >
+                                          <RefreshCw size={14} className="text-sky-400" />
+                                          Send password reset email
+                                        </button>
+                                      )}
+                                      {member.user_id && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActivationMenuMemberId(null);
+                                            setSetPasswordMember(member);
+                                            setNewPassword('');
+                                            setShowSetPasswordModal(true);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-600/50 transition-colors"
+                                        >
+                                          <KeyRound size={14} className="text-amber-400" />
+                                          Set password manually
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            if (!member.user_id && emailMatches[member.id]) {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLinkSingleMember(member.id);
+                                  }}
+                                  disabled={linkingMemberId === member.id}
+                                  className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors disabled:opacity-50"
+                                  title="Account found - click to link"
+                                >
+                                  {linkingMemberId === member.id ? (
+                                    <div className="animate-spin h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
+                                  ) : (
+                                    <Link size={16} />
+                                  )}
+                                </button>
+                              );
+                            }
+
+                            if (!member.user_id && memberInvitations[member.id]?.status === 'pending') {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewInvitation(member.id);
+                                  }}
+                                  className="p-1.5 rounded-lg text-orange-400 hover:bg-orange-900/30 transition-colors"
+                                  title="Invitation pending"
+                                >
+                                  <Clock size={16} />
+                                </button>
+                              );
+                            }
+
+                            if (!member.user_id && member.email) {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleActivateSingle(member);
+                                  }}
+                                  disabled={activatingMemberId === member.id}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-sky-400 transition-colors disabled:opacity-50"
+                                  title="Activate for AlfiePRO App"
+                                >
+                                  {activatingMemberId === member.id ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                  ) : (
+                                    <Smartphone size={16} />
+                                  )}
+                                </button>
+                              );
+                            }
+
+                            return (
+                              <div
+                                className="p-1.5 rounded-lg text-slate-600"
+                                title="No email address - cannot activate"
                               >
-                                {linkingMemberId === member.id ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-amber-400 border-t-transparent rounded-full"></div>
-                                ) : (
-                                  <Link size={16} />
-                                )}
-                              </button>
-                            ) : memberInvitations[member.id] && memberInvitations[member.id].status === 'pending' ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewInvitation(member.id);
-                                }}
-                                className="p-1.5 rounded-lg text-orange-400 hover:bg-orange-900/30 transition-colors"
-                                title="Invitation pending"
-                              >
-                                <Clock size={16} />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleInviteMemberClick(member);
-                                }}
-                                disabled={invitingMemberId === member.id}
-                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
-                                title="Invite to register"
-                              >
-                                {invitingMemberId === member.id ? (
-                                  <div className="animate-spin h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full"></div>
-                                ) : (
-                                  <Send size={16} />
-                                )}
-                              </button>
-                            )
-                          ) : (
-                            <div
-                              className="p-1.5 rounded-lg text-green-500 bg-green-900/20"
-                              title="Connected - has login account"
-                            >
-                              <UserCheck size={16} />
-                            </div>
-                          )}
+                                <Smartphone size={16} />
+                              </div>
+                            );
+                          })()}
                           {isExpired && (
                             <button
                               onClick={(e) => {
@@ -1041,19 +1601,52 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                               <ChevronRight size={16} />
                             </button>
                           )}
-                          {filterStatus === 'archived' ? (
+                          {member.membership_status === 'archived' ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleRestoreMember(member.id);
                               }}
                               className="p-1.5 rounded-lg text-green-400 hover:bg-green-900/30 transition-colors"
-                              title="Restore member"
+                              title="Restore archived member"
                             >
                               <ArchiveRestore size={16} />
                             </button>
+                          ) : member.membership_status === 'cancelled' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReactivateMember(member.id);
+                              }}
+                              className="p-1.5 rounded-lg text-green-400 hover:bg-green-900/30 transition-colors"
+                              title="Reactivate membership"
+                            >
+                              <UserCheck size={16} />
+                            </button>
                           ) : (
                             <>
+                              {canImpersonate && !isImpersonating && member.user_id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startImpersonation(member.id);
+                                  }}
+                                  className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-900/30 transition-colors"
+                                  title={`View as ${member.first_name} ${member.last_name}`}
+                                >
+                                  <Eye size={16} />
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewMember(member.id);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700/50 transition-colors"
+                                title="View membership"
+                              >
+                                <Eye size={16} />
+                              </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1062,7 +1655,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                                 className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-900/30 transition-colors"
                                 title="Edit member"
                               >
-                                <Edit2 size={16} />
+                                <Pencil size={16} />
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1290,11 +1883,335 @@ export const MembersPage: React.FC<MembersPageProps> = ({ darkMode, onNavigateTo
                 </button>
                 <button
                   onClick={handleConfirmInvite}
-                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  className="btn-primary-green flex-1 px-4 py-2 text-white rounded-lg transition-colors"
                 >
                   Send Invitation
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activate for App Modal */}
+      {showActivateConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-lg w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
+                    <Smartphone size={20} className="text-sky-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      {activationResults ? 'Activation Complete' : 'Activate for AlfiePRO App'}
+                    </h3>
+                    <p className="text-sm text-slate-400">
+                      {activationResults
+                        ? `${activationResults.summary.created} account${activationResults.summary.created === 1 ? '' : 's'} created`
+                        : `${membersToActivate.length} member${membersToActivate.length === 1 ? '' : 's'} selected`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowActivateConfirmModal(false);
+                    setMembersToActivate([]);
+                    setActivationResults(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {!activationResults ? (
+                <>
+                  <p className="text-slate-300 mb-4">
+                    {membersToActivate.length === 1
+                      ? <>This will create a login account for <span className="font-semibold text-white">{membersToActivate[0].first_name} {membersToActivate[0].last_name}</span> and send them an email with a link to set their password.</>
+                      : <>This will create login accounts for <span className="font-semibold text-white">{membersToActivate.length} members</span> and email each of them with a link to set their password.</>
+                    }
+                  </p>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">1</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Account created</p>
+                        <p className="text-xs text-slate-400">Auth account pre-created with their email on file</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">2</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Welcome email sent</p>
+                        <p className="text-xs text-slate-400">Contains a secure link to set their password — works on any device</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-slate-700/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-sky-400 text-xs font-bold">3</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-white font-medium">Member sets their password</p>
+                        <p className="text-xs text-slate-400">They click the link, set a password in their browser, then sign in on web or app</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {membersToActivate.length <= 5 && (
+                    <div className="mb-4">
+                      <p className="text-xs text-slate-500 mb-2">Members to activate:</p>
+                      <div className="space-y-1">
+                        {membersToActivate.map(m => (
+                          <div key={m.id} className="flex items-center justify-between text-sm py-1 px-2 bg-slate-700/30 rounded">
+                            <span className="text-slate-300">{m.first_name} {m.last_name}</span>
+                            <span className="text-slate-500 text-xs">{m.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {membersToActivate.some(m => !m.email) && (
+                    <div className="p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg mb-4">
+                      <p className="text-sm text-amber-400">
+                        {membersToActivate.filter(m => !m.email).length} member{membersToActivate.filter(m => !m.email).length === 1 ? '' : 's'} without
+                        an email address will be skipped.
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {activationResults.summary.created > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-green-900/20 border border-green-900/30 rounded-lg">
+                      <CheckCircle2 size={18} className="text-green-400 flex-shrink-0" />
+                      <p className="text-sm text-green-300">
+                        {activationResults.summary.created} account{activationResults.summary.created === 1 ? '' : 's'} created and welcome email{activationResults.summary.created === 1 ? '' : 's'} sent
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.existing_linked > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-blue-900/20 border border-blue-900/30 rounded-lg">
+                      <UserCheck size={18} className="text-blue-400 flex-shrink-0" />
+                      <p className="text-sm text-blue-300">
+                        {activationResults.summary.existing_linked} already had an account
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.no_email > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
+                      <Mail size={18} className="text-amber-400 flex-shrink-0" />
+                      <p className="text-sm text-amber-300">
+                        {activationResults.summary.no_email} skipped (no email address)
+                      </p>
+                    </div>
+                  )}
+                  {activationResults.summary.errors > 0 && (
+                    <div className="p-3 bg-red-900/20 border border-red-900/30 rounded-lg">
+                      <div className="flex items-center gap-3 mb-2">
+                        <X size={18} className="text-red-400 flex-shrink-0" />
+                        <p className="text-sm text-red-300">
+                          {activationResults.summary.errors} failed
+                        </p>
+                      </div>
+                      <div className="space-y-1 ml-8">
+                        {activationResults.results
+                          .filter(r => r.status === 'error')
+                          .map(r => (
+                            <p key={r.member_id} className="text-xs text-red-400">
+                              {r.name}: {r.error}
+                            </p>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-700">
+              {!activationResults && (
+                <div className="mb-4">
+                  {showActivationTestEmail ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="email"
+                        value={activationTestEmail}
+                        onChange={(e) => setActivationTestEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendActivationTestEmail()}
+                        placeholder="Enter email address..."
+                        className="flex-1 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSendActivationTestEmail}
+                        disabled={sendingActivationTest}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 text-white rounded-lg text-sm hover:bg-slate-500 transition-colors disabled:opacity-50"
+                      >
+                        {sendingActivationTest ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        Send
+                      </button>
+                      <button
+                        onClick={() => { setShowActivationTestEmail(false); setActivationTestEmail(''); }}
+                        className="text-slate-500 hover:text-slate-400 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleSendActivationTestEmail}
+                      className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-sky-400 transition-colors"
+                    >
+                      <Mail size={14} />
+                      Activate on behalf of member
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                {!activationResults ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowActivateConfirmModal(false);
+                        setMembersToActivate([]);
+                        setShowActivationTestEmail(false);
+                      }}
+                      className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmActivation}
+                      disabled={activating}
+                      className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-sky-500 to-blue-600 text-white rounded-lg hover:from-sky-600 hover:to-blue-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {activating ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Activating...
+                        </>
+                      ) : (
+                        <>
+                          <Smartphone size={16} />
+                          Activate {membersToActivate.filter(m => m.email).length} Member{membersToActivate.filter(m => m.email).length === 1 ? '' : 's'}
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setShowActivateConfirmModal(false);
+                      setMembersToActivate([]);
+                      setActivationResults(null);
+                      setShowActivationTestEmail(false);
+                    }}
+                    className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 font-medium transition-colors"
+                  >
+                    Done
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Password Modal */}
+      {showSetPasswordModal && setPasswordMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-md w-full">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                    <KeyRound size={20} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Set Password</h3>
+                    <p className="text-sm text-slate-400">
+                      {setPasswordMember.first_name} {setPasswordMember.last_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSetPasswordModal(false);
+                    setSetPasswordMember(null);
+                    setNewPassword('');
+                  }}
+                  className="text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-300 mb-4">
+                Set a password on behalf of <span className="font-semibold text-white">{setPasswordMember.first_name} {setPasswordMember.last_name}</span>.
+                You will need to communicate this password to the member directly.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm text-slate-400 mb-1.5">New Password</label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSetPasswordForMember()}
+                  placeholder="Enter password (min 6 characters)"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  autoFocus
+                />
+                {newPassword.length > 0 && newPassword.length < 6 && (
+                  <p className="text-xs text-red-400 mt-1">Password must be at least 6 characters</p>
+                )}
+              </div>
+              <div className="p-3 bg-amber-900/20 border border-amber-900/30 rounded-lg">
+                <p className="text-xs text-amber-400">
+                  The password is shown in plain text so you can share it with the member. They can change it later from their profile settings.
+                </p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowSetPasswordModal(false);
+                  setSetPasswordMember(null);
+                  setNewPassword('');
+                }}
+                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSetPasswordForMember}
+                disabled={settingPassword || newPassword.length < 6}
+                className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-amber-500 to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-700 font-medium transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {settingPassword ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Setting...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound size={16} />
+                    Set Password
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

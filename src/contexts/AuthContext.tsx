@@ -24,6 +24,24 @@ interface CurrentOrganization {
   role: string;
 }
 
+interface CancelledMembership {
+  club_id: string;
+  club_name: string;
+  cancelled_at: string | null;
+  cancelled_reason: string | null;
+  previous_membership_level: string | null;
+}
+
+interface UnfinancialMemberData {
+  member_id: string;
+  club_id: string;
+  club_name: string;
+  membership_level: string | null;
+  is_new_member: boolean;
+  renewal_date: string | null;
+  date_joined: string | null;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   userClubs: UserClub[];
@@ -40,6 +58,10 @@ interface AuthContextType {
   onboardingCompleted: boolean;
   hasPendingApplication: boolean;
   hasPendingClubApplication: boolean;
+  hasCancelledMembership: boolean;
+  cancelledMemberships: CancelledMembership[];
+  hasUnfinancialMember: boolean;
+  unfinancialMemberData: UnfinancialMemberData | null;
   signOut: () => Promise<void>;
   refreshUserClubs: () => Promise<UserClub[]>;
   setCurrentClub: (club: UserClub | null) => void;
@@ -64,18 +86,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [clubsLoaded, setClubsLoaded] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // Check if we're in the middle of a club switch (persists across reload)
-  const [isSwitchingClub, setIsSwitchingClub] = useState(() => {
-    return sessionStorage.getItem('switching_club') === 'true';
-  });
+  const [isSwitchingClub] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isNationalOrgAdmin, setIsNationalOrgAdmin] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
   const [hasPendingClubApplication, setHasPendingClubApplication] = useState(false);
+  const [hasCancelledMembership, setHasCancelledMembership] = useState(false);
+  const [cancelledMemberships, setCancelledMemberships] = useState<CancelledMembership[]>([]);
+  const [hasUnfinancialMember, setHasUnfinancialMember] = useState(false);
+  const [unfinancialMemberData, setUnfinancialMemberData] = useState<UnfinancialMemberData | null>(null);
   const [isStateOrgAdmin, setIsStateOrgAdmin] = useState(false);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const [impersonatedAssociationRoles, setImpersonatedAssociationRoles] = useState<{
+    isNationalOrgAdmin: boolean;
+    isStateOrgAdmin: boolean;
+  }>({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
 
   // CRITICAL: Track current user ID with ref to prevent duplicate SIGNED_IN processing
   // State updates are async, so we need a synchronous way to check current user
@@ -225,12 +253,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUserClubs(validClubs);
       setClubsLoaded(true);
 
-      // Clear club switching state once clubs are loaded
-      if (sessionStorage.getItem('switching_club') === 'true') {
-        console.log('✅ Club switch completed');
-        sessionStorage.removeItem('switching_club');
-        sessionStorage.removeItem('switching_to_club_name');
-        setIsSwitchingClub(false);
+      // During impersonation, skip overwriting currentClub/localStorage
+      // The impersonation context and overrides handle club selection
+      const isCurrentlyImpersonating = !!sessionStorage.getItem('impersonation_session');
+      if (isCurrentlyImpersonating) {
+        return validClubs;
       }
 
       // Set current club if none is selected or restore from localStorage
@@ -294,14 +321,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleSetCurrentClub = (club: UserClub | null) => {
     const previousClub = currentClub;
-
-    console.log('🏢 handleSetCurrentClub called');
-    console.log('  Previous club:', previousClub?.clubId, previousClub?.club?.name);
-    console.log('  New club:', club?.clubId, club?.club?.name);
-    console.log('  Is initial load:', isInitialLoad);
-    console.log('  Stack trace:', new Error().stack);
-
-    // Only reload if we're actually CHANGING clubs AND it's not the initial load
     const isActualChange = !isInitialLoad && previousClub?.clubId !== club?.clubId && previousClub !== null;
 
     setCurrentClub(club);
@@ -309,28 +328,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('currentClubId', club.clubId);
 
       if (isActualChange) {
-        console.log('🔄 Club changed by user - reloading page');
-
-        // Set sessionStorage flag to persist across reload
-        sessionStorage.setItem('switching_club', 'true');
-        sessionStorage.setItem('switching_to_club_name', club.club?.name || 'club');
-
-        // Show loading overlay before reload
-        setIsSwitchingClub(true);
-
-        // Clear any cached data from previous club
         localStorage.removeItem(CURRENT_EVENT_KEY);
-
-        // Slightly longer delay to ensure loading overlay renders
-        setTimeout(() => {
-          // Force reload to refresh all data for the new club
-          window.location.reload();
-        }, 150);
-      } else {
-        console.log('✅ No reload needed (initial load or same club)');
       }
 
-      // Mark that initial load is complete
       if (isInitialLoad) {
         setIsInitialLoad(false);
       }
@@ -427,21 +427,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         if (mounted && session?.user) {
-          // Extract first name and last name from user metadata
-          const firstName = session.user.user_metadata?.first_name;
-          const lastName = session.user.user_metadata?.last_name;
+          const { data: { user: validatedUser }, error: validateError } = await supabase.auth.getUser();
+          if (validateError || !validatedUser) {
+            console.warn('Session exists but server validation failed, clearing session');
+            await supabase.auth.signOut().catch(() => {});
+            localStorage.removeItem('alfie-pro-auth');
+            if (mounted) {
+              currentUserIdRef.current = null;
+              setUser(null);
+              setOnboardingCompleted(false);
+              clearTimeout(loadingTimeout);
+              setLoading(false);
+            }
+            return;
+          }
 
-          // Create enhanced user object with first and last name
+          const firstName = validatedUser.user_metadata?.first_name;
+          const lastName = validatedUser.user_metadata?.last_name;
+
           const enhancedUser: AuthUser = {
-            ...session.user,
+            ...validatedUser,
             firstName,
             lastName
           };
 
           const previousUserId = currentUserIdRef.current;
-          currentUserIdRef.current = session.user.id;
+          currentUserIdRef.current = validatedUser.id;
 
-          if (previousUserId && previousUserId !== session.user.id) {
+          if (previousUserId && previousUserId !== validatedUser.id) {
             localStorage.removeItem('currentClubId');
             localStorage.removeItem('currentOrganization');
           }
@@ -451,16 +464,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const { data: profileData } = await supabase
             .from('profiles')
             .select('onboarding_completed')
-            .eq('id', session.user.id)
+            .eq('id', validatedUser.id)
             .maybeSingle();
 
           setOnboardingCompleted(profileData?.onboarding_completed || false);
 
-          // Check for pending membership application
           const { data: pendingApp } = await supabase
             .from('membership_applications')
             .select('id, status')
-            .eq('user_id', session.user.id)
+            .eq('user_id', validatedUser.id)
             .eq('is_draft', false)
             .eq('status', 'pending')
             .limit(1)
@@ -468,19 +480,88 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
           setHasPendingApplication(!!pendingApp);
 
-          // Check for pending club registration
           const { data: pendingClub } = await supabase
             .from('clubs')
             .select('id')
-            .eq('registered_by_user_id', session.user.id)
+            .eq('registered_by_user_id', validatedUser.id)
             .eq('approval_status', 'pending_approval')
             .limit(1)
             .maybeSingle();
 
           setHasPendingClubApplication(!!pendingClub);
 
-          // CRITICAL: Load user clubs on initial auth (pass user ID explicitly)
-          await refreshUserClubs(session.user.id);
+          // Check for cancelled memberships - only show renewal gate if ALL memberships are cancelled
+          // and there are no active ones
+          const { data: cancelledData } = await supabase
+            .from('members')
+            .select('club_id, club, cancelled_at, cancelled_reason, previous_membership_level')
+            .eq('user_id', validatedUser.id)
+            .eq('membership_status', 'cancelled');
+
+          const { data: activeMemberData } = await supabase
+            .from('members')
+            .select('id')
+            .eq('user_id', validatedUser.id)
+            .in('membership_status', ['active', 'expired'])
+            .limit(1)
+            .maybeSingle();
+
+          const hasCancelled = (cancelledData || []).length > 0 && !activeMemberData;
+          setHasCancelledMembership(hasCancelled);
+          if (hasCancelled && cancelledData) {
+            setCancelledMemberships(cancelledData.map((m: any) => ({
+              club_id: m.club_id,
+              club_name: m.club,
+              cancelled_at: m.cancelled_at,
+              cancelled_reason: m.cancelled_reason,
+              previous_membership_level: m.previous_membership_level
+            })));
+          } else {
+            setCancelledMemberships([]);
+          }
+
+          if (!hasCancelled) {
+            const { data: unfinancialData } = await supabase
+              .from('members')
+              .select('id, club_id, club, membership_level, is_financial, renewal_date, date_joined')
+              .eq('user_id', validatedUser.id)
+              .eq('is_financial', false)
+              .in('membership_status', ['active', 'expired'])
+              .limit(1)
+              .maybeSingle();
+
+            const { data: userRoleData } = await supabase
+              .from('user_clubs')
+              .select('role')
+              .eq('user_id', validatedUser.id)
+              .in('role', ['admin', 'editor', 'super_admin', 'state_admin', 'national_admin']);
+
+            const isAdminUser = (userRoleData || []).length > 0 || validatedUser.user_metadata?.is_super_admin === true;
+
+            if (unfinancialData && !isAdminUser) {
+              const hasRecentJoin = unfinancialData.date_joined &&
+                (new Date().getTime() - new Date(unfinancialData.date_joined).getTime()) < 30 * 24 * 60 * 60 * 1000;
+
+              setHasUnfinancialMember(true);
+              setUnfinancialMemberData({
+                member_id: unfinancialData.id,
+                club_id: unfinancialData.club_id,
+                club_name: unfinancialData.club || 'Your Club',
+                membership_level: unfinancialData.membership_level,
+                is_new_member: !!hasRecentJoin,
+                renewal_date: unfinancialData.renewal_date,
+                date_joined: unfinancialData.date_joined,
+              });
+            } else {
+              setHasUnfinancialMember(false);
+              setUnfinancialMemberData(null);
+            }
+          } else {
+            setHasUnfinancialMember(false);
+            setUnfinancialMemberData(null);
+          }
+
+          await refreshUserClubs(validatedUser.id);
 
           // Restore currentOrganization from localStorage if exists
           try {
@@ -496,16 +577,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           clearTimeout(loadingTimeout);
           setLoading(false);
         } else if (mounted) {
-          currentUserIdRef.current = null; // Clear ref when no session
+          currentUserIdRef.current = null;
           setUser(null);
           setOnboardingCompleted(false);
+          setHasCancelledMembership(false);
+          setCancelledMemberships([]);
+          setHasUnfinancialMember(false);
+          setUnfinancialMemberData(null);
           clearTimeout(loadingTimeout);
           setLoading(false);
         }
 
         // Set up auth state listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
+          (event, session) => {
             console.log('Auth state changed:', event, session?.user?.email);
 
             if (event === 'TOKEN_REFRESHED') {
@@ -521,11 +606,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return;
             }
 
-            // Handle signed out events
             if (event === 'SIGNED_OUT') {
               console.log('User signed out, clearing state');
               if (mounted) {
-                currentUserIdRef.current = null; // Clear ref
+                currentUserIdRef.current = null;
                 setUser(null);
                 setUserClubs([]);
                 setCurrentClub(null);
@@ -540,83 +624,150 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               return;
             }
 
-            // CRITICAL: Ignore SIGNED_IN events if user is already authenticated
-            // Use ref instead of state to avoid async state update issues
             if (event === 'SIGNED_IN' && currentUserIdRef.current === session?.user?.id) {
               console.log('SIGNED_IN event for already authenticated user - ignoring');
               return;
             }
 
-            if (mounted && session?.user) {
-              // Extract first name and last name from user metadata
-              const firstName = session.user.user_metadata?.first_name;
-              const lastName = session.user.user_metadata?.last_name;
+            (async () => {
+              if (mounted && session?.user) {
+                const firstName = session.user.user_metadata?.first_name;
+                const lastName = session.user.user_metadata?.last_name;
 
-              // Create enhanced user object with first and last name
-              const enhancedUser: AuthUser = {
-                ...session.user,
-                firstName,
-                lastName
-              };
+                const enhancedUser: AuthUser = {
+                  ...session.user,
+                  firstName,
+                  lastName
+                };
 
-              const prevUserId = currentUserIdRef.current;
-              currentUserIdRef.current = session.user.id;
+                const prevUserId = currentUserIdRef.current;
+                currentUserIdRef.current = session.user.id;
 
-              if (prevUserId && prevUserId !== session.user.id) {
+                if (prevUserId && prevUserId !== session.user.id) {
+                  localStorage.removeItem('currentClubId');
+                  localStorage.removeItem('currentOrganization');
+                }
+
+                setUser(enhancedUser);
+
+                const { data: profileData } = await supabase
+                  .from('profiles')
+                  .select('onboarding_completed')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+
+                setOnboardingCompleted(profileData?.onboarding_completed || false);
+
+                const { data: pendingApp } = await supabase
+                  .from('membership_applications')
+                  .select('id, status')
+                  .eq('user_id', session.user.id)
+                  .eq('is_draft', false)
+                  .eq('status', 'pending')
+                  .limit(1)
+                  .maybeSingle();
+
+                setHasPendingApplication(!!pendingApp);
+
+                const { data: pendingClub } = await supabase
+                  .from('clubs')
+                  .select('id')
+                  .eq('registered_by_user_id', session.user.id)
+                  .eq('approval_status', 'pending_approval')
+                  .limit(1)
+                  .maybeSingle();
+
+                setHasPendingClubApplication(!!pendingClub);
+
+                const { data: cancelledData2 } = await supabase
+                  .from('members')
+                  .select('club_id, club, cancelled_at, cancelled_reason, previous_membership_level')
+                  .eq('user_id', session.user.id)
+                  .eq('membership_status', 'cancelled');
+
+                const { data: activeMemberData2 } = await supabase
+                  .from('members')
+                  .select('id')
+                  .eq('user_id', session.user.id)
+                  .in('membership_status', ['active', 'expired'])
+                  .limit(1)
+                  .maybeSingle();
+
+                const hasCancelled2 = (cancelledData2 || []).length > 0 && !activeMemberData2;
+                setHasCancelledMembership(hasCancelled2);
+                if (hasCancelled2 && cancelledData2) {
+                  setCancelledMemberships(cancelledData2.map((m: any) => ({
+                    club_id: m.club_id,
+                    club_name: m.club,
+                    cancelled_at: m.cancelled_at,
+                    cancelled_reason: m.cancelled_reason,
+                    previous_membership_level: m.previous_membership_level
+                  })));
+                } else {
+                  setCancelledMemberships([]);
+                }
+
+                if (!hasCancelled2) {
+                  const { data: unfinData2 } = await supabase
+                    .from('members')
+                    .select('id, club_id, club, membership_level, is_financial, renewal_date, date_joined')
+                    .eq('user_id', session.user.id)
+                    .eq('is_financial', false)
+                    .in('membership_status', ['active', 'expired'])
+                    .limit(1)
+                    .maybeSingle();
+
+                  const { data: roleData2 } = await supabase
+                    .from('user_clubs')
+                    .select('role')
+                    .eq('user_id', session.user.id)
+                    .in('role', ['admin', 'editor', 'super_admin', 'state_admin', 'national_admin']);
+
+                  const isAdmin2 = (roleData2 || []).length > 0 || session.user.user_metadata?.is_super_admin === true;
+
+                  if (unfinData2 && !isAdmin2) {
+                    const recentJoin2 = unfinData2.date_joined &&
+                      (new Date().getTime() - new Date(unfinData2.date_joined).getTime()) < 30 * 24 * 60 * 60 * 1000;
+
+                    setHasUnfinancialMember(true);
+                    setUnfinancialMemberData({
+                      member_id: unfinData2.id,
+                      club_id: unfinData2.club_id,
+                      club_name: unfinData2.club || 'Your Club',
+                      membership_level: unfinData2.membership_level,
+                      is_new_member: !!recentJoin2,
+                      renewal_date: unfinData2.renewal_date,
+                      date_joined: unfinData2.date_joined,
+                    });
+                  } else {
+                    setHasUnfinancialMember(false);
+                    setUnfinancialMemberData(null);
+                  }
+                } else {
+                  setHasUnfinancialMember(false);
+                  setUnfinancialMemberData(null);
+                }
+
+                await refreshUserClubs(session.user.id);
+              } else if (mounted) {
+                currentUserIdRef.current = null;
+                setUser(null);
+                setUserClubs([]);
+                setCurrentClub(null);
+                setIsSuperAdmin(false);
+                setIsNationalOrgAdmin(false);
+                setIsStateOrgAdmin(false);
+                setUserSubscription(null);
+                setOnboardingCompleted(false);
+                setHasPendingApplication(false);
+                setHasPendingClubApplication(false);
+                setHasCancelledMembership(false);
+                setCancelledMemberships([]);
+                setHasUnfinancialMember(false);
+                setUnfinancialMemberData(null);
                 localStorage.removeItem('currentClubId');
-                localStorage.removeItem('currentOrganization');
               }
-
-              setUser(enhancedUser);
-
-              // Check onboarding status
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('onboarding_completed')
-                .eq('id', session.user.id)
-                .maybeSingle();
-
-              setOnboardingCompleted(profileData?.onboarding_completed || false);
-
-              // Check for pending membership application
-              const { data: pendingApp } = await supabase
-                .from('membership_applications')
-                .select('id, status')
-                .eq('user_id', session.user.id)
-                .eq('is_draft', false)
-                .eq('status', 'pending')
-                .limit(1)
-                .maybeSingle();
-
-              setHasPendingApplication(!!pendingApp);
-
-              // Check for pending club registration
-              const { data: pendingClub } = await supabase
-                .from('clubs')
-                .select('id')
-                .eq('registered_by_user_id', session.user.id)
-                .eq('approval_status', 'pending_approval')
-                .limit(1)
-                .maybeSingle();
-
-              setHasPendingClubApplication(!!pendingClub);
-
-              // Refresh clubs with explicit user ID
-              await refreshUserClubs(session.user.id);
-            } else if (mounted) {
-              currentUserIdRef.current = null; // Clear ref when no session
-              setUser(null);
-              setUserClubs([]);
-              setCurrentClub(null);
-              setIsSuperAdmin(false);
-              setIsNationalOrgAdmin(false);
-              setIsStateOrgAdmin(false);
-              setUserSubscription(null);
-              setOnboardingCompleted(false);
-              setHasPendingApplication(false);
-              setHasPendingClubApplication(false);
-              localStorage.removeItem('currentClubId');
-            }
+            })();
           }
         );
 
@@ -663,22 +814,119 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Note: Proactive session refresh is handled by Supabase's autoRefreshToken
   // and the health check in supabase.ts - no need for duplicate logic here
 
+  useEffect(() => {
+    if (!user) return;
+    const updateLastSeen = async () => {
+      try { await supabase.rpc('update_user_last_seen'); } catch {}
+    };
+    updateLastSeen();
+    const interval = setInterval(updateLastSeen, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkImpersonatedAssociationRoles = async () => {
+      try {
+        const stored = sessionStorage.getItem('impersonation_session');
+        if (!stored) {
+          if (mounted) setImpersonatedAssociationRoles({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+          return;
+        }
+        const imp = JSON.parse(stored);
+        const targetUserId = imp?.targetUserId;
+        if (!targetUserId) {
+          if (mounted) setImpersonatedAssociationRoles({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+          return;
+        }
+
+        const [nationalResult, stateResult] = await Promise.all([
+          supabase
+            .from('user_national_associations')
+            .select('role')
+            .eq('user_id', targetUserId)
+            .eq('role', 'national_admin')
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('user_state_associations')
+            .select('role')
+            .eq('user_id', targetUserId)
+            .eq('role', 'state_admin')
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        if (mounted) {
+          setImpersonatedAssociationRoles({
+            isNationalOrgAdmin: nationalResult.data?.role === 'national_admin',
+            isStateOrgAdmin: stateResult.data?.role === 'state_admin',
+          });
+        }
+      } catch {
+        if (mounted) setImpersonatedAssociationRoles({ isNationalOrgAdmin: false, isStateOrgAdmin: false });
+      }
+    };
+
+    checkImpersonatedAssociationRoles();
+    return () => { mounted = false; };
+  }, []);
+
+  const impersonationOverrides = React.useMemo(() => {
+    try {
+      const stored = sessionStorage.getItem('impersonation_session');
+      if (!stored) return null;
+      const imp = JSON.parse(stored);
+      if (!imp || !imp.targetMemberId) return null;
+
+      const targetClubs: UserClub[] = (imp.targetClubs || []).map((tc: any) => ({
+        id: `imp_${tc.club_id}`,
+        clubId: tc.club_id,
+        role: tc.role || 'member',
+        club: {
+          id: tc.club_id,
+          name: tc.club_name,
+          abbreviation: tc.club_abbreviation,
+          logo: tc.club_logo,
+        },
+      }));
+
+      const defaultClubId = imp.targetDefaultClubId;
+      const targetCurrentClub = targetClubs.find(c => c.clubId === defaultClubId) || targetClubs[0] || null;
+
+      return {
+        userClubs: targetClubs,
+        currentClub: targetCurrentClub,
+        isSuperAdmin: imp.targetIsSuperAdmin === true,
+        isNationalOrgAdmin: impersonatedAssociationRoles.isNationalOrgAdmin,
+        isStateOrgAdmin: impersonatedAssociationRoles.isStateOrgAdmin,
+        onboardingCompleted: imp.targetOnboardingCompleted !== false,
+      };
+    } catch {
+      return null;
+    }
+  }, [impersonatedAssociationRoles]);
+
   const value = {
     user,
-    userClubs,
-    currentClub,
-    currentOrganization,
+    userClubs: impersonationOverrides?.userClubs ?? userClubs,
+    currentClub: impersonationOverrides?.currentClub ?? currentClub,
+    currentOrganization: impersonationOverrides ? null : currentOrganization,
     loading,
     clubsLoaded,
     isLoggingOut,
     isSwitchingClub,
-    isSuperAdmin,
-    isNationalOrgAdmin,
-    isStateOrgAdmin,
+    isSuperAdmin: impersonationOverrides?.isSuperAdmin ?? isSuperAdmin,
+    isNationalOrgAdmin: impersonationOverrides?.isNationalOrgAdmin ?? isNationalOrgAdmin,
+    isStateOrgAdmin: impersonationOverrides?.isStateOrgAdmin ?? isStateOrgAdmin,
     userSubscription,
-    onboardingCompleted,
+    onboardingCompleted: impersonationOverrides?.onboardingCompleted ?? onboardingCompleted,
     hasPendingApplication,
     hasPendingClubApplication,
+    hasCancelledMembership,
+    cancelledMemberships,
+    hasUnfinancialMember,
+    unfinancialMemberData,
     signOut,
     refreshUserClubs,
     setCurrentClub: handleSetCurrentClub,

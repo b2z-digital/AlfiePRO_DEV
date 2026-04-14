@@ -987,14 +987,41 @@ export const EventWidgetRenderer: React.FC<Props> = ({ widget, websiteId, darkMo
         </div>
       );
 
-    case 'video-player':
+    case 'video-player': {
+      const cfCode = widget.settings?.cloudflare_customer_code;
+      const cfInputId = widget.settings?.cloudflare_live_input_id;
+      const youtubeUrl = widget.settings?.youtube_url;
+      const youtubeId = youtubeUrl ? (youtubeUrl.match(/(?:youtu\.be\/|v=|embed\/)([a-zA-Z0-9_-]{11})/) || [])[1] : null;
+      const hasCfStream = cfCode && cfInputId;
+
       return (
-        <div className={`p-6 rounded-lg ${darkMode ? 'bg-slate-800' : 'bg-white'} border ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-          <div className={`aspect-video rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-100'} flex items-center justify-center`}>
-            <Video className={`w-16 h-16 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+        <div className="rounded-lg overflow-hidden">
+          <div className="relative aspect-video bg-black">
+            {hasCfStream ? (
+              <iframe
+                src={`https://customer-${cfCode}.cloudflarestream.com/${cfInputId}/iframe?autoplay=true&muted=true&preload=auto&letterboxColor=000000`}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                style={{ border: 'none' }}
+              />
+            ) : youtubeId ? (
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=0&controls=1&modestbranding=1&rel=0`}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                style={{ border: 'none' }}
+              />
+            ) : (
+              <div className={`absolute inset-0 flex items-center justify-center ${darkMode ? 'bg-slate-700' : 'bg-slate-100'}`}>
+                <Video className={`w-16 h-16 ${darkMode ? 'text-slate-600' : 'text-slate-300'}`} />
+              </div>
+            )}
           </div>
         </div>
       );
+    }
 
     case 'weather':
       return (

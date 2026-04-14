@@ -1,0 +1,590 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
+};
+
+interface ActivateRequest {
+  member_ids: string[];
+  club_id: string;
+  club_name: string;
+  app_deep_link_base?: string;
+  bcc_email?: string;
+  test_email_only?: boolean;
+  test_email_recipient?: string;
+  preview_member_email?: string;
+  preview_member_name?: string;
+  activate_on_behalf?: boolean;
+  behalf_email_recipient?: string;
+  resend?: boolean;
+}
+
+interface ActivationResult {
+  member_id: string;
+  email: string;
+  name: string;
+  status: "created" | "existing_linked" | "error" | "no_email";
+  error?: string;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sendGridApiKey = Deno.env.get("SENDGRID_API_KEY");
+    const defaultFromEmail = Deno.env.get("DEFAULT_FROM_EMAIL");
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: callingUser }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !callingUser) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { member_ids, club_id, club_name, app_deep_link_base, bcc_email, test_email_only, test_email_recipient, preview_member_email, preview_member_name, activate_on_behalf, behalf_email_recipient, resend }: ActivateRequest = await req.json();
+
+    if ((!test_email_only && (!member_ids?.length || !club_id || !club_name)) || (test_email_only && (!club_id || !club_name))) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: roleCheck } = await supabase
+      .from("user_clubs")
+      .select("role")
+      .eq("user_id", callingUser.id)
+      .eq("club_id", club_id)
+      .maybeSingle();
+
+    const { data: profileCheck } = await supabase
+      .from("profiles")
+      .select("is_super_admin")
+      .eq("id", callingUser.id)
+      .maybeSingle();
+
+    const isSuperAdmin = profileCheck?.is_super_admin === true;
+    const isClubAdmin = roleCheck && ["admin", "super_admin", "editor"].includes(roleCheck.role);
+
+    if (!isSuperAdmin && !isClubAdmin) {
+      return new Response(
+        JSON.stringify({ error: "Insufficient permissions. Must be a club admin." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: clubInfo } = await supabase
+      .from("clubs")
+      .select("logo")
+      .eq("id", club_id)
+      .maybeSingle();
+
+    const clubLogoUrl = clubInfo?.logo || "";
+
+    if (test_email_only) {
+      const recipientEmail = test_email_recipient || callingUser.email;
+      if (!recipientEmail) {
+        return new Response(
+          JSON.stringify({ error: "No email address for test" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!sendGridApiKey) {
+        return new Response(
+          JSON.stringify({ error: "Email service not configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: appSettings } = await supabase
+        .from("platform_settings")
+        .select("key, value")
+        .eq("category", "mobile_app");
+
+      const platformConfig: Record<string, string> = {};
+      (appSettings || []).forEach((s: { key: string; value: string }) => {
+        platformConfig[s.key] = s.value;
+      });
+
+      const testWebAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
+      const sampleToken = "SAMPLE_TOKEN_FOR_PREVIEW";
+      const memberEmail = preview_member_email || "member@example.com";
+      const memberName = preview_member_name || "New Member";
+      const sampleWebLink = `${testWebAppUrl}/reset-password?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(memberEmail)}`;
+      const sampleDeepLink = app_deep_link_base ? `${app_deep_link_base}/activate?activation=${encodeURIComponent(sampleToken)}&email=${encodeURIComponent(memberEmail)}` : undefined;
+
+      await sendActivationEmail({
+        sendGridApiKey,
+        fromEmail: defaultFromEmail || "noreply@alfiepro.com.au",
+        toEmail: recipientEmail,
+        recipientName: memberName,
+        clubName: club_name,
+        clubLogoUrl,
+        activationDeepLink: sampleDeepLink || "",
+        webActivationLink: sampleWebLink,
+        appStoreUrl: platformConfig["ios_app_store_url"] || "",
+        playStoreUrl: platformConfig["android_play_store_url"] || "",
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, message: `Preview email sent to ${recipientEmail}` }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: appSettings } = await supabase
+      .from("platform_settings")
+      .select("key, value")
+      .eq("category", "mobile_app");
+
+    const platformConfig: Record<string, string> = {};
+    (appSettings || []).forEach((s: { key: string; value: string }) => {
+      platformConfig[s.key] = s.value;
+    });
+
+    const { data: members, error: membersError } = await supabase
+      .from("members")
+      .select("id, first_name, last_name, email, user_id, club_id")
+      .in("id", member_ids)
+      .eq("club_id", club_id);
+
+    if (membersError) {
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch members: ${membersError.message}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const results: ActivationResult[] = [];
+
+    for (const member of members || []) {
+      if (!member.email) {
+        results.push({
+          member_id: member.id,
+          email: "",
+          name: `${member.first_name} ${member.last_name}`,
+          status: "no_email",
+          error: "Member has no email address",
+        });
+        continue;
+      }
+
+      try {
+        if (member.user_id && !resend) {
+          results.push({
+            member_id: member.id,
+            email: member.email,
+            name: `${member.first_name} ${member.last_name}`,
+            status: "existing_linked",
+          });
+          continue;
+        }
+
+        let userId: string;
+
+        if (member.user_id && resend) {
+          userId = member.user_id;
+        } else {
+          const { data: existingUsers } = await supabase.auth.admin.listUsers({
+            page: 1,
+            perPage: 1,
+          });
+
+          let existingUser = null;
+          if (existingUsers?.users) {
+            const { data: searchResult } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("id", (
+                await supabase.rpc("get_user_id_by_email", { p_email: member.email })
+              ).data)
+              .maybeSingle();
+
+            if (searchResult) {
+              existingUser = { id: searchResult.id };
+            }
+          }
+
+          if (existingUser) {
+            userId = existingUser.id;
+          } else {
+            const tempPassword = crypto.randomUUID() + "Aa1!";
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+              email: member.email,
+              password: tempPassword,
+              email_confirm: true,
+              user_metadata: {
+                first_name: member.first_name,
+                last_name: member.last_name,
+                activation_source: "admin_activation",
+              },
+            });
+
+            if (createError) {
+              if (createError.message?.includes("already been registered") ||
+                  createError.message?.includes("already exists")) {
+                const { data: userList } = await supabase.auth.admin.listUsers();
+                const found = userList?.users?.find(
+                  (u: any) => u.email?.toLowerCase() === member.email.toLowerCase()
+                );
+                if (found) {
+                  userId = found.id;
+                } else {
+                  throw new Error(`User exists but could not be found: ${createError.message}`);
+                }
+              } else {
+                throw createError;
+              }
+            } else {
+              userId = newUser.user!.id;
+            }
+          }
+        }
+
+        await supabase
+          .from("members")
+          .update({
+            user_id: userId,
+            activation_status: "pending",
+            activation_sent_at: new Date().toISOString(),
+          })
+          .eq("id", member.id);
+
+        if (!resend) {
+          await supabase
+            .from("user_clubs")
+            .upsert(
+              { user_id: userId, club_id: member.club_id, role: "member" },
+              { onConflict: "user_id,club_id" }
+            );
+
+          const { data: existingProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("id", userId)
+            .maybeSingle();
+
+          if (existingProfile) {
+            await supabase
+              .from("profiles")
+              .update({
+                onboarding_completed: true,
+                default_club_id: member.club_id,
+                primary_club_id: member.club_id,
+              })
+              .eq("id", userId);
+          }
+        }
+
+        const webAppUrl = (platformConfig.web_app_url || "https://app.alfiepro.com.au").replace(/\/+$/, "");
+
+        const activationToken = crypto.randomUUID() + "-" + crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        await supabase
+          .from("member_activation_tokens")
+          .insert({
+            user_id: userId,
+            email: member.email,
+            token: activationToken,
+            expires_at: expiresAt,
+          });
+
+        const webActivationLink = `${webAppUrl}/reset-password?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
+
+        if (sendGridApiKey && defaultFromEmail) {
+          const deepLinkBase = (app_deep_link_base || platformConfig.app_deep_link_base || "alfiepro://").replace(/\/+$/, "");
+          const separator = deepLinkBase.endsWith("://") ? "" : "/";
+          const activationDeepLink = `${deepLinkBase}${separator}activate?activation=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(member.email)}`;
+
+          const appStoreUrl = platformConfig.ios_app_store_url || "";
+          const playStoreUrl = platformConfig.android_play_store_url || "";
+
+          const emailRecipient = (activate_on_behalf && behalf_email_recipient) ? behalf_email_recipient : member.email;
+
+          await sendActivationEmail({
+            sendGridApiKey,
+            fromEmail: defaultFromEmail,
+            toEmail: emailRecipient,
+            recipientName: member.first_name,
+            clubName: club_name,
+            clubLogoUrl,
+            webActivationLink,
+            activationDeepLink,
+            appStoreUrl,
+            playStoreUrl,
+            bccEmail: activate_on_behalf ? undefined : bcc_email,
+          });
+        }
+
+        results.push({
+          member_id: member.id,
+          email: member.email,
+          name: `${member.first_name} ${member.last_name}`,
+          status: "created",
+        });
+      } catch (err: any) {
+        console.error(`Error activating member ${member.id}:`, err);
+        results.push({
+          member_id: member.id,
+          email: member.email || "",
+          name: `${member.first_name} ${member.last_name}`,
+          status: "error",
+          error: err.message || "Unknown error",
+        });
+      }
+    }
+
+    const created = results.filter((r) => r.status === "created").length;
+    const linked = results.filter((r) => r.status === "existing_linked").length;
+    const errors = results.filter((r) => r.status === "error").length;
+    const noEmail = results.filter((r) => r.status === "no_email").length;
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        summary: { created, existing_linked: linked, errors, no_email: noEmail, total: results.length },
+        results,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err: any) {
+    console.error("Activation error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Internal server error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
+
+interface EmailParams {
+  sendGridApiKey: string;
+  fromEmail: string;
+  toEmail: string;
+  recipientName: string;
+  clubName: string;
+  clubLogoUrl: string;
+  activationDeepLink: string;
+  webActivationLink: string;
+  appStoreUrl: string;
+  playStoreUrl: string;
+  bccEmail?: string;
+}
+
+async function sendActivationEmail(params: EmailParams) {
+  const {
+    sendGridApiKey,
+    fromEmail,
+    toEmail,
+    recipientName,
+    clubName,
+    clubLogoUrl,
+    activationDeepLink,
+    webActivationLink,
+    appStoreUrl,
+    playStoreUrl,
+    bccEmail,
+  } = params;
+
+  const hasAppStoreLinks = !!(appStoreUrl || playStoreUrl);
+
+  const logoHtml = clubLogoUrl
+    ? `<img src="${clubLogoUrl}" alt="${clubName}" style="max-width:80px;height:auto;margin:0 0 12px;border-radius:8px;background:rgba(255,255,255,0.15);padding:6px" /><br/>`
+    : '';
+
+  const emailHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:16px 16px 0 0;padding:32px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    ${logoHtml}
+                    <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Welcome to ${clubName}</h1>
+                    <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Your AlfiePRO membership account is ready</p>
+                  </td>
+                  <td align="right" valign="top">
+                    <div style="background:rgba(255,255,255,0.2);border-radius:10px;padding:8px 14px;display:inline-block;">
+                      <span style="color:#ffffff;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Alfie PRO</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background-color:#ffffff;padding:32px 40px;">
+              <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">Hi ${recipientName},</p>
+              <p style="margin:0 0 28px;color:#334155;font-size:15px;line-height:1.6;">
+                <strong>${clubName}</strong> has set up your AlfiePRO account. Click the button below to set your password &mdash; it works on any device, in any browser.
+              </p>
+
+              <!-- PRIMARY: Web activation button -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="border:1px solid #e2e8f0;border-radius:12px;padding:28px;text-align:center;">
+                    <p style="margin:0 0 16px;color:#0f172a;font-size:20px;font-weight:700;">Set Your Password</p>
+                    <table cellpadding="0" cellspacing="0" style="margin:0 auto 14px;">
+                      <tr>
+                        <td style="background:linear-gradient(135deg,#0ea5e9,#0284c7);border-radius:8px;">
+                          <a href="${webActivationLink}" style="display:inline-block;color:#ffffff;padding:14px 48px;text-decoration:none;font-size:16px;font-weight:600;letter-spacing:0.3px;">Activate My Account</a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">Opens in your web browser &mdash; works on any device</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Account Details -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <tr>
+                  <td style="background-color:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;">
+                    <p style="margin:0;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Your Account Details</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;width:35%;">
+                          <span style="color:#64748b;font-size:13px;">Club</span>
+                        </td>
+                        <td style="padding:12px 20px;border-bottom:1px solid #f1f5f9;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:600;">${clubName}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#64748b;font-size:13px;">Email / Username</span>
+                        </td>
+                        <td style="padding:12px 20px;">
+                          <span style="color:#0f172a;font-size:13px;font-weight:500;">${toEmail}</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- SECONDARY: Mobile app section -->
+              ${hasAppStoreLinks || activationDeepLink ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;border-left:4px solid #0ea5e9;">
+                    <p style="margin:0 0 6px;color:#334155;font-size:13px;font-weight:600;">Prefer the mobile app?</p>
+                    <p style="margin:0 0 ${hasAppStoreLinks ? "14px" : "0"};color:#64748b;font-size:13px;line-height:1.5;">
+                      Once you've set your password above, download AlfiePRO and sign in with <strong>${toEmail}</strong>.
+                      ${activationDeepLink ? `Or tap the button below to open directly in the app (only works if the app is already installed on this device).` : ""}
+                    </p>
+                    ${hasAppStoreLinks ? `
+                    <table cellpadding="0" cellspacing="0" style="margin-bottom:${activationDeepLink ? "12px" : "0"};">
+                      <tr>
+                        ${appStoreUrl ? `<td style="padding:0 6px 0 0;"><a href="${appStoreUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;padding:8px 16px;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">App Store</a></td>` : ""}
+                        ${playStoreUrl ? `<td style="padding:0 6px 0 0;"><a href="${playStoreUrl}" style="display:inline-block;background:#0f172a;color:#ffffff;padding:8px 16px;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">Google Play</a></td>` : ""}
+                      </tr>
+                    </table>` : ""}
+                    ${activationDeepLink ? `
+                    <table cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="border:1px solid #cbd5e1;border-radius:6px;">
+                          <a href="${activationDeepLink}" style="display:inline-block;color:#475569;padding:8px 16px;text-decoration:none;font-size:12px;font-weight:600;">Open in AlfiePRO App</a>
+                        </td>
+                      </tr>
+                    </table>` : ""}
+                  </td>
+                </tr>
+              </table>
+              ` : ""}
+
+              <p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;text-align:center;">
+                This activation was sent on behalf of ${clubName}. If you did not expect this email, you can safely ignore it.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;">
+              <p style="margin:0;color:#94a3b8;font-size:12px;">
+                Powered by <strong style="color:#0ea5e9;">AlfiePRO</strong> &mdash; RC Yacht Club Management Platform
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const personalization: Record<string, unknown> = {
+    to: [{ email: toEmail, name: recipientName }],
+    subject: `Welcome to ${clubName} on AlfiePRO`,
+  };
+  if (bccEmail) {
+    personalization.bcc = [{ email: bccEmail }];
+  }
+
+  const emailData = {
+    personalizations: [personalization],
+    from: { email: fromEmail, name: clubName },
+    content: [
+      {
+        type: "text/html",
+        value: emailHtml,
+      },
+    ],
+  };
+
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${sendGridApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(emailData),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("SendGrid error:", response.status, errorText);
+    throw new Error(`Email send failed: ${response.status}`);
+  }
+}

@@ -74,6 +74,13 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [categories, setCategories] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<any[]>([]);
+  const [taxEnabled, setTaxEnabled] = useState(false);
+
+  // Quick add category
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryType, setNewCategoryType] = useState<'income' | 'expense'>('income');
+  const [savingCategory, setSavingCategory] = useState(false);
 
   useEffect(() => {
     if (isAssociation || currentClub?.clubId) {
@@ -155,10 +162,11 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
       setCategories(categoriesData || []);
 
       // Load tax rates
-      let taxRatesData = [];
+      let taxRatesData: any[] = [];
       let taxRatesError = null;
 
       if (isAssociation) {
+        setTaxEnabled(true);
         const { data, error } = await supabase
           .from('association_tax_rates')
           .select('*')
@@ -166,27 +174,79 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           .eq('association_type', associationType)
           .eq('is_active', true)
           .order('name');
-        taxRatesData = data;
+        taxRatesData = data || [];
         taxRatesError = error;
       } else {
-        const { data, error } = await supabase
-          .from('tax_rates')
-          .select('*')
-          .eq('club_id', currentClub?.clubId)
-          .eq('is_active', true)
-          .order('name');
-        taxRatesData = data;
-        taxRatesError = error;
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('tax_enabled')
+          .eq('id', currentClub?.clubId)
+          .maybeSingle();
+
+        const isTaxEnabled = clubData?.tax_enabled || false;
+        setTaxEnabled(isTaxEnabled);
+
+        if (isTaxEnabled) {
+          const { data, error } = await supabase
+            .from('tax_rates')
+            .select('*')
+            .eq('club_id', currentClub?.clubId)
+            .eq('is_active', true)
+            .order('name');
+          taxRatesData = data || [];
+          taxRatesError = error;
+        }
       }
 
       if (taxRatesError) throw taxRatesError;
-      setTaxRates(taxRatesData || []);
+      setTaxRates(taxRatesData);
 
     } catch (err) {
       console.error('Error loading initial data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load initial data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuickAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setSavingCategory(true);
+    try {
+      if (isAssociation) {
+        const { data, error: insertError } = await supabase
+          .from('association_budget_categories')
+          .insert({
+            association_id: associationId,
+            association_type: associationType,
+            name: newCategoryName.trim(),
+            type: newCategoryType,
+            is_active: true
+          })
+          .select('id, name, type')
+          .single();
+        if (insertError) throw insertError;
+        if (data) setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('budget_categories')
+          .insert({
+            club_id: currentClub?.clubId,
+            name: newCategoryName.trim(),
+            type: newCategoryType,
+            is_active: true
+          })
+          .select('id, name, type')
+          .single();
+        if (insertError) throw insertError;
+        if (data) setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      setNewCategoryName('');
+      setShowAddCategory(false);
+    } catch (err) {
+      console.error('Error creating category:', err);
+    } finally {
+      setSavingCategory(false);
     }
   };
 
@@ -708,7 +768,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           yPos = 20;
         }
 
-        const gstLabel = invoice.tax_amount > 0 ? 'GST' : '-';
+        const gstLabel = invoice.tax_amount > 0 ? 'Tax' : '-';
 
         doc.text(item.description, colX.description, yPos);
         doc.text(String(item.quantity), colX.quantity, yPos);
@@ -900,16 +960,16 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
             <h3 className="text-lg font-semibold text-white mb-4">Line Items</h3>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 text-sm font-medium text-slate-400">
+              <div className={`grid gap-4 text-sm font-medium text-slate-400 ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                 <div className="col-span-3">Description</div>
                 <div className="col-span-2">Amount</div>
                 <div className="col-span-3">Category</div>
-                <div className="col-span-3">Tax</div>
+                {taxEnabled && <div className="col-span-3">Tax</div>}
                 <div className="col-span-1">Actions</div>
               </div>
 
               {lineItems.map((item, index) => (
-                <div key={item.id} className="grid grid-cols-12 gap-4 items-start">
+                <div key={item.id} className={`grid gap-4 items-start ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                   <div className="col-span-3">
                     <input
                       type="text"
@@ -939,7 +999,14 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
                   <div className="col-span-3">
                     <select
                       value={item.category}
-                      onChange={(e) => updateLineItem(item.id, 'category', e.target.value)}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          e.target.value = item.category;
+                          setShowAddCategory(true);
+                          return;
+                        }
+                        updateLineItem(item.id, 'category', e.target.value);
+                      }}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                     >
                       <option value="">Select category</option>
@@ -948,28 +1015,31 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
                           {category.name}
                         </option>
                       ))}
+                      <option value="__add_new__">+ Add a Category...</option>
                     </select>
                   </div>
 
-                  <div className="col-span-3">
-                    <select
-                      value={item.tax_type}
-                      onChange={(e) => updateLineItem(item.id, 'tax_type', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                    >
-                      <option value="none">No Tax</option>
-                      {taxRates.map(rate => (
-                        <optgroup key={rate.id} label={rate.name}>
-                          <option value="included">
-                            Tax Included
-                          </option>
-                          <option value="excluded">
-                            Tax Excluded
-                          </option>
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                  {taxEnabled && (
+                    <div className="col-span-3">
+                      <select
+                        value={item.tax_type}
+                        onChange={(e) => updateLineItem(item.id, 'tax_type', e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                      >
+                        <option value="none">No Tax</option>
+                        {taxRates.map(rate => (
+                          <optgroup key={rate.id} label={rate.name}>
+                            <option value="included">
+                              Tax Included
+                            </option>
+                            <option value="excluded">
+                              Tax Excluded
+                            </option>
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="col-span-1">
                     {lineItems.length > 1 && (
@@ -1022,15 +1092,19 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
-              <div className="flex justify-between text-slate-300">
-                <span>Sub Total</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Tax</span>
-                <span>${taxAmount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold text-white border-t border-slate-600 pt-2">
+              {taxEnabled && (
+                <>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Sub Total</span>
+                    <span>${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Tax</span>
+                    <span>${taxAmount.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              <div className={`flex justify-between text-xl font-bold text-white ${taxEnabled ? 'border-t border-slate-600 pt-2' : ''}`}>
                 <span>TOTAL</span>
                 <span>${total.toFixed(2)} AUD</span>
               </div>
@@ -1045,7 +1119,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowEmailModal(true)}
-                    className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors"
                   >
                     <Send className="w-4 h-4" />
                     Send Email
@@ -1072,7 +1146,7 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="btn-primary-green px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
               >
                 {loading ? 'Saving...' : (editingInvoice ? 'Update Invoice' : 'Save Invoice')}
               </button>
@@ -1089,6 +1163,65 @@ export const InvoiceCreationPage: React.FC<InvoiceCreationPageProps> = ({
           onClose={() => setShowEmailModal(false)}
           darkMode={darkMode}
         />
+      )}
+
+      {showAddCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Add Category</h3>
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm mb-4"
+              placeholder="Category name"
+              autoFocus
+            />
+            <div className="mb-4">
+              <label className="block text-sm text-slate-400 mb-2">Category Type</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setNewCategoryType('income')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    newCategoryType === 'income'
+                      ? 'bg-green-600/20 text-green-400 border border-green-500/50'
+                      : 'bg-slate-700 text-slate-400 border border-slate-600 hover:border-slate-500'
+                  }`}
+                >
+                  Income
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewCategoryType('expense')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    newCategoryType === 'expense'
+                      ? 'bg-red-600/20 text-red-400 border border-red-500/50'
+                      : 'bg-slate-700 text-slate-400 border border-slate-600 hover:border-slate-500'
+                  }`}
+                >
+                  Expense
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                className="px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleQuickAddCategory}
+                disabled={savingCategory || !newCategoryName.trim()}
+                className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                {savingCategory ? 'Adding...' : 'Add Category'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

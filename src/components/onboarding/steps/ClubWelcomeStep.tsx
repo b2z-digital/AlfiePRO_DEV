@@ -21,7 +21,7 @@ export const ClubWelcomeStep: React.FC<ClubWelcomeStepProps> = ({ onNext, onBack
 
       <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-6 mb-8">
         <div className="flex items-center justify-center gap-3 mb-2">
-          <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center">
             <span className="text-white font-bold text-sm">30</span>
           </div>
           <h3 className="text-xl font-semibold text-white">
@@ -122,7 +122,7 @@ export const ClubWelcomeStep: React.FC<ClubWelcomeStepProps> = ({ onNext, onBack
           )}
           <button
             onClick={onNext}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+            className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg"
           >
             Let's Get Started
             <ArrowRight className="w-5 h-5" />

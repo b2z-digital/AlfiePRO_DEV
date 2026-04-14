@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, TrendingUp, CheckCircle, Download, RefreshCw, BarChart3, DollarSign, Check, X, CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
+import { Globe, TrendingUp, CircleCheck as CheckCircle, Download, RefreshCw, ChartBar as BarChart3, DollarSign, Check, X, SquareCheck as CheckSquare, Square, Plus, Receipt, ChevronDown, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { AssociationPaymentReconciliationModal } from './AssociationPaymentReconciliationModal';
 import {
@@ -338,7 +338,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
           <div className="flex items-start justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+                <div className="p-3 rounded-xl bg-gradient-to-br">
                   <DollarSign className="text-white" size={28} />
                 </div>
                 <div>
@@ -576,7 +576,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
                       <div className="mt-3">
                         <div className="h-2 rounded-full bg-slate-600 overflow-hidden">
                           <div
-                            className="h-full bg-green-500 transition-all duration-300"
+                            className="h-full transition-all duration-300"
                             style={{
                               width: `${state.totalOwed > 0 ? (state.totalPaid / state.totalOwed) * 100 : 0}%`
                             }}
@@ -610,7 +610,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
                       <button
                         onClick={handleBulkMarkPaid}
                         disabled={bulkActionInProgress}
-                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn-primary-green px-4 py-2 rounded-lg text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Check size={18} />
                         Mark Paid
@@ -709,7 +709,7 @@ export const NationalRemittanceDashboard: React.FC<NationalRemittanceDashboardPr
                               {isPending && (
                                 <button
                                   onClick={() => handleMarkPaid(remittance.id)}
-                                  className="px-3 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+                                  className="btn-primary-green px-3 py-1 rounded-lg text-white text-xs font-medium transition-colors"
                                 >
                                   Mark Paid
                                 </button>

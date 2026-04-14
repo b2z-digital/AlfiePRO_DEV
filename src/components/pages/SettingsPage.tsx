@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, User, Building, Users, Shield, Mail, Phone, Save, AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap } from 'lucide-react';
+import { Settings, User, Building, Users, Shield, Mail, Phone, Save, TriangleAlert as AlertTriangle, Check, Globe, CreditCard, Upload, Trash2, Sun, Moon, FileText, Download, Smartphone, Sailboat, Percent, Tag, Receipt, DollarSign, Calendar, BookOpen, ScrollText, LayoutGrid, Megaphone, ChevronDown, Zap, Landmark } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { updateUserProfile } from '../../utils/auth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { ClubSettings } from './ClubSettings';
@@ -35,12 +36,14 @@ interface SettingsPageProps {
 }
 
 type SettingsTab = 'profile' | 'club' | 'yacht-classes' | 'association' | 'association-fees' | 'association-users' | 'club-features' | 'team' | 'subscriptions' | 'integrations' |
-  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' |
-  'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' | 'membership-payment' |
+  'finance-tax' | 'finance-categories' | 'finance-documents' | 'finance-payment' | 'finance-payment-settings' | 'finance-opening-balance' |
+  'membership-types' | 'membership-renewals' | 'membership-emails' | 'membership-conduct' |
   'race-documents' | 'import-export' | 'dashboard-templates' | 'advertising' | 'start-system';
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { can } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
@@ -56,6 +59,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<'active' | 'expired' | 'none'>('none');
+  const fromSetupChecklist = location.state?.fromSetupChecklist === true;
   const [renewalDate, setRenewalDate] = useState<string | null>(null);
   const [showMembershipModal, setShowMembershipModal] = useState(false);
   const { addNotification } = useNotifications();
@@ -194,7 +198,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
         .from('members')
         .select('is_financial, renewal_date')
         .eq('club_id', currentClub?.clubId)
-        .eq('user_id', user?.id)
+        .eq('user_id', effectiveUserId)
         .limit(1)
         .maybeSingle();
       
@@ -376,6 +380,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
       console.error('Error installing PWA:', error);
       addNotification('Failed to install app', 'error');
     }
+  };
+
+  const handleSetupSaveComplete = () => {
+    navigate('/', { state: { fromSetupChecklist: true } });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -938,7 +946,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                   </div>
                 </button>
 
-                {/* Association Fees Card */}
+                {/* Bank Details Card */}
                 <button
                   onClick={() => setActiveTab('finance-payment')}
                   className={`
@@ -952,12 +960,62 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-amber-50' : 'bg-amber-500/20'}`}>
-                      <DollarSign size={20} className="text-amber-400" />
+                      <Landmark size={20} className="text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Association Fees</h3>
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Bank Details</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Set membership fees and payment methods
+                        Set bank name, BSB, and account number for payments
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Payment Settings Card */}
+                <button
+                  onClick={() => setActiveTab('finance-payment-settings')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'finance-payment-settings'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-green-50' : 'bg-green-500/20'}`}>
+                      <CreditCard size={20} className="text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Settings</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Configure Stripe and membership payment integration
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Opening Balance Card */}
+                <button
+                  onClick={() => setActiveTab('finance-opening-balance')}
+                  className={`
+                    group p-6 rounded-xl text-left transition-all border
+                    ${activeTab === 'finance-opening-balance'
+                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                      : lightMode
+                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
+                  `}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-lg transition-colors ${lightMode ? 'bg-blue-50' : 'bg-blue-500/20'}`}>
+                      <Landmark size={20} className="text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Opening Balance</h3>
+                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
+                        Set your starting bank balance for accurate reporting
                       </p>
                     </div>
                   </div>
@@ -1097,36 +1155,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
                       <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Code of Conduct</h3>
                       <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
                         Define club rules and conduct policies
-                      </p>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Payment Settings Card */}
-                <button
-                  onClick={() => setActiveTab('membership-payment')}
-                  className={`
-                    group p-6 rounded-xl text-left transition-all border
-                    ${activeTab === 'membership-payment'
-                      ? 'bg-slate-800/90 border-blue-500/50 shadow-lg shadow-blue-500/10'
-                      : lightMode
-                        ? 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 hover:border-slate-600'}
-                  `}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`
-                      p-3 rounded-lg transition-colors
-                      ${activeTab === 'membership-payment'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-slate-700 text-slate-400 group-hover:bg-slate-600'}
-                    `}>
-                      <CreditCard size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-semibold mb-1 ${lightMode ? 'text-gray-900' : 'text-white'}`}>Payment Information</h3>
-                      <p className={`text-sm leading-relaxed ${lightMode ? 'text-gray-600' : 'text-slate-400'}`}>
-                        Configure payment details for invoices
                       </p>
                     </div>
                   </div>
@@ -1728,7 +1756,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'team' && (
-            <CommitteeManagement darkMode={darkMode} />
+            <CommitteeManagement darkMode={darkMode} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'dashboard-templates' && (
@@ -1752,7 +1780,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-categories' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="categories" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'finance-documents' && (
@@ -1760,27 +1788,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ darkMode }) => {
           )}
 
           {activeTab === 'finance-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+          )}
+
+          {activeTab === 'finance-payment-settings' && (
+            <FinanceSettingsPage darkMode={darkMode} initialTab="membership" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
+          )}
+
+          {activeTab === 'finance-opening-balance' && (
+            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="opening-balance" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'membership-types' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="types" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="types" onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'membership-renewals' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="renewals" onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'membership-emails' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="emails" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="emails" />
           )}
 
           {activeTab === 'membership-conduct' && (
-            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
-          )}
-
-          {activeTab === 'membership-payment' && (
-            <FinanceSettingsPage darkMode={darkMode} initialTab="transactions" initialSection="payment" associationId={currentOrganization?.id} associationType={currentOrganization?.type as 'state' | 'national' | undefined} />
+            <MembershipSettingsPage darkMode={darkMode} initialView="conduct" onSaveComplete={fromSetupChecklist ? handleSetupSaveComplete : undefined} />
           )}
 
           {activeTab === 'race-documents' && (

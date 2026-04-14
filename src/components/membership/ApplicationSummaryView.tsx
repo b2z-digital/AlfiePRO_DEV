@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, Award, Anchor, AlertCircle, CreditCard, CheckCircle } from 'lucide-react';
+import { User, MapPin, Award, Anchor, CircleAlert as AlertCircle, CreditCard, CircleCheck as CheckCircle } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 
 interface ApplicationData {
@@ -248,7 +248,7 @@ export const ApplicationSummaryView: React.FC<ApplicationSummaryViewProps> = ({
           <button
             onClick={onApprove}
             disabled={processing}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+            className="btn-primary-green flex-1 flex items-center justify-center gap-2 px-6 py-3 text-white rounded-xl font-semibold transition-all shadow-lg hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
           >
             <CheckCircle size={20} />
             {processing ? 'Processing...' : 'Approve Application'}

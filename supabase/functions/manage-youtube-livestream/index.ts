@@ -245,6 +245,12 @@ Deno.serve(async (req: Request) => {
         return await getVideoMetrics(credentials, sessionData, corsHeaders, context);
       case 'deleteBroadcast':
         return await deleteBroadcast(credentials, { broadcastId, ...sessionData }, corsHeaders, context);
+      case 'createPlaylist':
+        return await createPlaylist(credentials, sessionData, corsHeaders, context);
+      case 'addToPlaylist':
+        return await addToPlaylist(credentials, sessionData, corsHeaders, context);
+      case 'getPlaylist':
+        return await getPlaylist(credentials, sessionData, corsHeaders, context);
       default:
         return new Response(
           JSON.stringify({ error: 'Invalid action' }),
@@ -436,7 +442,17 @@ async function transitionBroadcast(
   );
 
   if (!response.ok) {
-    throw new Error(`YouTube API error: ${JSON.stringify(data)}`);
+    const errorReason = data?.error?.errors?.[0]?.reason || '';
+    const errorMessage = data?.error?.message || JSON.stringify(data);
+    return new Response(
+      JSON.stringify({
+        error: errorMessage,
+        reason: errorReason,
+        code: data?.error?.code || response.status,
+        details: data
+      }),
+      { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   return new Response(
@@ -576,6 +592,128 @@ async function deleteBroadcast(
 
   return new Response(
     JSON.stringify({ success: true, message: 'Broadcast deleted successfully' }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function createPlaylist(
+  credentials: YouTubeCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>,
+  context: Context
+): Promise<Response> {
+  const { title, description } = sessionData;
+
+  const playlistData = {
+    snippet: {
+      title: title,
+      description: description || `Race replays from ${title}`,
+    },
+    status: {
+      privacyStatus: 'public',
+    },
+  };
+
+  const { response, data } = await makeAuthenticatedRequest(
+    'https://www.googleapis.com/youtube/v3/playlists?part=snippet,status',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(playlistData),
+    },
+    credentials,
+    context
+  );
+
+  if (!response.ok) {
+    const errorDetail = data.error?.message || JSON.stringify(data);
+    return new Response(
+      JSON.stringify({ error: `Failed to create playlist: ${errorDetail}`, details: data }),
+      { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  console.log('[YouTube] Playlist created:', data.id, data.snippet?.title);
+
+  return new Response(
+    JSON.stringify({ success: true, playlist: { id: data.id, title: data.snippet?.title } }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function addToPlaylist(
+  credentials: YouTubeCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>,
+  context: Context
+): Promise<Response> {
+  const { playlistId, videoId, position } = sessionData;
+
+  const itemData: any = {
+    snippet: {
+      playlistId: playlistId,
+      resourceId: {
+        kind: 'youtube#video',
+        videoId: videoId,
+      },
+    },
+  };
+
+  if (typeof position === 'number') {
+    itemData.snippet.position = position;
+  }
+
+  const { response, data } = await makeAuthenticatedRequest(
+    'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(itemData),
+    },
+    credentials,
+    context
+  );
+
+  if (!response.ok) {
+    const errorDetail = data.error?.message || JSON.stringify(data);
+    return new Response(
+      JSON.stringify({ error: `Failed to add video to playlist: ${errorDetail}`, details: data }),
+      { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  console.log('[YouTube] Video added to playlist:', playlistId, 'videoId:', videoId);
+
+  return new Response(
+    JSON.stringify({ success: true, playlistItem: data }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function getPlaylist(
+  credentials: YouTubeCredentials,
+  sessionData: any,
+  corsHeaders: Record<string, string>,
+  context: Context
+): Promise<Response> {
+  const { playlistId } = sessionData;
+
+  const { response, data } = await makeAuthenticatedRequest(
+    `https://www.googleapis.com/youtube/v3/playlists?part=snippet,status,contentDetails&id=${playlistId}`,
+    { method: 'GET' },
+    credentials,
+    context
+  );
+
+  if (!response.ok) {
+    return new Response(
+      JSON.stringify({ error: data.error?.message || 'Failed to get playlist' }),
+      { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, playlist: data.items?.[0] || null }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }

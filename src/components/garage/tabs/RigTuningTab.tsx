@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Save, Wind, Waves, Star, Trash2, Copy, FileText, ExternalLink } from 'lucide-react';
+import { Settings, Plus, Save, Wind, Waves, Star, Trash2, Copy, FileText, ExternalLink, Pencil, Check, X } from 'lucide-react';
 import { supabase } from '../../../utils/supabase';
 
 interface RigTuningTabProps {
@@ -81,9 +81,11 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
   const [saving, setSaving] = useState(false);
   const [showNewRigModal, setShowNewRigModal] = useState(false);
   const [newRigName, setNewRigName] = useState('');
-  const [showConfig, setShowConfig] = useState(false);
   const [tuningGuideUrl, setTuningGuideUrl] = useState<string | null>(null);
   const [tuningGuideFileName, setTuningGuideFileName] = useState<string | null>(null);
+  const [editingRigId, setEditingRigId] = useState<string | null>(null);
+  const [editingRigName, setEditingRigName] = useState('');
+  const [deleteRigConfirm, setDeleteRigConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     loadBoatTuningGuide();
@@ -150,8 +152,15 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
       });
 
       setRigs(sortedRigs);
-      if (sortedRigs.length > 0) {
+      if (sortedRigs.length > 0 && !selectedRig) {
         setSelectedRig(sortedRigs[0]);
+      } else if (sortedRigs.length > 0 && selectedRig) {
+        const stillExists = sortedRigs.find(r => r.id === selectedRig.id);
+        if (!stillExists) {
+          setSelectedRig(sortedRigs[0]);
+        }
+      } else if (sortedRigs.length === 0) {
+        setSelectedRig(null);
       }
     } catch (error) {
       console.error('Error loading rigs:', error);
@@ -200,6 +209,43 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
       console.error('Error creating rig:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const renameRig = async (rigId: string) => {
+    if (!editingRigName.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('boat_rigs')
+        .update({ name: editingRigName.trim() })
+        .eq('id', rigId);
+
+      if (error) throw error;
+      await loadRigs();
+      if (selectedRig?.id === rigId) {
+        setSelectedRig(prev => prev ? { ...prev, name: editingRigName.trim() } : null);
+      }
+      setEditingRigId(null);
+      setEditingRigName('');
+    } catch (error) {
+      console.error('Error renaming rig:', error);
+    }
+  };
+
+  const deleteRig = async (rigId: string) => {
+    try {
+      const { error } = await supabase
+        .from('boat_rigs')
+        .delete()
+        .eq('id', rigId);
+
+      if (error) throw error;
+      setDeleteRigConfirm(null);
+      await loadRigs();
+      onUpdate();
+    } catch (error) {
+      console.error('Error deleting rig:', error);
     }
   };
 
@@ -292,6 +338,11 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
     }));
   };
 
+  const conditionCount = (rigId: string) => {
+    if (selectedRig?.id === rigId) return rigConditions.length;
+    return null;
+  };
+
   if (loading) {
     return (
       <div className={`rounded-2xl p-12 text-center ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}>
@@ -301,71 +352,8 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
     );
   }
 
-  if (rigs.length === 0) {
-    return (
-      <div className={`rounded-2xl p-12 text-center ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <Settings className={`w-16 h-16 mx-auto mb-4 ${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
-        <h3 className={`text-xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          No Rig Configurations
-        </h3>
-        <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          Create your first rig configuration to start tuning
-        </p>
-        <button
-          onClick={() => setShowNewRigModal(true)}
-          className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200"
-        >
-          <Plus className="w-5 h-5 inline mr-2" />
-          Create First Rig
-        </button>
-
-        {showNewRigModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewRigModal(false)}>
-            <div
-              className={`rounded-2xl p-6 max-w-md w-full mx-4 ${darkMode ? 'bg-slate-800/80 backdrop-blur-sm border border-slate-700' : 'bg-white border border-slate-200'}`}
-              onClick={e => e.stopPropagation()}
-            >
-              <h3 className={`text-xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                Create New Rig
-              </h3>
-              <input
-                type="text"
-                value={newRigName}
-                onChange={e => setNewRigName(e.target.value)}
-                placeholder="e.g., A Rig, B Rig, Light Air Setup"
-                className={`w-full px-4 py-3 rounded-lg mb-4 ${
-                  darkMode
-                    ? 'bg-slate-900 border-slate-700 text-white'
-                    : 'bg-white border-slate-300 text-slate-900'
-                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowNewRigModal(false)}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium ${
-                    darkMode ? 'bg-slate-700 text-white' : 'bg-slate-200 text-slate-900'
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createNewRig}
-                  disabled={!newRigName.trim() || saving}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
-                >
-                  Create
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Tuning Guide Banner */}
       {tuningGuideUrl && (
         <a
           href={tuningGuideUrl}
@@ -380,10 +368,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`
-                p-3 rounded-xl
-                ${darkMode ? 'bg-blue-500/20' : 'bg-blue-100'}
-              `}>
+              <div className={`p-3 rounded-xl ${darkMode ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
                 <FileText className="text-blue-500" size={28} />
               </div>
               <div>
@@ -391,7 +376,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
                   Manufacturer Tuning Guide
                 </h3>
                 <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  {tuningGuideFileName || 'Tuning Guide'} • Click to view PDF
+                  {tuningGuideFileName || 'Tuning Guide'} -- Click to view PDF
                 </p>
               </div>
             </div>
@@ -403,301 +388,319 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
         </a>
       )}
 
-      {/* Header with Configure Button */}
-      <div className="flex items-center justify-between">
-        <div>
-          {selectedRig && (
-            <div>
-              <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                {selectedRig.name}
-              </h3>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                {windCondition.charAt(0).toUpperCase() + windCondition.slice(1)} Wind • {waterCondition.charAt(0).toUpperCase() + waterCondition.slice(1)} Water
-              </p>
-            </div>
-          )}
+      {/* Rig Selector - Always Visible */}
+      <div className={`rounded-2xl p-5 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+            Your Rigs
+          </h3>
+          <button
+            onClick={() => {
+              setNewRigName('');
+              setShowNewRigModal(true);
+            }}
+            className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 text-sm flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            Add Rig
+          </button>
         </div>
-        <button
-          onClick={() => setShowConfig(!showConfig)}
-          className={`px-4 py-2 rounded-lg font-medium transition-all ${
-            showConfig
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-              : darkMode
-              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-          }`}
-        >
-          <Settings className="w-4 h-4 inline mr-2" />
-          {showConfig ? 'Hide Config' : 'Configure'}
-        </button>
-      </div>
 
-      {/* Collapsible Config Panel */}
-      {showConfig && (
-        <div className="space-y-6">
-          {/* Rig Selector */}
-          <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                Rig Configuration
-              </h3>
-              <button
-                onClick={() => setShowNewRigModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 text-sm"
+        {rigs.length === 0 ? (
+          <div className={`text-center py-8 rounded-xl border-2 border-dashed ${darkMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+            <Settings className="w-10 h-10 mx-auto mb-3 opacity-50" />
+            <p className="font-medium mb-1">No rigs yet</p>
+            <p className="text-sm">Click "Add Rig" to create your first rig configuration</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {rigs.map(rig => (
+              <div
+                key={rig.id}
+                className={`relative rounded-xl transition-all ${
+                  selectedRig?.id === rig.id
+                    ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg ring-2 ring-cyan-400/50'
+                    : darkMode
+                    ? 'bg-slate-700/80 text-slate-300 hover:bg-slate-600'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
               >
-                <Plus className="w-4 h-4 inline mr-1" />
-                New Rig
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {rigs.map(rig => (
-                <button
-                  key={rig.id}
-                  onClick={() => setSelectedRig(rig)}
-                  className={`p-4 rounded-xl text-left transition-all ${
-                    selectedRig?.id === rig.id
-                      ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg'
-                      : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  <div className="font-bold text-sm mb-1">{rig.name}</div>
-                  {rig.is_default && (
-                    <div className="text-xs opacity-75">Default</div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Conditions Selector */}
-          <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Sailing Conditions
-        </h3>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Wind Condition */}
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <Wind className="w-4 h-4 inline mr-2" />
-              Wind Condition
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['light', 'medium', 'strong'] as const).map(condition => (
-                <button
-                  key={condition}
-                  onClick={() => setWindCondition(condition)}
-                  className={`py-3 rounded-lg font-medium capitalize transition-all ${
-                    windCondition === condition
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-                      : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {condition}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Water Condition */}
-          <div>
-            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-              <Waves className="w-4 h-4 inline mr-2" />
-              Water Condition
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['flat', 'moderate', 'rough'] as const).map(condition => (
-                <button
-                  key={condition}
-                  onClick={() => setWaterCondition(condition)}
-                  className={`py-3 rounded-lg font-medium capitalize transition-all ${
-                    waterCondition === condition
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-                      : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {condition}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {selectedCondition && (
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={duplicateRigCondition}
-              disabled={saving}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'
-              }`}
-            >
-              <Copy className="w-4 h-4 inline mr-2" />
-              Duplicate
-            </button>
-            <button
-              onClick={deleteRigCondition}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all"
-            >
-              <Trash2 className="w-4 h-4 inline mr-2" />
-              Delete
-            </button>
+                {editingRigId === rig.id ? (
+                  <div className="p-3">
+                    <input
+                      type="text"
+                      value={editingRigName}
+                      onChange={e => setEditingRigName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') renameRig(rig.id);
+                        if (e.key === 'Escape') { setEditingRigId(null); setEditingRigName(''); }
+                      }}
+                      autoFocus
+                      className={`w-full px-2 py-1 rounded text-sm font-bold ${
+                        darkMode
+                          ? 'bg-slate-900 border-slate-600 text-white'
+                          : 'bg-white border-slate-300 text-slate-900'
+                      } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                    />
+                    <div className="flex gap-1 mt-2">
+                      <button
+                        onClick={() => renameRig(rig.id)}
+                        className="p-1 rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => { setEditingRigId(null); setEditingRigName(''); }}
+                        className={`p-1 rounded transition-colors ${darkMode ? 'bg-slate-600 text-white hover:bg-slate-500' : 'bg-slate-300 text-slate-700 hover:bg-slate-400'}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : deleteRigConfirm === rig.id ? (
+                  <div className="p-3">
+                    <p className={`text-xs font-medium mb-2 ${selectedRig?.id === rig.id ? 'text-white/90' : darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                      Delete "{rig.name}" and all its settings?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => deleteRig(rig.id)}
+                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg font-medium hover:bg-red-700 transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setDeleteRigConfirm(null)}
+                        className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${
+                          selectedRig?.id === rig.id
+                            ? 'bg-white/20 text-white hover:bg-white/30'
+                            : darkMode
+                            ? 'bg-slate-600 text-white hover:bg-slate-500'
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <button
+                      onClick={() => setSelectedRig(rig)}
+                      className="w-full p-4 pb-2 text-left"
+                    >
+                      <div className="font-bold text-sm">{rig.name}</div>
+                      {rig.is_default && (
+                        <div className={`text-xs mt-0.5 ${selectedRig?.id === rig.id ? 'text-white/70' : 'opacity-60'}`}>Default</div>
+                      )}
+                      {conditionCount(rig.id) !== null && (
+                        <div className={`text-xs mt-0.5 ${selectedRig?.id === rig.id ? 'text-white/70' : 'opacity-60'}`}>
+                          {conditionCount(rig.id)} condition{conditionCount(rig.id) !== 1 ? 's' : ''} saved
+                        </div>
+                      )}
+                    </button>
+                    <div className="flex items-center gap-1 px-3 pb-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingRigId(rig.id);
+                          setEditingRigName(rig.name);
+                        }}
+                        title="Rename rig"
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          selectedRig?.id === rig.id
+                            ? 'hover:bg-white/20 text-white/70 hover:text-white'
+                            : darkMode
+                            ? 'hover:bg-slate-500 text-slate-400 hover:text-slate-200'
+                            : 'hover:bg-slate-300 text-slate-400 hover:text-slate-600'
+                        }`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteRigConfirm(rig.id);
+                        }}
+                        title="Delete rig"
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          selectedRig?.id === rig.id
+                            ? 'hover:bg-red-500/30 text-white/70 hover:text-red-200'
+                            : darkMode
+                            ? 'hover:bg-red-900/40 text-slate-400 hover:text-red-400'
+                            : 'hover:bg-red-100 text-slate-400 hover:text-red-500'
+                        }`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
-        </div>
+
+      {selectedRig && (
+        <>
+          {/* Sailing Conditions */}
+          <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              Sailing Conditions
+            </h3>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Wind className="w-4 h-4 inline mr-2" />
+                  Wind Condition
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['light', 'medium', 'strong'] as const).map(condition => (
+                    <button
+                      key={condition}
+                      onClick={() => setWindCondition(condition)}
+                      className={`py-3 rounded-lg font-medium capitalize transition-all ${
+                        windCondition === condition
+                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
+                          : darkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {condition}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <Waves className="w-4 h-4 inline mr-2" />
+                  Water Condition
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['flat', 'moderate', 'rough'] as const).map(condition => (
+                    <button
+                      key={condition}
+                      onClick={() => setWaterCondition(condition)}
+                      className={`py-3 rounded-lg font-medium capitalize transition-all ${
+                        waterCondition === condition
+                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
+                          : darkMode
+                          ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {condition}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {selectedCondition && (
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={duplicateRigCondition}
+                  disabled={saving}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                    darkMode ? 'bg-slate-700 text-white hover:bg-slate-600' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'
+                  }`}
+                >
+                  <Copy className="w-4 h-4 inline mr-2" />
+                  Duplicate to Another Condition
+                </button>
+                <button
+                  onClick={deleteRigCondition}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all text-sm"
+                >
+                  <Trash2 className="w-4 h-4 inline mr-2" />
+                  Delete Condition
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Rig Measurements */}
+          <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+            <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              Rig Measurements
+              <span className={`ml-2 text-sm font-normal ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                for {selectedRig.name} -- {windCondition.charAt(0).toUpperCase() + windCondition.slice(1)} Wind / {waterCondition.charAt(0).toUpperCase() + waterCondition.slice(1)} Water
+              </span>
+            </h3>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <MeasurementInput label="Static Rake" value={settings.staticRake} onChange={val => updateSetting('staticRake', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Rake Datum" value={settings.rakeDatum} onChange={val => updateSetting('rakeDatum', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Shroud Tension" value={settings.shroud} onChange={val => updateSetting('shroud', val)} darkMode={darkMode} unit="units" />
+              <MeasurementInput label="Ram Position" value={settings.ramPosition} onChange={val => updateSetting('ramPosition', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Vang" value={settings.vang} onChange={val => updateSetting('vang', val)} darkMode={darkMode} unit="units" />
+              <MeasurementInput label="Mains Outhaul" value={settings.mainsOuthaul} onChange={val => updateSetting('mainsOuthaul', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Mains Foot Depth" value={settings.mainsFootDepth} onChange={val => updateSetting('mainsFootDepth', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Mains Twist" value={settings.mainsTwist} onChange={val => updateSetting('mainsTwist', val)} darkMode={darkMode} unit="degrees" />
+              <MeasurementInput label="Jib Outhaul" value={settings.jibOuthaul} onChange={val => updateSetting('jibOuthaul', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Jib Foot Depth" value={settings.jibFootDepth} onChange={val => updateSetting('jibFootDepth', val)} darkMode={darkMode} unit="mm" />
+              <MeasurementInput label="Jib Twist" value={settings.jibTwist} onChange={val => updateSetting('jibTwist', val)} darkMode={darkMode} unit="degrees" />
+            </div>
+
+            <div className="mt-6">
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                <Star className="w-4 h-4 inline mr-2" />
+                Performance Rating
+              </label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(rating => (
+                  <button
+                    key={rating}
+                    onClick={() => setPerformanceRating(rating)}
+                    className={`p-3 rounded-lg transition-all ${
+                      performanceRating && performanceRating >= rating
+                        ? 'text-yellow-500'
+                        : darkMode
+                        ? 'text-slate-600 hover:text-slate-400'
+                        : 'text-slate-300 hover:text-slate-500'
+                    }`}
+                  >
+                    <Star className="w-6 h-6" fill={performanceRating && performanceRating >= rating ? 'currentColor' : 'none'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                Notes
+              </label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={4}
+                placeholder="Add notes about this setup..."
+                className={`w-full px-4 py-3 rounded-lg ${
+                  darkMode
+                    ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
+                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              />
+            </div>
+
+            <div className="mt-6">
+              <button
+                onClick={saveRigCondition}
+                disabled={saving}
+                className="btn-primary-green w-full px-6 py-4 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+              >
+                <Save className="w-5 h-5 inline mr-2" />
+                {saving ? 'Saving...' : selectedCondition ? 'Update Settings' : 'Save Settings'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Rig Settings */}
-      <div className={`rounded-2xl p-6 ${darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-        <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-          Rig Measurements
-        </h3>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <MeasurementInput
-            label="Static Rake"
-            value={settings.staticRake}
-            onChange={val => updateSetting('staticRake', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Rake Datum"
-            value={settings.rakeDatum}
-            onChange={val => updateSetting('rakeDatum', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Shroud Tension"
-            value={settings.shroud}
-            onChange={val => updateSetting('shroud', val)}
-            darkMode={darkMode}
-            unit="units"
-          />
-          <MeasurementInput
-            label="Ram Position"
-            value={settings.ramPosition}
-            onChange={val => updateSetting('ramPosition', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Vang"
-            value={settings.vang}
-            onChange={val => updateSetting('vang', val)}
-            darkMode={darkMode}
-            unit="units"
-          />
-          <MeasurementInput
-            label="Mains Outhaul"
-            value={settings.mainsOuthaul}
-            onChange={val => updateSetting('mainsOuthaul', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Mains Foot Depth"
-            value={settings.mainsFootDepth}
-            onChange={val => updateSetting('mainsFootDepth', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Mains Twist"
-            value={settings.mainsTwist}
-            onChange={val => updateSetting('mainsTwist', val)}
-            darkMode={darkMode}
-            unit="degrees"
-          />
-          <MeasurementInput
-            label="Jib Outhaul"
-            value={settings.jibOuthaul}
-            onChange={val => updateSetting('jibOuthaul', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Jib Foot Depth"
-            value={settings.jibFootDepth}
-            onChange={val => updateSetting('jibFootDepth', val)}
-            darkMode={darkMode}
-            unit="mm"
-          />
-          <MeasurementInput
-            label="Jib Twist"
-            value={settings.jibTwist}
-            onChange={val => updateSetting('jibTwist', val)}
-            darkMode={darkMode}
-            unit="degrees"
-          />
-        </div>
-
-        {/* Performance Rating */}
-        <div className="mt-6">
-          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-            <Star className="w-4 h-4 inline mr-2" />
-            Performance Rating
-          </label>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map(rating => (
-              <button
-                key={rating}
-                onClick={() => setPerformanceRating(rating)}
-                className={`p-3 rounded-lg transition-all ${
-                  performanceRating && performanceRating >= rating
-                    ? 'text-yellow-500'
-                    : darkMode
-                    ? 'text-slate-600 hover:text-slate-400'
-                    : 'text-slate-300 hover:text-slate-500'
-                }`}
-              >
-                <Star className="w-6 h-6" fill={performanceRating && performanceRating >= rating ? 'currentColor' : 'none'} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="mt-6">
-          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-            Notes
-          </label>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            rows={4}
-            placeholder="Add notes about this setup..."
-            className={`w-full px-4 py-3 rounded-lg ${
-              darkMode
-                ? 'bg-slate-800 border-slate-600 text-white placeholder-slate-500'
-                : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-            } border focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-          />
-        </div>
-
-        {/* Save Button */}
-        <div className="mt-6">
-          <button
-            onClick={saveRigCondition}
-            disabled={saving}
-            className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
-          >
-            <Save className="w-5 h-5 inline mr-2" />
-            {saving ? 'Saving...' : selectedCondition ? 'Update Settings' : 'Save Settings'}
-          </button>
-        </div>
-      </div>
-
-      {/* New Rig Modal */}
       {showNewRigModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewRigModal(false)}>
           <div
@@ -711,7 +714,9 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
               type="text"
               value={newRigName}
               onChange={e => setNewRigName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') createNewRig(); }}
               placeholder="e.g., A Rig, B Rig, Light Air Setup"
+              autoFocus
               className={`w-full px-4 py-3 rounded-lg mb-4 ${
                 darkMode
                   ? 'bg-slate-900 border-slate-700 text-white'
@@ -730,7 +735,7 @@ export const RigTuningTab: React.FC<RigTuningTabProps> = ({ boatId, boatType, da
               <button
                 onClick={createNewRig}
                 disabled={!newRigName.trim() || saving}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 disabled:opacity-50"
+                className="btn-primary-green flex-1 px-4 py-3 text-white rounded-lg font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50"
               >
                 Create
               </button>

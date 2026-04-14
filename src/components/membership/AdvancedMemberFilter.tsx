@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, Filter, ChevronDown, Check } from 'lucide-react';
+import { X, Plus, Trash2, ListFilter as Filter, ChevronDown, Check } from 'lucide-react';
 import {
   FilterCondition,
   FilterGroup,
@@ -495,7 +495,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] border border-slate-700/50">
-        <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-blue-600 to-blue-700">
+        <div className="flex items-center justify-between px-6 py-5 from-blue-600 to-blue-700">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/15 rounded-xl">
               <Filter className="text-white" size={22} />
@@ -697,7 +697,7 @@ export const AdvancedMemberFilter: React.FC<AdvancedMemberFilterProps> = ({
             </button>
             <button
               onClick={handleApply}
-              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 font-medium transition-colors"
+              className="btn-primary-green flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all"
             >
               <Filter size={18} />
               Apply Filters

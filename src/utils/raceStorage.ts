@@ -127,8 +127,8 @@ export const getStoredRaceEvents = async (): Promise<RaceEvent[]> => {
             showClubState: race.show_club_state ?? false,
             showDesign: race.show_design ?? false,
             showCategory: race.show_category ?? false,
-            enable_observers: race.enable_observers || false,
-            observers_per_heat: race.observers_per_heat || undefined,
+            enable_observers: race.enable_observers ?? false,
+            observers_per_heat: race.observers_per_heat ?? undefined,
             enableLiveTracking: race.enable_live_tracking || false,
             enableLiveStream: race.enable_livestream || false
           } as any;
@@ -269,8 +269,8 @@ export const storeRaceEvent = async (event: RaceEvent): Promise<void> => {
           enable_live_tracking: (event as any).enableLiveTracking || false,
           enable_livestream: (event as any).enableLiveStream || false,
           // Observer settings
-          enable_observers: (event as any).enable_observers || false,
-          observers_per_heat: (event as any).observers_per_heat || undefined
+          enable_observers: (event as any).enable_observers ?? false,
+          observers_per_heat: (event as any).observers_per_heat ?? undefined
         });
 
       if (error) {
@@ -535,14 +535,16 @@ export const getStoredRaceSeries = async (): Promise<RaceSeries[]> => {
             cancellationReason: round.cancellation_reason,
             heatManagement: round.heat_management,
             numRaces: round.num_races || 12,
-            dropRules: round.drop_rules || [],
+            dropRules: (round.drop_rules && (Array.isArray(round.drop_rules) ? round.drop_rules.length > 0 : true)) ? round.drop_rules : [4, 8, 16, 24, 32, 40],
             multiDay: round.multi_day || false,
             numberOfDays: round.number_of_days || 1,
             dayResults: round.day_results || {},
             currentDay: round.current_day || 1,
             averagePointsApplied: round.average_points_applied || {},
             manualScoreOverrides: round.manual_score_overrides || {},
-            enableLiveStream: round.enable_livestream || false
+            enableLiveStream: round.enable_livestream || false,
+            enable_observers: round.enable_observers || false,
+            observers_per_heat: round.observers_per_heat || 2
           });
         });
       }
@@ -959,16 +961,54 @@ export const reloadCurrentEventFromDatabase = async (): Promise<RaceEvent | null
 
     console.log('🔄 Reloading event from database:', currentEvent.id);
 
-    const { data, error } = await supabase
-      .from('quick_races')
-      .select('*')
-      .eq('id', currentEvent.id)
-      .eq('club_id', currentClubId)
-      .single();
+    let data: any = null;
 
-    if (error) {
-      console.error('❌ Error reloading event:', error);
-      return null;
+    if (currentEvent.isSeriesEvent && currentEvent.seriesId) {
+      let roundId = currentEvent.seriesRoundId;
+      if (!roundId && currentEvent.roundName) {
+        const { data: roundRow } = await supabase
+          .from('race_series_rounds')
+          .select('id')
+          .eq('series_id', currentEvent.seriesId)
+          .eq('round_name', currentEvent.roundName)
+          .maybeSingle();
+        roundId = roundRow?.id;
+        if (roundId) {
+          currentEvent.seriesRoundId = roundId;
+        }
+      }
+      if (roundId) {
+        const { data: roundData, error: roundError } = await supabase
+          .from('race_series_rounds')
+          .select('*')
+          .eq('id', roundId)
+          .maybeSingle();
+        if (roundError) {
+          console.error('❌ Error reloading series round:', roundError);
+          return null;
+        }
+        if (roundData) {
+          data = {
+            ...roundData,
+            event_name: `${roundData.round_name} - ${currentEvent.eventName?.split(' - ').slice(1).join(' - ') || ''}`,
+            club_name: currentEvent.clubName,
+            race_date: roundData.date,
+            race_venue: roundData.venue,
+          };
+        }
+      }
+    } else {
+      const { data: qrData, error } = await supabase
+        .from('quick_races')
+        .select('*')
+        .eq('id', currentEvent.id)
+        .eq('club_id', currentClubId)
+        .maybeSingle();
+      if (error) {
+        console.error('❌ Error reloading event:', error);
+        return null;
+      }
+      data = qrData;
     }
 
     if (!data) {
@@ -1047,7 +1087,7 @@ export const updateEventResults = async (
   currentDay: number = 1,
   heatManagement: HeatManagement | null = null,
   numRaces: number = 12,
-  dropRules: number[] = [],
+  dropRules: number[] = [4, 8, 16, 24, 32, 40],
   dayResults?: Record<number, any>
 ): Promise<void> => {
   console.log('updateEventResults called with:', {
@@ -1247,10 +1287,12 @@ export const updateEventResults = async (
           completed: completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40],
           multi_day: updatedEvent.multiDay || false,
           number_of_days: updatedEvent.numberOfDays || 1,
-          current_day: currentDay
+          current_day: currentDay,
+          enable_observers: updatedEvent.enable_observers || false,
+          observers_per_heat: updatedEvent.observers_per_heat || 2
         };
 
         // For multi-day series rounds, store results in day_results ONLY
@@ -1276,7 +1318,6 @@ export const updateEventResults = async (
         }
 
         if (existingRound) {
-          // Update existing round
           console.log('[saveEventResults] About to update round with data:', {
             id: existingRound.id,
             skippers: roundData.skippers?.length || 0,
@@ -1295,10 +1336,13 @@ export const updateEventResults = async (
             throw updateError;
           }
 
+          if (!updatedEvent.seriesRoundId) {
+            updatedEvent.seriesRoundId = existingRound.id;
+            setCurrentEvent(updatedEvent);
+          }
+
           console.log('[saveEventResults] Updated existing series round');
         } else {
-          // Create new round - need to determine round_index
-          // Get max round_index for this series and add 1
           const { data: maxIndexData } = await supabase
             .from('race_series_rounds')
             .select('round_index')
@@ -1309,16 +1353,23 @@ export const updateEventResults = async (
 
           const nextIndex = (maxIndexData?.round_index || 0) + 1;
 
-          const { error: insertError } = await supabase
+          const { data: insertedRow, error: insertError } = await supabase
             .from('race_series_rounds')
             .insert({
               ...roundData,
               round_index: nextIndex
-            });
+            })
+            .select('id')
+            .maybeSingle();
 
           if (insertError) {
             console.error('Error inserting series round:', insertError);
             throw insertError;
+          }
+
+          if (insertedRow?.id) {
+            updatedEvent.seriesRoundId = insertedRow.id;
+            setCurrentEvent(updatedEvent);
           }
 
           console.log('[saveEventResults] Created new series round with index:', nextIndex);
@@ -1408,16 +1459,13 @@ export const updateEventResults = async (
         updateData['day_results'] = updatedEvent.dayResults;
 
         const updatePayload = {
-          skippers: skippers, // Save skippers for multi-day events
+          skippers: skippers,
           day_results: updatedEvent.dayResults,
           current_day: currentDay,
           completed: updatedEvent.completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
-          // Preserve observer settings
-          enable_observers: updatedEvent.enable_observers,
-          observers_per_heat: updatedEvent.observers_per_heat
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]
         };
 
         console.log('📤 Updating multi-day event in database:', {
@@ -1451,10 +1499,7 @@ export const updateEventResults = async (
           completed,
           heat_management: heatManagement,
           num_races: numRaces,
-          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40], // Default to RRS - Appendix A
-          // Preserve observer settings
-          enable_observers: updatedEvent.enable_observers,
-          observers_per_heat: updatedEvent.observers_per_heat
+          drop_rules: Array.isArray(dropRules) ? dropRules : [4, 8, 16, 24, 32, 40]
         };
 
         console.log('📤 Updating single-day event in database:', {

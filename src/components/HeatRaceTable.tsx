@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoreHorizontal, Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
+import { SquarePen as Edit2, Trophy, Medal, X, ChevronRight, Trash2, Users, TrendingUp, Flag, Hop as Home, ChevronDown, ChevronUp, Settings, Zap, FileText, MoveHorizontal as MoreHorizontal, SquarePen as Edit, RotateCcw, Calendar, CalendarRange, Check } from 'lucide-react';
 import { HeatRaceInput } from './HeatRaceInput';
 import { HeatDesignation, HeatManagement, HeatResult, getHeatColorClasses, calculateOverallPositions } from '../types/heat';
 import { useNavigate } from 'react-router-dom';
@@ -250,7 +250,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
             {isCurrentHeat && isComplete && !displayRoundData.completed && (
               <button
                 onClick={() => setShowCompleteHeatConfirm(true)}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 <Check size={18} />
                 Complete Heat {heat}

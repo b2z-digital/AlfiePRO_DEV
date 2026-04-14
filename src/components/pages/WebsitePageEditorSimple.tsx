@@ -218,7 +218,7 @@ const WebsitePageEditorSimple: React.FC<WebsitePageEditorSimpleProps> = ({ onBac
             <button
               onClick={handlePublish}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
             >
               <Eye size={18} />
               Publish

@@ -226,7 +226,7 @@ export const ConnectionMonitor: React.FC = () => {
           </div>
         </div>
       ) : showReconnected ? (
-        <div className="bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
+        <div className="text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
           <Wifi className="w-5 h-5" />
           <div>
             <div className="font-semibold">Connection Restored</div>

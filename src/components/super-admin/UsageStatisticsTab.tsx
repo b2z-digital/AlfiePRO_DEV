@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   Globe, Building, Users, MapPin, TrendingUp, Calendar,
-  Trophy, BarChart3, Activity, ArrowUpRight, Filter
+  Trophy, BarChart3, Activity, ArrowUpRight, Filter, UserCheck
 } from 'lucide-react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import { supabase } from '../../utils/supabase';
+import { UserActivityView } from './UserActivityView';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement, Filler);
 
@@ -44,7 +45,7 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
   const [stateBreakdown, setStateBreakdown] = useState<StateBreakdown[]>([]);
   const [monthlyGrowth, setMonthlyGrowth] = useState<{ month: string; clubs: number; members: number }[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(true);
-  const [viewMode, setViewMode] = useState<'overview' | 'clubs'>('overview');
+  const [viewMode, setViewMode] = useState<'overview' | 'clubs' | 'users'>('overview');
 
   useEffect(() => {
     loadDetailedStats();
@@ -299,10 +300,23 @@ export function UsageStatisticsTab({ darkMode, stats, loading }: UsageStatistics
             <Building size={14} className="inline mr-1.5" />
             All Clubs
           </button>
+          <button
+            onClick={() => setViewMode('users')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'users'
+                ? darkMode ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30' : 'bg-sky-50 text-sky-700 border border-sky-200'
+                : darkMode ? 'text-slate-400 hover:bg-slate-800/50' : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <UserCheck size={14} className="inline mr-1.5" />
+            User Activity
+          </button>
         </div>
       </div>
 
-      {viewMode === 'overview' ? (
+      {viewMode === 'users' ? (
+        <UserActivityView darkMode={darkMode} />
+      ) : viewMode === 'overview' ? (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}`}>

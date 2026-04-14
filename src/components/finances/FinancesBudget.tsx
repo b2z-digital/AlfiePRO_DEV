@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, BarChart3, PieChart as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, Edit3 } from 'lucide-react';
+import { Save, X, DollarSign, Calendar, TrendingUp, TrendingDown, ChartBar as BarChart3, ChartPie as PieChartIcon, Target, Wallet, ChevronDown, ChevronRight, CreditCard as Edit3, Tag, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
@@ -34,6 +35,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associationId, associationType }) => {
   const { currentClub } = useAuth();
+  const navigate = useNavigate();
   const isAssociation = !!associationId && !!associationType;
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([]);
@@ -277,25 +279,25 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       legend: {
         display: true,
         position: 'bottom' as const,
-        labels: { color: 'rgb(203, 213, 225)', padding: 15, font: { size: 12 } },
+        labels: { color: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)', padding: 15, font: { size: 12 } },
       },
       tooltip: {
-        backgroundColor: 'rgb(30, 41, 59)',
-        titleColor: 'rgb(226, 232, 240)',
-        bodyColor: 'rgb(203, 213, 225)',
-        borderColor: 'rgb(51, 65, 85)',
+        backgroundColor: darkMode ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)',
+        titleColor: darkMode ? 'rgb(226, 232, 240)' : 'rgb(15, 23, 42)',
+        bodyColor: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
+        borderColor: darkMode ? 'rgb(51, 65, 85)' : 'rgb(226, 232, 240)',
         borderWidth: 1,
         padding: 12,
       },
     },
     scales: {
       x: {
-        grid: { color: 'rgba(71, 85, 105, 0.3)' },
-        ticks: { color: 'rgb(148, 163, 184)' },
+        grid: { color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(226, 232, 240, 0.8)' },
+        ticks: { color: darkMode ? 'rgb(148, 163, 184)' : 'rgb(100, 116, 139)' },
       },
       y: {
-        grid: { color: 'rgba(71, 85, 105, 0.3)' },
-        ticks: { color: 'rgb(148, 163, 184)' },
+        grid: { color: darkMode ? 'rgba(71, 85, 105, 0.3)' : 'rgba(226, 232, 240, 0.8)' },
+        ticks: { color: darkMode ? 'rgb(148, 163, 184)' : 'rgb(100, 116, 139)' },
       },
     },
   };
@@ -321,7 +323,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
     datasets: [{
       data: expenseCategoryTotals.map(c => c.total),
       backgroundColor: expenseCategoryTotals.map((_, i) => allocationColors[i % allocationColors.length]),
-      borderColor: 'rgb(15, 23, 42)',
+      borderColor: darkMode ? 'rgb(15, 23, 42)' : 'rgb(255, 255, 255)',
       borderWidth: 2,
     }],
   };
@@ -333,13 +335,13 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       legend: {
         display: true,
         position: 'right' as const,
-        labels: { color: 'rgb(203, 213, 225)', padding: 10, font: { size: 11 } },
+        labels: { color: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)', padding: 10, font: { size: 11 } },
       },
       tooltip: {
-        backgroundColor: 'rgb(30, 41, 59)',
-        titleColor: 'rgb(226, 232, 240)',
-        bodyColor: 'rgb(203, 213, 225)',
-        borderColor: 'rgb(51, 65, 85)',
+        backgroundColor: darkMode ? 'rgb(30, 41, 59)' : 'rgb(255, 255, 255)',
+        titleColor: darkMode ? 'rgb(226, 232, 240)' : 'rgb(15, 23, 42)',
+        bodyColor: darkMode ? 'rgb(203, 213, 225)' : 'rgb(71, 85, 105)',
+        borderColor: darkMode ? 'rgb(51, 65, 85)' : 'rgb(226, 232, 240)',
         borderWidth: 1,
         padding: 12,
         callbacks: {
@@ -383,7 +385,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               type="number"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="w-24 pl-5 pr-2 py-1.5 text-xs bg-slate-900 border border-cyan-500 rounded-lg text-white text-right focus:outline-none focus:ring-2 focus:ring-cyan-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className={`w-24 pl-5 pr-2 py-1.5 text-xs border border-cyan-500 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-cyan-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${darkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCellSave();
                 if (e.key === 'Escape') handleCellCancel();
@@ -406,8 +408,8 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
         onClick={() => handleCellEdit(categoryId, month)}
         className={`group/cell w-full px-2 py-1.5 text-xs rounded-lg transition-all text-right ${
           amount > 0
-            ? 'text-slate-200 hover:bg-slate-700/60'
-            : 'text-slate-600 hover:text-slate-400 hover:bg-slate-700/40'
+            ? `${darkMode ? 'text-slate-200 hover:bg-slate-700/60' : 'text-slate-700 hover:bg-slate-100'}`
+            : `${darkMode ? 'text-slate-600 hover:text-slate-400 hover:bg-slate-700/40' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`
         }`}
       >
         <span className="group-hover/cell:hidden">{amount > 0 ? formatCurrency(amount) : '-'}</span>
@@ -437,17 +439,17 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
     const totalCellBg = isIncome ? 'bg-emerald-950/30' : 'bg-red-950/30';
 
     return (
-      <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 backdrop-blur-sm overflow-hidden">
+      <div className={`rounded-2xl border backdrop-blur-sm overflow-hidden ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-700/20 transition-colors"
+          className={`w-full flex items-center justify-between px-6 py-4 transition-colors ${darkMode ? 'hover:bg-slate-700/20' : 'hover:bg-slate-50'}`}
         >
           <div className="flex items-center gap-3">
             <div className={`p-2.5 rounded-xl ${iconBg}`}>
               <Icon className={iconColor} size={20} />
             </div>
             <div className="text-left">
-              <h3 className="text-base font-semibold text-white">
+              <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {isIncome ? 'Income Budget' : 'Expense Budget'}
               </h3>
               <p className="text-xs text-slate-500">
@@ -459,17 +461,17 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
             <span className={`text-lg font-bold ${totalColor}`}>
               {formatCurrency(sectionTotal)}
             </span>
-            {isExpanded ? <ChevronDown size={18} className="text-slate-400" /> : <ChevronRight size={18} className="text-slate-400" />}
+            {isExpanded ? <ChevronDown size={18} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} /> : <ChevronRight size={18} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />}
           </div>
         </button>
 
         {isExpanded && sectionCategories.length > 0 && (
-          <div className="border-t border-slate-700/50">
+          <div className={`border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
                 <thead>
-                  <tr className="border-b border-slate-700/40">
-                    <th className="sticky left-0 z-10 bg-slate-800/90 backdrop-blur-sm px-4 py-3 text-left w-[180px]">
+                  <tr className={`border-b ${darkMode ? 'border-slate-700/40' : 'border-slate-200'}`}>
+                    <th className={`sticky left-0 z-10 backdrop-blur-sm px-4 py-3 text-left w-[180px] ${darkMode ? 'bg-slate-800/90' : 'bg-white/90'}`}>
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Category</span>
                     </th>
                     {MONTHS.map((m) => (
@@ -477,7 +479,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
                         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{m}</span>
                       </th>
                     ))}
-                    <th className="sticky right-0 z-10 bg-slate-800/90 backdrop-blur-sm px-4 py-3 text-right w-[110px]">
+                    <th className={`sticky right-0 z-10 backdrop-blur-sm px-4 py-3 text-right w-[110px] ${darkMode ? 'bg-slate-800/90' : 'bg-white/90'}`}>
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Annual</span>
                     </th>
                   </tr>
@@ -486,16 +488,16 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
                   {sectionCategories.map((category) => {
                     const catTotal = calculateCategoryTotal(category.id);
                     return (
-                      <tr key={category.id} className="border-b border-slate-700/20 hover:bg-slate-700/15 transition-colors group">
-                        <td className="sticky left-0 z-10 bg-slate-800/90 group-hover:bg-slate-700/90 backdrop-blur-sm px-4 py-2.5">
-                          <span className="text-sm text-slate-300 font-medium">{category.name}</span>
+                      <tr key={category.id} className={`border-b transition-colors group ${darkMode ? 'border-slate-700/20 hover:bg-slate-700/15' : 'border-slate-100 hover:bg-slate-50'}`}>
+                        <td className={`sticky left-0 z-10 backdrop-blur-sm px-4 py-2.5 ${darkMode ? 'bg-slate-800/90 group-hover:bg-slate-700/90' : 'bg-white/90 group-hover:bg-slate-50/90'}`}>
+                          <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{category.name}</span>
                         </td>
                         {MONTHS.map((_, monthIndex) => (
                           <td key={monthIndex} className="px-1 py-1.5 text-center">
                             {renderEditableCell(category.id, monthIndex + 1, type)}
                           </td>
                         ))}
-                        <td className="sticky right-0 z-10 bg-slate-800/90 group-hover:bg-slate-700/90 backdrop-blur-sm px-4 py-2.5 text-right">
+                        <td className={`sticky right-0 z-10 backdrop-blur-sm px-4 py-2.5 text-right ${darkMode ? 'bg-slate-800/90 group-hover:bg-slate-700/90' : 'bg-white/90 group-hover:bg-slate-50/90'}`}>
                           <span className={`text-sm font-semibold ${totalColor}`}>
                             {formatCurrency(catTotal)}
                           </span>
@@ -529,7 +531,7 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
         )}
 
         {isExpanded && sectionCategories.length === 0 && (
-          <div className="px-6 py-8 text-center border-t border-slate-700/50">
+          <div className={`px-6 py-8 text-center border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
             <p className="text-sm text-slate-500">
               No {isIncome ? 'income' : 'expense'} categories yet. Add categories in Settings to start budgeting.
             </p>
@@ -543,16 +545,16 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Budget Planning</h2>
-          <p className="text-sm text-slate-400 mt-1">Plan and track your financial budget for {selectedYear}</p>
+          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Budget Planning</h2>
+          <p className={`text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Plan and track your financial budget for {selectedYear}</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-br from-slate-800/60 to-slate-800/40 border border-slate-700/50 rounded-xl backdrop-blur-sm">
-            <Calendar size={16} className="text-slate-400" />
+          <div className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
+            <Calendar size={16} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="bg-transparent text-white text-sm font-medium outline-none cursor-pointer"
+              className={`bg-transparent text-sm font-medium outline-none cursor-pointer ${darkMode ? 'text-white' : 'text-slate-900'}`}
             >
               {Array.from({ length: 5 }, (_, i) => {
                 const year = new Date().getFullYear() - 2 + i;
@@ -572,43 +574,43 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
       {categories.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-emerald-500/[0.08] rounded-2xl border border-emerald-500/20 p-5 transition-all duration-300 hover:border-emerald-500/40 hover:shadow-lg hover:shadow-emerald-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-emerald-500/10 rounded-xl">
                     <TrendingUp className="text-emerald-400" size={20} />
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 font-medium mb-1">Total Income Budget</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(totalIncome)}</p>
+                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Income Budget</p>
+                <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(totalIncome)}</p>
                 <p className="text-[11px] text-slate-500 mt-1">{incomeCategories.length} categories</p>
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-gradient-to-br from-red-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-red-500/[0.08] rounded-2xl border border-red-500/20 p-5 transition-all duration-300 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-red-500/10 rounded-xl">
                     <TrendingDown className="text-red-400" size={20} />
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 font-medium mb-1">Total Expense Budget</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(totalExpenses)}</p>
+                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Expense Budget</p>
+                <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(totalExpenses)}</p>
                 <p className="text-[11px] text-slate-500 mt-1">{expenseCategories.length} categories</p>
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-gradient-to-br from-cyan-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-cyan-500/[0.08] rounded-2xl border border-cyan-500/20 p-5 transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-cyan-500/10 rounded-xl">
                     <Wallet className="text-cyan-400" size={20} />
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 font-medium mb-1">Net Budget</p>
+                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Budget</p>
                 <p className={`text-2xl font-bold ${netBudget >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {formatCurrency(netBudget)}
                 </p>
@@ -616,15 +618,15 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="group relative overflow-hidden bg-gradient-to-br from-amber-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/5">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
+            <div className="group relative overflow-hidden bg-amber-500/[0.08] rounded-2xl border border-amber-500/20 p-5 transition-all duration-300 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 backdrop-blur-sm">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className="p-2.5 bg-amber-500/10 rounded-xl">
                     <Target className="text-amber-400" size={20} />
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 font-medium mb-1">Budget Margin</p>
+                <p className={`text-xs font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Budget Margin</p>
                 <p className={`text-2xl font-bold ${netBudget >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
                   {totalIncome > 0 ? ((netBudget / totalIncome) * 100).toFixed(1) : '0.0'}%
                 </p>
@@ -634,12 +636,12 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center gap-2 mb-6">
                 <BarChart3 size={20} className="text-cyan-400" />
                 <div>
-                  <h3 className="text-base font-semibold text-white">Monthly Budget Distribution</h3>
-                  <p className="text-xs text-slate-400">Income vs Expenses by month</p>
+                  <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Monthly Budget Distribution</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Income vs Expenses by month</p>
                 </div>
               </div>
               <div className="h-[280px]">
@@ -647,12 +649,12 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+            <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center gap-2 mb-6">
                 <PieChartIcon size={20} className="text-cyan-400" />
                 <div>
-                  <h3 className="text-base font-semibold text-white">Expense Allocation</h3>
-                  <p className="text-xs text-slate-400">Budget breakdown by category</p>
+                  <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Expense Allocation</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Budget breakdown by category</p>
                 </div>
               </div>
               {expenseCategoryTotals.length > 0 ? (
@@ -667,13 +669,13 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-slate-800/60 to-slate-800/40 rounded-2xl border border-slate-700/50 p-6 backdrop-blur-sm">
+          <div className={`rounded-2xl border p-6 backdrop-blur-sm ${darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-slate-200'}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <DollarSign size={20} className="text-cyan-400" />
                 <div>
-                  <h3 className="text-base font-semibold text-white">Net Monthly Position</h3>
-                  <p className="text-xs text-slate-400">Income minus expenses per month</p>
+                  <h3 className={`text-base font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Net Monthly Position</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Income minus expenses per month</p>
                 </div>
               </div>
             </div>
@@ -708,15 +710,15 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           {renderCategorySection('income', incomeCategories, incomeExpanded, () => setIncomeExpanded(!incomeExpanded))}
           {renderCategorySection('expense', expenseCategories, expenseExpanded, () => setExpenseExpanded(!expenseExpanded))}
 
-          <div className="bg-gradient-to-r from-cyan-500/10 via-slate-800/50 to-slate-800/30 rounded-2xl border border-cyan-500/20 p-5">
+          <div className={`rounded-2xl border p-5 ${darkMode ? 'from-cyan-500/10 via-slate-800/50 to-slate-800/30 border-cyan-500/20' : 'bg-cyan-50/50 border-cyan-500/20'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-cyan-500/10 rounded-xl">
                   <Wallet className="text-cyan-400" size={20} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">Annual Net Position</p>
-                  <p className="text-xs text-slate-400">{selectedYear} total income minus total expenses</p>
+                  <p className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Annual Net Position</p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedYear} total income minus total expenses</p>
                 </div>
               </div>
               <div className="text-right">
@@ -731,17 +733,22 @@ export const FinancesBudget: React.FC<FinancesBudgetProps> = ({ darkMode, associ
           </div>
         </>
       ) : (
-        <div className="text-center py-20 rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800/60 to-slate-800/40 backdrop-blur-sm">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-700/50 mb-4">
-            <DollarSign size={32} className="text-slate-400" />
+        <div className={`text-center py-20 rounded-2xl border backdrop-blur-sm ${darkMode ? 'border-slate-700/50 bg-slate-800/50' : 'border-slate-200 bg-white'}`}>
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+            <Tag size={32} className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">No Budget Categories</h3>
-          <p className="text-slate-400 mb-1 max-w-md mx-auto text-sm">
+          <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>No Budget Categories</h3>
+          <p className={`mb-4 max-w-md mx-auto text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             Create budget categories before you can plan your budget.
           </p>
-          <p className="text-slate-500 text-xs">
-            Go to Settings &rarr; Finance &rarr; Categories to get started.
-          </p>
+          <button
+            onClick={() => navigate('/finances/categories')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Tag size={16} />
+            Set Up Categories
+            <ArrowRight size={16} />
+          </button>
         </div>
       )}
     </div>

@@ -122,7 +122,7 @@ export const AddBoatModal: React.FC<AddBoatModalProps> = ({
         ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
       `}>
         {/* Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-3 relative z-10">
             <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20 transform hover:scale-105 transition-transform">
@@ -163,7 +163,7 @@ export const AddBoatModal: React.FC<AddBoatModalProps> = ({
           >
             Basic Information
             {activeTab === 'basic' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-600"></div>
             )}
           </button>
           <button
@@ -183,7 +183,7 @@ export const AddBoatModal: React.FC<AddBoatModalProps> = ({
           >
             Registration & Certification
             {activeTab === 'certification' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 from-cyan-500 to-blue-600"></div>
             )}
           </button>
         </div>
@@ -225,6 +225,25 @@ export const AddBoatModal: React.FC<AddBoatModalProps> = ({
                       onChange={(e) => setFormData({ ...formData, sail_number: e.target.value })}
                       className={`
                         w-full px-4 py-2.5 rounded-lg border transition-colors
+                        ${darkMode
+                          ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-cyan-500'
+                          : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500'}
+                        focus:outline-none focus:ring-2 focus:ring-cyan-500/20
+                      `}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      Hull Registration #
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g., IOM-AUS-123"
+                      value={formData.hull_registration_number}
+                      onChange={(e) => setFormData({ ...formData, hull_registration_number: e.target.value })}
+                      className={`
+                        w-full px-4 py-2.5 rounded-lg border transition-colors font-mono tracking-wide
                         ${darkMode
                           ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400 focus:border-cyan-500'
                           : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-500'}

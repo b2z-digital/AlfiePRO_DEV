@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Users, UserPlus, Shield, Trash2, Edit2, GripVertical, Plus,
-  Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown,
-  Globe, LayoutGrid, Check
-} from 'lucide-react';
+import { Users, UserPlus, Shield, Trash2, SquarePen as Edit2, GripVertical, Plus, Crown, DollarSign, FileText, Calendar, Heart, LifeBuoy, X, ChevronDown, Globe, LayoutGrid, Check } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import AccessLevelManager from '../committee/AccessLevelManager';
 import {
   DndContext,
   closestCenter,
@@ -28,6 +26,9 @@ import { CSS } from '@dnd-kit/utilities';
 
 interface CommitteeManagementProps {
   darkMode: boolean;
+  associationId?: string;
+  associationType?: 'state' | 'national';
+  onSaveComplete?: () => void;
 }
 
 interface PositionDefinition {
@@ -39,6 +40,7 @@ interface PositionDefinition {
   dashboard_template_id?: string | null;
   position_priority?: number | null;
   show_on_website?: boolean;
+  access_level?: string;
 }
 
 interface PositionAssignment {
@@ -60,10 +62,11 @@ interface Member {
   avatar_url?: string | null;
 }
 
-export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode }) => {
-  const { currentClub } = useAuth();
+export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMode, associationId, associationType, onSaveComplete }) => {
+  const { currentClub, currentOrganization } = useAuth();
   const { addNotification } = useNotifications();
-  const [activeTab, setActiveTab] = useState<'positions' | 'assignments'>('assignments');
+  const { isAdmin, isEditor, isStateAdmin, isNationalAdmin } = usePermissions();
+  const [activeTab, setActiveTab] = useState<'positions' | 'assignments' | 'access-levels'>('assignments');
   const [positions, setPositions] = useState<PositionDefinition[]>([]);
   const [assignments, setAssignments] = useState<PositionAssignment[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -71,66 +74,141 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   const [editingPosition, setEditingPosition] = useState<PositionDefinition | null>(null);
   const [showPositionForm, setShowPositionForm] = useState(false);
 
-  const isAdmin = currentClub?.role === 'admin';
-  const isEditor = currentClub?.role === 'editor';
-  const canManage = isAdmin || isEditor;
+  const effectiveAssocId = associationId || currentOrganization?.id;
+  const effectiveAssocType = associationType || (currentOrganization?.type as 'state' | 'national' | undefined);
+  const isAssociationContext = !!effectiveAssocType && (effectiveAssocType === 'state' || effectiveAssocType === 'national');
+
+  const canManage = isAdmin || isEditor || isStateAdmin || isNationalAdmin;
 
   useEffect(() => {
-    if (currentClub) {
+    if (isAssociationContext ? effectiveAssocId : currentClub) {
       fetchData();
     }
-  }, [currentClub]);
+  }, [currentClub, effectiveAssocId, effectiveAssocType]);
 
   const fetchData = async () => {
-    if (!currentClub) return;
+    if (!isAssociationContext && !currentClub) return;
 
     try {
       setLoading(true);
 
-      const { data: positionsData, error: positionsError } = await supabase
-        .from('committee_position_definitions')
-        .select('*')
-        .eq('club_id', currentClub.clubId)
-        .order('display_order');
+      if (isAssociationContext && effectiveAssocId) {
+        const assocColumn = effectiveAssocType === 'state' ? 'state_association_id' : 'national_association_id';
 
-      if (positionsError) throw positionsError;
-      setPositions(positionsData || []);
+        const { data: positionsData, error: positionsError } = await supabase
+          .from('committee_position_definitions')
+          .select('*')
+          .eq(assocColumn, effectiveAssocId)
+          .order('display_order');
 
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('committee_positions')
-        .select(`
-          id,
-          position_definition_id,
-          position_title,
-          member_id,
-          user_id,
-          members (first_name, last_name, avatar_url)
-        `)
-        .eq('club_id', currentClub.clubId);
+        if (positionsError) throw positionsError;
+        setPositions(positionsData || []);
 
-      if (assignmentsError) throw assignmentsError;
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('committee_positions')
+          .select(`
+            id,
+            position_definition_id,
+            position_title,
+            member_id,
+            user_id,
+            members (first_name, last_name, avatar_url)
+          `)
+          .eq(assocColumn, effectiveAssocId);
 
-      const formattedAssignments = assignmentsData?.map(a => ({
-        id: a.id,
-        position_definition_id: a.position_definition_id || '',
-        position_name: a.position_title || '',
-        member_id: a.member_id,
-        member_name: a.members ? `${a.members.first_name} ${a.members.last_name}` : null,
-        user_id: a.user_id,
-        avatar_url: a.members?.avatar_url
-      })) || [];
+        if (assignmentsError) throw assignmentsError;
 
-      setAssignments(formattedAssignments);
+        const formattedAssignments = assignmentsData?.map(a => ({
+          id: a.id,
+          position_definition_id: a.position_definition_id || '',
+          position_name: a.position_title || '',
+          member_id: a.member_id,
+          member_name: a.members ? `${a.members.first_name} ${a.members.last_name}` : null,
+          user_id: a.user_id,
+          avatar_url: a.members?.avatar_url
+        })) || [];
 
-      const { data: membersData, error: membersError } = await supabase
-        .from('members')
-        .select('id, first_name, last_name, email, user_id, avatar_url')
-        .eq('club_id', currentClub.clubId)
-        .order('last_name');
+        setAssignments(formattedAssignments);
 
-      if (membersError) throw membersError;
-      setMembers(membersData || []);
+        let clubIds: string[] = [];
+        if (effectiveAssocType === 'state') {
+          const { data: clubs } = await supabase
+            .from('clubs')
+            .select('id')
+            .eq('state_association_id', effectiveAssocId);
+          clubIds = clubs?.map(c => c.id) || [];
+        } else {
+          const { data: states } = await supabase
+            .from('state_associations')
+            .select('id')
+            .eq('national_association_id', effectiveAssocId);
+          const stateIds = states?.map(s => s.id) || [];
+          if (stateIds.length > 0) {
+            const { data: clubs } = await supabase
+              .from('clubs')
+              .select('id')
+              .in('state_association_id', stateIds);
+            clubIds = clubs?.map(c => c.id) || [];
+          }
+        }
 
+        if (clubIds.length > 0) {
+          const { data: membersData, error: membersError } = await supabase
+            .from('members')
+            .select('id, first_name, last_name, email, user_id, avatar_url')
+            .in('club_id', clubIds)
+            .order('last_name');
+
+          if (membersError) throw membersError;
+          setMembers(membersData || []);
+        } else {
+          setMembers([]);
+        }
+      } else {
+        const { data: positionsData, error: positionsError } = await supabase
+          .from('committee_position_definitions')
+          .select('*')
+          .eq('club_id', currentClub!.clubId)
+          .order('display_order');
+
+        if (positionsError) throw positionsError;
+        setPositions(positionsData || []);
+
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('committee_positions')
+          .select(`
+            id,
+            position_definition_id,
+            position_title,
+            member_id,
+            user_id,
+            members (first_name, last_name, avatar_url)
+          `)
+          .eq('club_id', currentClub!.clubId);
+
+        if (assignmentsError) throw assignmentsError;
+
+        const formattedAssignments = assignmentsData?.map(a => ({
+          id: a.id,
+          position_definition_id: a.position_definition_id || '',
+          position_name: a.position_title || '',
+          member_id: a.member_id,
+          member_name: a.members ? `${a.members.first_name} ${a.members.last_name}` : null,
+          user_id: a.user_id,
+          avatar_url: a.members?.avatar_url
+        })) || [];
+
+        setAssignments(formattedAssignments);
+
+        const { data: membersData, error: membersError } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, user_id, avatar_url')
+          .eq('club_id', currentClub!.clubId)
+          .order('last_name');
+
+        if (membersError) throw membersError;
+        setMembers(membersData || []);
+      }
     } catch (error: any) {
       console.error('Error fetching committee data:', error);
       addNotification('error', 'Failed to load committee data');
@@ -140,7 +218,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   };
 
   const handleSavePosition = async (positionData: Partial<PositionDefinition>) => {
-    if (!currentClub) return;
+    if (!isAssociationContext && !currentClub) return;
 
     try {
       if (editingPosition) {
@@ -153,6 +231,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             dashboard_template_id: positionData.dashboard_template_id,
             position_priority: positionData.position_priority,
             show_on_website: positionData.show_on_website,
+            access_level: positionData.access_level,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingPosition.id);
@@ -164,18 +243,30 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
           ? Math.max(...positions.map(p => p.display_order))
           : 0;
 
+        const insertData: Record<string, any> = {
+          position_name: positionData.position_name,
+          description: positionData.description,
+          is_executive: false,
+          display_order: maxOrder + 1,
+          dashboard_template_id: positionData.dashboard_template_id,
+          position_priority: positionData.position_priority,
+          show_on_website: positionData.show_on_website,
+          access_level: positionData.access_level
+        };
+
+        if (isAssociationContext && effectiveAssocId) {
+          if (effectiveAssocType === 'state') {
+            insertData.state_association_id = effectiveAssocId;
+          } else {
+            insertData.national_association_id = effectiveAssocId;
+          }
+        } else {
+          insertData.club_id = currentClub!.clubId;
+        }
+
         const { error } = await supabase
           .from('committee_position_definitions')
-          .insert({
-            club_id: currentClub.clubId,
-            position_name: positionData.position_name,
-            description: positionData.description,
-            is_executive: false,
-            display_order: maxOrder + 1,
-            dashboard_template_id: positionData.dashboard_template_id,
-            position_priority: positionData.position_priority,
-            show_on_website: positionData.show_on_website
-          });
+          .insert(insertData);
 
         if (error) throw error;
         addNotification('success', 'Position created successfully');
@@ -186,7 +277,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
       fetchData();
     } catch (error: any) {
       console.error('Error saving position:', error);
-      addNotification('error', 'Failed to save position');
+      addNotification('error', error?.message || 'Failed to save position');
     }
   };
 
@@ -209,7 +300,7 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
   };
 
   const handleAddMember = async (positionDefId: string, memberId: string) => {
-    if (!currentClub) return;
+    if (!isAssociationContext && !currentClub) return;
 
     try {
       const position = positions.find(p => p.id === positionDefId);
@@ -227,26 +318,76 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
         return;
       }
 
+      const insertData: Record<string, any> = {
+        position_definition_id: positionDefId,
+        position_title: position.position_name,
+        title: position.position_name,
+        name: `${member.first_name} ${member.last_name}`,
+        email: member.email,
+        member_id: memberId
+      };
+
+      if (member.user_id) {
+        insertData.user_id = member.user_id;
+      }
+
+      if (isAssociationContext && effectiveAssocId) {
+        if (effectiveAssocType === 'state') {
+          insertData.state_association_id = effectiveAssocId;
+        } else {
+          insertData.national_association_id = effectiveAssocId;
+        }
+      } else {
+        insertData.club_id = currentClub!.clubId;
+      }
+
       const { error } = await supabase
         .from('committee_positions')
-        .insert({
-          club_id: currentClub.clubId,
-          position_definition_id: positionDefId,
-          position_title: position.position_name,
-          title: position.position_name,
-          name: `${member.first_name} ${member.last_name}`,
-          email: member.email,
-          member_id: memberId,
-          user_id: member.user_id
-        });
+        .insert(insertData);
 
       if (error) throw error;
 
+      if (isAssociationContext && effectiveAssocId && member.user_id) {
+        const assocTable = effectiveAssocType === 'state' ? 'user_state_associations' : 'user_national_associations';
+        const assocIdCol = effectiveAssocType === 'state' ? 'state_association_id' : 'national_association_id';
+
+        const { data: existing } = await supabase
+          .from(assocTable)
+          .select('id')
+          .eq('user_id', member.user_id)
+          .eq(assocIdCol, effectiveAssocId)
+          .maybeSingle();
+
+        if (!existing) {
+          const accessLevel = position.access_level || 'editor';
+          let role = 'member';
+          if (accessLevel === 'admin') {
+            role = effectiveAssocType === 'state' ? 'state_admin' : 'national_admin';
+          } else if (accessLevel === 'editor') {
+            role = 'editor';
+          }
+
+          const accessData: Record<string, any> = {
+            user_id: member.user_id,
+            role,
+          };
+          accessData[assocIdCol] = effectiveAssocId;
+
+          await supabase
+            .from(assocTable)
+            .insert(accessData);
+        }
+      }
+
       addNotification('success', 'Member assigned successfully');
       fetchData();
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (error: any) {
       console.error('Error assigning member:', error);
-      addNotification('error', 'Failed to assign member');
+      console.error('Error details:', error?.message, error?.code, error?.details, error?.hint);
+      addNotification('error', `Failed to assign member: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -327,12 +468,18 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">Committee Management</h2>
-          <p className="text-slate-400 mt-1">Define positions and assign members to your committee</p>
+          <h2 className="text-2xl font-bold text-white">
+            {isAssociationContext ? 'Association Committee Management' : 'Committee Management'}
+          </h2>
+          <p className="text-slate-400 mt-1">
+            {isAssociationContext
+              ? 'Define positions and assign members to your association committee'
+              : 'Define positions and assign members to your committee'}
+          </p>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-700">
+      <div className="flex items-center gap-2 border-b border-slate-700">
         <button
           onClick={() => setActiveTab('assignments')}
           className={`px-4 py-2 font-medium transition-colors ${
@@ -359,6 +506,33 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
               <Shield size={16} />
               Manage Positions
             </div>
+          </button>
+        )}
+        {(isAdmin || isStateAdmin || isNationalAdmin) && (
+          <button
+            onClick={() => setActiveTab('access-levels')}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === 'access-levels'
+                ? 'text-blue-400 border-b-2 border-blue-400'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <LayoutGrid size={16} />
+              Manage Access Levels
+            </div>
+          </button>
+        )}
+        {activeTab === 'positions' && canManage && !showPositionForm && (
+          <button
+            onClick={() => {
+              setEditingPosition(null);
+              setShowPositionForm(true);
+            }}
+            className="btn-primary-green ml-auto mb-1 flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl whitespace-nowrap"
+          >
+            <Plus size={20} strokeWidth={2.5} />
+            Add Position
           </button>
         )}
       </div>
@@ -416,19 +590,6 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
 
       {activeTab === 'positions' && canManage && (
         <div className="space-y-4">
-          {!showPositionForm && (
-            <button
-              onClick={() => {
-                setEditingPosition(null);
-                setShowPositionForm(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              <Plus size={16} />
-              Add Position
-            </button>
-          )}
-
           {showPositionForm && (
             <PositionForm
               position={editingPosition}
@@ -466,6 +627,18 @@ export const CommitteeManagement: React.FC<CommitteeManagementProps> = ({ darkMo
             </SortableContext>
           </DndContext>
         </div>
+      )}
+
+      {activeTab === 'access-levels' && (isAdmin || isStateAdmin || isNationalAdmin) && (
+        <AccessLevelManager
+          darkMode={darkMode}
+          scopeType={
+            isAssociationContext
+              ? effectiveAssocType === 'state' ? 'state_association' : 'national_association'
+              : 'club'
+          }
+          scopeId={isAssociationContext ? effectiveAssocId! : currentClub!.clubId}
+        />
       )}
     </div>
   );
@@ -519,6 +692,27 @@ const SortablePositionItem: React.FC<SortablePositionItemProps> = ({
         )}
       </div>
 
+      {position.access_level && (
+        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+          position.access_level === 'admin'
+            ? 'bg-amber-500/10 border-amber-500/20'
+            : position.access_level === 'editor'
+              ? 'bg-blue-500/10 border-blue-500/20'
+              : 'bg-slate-500/10 border-slate-500/20'
+        }`}>
+          <Shield size={11} className={
+            position.access_level === 'admin' ? 'text-amber-400'
+              : position.access_level === 'editor' ? 'text-blue-400'
+                : 'text-slate-400'
+          } />
+          <span className={`text-xs capitalize ${
+            position.access_level === 'admin' ? 'text-amber-400'
+              : position.access_level === 'editor' ? 'text-blue-400'
+                : 'text-slate-400'
+          }`}>{position.access_level}</span>
+        </div>
+      )}
+
       {position.show_on_website && (
         <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
           <Globe size={11} className="text-green-400" />
@@ -562,10 +756,15 @@ interface DashboardTemplate {
 const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel }) => {
   const isPresident = (name: string) => /president/i.test(name);
   const isSecretary = (name: string) => /secretary/i.test(name);
+  const isTreasurer = (name: string) => /treasurer/i.test(name);
+  const isExecutiveRole = (name: string) =>
+    isPresident(name) || name.toLowerCase().includes('vice president') || isSecretary(name) || isTreasurer(name);
 
   const defaultWebsite = position
     ? (position.show_on_website ?? false)
     : false;
+
+  const defaultAccessLevel = position?.access_level || 'editor';
 
   const [formData, setFormData] = useState({
     position_name: position?.position_name || '',
@@ -573,26 +772,31 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
     dashboard_template_id: position?.dashboard_template_id || null as string | null,
     position_priority: position?.position_priority ?? 50,
     show_on_website: defaultWebsite,
+    access_level: defaultAccessLevel,
   });
   const [templates, setTemplates] = useState<DashboardTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
 
-  // Auto-set show_on_website and dashboard template when name changes (new positions only)
   useEffect(() => {
     if (!position && templates.length > 0) {
       const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
       const autoTemplate = getDefaultTemplateForPosition(formData.position_name);
+      const autoAccess = isExecutiveRole(formData.position_name) ? 'admin' : 'editor';
       setFormData(prev => ({
         ...prev,
         show_on_website: shouldShow,
         dashboard_template_id: autoTemplate,
+        access_level: autoAccess,
       }));
     } else if (!position) {
       const shouldShow = isPresident(formData.position_name) || isSecretary(formData.position_name);
-      if (shouldShow !== formData.show_on_website) {
-        setFormData(prev => ({ ...prev, show_on_website: shouldShow }));
-      }
+      const autoAccess = isExecutiveRole(formData.position_name) ? 'admin' : 'editor';
+      setFormData(prev => ({
+        ...prev,
+        show_on_website: shouldShow,
+        access_level: autoAccess,
+      }));
     }
   }, [formData.position_name, templates]);
 
@@ -694,6 +898,43 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
             placeholder="Brief description of the role"
             rows={2}
           />
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <Shield size={13} />
+            System Access Level
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Members assigned to this position will receive this access level in the club
+          </p>
+          <div className="flex gap-2">
+            {[
+              { value: 'admin', label: 'Admin', color: 'amber', desc: 'Full access' },
+              { value: 'editor', label: 'Editor', color: 'blue', desc: 'Can edit' },
+              { value: 'viewer', label: 'Viewer', color: 'slate', desc: 'Read only' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, access_level: opt.value }))}
+                className={`flex-1 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border transition-all ${
+                  formData.access_level === opt.value
+                    ? `bg-${opt.color}-500/10 border-${opt.color}-500/30 text-${opt.color}-400`
+                    : 'border-slate-600/50 text-slate-500 hover:border-slate-500'
+                }`}
+                style={formData.access_level === opt.value ? {
+                  backgroundColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.1)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                  borderColor: opt.color === 'amber' ? 'rgba(245, 158, 11, 0.3)' : opt.color === 'blue' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(100, 116, 139, 0.3)',
+                  color: opt.color === 'amber' ? '#fbbf24' : opt.color === 'blue' ? '#60a5fa' : '#94a3b8',
+                } : {}}
+              >
+                <Shield size={16} />
+                <span className="text-xs font-medium">{opt.label}</span>
+                <span className="text-[10px] opacity-60">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Show on Website toggle */}
@@ -851,7 +1092,7 @@ const PositionForm: React.FC<PositionFormProps> = ({ position, onSave, onCancel 
       <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700/50 bg-slate-800/20">
         <button
           type="submit"
-          className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+          className="btn-primary-green flex-1 px-4 py-2.5 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
         >
           {position ? 'Save Changes' : 'Create Position'}
         </button>
@@ -919,6 +1160,26 @@ const SortablePositionCard: React.FC<SortablePositionCardProps> = ({
           <div className="flex items-center gap-2 mb-1">
             <span className="text-blue-400">{getPositionIcon(position.position_name)}</span>
             <h3 className="font-semibold text-white">{position.position_name}</h3>
+            {position.access_level && (
+              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
+                position.access_level === 'admin'
+                  ? 'bg-amber-500/10 border-amber-500/20'
+                  : position.access_level === 'editor'
+                    ? 'bg-blue-500/10 border-blue-500/20'
+                    : 'bg-slate-500/10 border-slate-500/20'
+              }`}>
+                <Shield size={10} className={
+                  position.access_level === 'admin' ? 'text-amber-400'
+                    : position.access_level === 'editor' ? 'text-blue-400'
+                      : 'text-slate-400'
+                } />
+                <span className={`text-xs capitalize ${
+                  position.access_level === 'admin' ? 'text-amber-400'
+                    : position.access_level === 'editor' ? 'text-blue-400'
+                      : 'text-slate-400'
+                }`}>{position.access_level}</span>
+              </span>
+            )}
             {position.show_on_website && (
               <span className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full">
                 <Globe size={10} className="text-green-400" />

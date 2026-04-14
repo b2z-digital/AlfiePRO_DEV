@@ -19,6 +19,8 @@ import { useNotifications } from './contexts/NotificationContext';
 import { InvitationSignup } from './pages/InvitationSignup';
 import { OnboardingRouter } from './components/onboarding/OnboardingRouter';
 import { ApplicationPendingScreen } from './components/onboarding/ApplicationPendingScreen';
+import { CancelledMembershipScreen } from './components/onboarding/CancelledMembershipScreen';
+import { UnfinancialMemberScreen } from './components/onboarding/UnfinancialMemberScreen';
 import { ClubSelfRegistration } from './components/auth/ClubSelfRegistration';
 import { ClubApplicationPendingScreen } from './components/auth/ClubApplicationPendingScreen';
 import { PublicClubHomepageNew } from './components/public/PublicClubHomepageNew';
@@ -53,7 +55,27 @@ import { SubdomainProvider } from './contexts/SubdomainContext';
 import AlfieTVPage from './pages/AlfieTVPage';
 import StripeOAuthCallback from './components/StripeOAuthCallback';
 import { HMSValidatorPage } from './pages/HMSValidatorPage';
+import PublicVideoPlayer from './components/public/PublicVideoPlayer';
+import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import './styles/index.css';
+
+function useIsMobilePhone() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const width = window.innerWidth;
+      const isMobileWidth = width < 768;
+      const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      setIsMobile(isMobileWidth && hasTouchScreen);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  return isMobile;
+}
 
 function App() {
   // Use lightMode from localStorage to match the rest of the app
@@ -74,15 +96,26 @@ function App() {
   }, []);
   const [showScoring, setShowScoring] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<RaceEvent | null>(null);
-  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs } = useAuth();
+  const { user, loading, clubsLoaded, isLoggingOut, onboardingCompleted, hasPendingApplication, hasPendingClubApplication, userClubs, hasCancelledMembership, cancelledMemberships, hasUnfinancialMember, unfinancialMemberData } = useAuth();
   const { notifications, removeNotification } = useNotifications();
 
+  const isMobilePhone = useIsMobilePhone();
+
   useDataPreloader();
+
+  // Public video player - bypass ALL auth checks entirely
+  if (window.location.pathname.startsWith('/play/')) {
+    return (
+      <Routes>
+        <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
+      </Routes>
+    );
+  }
 
   // Detect if we're on a subdomain or custom domain (for public club websites)
   const hostname = window.location.hostname;
   const isAlfieproDomain = hostname.includes('.alfiepro.com.au') || hostname === 'alfiepro.com.au';
-  const isMainDomain = hostname === 'alfiepro.com.au' || hostname === 'www.alfiepro.com.au';
+  const isMainDomain = hostname === 'alfiepro.com.au' || hostname === 'www.alfiepro.com.au' || hostname === 'app.alfiepro.com.au';
   const isSubdomain = isAlfieproDomain &&
                       !isMainDomain &&
                       !hostname.startsWith('www.');
@@ -122,7 +155,10 @@ function App() {
   // Allow OAuth callbacks and public routes to work even during loading
   const isPublicRoute = window.location.pathname.startsWith('/stripe-oauth-callback') ||
                         window.location.pathname.startsWith('/auth/callback/youtube') ||
-                        window.location.pathname.startsWith('/mobile-stream');
+                        window.location.pathname.startsWith('/mobile-stream') ||
+                        window.location.pathname.startsWith('/play/') ||
+                        window.location.pathname.startsWith('/reset-password') ||
+                        window.location.pathname.startsWith('/forgot-password');
 
   console.log('🔍 App.tsx auth check:', {
     loading,
@@ -202,6 +238,10 @@ function App() {
           <Route path="/club/:clubId/public/results" element={<PublicResultsListPage />} />
           <Route path="/club/:clubId/public/results/:eventId" element={<PublicResultsPage />} />
 
+        {/* Global Public Legal Pages - no club context required */}
+        <Route path="/privacy-policy" element={<PublicPrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<PublicTermsOfServicePage />} />
+
         {/* Public Event Website Routes */}
         <Route path="/events/:slug/*" element={<PublicEventWebsitePage />} />
 
@@ -210,12 +250,17 @@ function App() {
 
         {/* Live Tracking Routes (Public) */}
         <Route path="/t/:token" element={<LiveTrackingPage />} />
+        <Route path="/t/:token/dashboard" element={<LiveDashboardPage />} />
+        <Route path="/t/:token/pro-broadcast" element={<ProBroadcastView />} />
         <Route path="/live/:token" element={<LiveTrackingPage />} />
         <Route path="/live/:token/dashboard" element={<LiveDashboardPage />} />
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
 
         {/* Mobile Livestream Route (Public) */}
         <Route path="/mobile-stream/:sessionId" element={<MobileStreamPage />} />
+
+        {/* Public Video Player (used by native mobile app for AlfieTV) */}
+        <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
 
         {/* AlfieTV Full-Screen Route */}
         <Route path="/alfie-tv" element={
@@ -263,11 +308,18 @@ function App() {
         <Route path="/stripe-oauth-callback" element={<StripeOAuthCallback />} />
         <Route path="/onboarding" element={
           isAuthenticated ? (
-            hasPendingApplication ? <Navigate to="/application-pending" /> : <OnboardingRouter darkMode={darkMode} />
+            hasPendingApplication ? <Navigate to="/application-pending" /> :
+            (clubsLoaded && userClubs.length > 0 && onboardingCompleted) ? <Navigate to="/" /> :
+            <OnboardingRouter darkMode={darkMode} />
           ) : <Navigate to="/login" />
         } />
         <Route path="/application-pending" element={
           isAuthenticated ? <ApplicationPendingScreen darkMode={darkMode} /> : <Navigate to="/login" />
+        } />
+        <Route path="/cancelled-membership" element={
+          isAuthenticated ? (
+            <CancelledMembershipScreen cancelledMemberships={cancelledMemberships} darkMode={darkMode} />
+          ) : <Navigate to="/login" />
         } />
         <Route path="/onboarding/subscribe" element={<SubscriptionSelection />} />
         <Route path="/onboarding/success" element={<SubscriptionSuccess />} />
@@ -306,6 +358,8 @@ function App() {
               <Navigate to="/application-pending" />
             ) : hasPendingClubApplication ? (
               <Navigate to="/club-application-pending" />
+            ) : hasCancelledMembership ? (
+              <CancelledMembershipScreen cancelledMemberships={cancelledMemberships} darkMode={darkMode} />
             ) : !clubsLoaded ? (
               <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
@@ -315,6 +369,10 @@ function App() {
               </div>
             ) : userClubs.length === 0 && !onboardingCompleted ? (
               <Navigate to="/onboarding" />
+            ) : hasUnfinancialMember && unfinancialMemberData ? (
+              <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />
+            ) : isMobilePhone ? (
+              <MobileAppComingSoon />
             ) : (
               <DashboardLayout
                 darkMode={darkMode}

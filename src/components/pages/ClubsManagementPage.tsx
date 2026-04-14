@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building, Plus, Users, CheckCircle, Grid, List, Eye, UserPlus, DollarSign, AlertCircle, MapPin as MapPinIcon, Edit2, Trash2, MoreVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, XCircle, Check, X } from 'lucide-react';
+import { Building, Plus, Users, CircleCheck as CheckCircle, Grid2x2 as Grid, List, Eye, UserPlus, DollarSign, CircleAlert as AlertCircle, MapPin as MapPinIcon, Pencil, Trash2, EllipsisVertical, Anchor, Calendar, Trophy, TrendingUp, Clock, Circle as XCircle, Check, X, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { ClubOnboardingWizard } from './ClubOnboardingWizard';
+import { ManageClubAdminsModal } from './ManageClubAdminsModal';
 import { useNavigate } from 'react-router-dom';
 import { loadGoogleMaps } from '../../utils/googleMaps';
 
@@ -14,6 +15,7 @@ interface SailingDay {
   start_time: string;
   end_time: string;
   boat_class_name?: string;
+  frequency?: string;
 }
 
 interface Club {
@@ -77,6 +79,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [pendingClubs, setPendingClubs] = useState<PendingClub[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
+  const [manageAdminsClub, setManageAdminsClub] = useState<{ id: string; name: string } | null>(null);
   const { addNotification } = useNotification();
 
   useEffect(() => {
@@ -161,6 +164,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         .eq('state_association_id', stateAssociationId)
         .neq('approval_status', 'pending_approval')
         .neq('approval_status', 'rejected')
+        .neq('is_test', true)
         .order('name', { ascending: true });
 
       console.log('ClubsManagementPage: Clubs query result:', { data, error, count: data?.length });
@@ -235,6 +239,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                 start_time,
                 end_time,
                 boat_class_id,
+                frequency,
                 boat_classes(name)
               `)
               .eq('club_id', club.id)
@@ -290,7 +295,8 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             day_of_week: sd.day_of_week,
             start_time: sd.start_time,
             end_time: sd.end_time,
-            boat_class_name: sd.boat_classes?.name || null
+            boat_class_name: sd.boat_classes?.name || null,
+            frequency: sd.frequency || 'every_week'
           }));
 
           // Log all query results for debugging
@@ -358,6 +364,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
         .select('id, name, abbreviation, location, email, phone, club_introduction, approval_status, registered_by_user_id, created_at')
         .eq('state_association_id', stateAssociationId)
         .eq('approval_status', 'pending_approval')
+        .neq('is_test', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -398,22 +405,13 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       const club = pendingClubs.find(c => c.id === clubId);
 
       if (club?.registered_by_user_id) {
-        const { data: existingLink } = await supabase
+        await supabase
           .from('user_clubs')
-          .select('id')
-          .eq('user_id', club.registered_by_user_id)
-          .eq('club_id', clubId)
-          .maybeSingle();
-
-        if (!existingLink) {
-          await supabase
-            .from('user_clubs')
-            .insert({
-              user_id: club.registered_by_user_id,
-              club_id: clubId,
-              role: 'admin',
-            });
-        }
+          .upsert({
+            user_id: club.registered_by_user_id,
+            club_id: clubId,
+            role: 'admin',
+          }, { onConflict: 'user_id,club_id' });
       }
 
       addNotification('success', `${club?.name || 'Club'} has been approved`);
@@ -820,7 +818,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
               </div>
               <button
                 onClick={() => setShowAddClubModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2.5 text-white rounded-lg font-medium transition-colors"
               >
                 <Plus size={20} />
                 Add Club
@@ -958,7 +956,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                     </button>
                     <button
                       onClick={() => handleApproveClub(club.id)}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="btn-primary-green flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       <Check size={14} />
                       Approve
@@ -1051,7 +1049,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                           : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <MoreVertical size={18} />
+                      <EllipsisVertical size={18} />
                     </button>
                     {openMenuId === club.id && (
                       <>
@@ -1065,6 +1063,20 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                             : 'bg-white border-slate-200'
                         }`}>
                           <button
+                            onClick={() => {
+                              setManageAdminsClub({ id: club.id, name: club.name });
+                              setOpenMenuId(null);
+                            }}
+                            className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                              darkMode
+                                ? 'text-amber-300 hover:bg-slate-700'
+                                : 'text-amber-700 hover:bg-amber-50'
+                            }`}
+                          >
+                            <Shield size={14} />
+                            Manage Access
+                          </button>
+                          <button
                             onClick={() => handleEditClub(club.id)}
                             className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                               darkMode
@@ -1072,7 +1084,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                                 : 'text-slate-700 hover:bg-slate-50'
                             }`}
                           >
-                            <Edit2 size={14} />
+                            <Pencil size={14} />
                             Edit Club
                           </button>
                           <button
@@ -1098,12 +1110,17 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                         <Calendar size={14} className="text-blue-400" />
                         <span className="text-xs font-medium text-blue-400">REGULAR SAILING</span>
                       </div>
-                      {club.sailing_days.slice(0, 2).map((day) => (
-                        <div key={day.id} className="flex items-center gap-2 text-xs">
+                      {club.sailing_days.slice(0, 3).map((day) => (
+                        <div key={day.id} className="flex items-center gap-2 text-xs flex-wrap">
                           <Clock size={12} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
                           <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                             {day.day_of_week}
                           </span>
+                          {day.frequency && day.frequency !== 'every_week' && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-xs">
+                              {day.frequency === 'week_a' ? 'Wk A' : 'Wk B'}
+                            </span>
+                          )}
                           <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
                             {day.start_time.substring(0, 5)} - {day.end_time.substring(0, 5)}
                           </span>
@@ -1114,9 +1131,9 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                           )}
                         </div>
                       ))}
-                      {club.sailing_days.length > 2 && (
+                      {club.sailing_days.length > 3 && (
                         <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                          +{club.sailing_days.length - 2} more
+                          +{club.sailing_days.length - 3} more
                         </div>
                       )}
                     </div>
@@ -1365,7 +1382,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                             : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        <MoreVertical size={18} />
+                        <EllipsisVertical size={18} />
                       </button>
                       {openMenuId === club.id && (
                         <>
@@ -1379,6 +1396,20 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                               : 'bg-white border-slate-200'
                           }`}>
                             <button
+                              onClick={() => {
+                                setManageAdminsClub({ id: club.id, name: club.name });
+                                setOpenMenuId(null);
+                              }}
+                              className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                                darkMode
+                                  ? 'text-amber-300 hover:bg-slate-700'
+                                  : 'text-amber-700 hover:bg-amber-50'
+                              }`}
+                            >
+                              <Shield size={14} />
+                              Manage Access
+                            </button>
+                            <button
                               onClick={() => handleEditClub(club.id)}
                               className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                                 darkMode
@@ -1386,7 +1417,7 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
                                   : 'text-slate-700 hover:bg-slate-50'
                               }`}
                             >
-                              <Edit2 size={14} />
+                              <Pencil size={14} />
                               Edit Club
                             </button>
                             <button
@@ -1414,9 +1445,10 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       <ClubOnboardingWizard
         isOpen={showAddClubModal}
         onClose={() => setShowAddClubModal(false)}
-        onSuccess={() => {
-          loadClubs();
+        onSuccess={async () => {
           setShowAddClubModal(false);
+          await loadClubs();
+          await loadPendingClubs();
         }}
         stateAssociationId={currentOrganization?.id || ''}
         darkMode={darkMode}
@@ -1430,10 +1462,10 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
             setShowEditModal(false);
             setSelectedClubId(null);
           }}
-          onSuccess={() => {
-            loadClubs();
+          onSuccess={async () => {
             setShowEditModal(false);
             setSelectedClubId(null);
+            await loadClubs();
           }}
           stateAssociationId={currentOrganization?.id || ''}
           darkMode={darkMode}
@@ -1442,6 +1474,16 @@ export const ClubsManagementPage: React.FC<ClubsManagementPageProps> = ({ darkMo
       )}
 
       {/* Delete Confirmation Modal */}
+      {manageAdminsClub && (
+        <ManageClubAdminsModal
+          isOpen={!!manageAdminsClub}
+          onClose={() => setManageAdminsClub(null)}
+          clubId={manageAdminsClub.id}
+          clubName={manageAdminsClub.name}
+          darkMode={darkMode}
+        />
+      )}
+
       {showDeleteConfirm && clubToDelete && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`w-full max-w-md rounded-xl shadow-2xl ${

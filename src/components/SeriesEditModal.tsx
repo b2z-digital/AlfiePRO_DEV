@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calculator, Save, ChevronDown, Edit2, Check } from 'lucide-react';
+import { X, Calculator, Save, ChevronDown, SquarePen as Edit2, Check } from 'lucide-react';
 import { RaceSeries } from '../types/race';
 import { Avatar } from './ui/Avatar';
 
@@ -603,7 +603,7 @@ export const SeriesEditModal: React.FC<SeriesEditModalProps> = ({
           </button>
           <button
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg transition-colors"
           >
             <Save size={18} />
             Save Changes

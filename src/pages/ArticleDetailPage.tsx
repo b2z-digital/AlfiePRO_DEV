@@ -6,7 +6,7 @@ import { formatDate } from '../utils/date';
 import { getArticleById, deleteArticle } from '../utils/articleStorage';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 
-const DEFAULT_COVER_IMAGE = '/RC-Yachts-image-custom_crop.jpg';
+const DEFAULT_COVER_IMAGE = '/alfie_app_logo.svg';
 
 const ArticleDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -130,6 +130,7 @@ const ArticleDetailPage: React.FC = () => {
               src={article.cover_image || DEFAULT_COVER_IMAGE}
               alt={article.title}
               className="w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_COVER_IMAGE; }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/30 to-transparent"></div>
 

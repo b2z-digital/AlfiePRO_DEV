@@ -1,17 +1,7 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-  Calendar,
-  User,
-  Clock,
-  AlertCircle,
-  CheckCircle2,
-  MoreVertical,
-  Tag,
-  Link as LinkIcon,
-  MessageSquare,
-} from 'lucide-react';
+import { Calendar, User, Clock, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, MoveVertical as MoreVertical, Tag, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import { EnhancedTask } from '../../types/eventCommandCenter';
 import { format } from 'date-fns';
 
@@ -218,7 +208,7 @@ export const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({ task, onTaskClic
 
       {/* Completed indicator */}
       {task.status === 'completed' && (
-        <div className="mt-2 px-2 py-1 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
+        <div className="mt-2 px-2 py-1 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded text-xs text-green-700 dark:text-green-400 flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" />
           Completed
         </div>

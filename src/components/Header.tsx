@@ -132,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </p>
                       </div>
                       {currentClub?.clubId === club.clubId && (
-                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <div className="w-2 h-2 rounded-full"></div>
                       )}
                     </button>
                   ))}

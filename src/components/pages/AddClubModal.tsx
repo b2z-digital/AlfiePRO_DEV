@@ -172,7 +172,7 @@ export const AddClubModal: React.FC<AddClubModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 rounded-lg font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+              className="btn-primary-green flex-1 px-4 py-2 rounded-lg font-medium text-white transition-colors disabled:opacity-50"
             >
               {loading ? 'Adding...' : 'Add Club'}
             </button>

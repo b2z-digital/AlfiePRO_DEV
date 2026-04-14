@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, Edit2, Check, AlertTriangle, Sailboat, Eye } from 'lucide-react';
+import { X, Settings, Trophy, Users, Shuffle, Hash, Award, Sun, Moon, SquarePen as Edit2, Check, TriangleAlert as AlertTriangle, Sailboat, Eye } from 'lucide-react';
 import { HeatManagement, HeatConfiguration, SeedingMethod } from '../types/heat';
 import { Skipper } from '../types';
-import { seedInitialHeats, validateHeatConfig, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
+import { seedInitialHeats, validateHeatConfig, validateHeatAssignments, HMSConfig, calculateOptimalHeats } from '../utils/hmsHeatSystem';
 import { seedInitialHeatsForSHRS, calculateOptimalHeats as calculateOptimalHeatsSHRS, validateSHRSConfig, SHRSConfig, generatePreSetQualifyingAssignments, seedSHRSHeatsByIndex } from '../utils/shrsHeatSystem';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { HMSSeedingModal } from './HMSSeedingModal';
@@ -516,7 +516,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     onSaveSettings({
       numRaces: currentNumRaces,
       dropRules: currentDropRules,
-      heatManagement: finalHeatManagement
+      heatManagement: finalHeatManagement,
+      displaySettings: {
+        show_flag: showFlag,
+        show_country: showCountry
+      },
+      observerSettings: {
+        enable_observers: enableObservers,
+        observers_per_heat: observersPerHeat
+      }
     });
 
     setShowManualAssignmentModal(false);
@@ -572,7 +580,15 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
     onSaveSettings({
       numRaces: currentNumRaces,
       dropRules: currentDropRules,
-      heatManagement: finalHeatManagement
+      heatManagement: finalHeatManagement,
+      displaySettings: {
+        show_flag: showFlag,
+        show_country: showCountry
+      },
+      observerSettings: {
+        enable_observers: enableObservers,
+        observers_per_heat: observersPerHeat
+      }
     });
 
     setShowHMSSeedingModal(false);
@@ -733,6 +749,11 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
               maxHeatSize: 12
             };
             heatAssignments = seedInitialHeats(skippers, hmsSeederConfig);
+
+            const assignmentProblems = validateHeatAssignments(heatAssignments, skippers.length);
+            if (assignmentProblems.length > 0) {
+              console.warn('Heat assignment validation issues:', assignmentProblems);
+            }
           }
 
           let allRounds;
@@ -2177,6 +2198,14 @@ export const RaceSettingsModal: React.FC<RaceSettingsModalProps> = ({
                 results: [],
                 completed: false
               }]
+            },
+            displaySettings: {
+              show_flag: showFlag,
+              show_country: showCountry
+            },
+            observerSettings: {
+              enable_observers: enableObservers,
+              observers_per_heat: observersPerHeat
             }
           });
 

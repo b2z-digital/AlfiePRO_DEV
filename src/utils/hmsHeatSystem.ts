@@ -17,75 +17,107 @@ export type PromotionSchedule = 'A' | 'B' | 'C';
 export interface HMSConfig {
   numberOfHeats: number;
   promotionCount: number; // 4 or 6 typically
+  promotionCountOverrides?: Record<number, number>; // Per-race promotion count overrides
   seedingMethod: SeedingMethod;
   maxHeatSize?: number; // Safety limit
 }
 
 /**
  * Get the promotion schedule to use based on race number and configuration
- * Race 2: Schedule A (redistribute all skippers based on R1 overall fleet ranking)
- * Race 3+: Schedule B/C (normal 4-up/4-down or 6-up/6-down promotion/relegation)
+ * Race 1: No promotion (seeding round)
+ * Race 2+: Schedule B (promote 4) or Schedule C (promote 6)
+ * Per HMS VBA reference: Race 2 uses the SAME promotion/relegation as Race 3+
  */
 export function getPromotionSchedule(raceNumber: number, promotionCount: number): PromotionSchedule {
-  // Race 2: Apply Schedule A after seeding round to redistribute all skippers
-  if (raceNumber === 2) {
-    return 'A';
+  if (raceNumber <= 1) {
+    return 'A'; // Not used for Race 1 (Promote=0), but return a value
   }
-  // Race 3+: Use Schedule B or C for normal promotion/relegation
   return promotionCount === 6 ? 'C' : 'B';
 }
 
 /**
- * Calculate tie-break position for skippers with same total score
- * HMS rules: Use all races INCLUDING discards for tie-break
- * Exclude Race 1 from tie-break calculations per HMS
- * Compare: number of 1sts, then 2nds, then 3rds, etc.
- * If still tied, use last race result
+ * Calculate tie-break for skippers with same total score per HMS VBA rules.
+ *
+ * Algorithm (matches VBA exactly):
+ * 1. Collect all race scores excluding Race 1 (when useHMS=true).
+ *    Include discards -- all race scores are used for tie-breaking.
+ * 2. Sort each skipper's scores from WORST to BEST (descending by value).
+ * 3. Compare column by column: lowest value wins each column.
+ * 4. If best-scores comparison fails, compare race finishes in REVERSE
+ *    chronological order (last race first, working backwards). Per RRS A8.2.
+ * 5. If still tied, return original order (unbreakable tie).
  */
 export function breakTie(
   skipperIndices: number[],
   allResults: SkipperRaceResult[],
-  discardedRaces: Map<number, number[]>
+  discardedRaces: Map<number, number[]>,
+  useHMS: boolean = true,
+  manualTieBreaks?: Map<number, number>
 ): number[] {
   if (skipperIndices.length <= 1) return skipperIndices;
 
-  // Get all results for these skippers, EXCLUDING Race 1
-  const skipperResults = skipperIndices.map(skipperIdx => {
-    const results = allResults
-      .filter(r => r.skipperIndex === skipperIdx && r.race > 1) // Exclude Race 1
-      .sort((a, b) => (a.position || 999) - (b.position || 999));
-    return { skipperIdx, results };
+  const minRace = useHMS ? 2 : 1; // Exclude Race 1 when HMS mode
+
+  // Phase 1: Best scores comparison (sorted worst-to-best, compared column by column)
+  const skipperBestScores = skipperIndices.map(skipperIdx => {
+    const scores = allResults
+      .filter(r => r.skipperIndex === skipperIdx && r.race >= minRace && r.position)
+      .map(r => Math.round((r.position || 999) * 10) / 10); // Round to 1 decimal like VBA
+    scores.sort((a, b) => b - a); // Descending (worst first, best last) -- matches VBA LARGE()
+    return { skipperIdx, scores };
   });
 
-  // Compare by counting 1sts, 2nds, 3rds, etc.
-  for (let position = 1; position <= 20; position++) {
-    const counts = skipperResults.map(sr => ({
-      skipperIdx: sr.skipperIdx,
-      count: sr.results.filter(r => r.position === position).length
+  // Find the maximum number of score columns to compare
+  const maxCols = Math.max(...skipperBestScores.map(s => s.scores.length));
+
+  // Compare column by column (VBA iterates through sorted scores)
+  for (let col = 0; col < maxCols; col++) {
+    const colValues = skipperBestScores.map(s => ({
+      skipperIdx: s.skipperIdx,
+      value: col < s.scores.length ? s.scores[col] : 999
     }));
 
-    // Sort by this position count (descending)
-    counts.sort((a, b) => b.count - a.count);
+    colValues.sort((a, b) => a.value - b.value); // Lowest wins
 
-    // If there's a clear winner at this position, use that order
-    if (counts[0].count > counts[1]?.count) {
-      const sorted = counts.map(c => c.skipperIdx);
-      // Return in the order that maintains ties for those still tied
-      return sorted;
+    // Check if first is uniquely best
+    if (colValues.length >= 2 && colValues[0].value < colValues[1].value) {
+      return colValues.map(c => c.skipperIdx);
     }
   }
 
-  // Still tied? Use last race result
-  const lastRaceNum = Math.max(...allResults.map(r => r.race));
-  const lastRaceResults = allResults.filter(r => r.race === lastRaceNum);
+  // Phase 2: Reverse chronological order of ALL race finishes (RRS A8.2)
+  const allRaceNums = [...new Set(allResults
+    .filter(r => r.race >= minRace)
+    .map(r => r.race))]
+    .sort((a, b) => b - a); // Last race first
 
-  return skipperIndices.sort((a, b) => {
-    const aResult = lastRaceResults.find(r => r.skipperIndex === a);
-    const bResult = lastRaceResults.find(r => r.skipperIndex === b);
-    const aPos = aResult?.position || 999;
-    const bPos = bResult?.position || 999;
-    return aPos - bPos;
-  });
+  for (const raceNum of allRaceNums) {
+    const raceResults = allResults.filter(r => r.race === raceNum);
+    const racePositions = skipperIndices.map(skipperIdx => ({
+      skipperIdx,
+      position: raceResults.find(r => r.skipperIndex === skipperIdx)?.position || 999
+    }));
+
+    racePositions.sort((a, b) => a.position - b.position);
+
+    if (racePositions.length >= 2 && racePositions[0].position < racePositions[1].position) {
+      return racePositions.map(r => r.skipperIdx);
+    }
+  }
+
+  // Phase 3: Manual tie-break values (race officer assigned)
+  if (manualTieBreaks && manualTieBreaks.size > 0) {
+    const withManual = skipperIndices
+      .map(idx => ({ idx, tieBreak: manualTieBreaks.get(idx) ?? 999 }))
+      .sort((a, b) => a.tieBreak - b.tieBreak);
+
+    if (withManual.length >= 2 && withManual[0].tieBreak < withManual[1].tieBreak) {
+      return withManual.map(m => m.idx);
+    }
+  }
+
+  // Unbreakable tie -- return original order
+  return skipperIndices;
 }
 
 /**
@@ -95,8 +127,11 @@ export function breakTie(
 export function calculateFleetBoard(
   allResults: SkipperRaceResult[],
   skippers: Skipper[],
-  dropRules: number[]
+  dropRules: number[],
+  numberOfHeats: number = 2,
+  manualTieBreaks?: Map<number, number>
 ): Array<{ skipperIndex: number; totalScore: number; position: number; discards: number[] }> {
+  const useHMS = numberOfHeats > 1;
   const skipperScores = new Map<number, { scores: number[]; races: number[] }>();
 
   // Initialize all skippers
@@ -156,7 +191,7 @@ export function calculateFleetBoard(
   scoredSkippers.sort((a, b) => {
     if (a.totalScore === b.totalScore) {
       // Tie-break
-      const tied = breakTie([a.skipperIndex, b.skipperIndex], allResults, new Map());
+      const tied = breakTie([a.skipperIndex, b.skipperIndex], allResults, new Map(), useHMS, manualTieBreaks);
       return tied.indexOf(a.skipperIndex) - tied.indexOf(b.skipperIndex);
     }
     return a.totalScore - b.totalScore;
@@ -584,14 +619,15 @@ function applyScheduleBC(
 
 /**
  * Generate heat assignments for next race based on current results
+ * Per HMS VBA: Race 2+ ALL use the same Schedule B/C promotion/relegation.
+ * Mid-round promotions/relegations are handled in completeHeat().
+ * Between rounds, we simply preserve the final heat composition.
  */
 export function generateHeatAssignmentsForNextRace(
   currentRace: number,
   currentRound: HeatRound,
   config: HMSConfig
 ): HeatAssignment[] {
-  const schedule = getPromotionSchedule(currentRace + 1, config.promotionCount);
-
   // Group results by heat
   const heatResults = new Map<HeatDesignation, HeatResult[]>();
   currentRound.results.forEach(result => {
@@ -601,13 +637,9 @@ export function generateHeatAssignmentsForNextRace(
     heatResults.get(result.heatDesignation)!.push(result);
   });
 
-  if (schedule === 'A') {
-    // Schedule A: Redistribute all skippers based on overall fleet ranking
-    return applyScheduleA(currentRound.heatAssignments, heatResults, config);
-  } else {
-    // Schedule B/C: Normal promotion/relegation (4 or 6 up/down)
-    return applyScheduleBC(currentRound.heatAssignments, heatResults, config);
-  }
+  // All rounds use Schedule B/C: preserve current heat composition
+  // Mid-round promotions/relegations have already been applied by completeHeat()
+  return applyScheduleBC(currentRound.heatAssignments, heatResults, config);
 }
 
 /**
@@ -652,7 +684,7 @@ export function calculateOptimalHeats(totalSkippers: number): {
   promotionCount: number;
 } {
   const MIN_FLEET_SIZE = 12;
-  const MAX_FLEET_SIZE = 20;
+  const MAX_FLEET_SIZE = 24;
   const MAX_HEATS = 5;
   const MIN_PROMOTION = 4;
 
@@ -736,4 +768,40 @@ export function validateHeatConfig(
     errors,
     warnings
   };
+}
+
+/**
+ * Validate that each skipper appears exactly once across all heats in a round.
+ * Per HMS VBA: every registered boat must appear in exactly one heat per round.
+ * Returns list of problems found (empty = valid).
+ */
+export function validateHeatAssignments(
+  assignments: HeatAssignment[],
+  totalSkippers: number
+): string[] {
+  const problems: string[] = [];
+  const seen = new Map<number, HeatDesignation>();
+
+  for (const assignment of assignments) {
+    for (const skipperIdx of assignment.skipperIndices) {
+      const existing = seen.get(skipperIdx);
+      if (existing) {
+        problems.push(`Skipper #${skipperIdx} appears in both Heat ${existing} and Heat ${assignment.heatDesignation}`);
+      } else {
+        seen.set(skipperIdx, assignment.heatDesignation);
+      }
+    }
+  }
+
+  if (seen.size < totalSkippers) {
+    const missing: number[] = [];
+    for (let i = 0; i < totalSkippers; i++) {
+      if (!seen.has(i)) missing.push(i);
+    }
+    if (missing.length > 0) {
+      problems.push(`${missing.length} skipper(s) not assigned to any heat: #${missing.join(', #')}`);
+    }
+  }
+
+  return problems;
 }

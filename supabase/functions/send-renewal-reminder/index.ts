@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
           type: 'system',
           title: 'Membership Renewal Reminder',
           message: notificationMessage,
-          action_url: '/dashboard/membership',
+          action_url: '/dashboard/my-membership',
           priority: daysUntilExpiry <= 7 ? 'high' : 'normal',
           read: false,
         })
@@ -159,7 +159,8 @@ Deno.serve(async (req: Request) => {
               renewal_date: member.renewal_date,
               membership_type: member.membership_level,
               club_id: club_id,
-              user_id: member.user_id
+              user_id: member.user_id,
+              member_id: member.id
             }
           })
         });

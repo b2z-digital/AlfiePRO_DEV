@@ -177,7 +177,7 @@ export default function LiveTrackingTabContent({
         {standingsLimit < dashboardData.standings.length && (
           <button
             onClick={handleLoadMore}
-            className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl font-semibold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-md"
+            className="btn-primary-green w-full mt-4 px-4 py-3 from-cyan-500 to-blue-600 text-white rounded-xl font-semibold hover:from-cyan-600 hover:to-blue-700 transition-all shadow-md"
           >
             Load More ({dashboardData.standings.length - standingsLimit} remaining)
           </button>
@@ -213,7 +213,7 @@ export default function LiveTrackingTabContent({
 
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-cyan-50 to-blue-50">
+        <div className="p-6 border-b border-slate-200 from-cyan-50 to-blue-50">
           <h3 className="text-2xl font-bold text-slate-900">Full Results Table</h3>
           <p className="text-sm text-slate-600 mt-1">Showing NET scores with drops applied</p>
         </div>

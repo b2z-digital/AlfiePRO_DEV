@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { HeatDesignation, HeatConfiguration, HeatManagement, getHeatColorClasses } from '../types/heat';
-import { Flag, ChevronDown, Users, Info, Grid } from 'lucide-react';
+import { Flag, ChevronDown, Users, Info, Grid2x2 as Grid } from 'lucide-react';
 
 interface HeatSelectorProps {
   heatManagement: HeatManagement;
@@ -134,7 +134,7 @@ export const HeatSelector: React.FC<HeatSelectorProps> = ({
                   {/* Completion Indicator */}
                   {status.completed && (
                     <div className="absolute top-2 right-2">
-                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs font-bold">✓</span>
                       </div>
                     </div>

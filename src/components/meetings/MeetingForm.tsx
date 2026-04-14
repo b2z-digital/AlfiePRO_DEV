@@ -1,11 +1,159 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Calendar, MapPin, Clock, Video, FileText, User, Plus, Trash2, ArrowLeft, Save, TriangleAlert as AlertTriangle, Users, Shield, Repeat, Info, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Meeting, MeetingFormData } from '../../types/meeting';
+import { Meeting, MeetingFormData, MeetingCategory, RecurrenceType } from '../../types/meeting';
 import { createMeeting, updateMeeting } from '../../utils/meetingStorage';
 import { supabase } from '../../utils/supabase';
 import { Member } from '../../types/member';
 import { MemberSelect } from '../ui/MemberSelect';
+import { loadGoogleMaps } from '../../utils/googleMaps';
+
+const recurrenceDescriptions: Record<RecurrenceType, string> = {
+  none: 'This meeting will not repeat',
+  weekly: 'Repeats every week on the same day',
+  fortnightly: 'Repeats every two weeks on the same day',
+  monthly: 'Repeats once a month on the same date',
+  quarterly: 'Repeats every three months',
+  yearly: 'Repeats once a year on the same date'
+};
+
+const RecurrenceSelector: React.FC<{
+  formData: { recurrence_type: RecurrenceType; recurrence_end_date: string; date: string };
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  recurrenceLabels: Record<RecurrenceType, string>;
+  recurrencePreviewDates: string[];
+}> = ({ formData, setFormData, recurrenceLabels, recurrencePreviewDates }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const isRecurring = formData.recurrence_type !== 'none';
+
+  return (
+    <div className="rounded-xl border border-slate-600/50 bg-slate-700/30 p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${isRecurring ? 'bg-blue-500/20' : 'bg-slate-600/50'}`}>
+            <Repeat size={18} className={isRecurring ? 'text-blue-400' : 'text-slate-400'} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-white">Recurring Meeting</p>
+            <p className="text-xs text-slate-400">
+              {recurrenceDescriptions[formData.recurrence_type]}
+            </p>
+          </div>
+        </div>
+
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className={`
+              flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border
+              ${isRecurring
+                ? 'bg-blue-600/20 text-blue-300 border-blue-500/40 hover:bg-blue-600/30'
+                : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+              }
+            `}
+          >
+            {recurrenceLabels[formData.recurrence_type]}
+            <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isOpen && (
+            <div className="absolute right-0 top-full mt-2 w-56 rounded-xl bg-slate-800 border border-slate-600/50 shadow-xl shadow-black/30 z-50 overflow-hidden">
+              {(Object.entries(recurrenceLabels) as [RecurrenceType, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setFormData((prev: any) => ({ ...prev, recurrence_type: key }));
+                    setIsOpen(false);
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors
+                    ${formData.recurrence_type === key
+                      ? 'bg-blue-600/20 text-blue-300'
+                      : 'text-slate-300 hover:bg-slate-700/70'
+                    }
+                  `}
+                >
+                  <span>{label}</span>
+                  {formData.recurrence_type === key && (
+                    <Check size={14} className="text-blue-400" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isRecurring && (
+        <div className="mt-4 pt-4 border-t border-slate-600/40 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                Repeat until
+              </label>
+              <div className="relative">
+                <Calendar size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={formData.recurrence_end_date}
+                  min={formData.date}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, recurrence_end_date: e.target.value }))}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm [color-scheme:dark]"
+                />
+              </div>
+            </div>
+            {recurrencePreviewDates.length > 0 && (
+              <p className="text-sm text-slate-300">
+                <span className="font-medium text-white">{recurrencePreviewDates.length + 1}</span> meetings will be created
+              </p>
+            )}
+          </div>
+
+          {recurrencePreviewDates.length > 0 && (
+            <div className="p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="px-2 py-0.5 rounded text-xs bg-blue-600/30 text-blue-300 border border-blue-500/30">
+                  {new Date(formData.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+                {recurrencePreviewDates.slice(0, 11).map((date, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded text-xs bg-slate-600/50 text-slate-300">
+                    {new Date(date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                ))}
+                {recurrencePreviewDates.length > 11 && (
+                  <span className="px-2 py-0.5 rounded text-xs text-slate-400">
+                    +{recurrencePreviewDates.length - 11} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!formData.recurrence_end_date && (
+            <p className="text-xs text-amber-400 flex items-center gap-1">
+              <Info size={12} />
+              Please select an end date for the recurring series
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface MeetingFormProps {
   clubId?: string;
@@ -26,7 +174,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   onSuccess,
   onCancel
 }) => {
-  const { user } = useAuth();
+  const { user, currentClub, currentOrganization } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -43,9 +191,16 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     { item_number: 2, item_name: '', owner_id: undefined, type: 'for_discussion' }
   ]);
   
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<any>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
   const [formData, setFormData] = useState<{
     name: string;
     location: string;
+    location_lat: number | null;
+    location_lng: number | null;
+    location_place_id: string;
     date: string;
     start_time: string;
     end_time: string;
@@ -54,9 +209,16 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     chairperson_id: string;
     minute_taker_id: string;
     meeting_type: 'in_person' | 'online' | 'hybrid';
+    meeting_category: MeetingCategory;
+    recurrence_type: RecurrenceType;
+    recurrence_end_date: string;
+    visible_to_member_clubs: boolean;
   }>({
     name: '',
     location: '',
+    location_lat: null,
+    location_lng: null,
+    location_place_id: '',
     date: new Date().toISOString().split('T')[0],
     start_time: '09:00',
     end_time: '10:00',
@@ -64,18 +226,24 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     description: '',
     chairperson_id: '',
     minute_taker_id: '',
-    meeting_type: 'in_person'
+    meeting_type: 'in_person',
+    meeting_category: 'general',
+    recurrence_type: 'none',
+    recurrence_end_date: '',
+    visible_to_member_clubs: true
   });
 
   useEffect(() => {
     fetchMembers();
     checkGoogleIntegration();
 
-    // If editing an existing meeting, populate the form
     if (meeting) {
       setFormData({
         name: meeting.name,
         location: meeting.location || '',
+        location_lat: (meeting as any).location_lat || null,
+        location_lng: (meeting as any).location_lng || null,
+        location_place_id: (meeting as any).location_place_id || '',
         date: meeting.date,
         start_time: meeting.start_time?.substring(0, 5) || '09:00',
         end_time: meeting.end_time?.substring(0, 5) || '10:00',
@@ -83,46 +251,93 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         description: meeting.description || '',
         chairperson_id: meeting.chairperson_id || '',
         minute_taker_id: meeting.minute_taker_id || '',
-        meeting_type: (meeting as any).meeting_type || 'in_person'
+        meeting_type: meeting.meeting_type || 'in_person',
+        meeting_category: meeting.meeting_category || 'general',
+        recurrence_type: meeting.recurrence_type || 'none',
+        recurrence_end_date: meeting.recurrence_end_date || '',
+        visible_to_member_clubs: meeting.visible_to_member_clubs ?? true
       });
 
-      // Fetch agenda items
+      if (locationInputRef.current) {
+        locationInputRef.current.value = meeting.location || '';
+      }
+
       fetchAgendaItems();
     }
-  }, [meeting, clubId, associationId, associationType]);
+  }, [meeting, clubId, associationId, associationType, currentClub?.clubId, currentOrganization?.id]);
+
+  useEffect(() => {
+    loadGoogleMaps(() => setMapsLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!mapsLoaded || !locationInputRef.current || autocompleteRef.current) return;
+
+    const autocomplete = new (window as any).google.maps.places.Autocomplete(locationInputRef.current, {
+      types: ['establishment', 'geocode'],
+      fields: ['formatted_address', 'geometry', 'place_id', 'name']
+    });
+
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry?.location) return;
+
+      const displayName = place.name && place.formatted_address && !place.formatted_address.startsWith(place.name)
+        ? `${place.name}, ${place.formatted_address}`
+        : place.formatted_address || place.name || '';
+
+      if (locationInputRef.current) {
+        locationInputRef.current.value = displayName;
+      }
+      setFormData(prev => ({
+        ...prev,
+        location: displayName,
+        location_lat: place.geometry!.location!.lat(),
+        location_lng: place.geometry!.location!.lng(),
+        location_place_id: place.place_id || ''
+      }));
+    });
+
+    autocompleteRef.current = autocomplete;
+  }, [mapsLoaded]);
 
   const checkGoogleIntegration = async () => {
     try {
-      if (clubId) {
-        const { data, error } = await supabase
-          .from('club_integrations')
-          .select('is_enabled')
-          .eq('club_id', clubId)
-          .eq('provider', 'google')
-          .eq('is_enabled', true)
-          .maybeSingle();
+      const effectiveAssociationId = associationId || currentOrganization?.id;
+      const effectiveAssociationType = associationType || currentOrganization?.type;
+      const effectiveClubId = clubId || currentClub?.clubId;
 
-        if (!error && data) {
-          setHasGoogleIntegration(true);
+      const lookups: { column: string; id: string }[] = [];
+
+      if (effectiveClubId && !effectiveAssociationId) {
+        lookups.push({ column: 'club_id', id: effectiveClubId });
+      } else if (effectiveAssociationId) {
+        const assocColumn = effectiveAssociationType === 'state' ? 'state_association_id' : 'national_association_id';
+        lookups.push({ column: assocColumn, id: effectiveAssociationId });
+        if (effectiveClubId) {
+          lookups.push({ column: 'club_id', id: effectiveClubId });
         }
-      } else if (associationId && associationType) {
-        const tableName = associationType === 'state'
-          ? 'state_association_integrations'
-          : 'national_association_integrations';
-        const idColumn = associationType === 'state'
-          ? 'state_association_id'
-          : 'national_association_id';
+      } else if (effectiveClubId) {
+        lookups.push({ column: 'club_id', id: effectiveClubId });
+      }
 
-        const { data, error } = await supabase
-          .from(tableName)
-          .select('is_enabled')
-          .eq(idColumn, associationId)
-          .eq('provider', 'google')
-          .eq('is_enabled', true)
-          .maybeSingle();
+      if (lookups.length === 0) return;
 
-        if (!error && data) {
+      for (const lookup of lookups) {
+        const { data: allIntegrations, error } = await supabase
+          .from('integrations')
+          .select('id, platform, is_active, credentials')
+          .eq(lookup.column, lookup.id);
+
+        if (error) continue;
+
+        const googleIntegration = (allIntegrations || []).find(
+          i => i.platform === 'google' && i.is_active && i.credentials?.refresh_token
+        );
+
+        if (googleIntegration) {
           setHasGoogleIntegration(true);
+          return;
         }
       }
     } catch (err) {
@@ -131,7 +346,11 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
   };
 
   const createGoogleMeet = async () => {
-    if ((!clubId && !associationId) || !formData.name || !formData.date) {
+    const effectiveClubId = clubId || currentClub?.clubId;
+    const effectiveAssociationId = associationId || currentOrganization?.id;
+    const effectiveAssociationType = associationType || currentOrganization?.type;
+
+    if ((!effectiveClubId && !effectiveAssociationId) || !formData.name || !formData.date) {
       setError('Please fill in meeting name and date first');
       return;
     }
@@ -140,32 +359,52 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     setError(null);
 
     try {
-      // Combine date and time into ISO format
       const startDateTime = new Date(`${formData.date}T${formData.start_time}`).toISOString();
       const endDateTime = new Date(`${formData.date}T${formData.end_time}`).toISOString();
 
-      // Get attendee emails
       const attendeeEmails = members
         .filter(m => m.email)
         .map(m => m.email)
         .filter(Boolean);
 
-      const { data, error } = await supabase.functions.invoke('create-google-meet', {
-        body: {
-          clubId,
-          associationId,
-          associationType,
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-google-meet`;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
+      const fetchResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          clubId: effectiveClubId || null,
+          associationId: effectiveAssociationId || null,
+          associationType: effectiveAssociationType || null,
           meetingName: formData.name,
           meetingDescription: formData.description,
           startDateTime,
           endDateTime,
           attendeeEmails
-        }
+        }),
       });
 
-      if (error) throw error;
+      const data = await fetchResponse.json();
 
-      if (data.meetingUrl) {
+      if (!fetchResponse.ok) {
+        throw new Error(data?.error || `Failed to create Google Meet (${fetchResponse.status})`);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.meetingUrl) {
         setFormData(prev => ({
           ...prev,
           conferencing_url: data.meetingUrl
@@ -187,68 +426,154 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     }
   };
 
-  const fetchMembers = async () => {
-    try {
-      if (clubId) {
-        // Fetch club members
+  const fetchCommitteeMembers = async (): Promise<Member[]> => {
+    const memberFields = 'id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
+
+    if (clubId) {
+      const { data: positions, error: posError } = await supabase
+        .from('committee_positions')
+        .select('member_id')
+        .eq('club_id', clubId);
+
+      if (posError) throw posError;
+
+      const memberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+      if (memberIds.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from('members')
+        .select(memberFields)
+        .eq('club_id', clubId)
+        .in('id', memberIds)
+        .order('first_name', { ascending: true });
+
+      if (error) throw error;
+      return (data as Member[]) || [];
+    } else if (associationId && associationType) {
+      const assocColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+      const { data: positions } = await supabase
+        .from('committee_positions')
+        .select('member_id')
+        .eq(assocColumn, associationId);
+      const committeeMemberIds = (positions || []).map(p => p.member_id).filter(Boolean);
+
+      if (committeeMemberIds.length > 0) {
         const { data, error } = await supabase
           .from('members')
-          .select('id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url')
-          .eq('club_id', clubId)
+          .select(memberFields)
+          .in('id', committeeMemberIds)
           .order('first_name', { ascending: true });
-
         if (error) throw error;
-        setMembers((data as Member[]) || []);
-      } else if (associationId && associationType) {
-        // Fetch association team members (from user_associations tables)
-        const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
-        const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
-
-        const { data: userAssociations, error: assocError } = await supabase
-          .from(tableName)
-          .select('user_id')
-          .eq(idColumn, associationId);
-
-        if (assocError) throw assocError;
-
-        if (!userAssociations || userAssociations.length === 0) {
-          setMembers([]);
-          return;
-        }
-
-        // Fetch profiles for these users
-        const userIds = userAssociations.map(ua => ua.user_id);
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', userIds)
-          .order('first_name', { ascending: true });
-
-        if (profilesError) throw profilesError;
-
-        // Transform to Member format (with minimal required fields)
-        const transformedMembers = (profiles || []).map((profile: any) => ({
-          id: profile.id,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          email: profile.email,
-          club_id: '',
-          phone: '',
-          club: '',
-          street: '',
-          city: '',
-          state: '',
-          postcode: '',
-          date_joined: '',
-          membership_level: 'Full',
-          is_financial: true,
-          amount_paid: 0,
-          created_at: '',
-          updated_at: ''
-        })) as Member[];
-
-        setMembers(transformedMembers);
+        return (data as Member[]) || [];
       }
+
+      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+      const { data: userAssociations, error: assocError } = await supabase
+        .from(tableName)
+        .select('user_id')
+        .eq(idColumn, associationId);
+
+      if (assocError) throw assocError;
+      if (!userAssociations || userAssociations.length === 0) return [];
+
+      const userIds = userAssociations.map(ua => ua.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+        .order('first_name', { ascending: true });
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map((profile: any) => ({
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        club_id: '',
+        phone: '',
+        club: '',
+        street: '',
+        city: '',
+        state: '',
+        postcode: '',
+        date_joined: '',
+        membership_level: 'Full',
+        is_financial: true,
+        amount_paid: 0,
+        created_at: '',
+        updated_at: ''
+      })) as Member[];
+    }
+
+    return [];
+  };
+
+  const fetchAllMembers = async (): Promise<Member[]> => {
+    const memberFields = 'id, first_name, last_name, email, phone, club, street, city, state, postcode, date_joined, membership_level, membership_level_custom, is_financial, amount_paid, created_at, updated_at, avatar_url';
+
+    if (clubId) {
+      const { data, error } = await supabase
+        .from('members')
+        .select(memberFields)
+        .eq('club_id', clubId)
+        .order('first_name', { ascending: true });
+      if (error) throw error;
+      return (data as Member[]) || [];
+    } else if (associationId && associationType) {
+      const tableName = associationType === 'state' ? 'user_state_associations' : 'user_national_associations';
+      const idColumn = associationType === 'state' ? 'state_association_id' : 'national_association_id';
+
+      const { data: userAssociations, error: assocError } = await supabase
+        .from(tableName)
+        .select('user_id')
+        .eq(idColumn, associationId);
+
+      if (assocError) throw assocError;
+      if (!userAssociations || userAssociations.length === 0) return [];
+
+      const userIds = userAssociations.map(ua => ua.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', userIds)
+        .order('first_name', { ascending: true });
+
+      if (profilesError) throw profilesError;
+
+      return (profiles || []).map((profile: any) => ({
+        id: profile.id,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        email: profile.email,
+        club_id: '',
+        phone: '',
+        club: '',
+        street: '',
+        city: '',
+        state: '',
+        postcode: '',
+        date_joined: '',
+        membership_level: 'Full',
+        is_financial: true,
+        amount_paid: 0,
+        created_at: '',
+        updated_at: ''
+      })) as Member[];
+    }
+
+    return [];
+  };
+
+  const fetchMembers = async (category?: MeetingCategory) => {
+    try {
+      const cat = category ?? formData.meeting_category;
+      const memberList = cat === 'committee'
+        ? await fetchCommitteeMembers()
+        : await fetchAllMembers();
+      setMembers(memberList);
     } catch (err) {
       console.error('Error fetching members:', err);
       setError('Failed to load members');
@@ -329,21 +654,33 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
     e.preventDefault();
     setError(null);
     setLoading(true);
-    
+
+    const currentLocation = locationInputRef.current?.value || formData.location;
+
     try {
       // Validate form
       if (!formData.name) {
         throw new Error('Meeting name is required');
       }
-      
+
       if (!formData.date) {
         throw new Error('Meeting date is required');
       }
-      
-      // Prepare meeting data
+
+      if (formData.recurrence_type !== 'none' && !formData.recurrence_end_date) {
+        throw new Error('Please select an end date for the recurring series');
+      }
+
+      if ((formData.meeting_type === 'hybrid' || formData.meeting_type === 'in_person') && !currentLocation) {
+        throw new Error('A location is required for in-person and hybrid meetings');
+      }
+
       const meetingData: any = {
         name: formData.name,
-        location: formData.location,
+        location: currentLocation,
+        location_lat: formData.location_lat,
+        location_lng: formData.location_lng,
+        location_place_id: formData.location_place_id || undefined,
         date: formData.date,
         start_time: formData.start_time,
         end_time: formData.end_time,
@@ -352,6 +689,10 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         chairperson_id: formData.chairperson_id || undefined,
         minute_taker_id: formData.minute_taker_id || undefined,
         meeting_type: formData.meeting_type,
+        meeting_category: formData.meeting_category,
+        recurrence_type: formData.recurrence_type,
+        recurrence_end_date: formData.recurrence_type !== 'none' ? formData.recurrence_end_date : undefined,
+        visible_to_member_clubs: associationId ? formData.visible_to_member_clubs : undefined,
         agenda_items: agendaItems
       };
       
@@ -364,12 +705,53 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       }
       
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving meeting:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save meeting');
+      const msg = err?.message || err?.details || err?.hint || 'Failed to save meeting';
+      setError(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCategoryChange = (category: MeetingCategory) => {
+    setFormData(prev => ({ ...prev, meeting_category: category }));
+    fetchMembers(category);
+  };
+
+  const recurrencePreviewDates = useMemo(() => {
+    if (formData.recurrence_type === 'none' || !formData.date || !formData.recurrence_end_date) return [];
+    const dates: string[] = [];
+    const start = new Date(formData.date);
+    const end = new Date(formData.recurrence_end_date);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return [];
+
+    let current = new Date(start);
+    const advance = () => {
+      switch (formData.recurrence_type) {
+        case 'weekly': current.setDate(current.getDate() + 7); break;
+        case 'fortnightly': current.setDate(current.getDate() + 14); break;
+        case 'monthly': current.setMonth(current.getMonth() + 1); break;
+        case 'quarterly': current.setMonth(current.getMonth() + 3); break;
+        case 'yearly': current.setFullYear(current.getFullYear() + 1); break;
+      }
+    };
+
+    advance();
+    while (current <= end && dates.length < 52) {
+      dates.push(current.toISOString().split('T')[0]);
+      advance();
+    }
+    return dates;
+  }, [formData.recurrence_type, formData.date, formData.recurrence_end_date]);
+
+  const recurrenceLabels: Record<RecurrenceType, string> = {
+    none: 'None',
+    weekly: 'Weekly',
+    fortnightly: 'Fortnightly',
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    yearly: 'Yearly'
   };
 
   return (
@@ -377,14 +759,14 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
       <div className="p-16">
         <div className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700">
               <Calendar className="text-white" size={28} />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white mb-2">
                 {meeting ? 'Edit Meeting' : 'Create a New Meeting'}
               </h1>
-              <p className="text-slate-400">Schedule and organize your club meetings</p>
+              <p className="text-slate-400">Schedule and organize your {associationId ? 'association' : 'club'} meetings</p>
             </div>
           </div>
 
@@ -411,9 +793,101 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {!meeting && (
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
+              <h3 className="text-lg font-medium text-white mb-4">Meeting Category</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleCategoryChange('general')}
+                  className={`
+                    relative p-4 rounded-xl border-2 transition-all text-left
+                    ${formData.meeting_category === 'general'
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2 rounded-lg ${formData.meeting_category === 'general' ? 'bg-blue-500/20' : 'bg-slate-600/50'}`}>
+                      <Users size={20} className={formData.meeting_category === 'general' ? 'text-blue-400' : 'text-slate-400'} />
+                    </div>
+                    <span className={`font-semibold ${formData.meeting_category === 'general' ? 'text-white' : 'text-slate-300'}`}>
+                      General Meeting
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 ml-11">
+                    Committee members manage the meeting, all members can be assigned actions
+                  </p>
+                  {formData.meeting_category === 'general' && (
+                    <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCategoryChange('committee')}
+                  className={`
+                    relative p-4 rounded-xl border-2 transition-all text-left
+                    ${formData.meeting_category === 'committee'
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`p-2 rounded-lg ${formData.meeting_category === 'committee' ? 'bg-amber-500/20' : 'bg-slate-600/50'}`}>
+                      <Shield size={20} className={formData.meeting_category === 'committee' ? 'text-amber-400' : 'text-slate-400'} />
+                    </div>
+                    <span className={`font-semibold ${formData.meeting_category === 'committee' ? 'text-white' : 'text-slate-300'}`}>
+                      Committee Meeting
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 ml-11">
+                    Only committee members can manage and be assigned actions
+                  </p>
+                  {formData.meeting_category === 'committee' && (
+                    <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                  )}
+                </button>
+              </div>
+              {formData.meeting_category === 'committee' && members.length === 0 && (
+                <div className="mt-3 p-3 rounded-lg bg-amber-900/20 border border-amber-500/30 flex items-start gap-2">
+                  <Info size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-300">
+                    No committee members found. Please assign committee roles in the Committee Management section first.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {associationId && (
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.visible_to_member_clubs}
+                  onChange={(e) => setFormData(prev => ({ ...prev, visible_to_member_clubs: e.target.checked }))}
+                  className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-700 text-teal-500 focus:ring-2 focus:ring-teal-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-white">Show in member clubs' calendars</span>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    When enabled, this meeting will appear in the race calendar of all member clubs so their members can RSVP and view details.
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
+
           <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 p-6">
             <h3 className="text-lg font-medium text-white mb-4">Meeting Details</h3>
-          
+
             <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1">
@@ -433,19 +907,34 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">
-                    Location
+                    Location {(formData.meeting_type === 'hybrid' || formData.meeting_type === 'in_person') && <span className="text-red-400">*</span>}
                   </label>
                   <div className="relative">
-                    <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
                     <input
+                      ref={locationInputRef}
                       type="text"
                       name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
+                      defaultValue={formData.location}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          location: e.target.value,
+                          location_lat: null,
+                          location_lng: null,
+                          location_place_id: ''
+                        }));
+                      }}
                       className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Meeting location"
+                      placeholder={mapsLoaded ? "Start typing an address..." : "Meeting location"}
                     />
                   </div>
+                  {formData.location_lat && formData.location_lng && (
+                    <p className="mt-1 text-xs text-emerald-400 flex items-center gap-1">
+                      <Check size={12} />
+                      Address verified with coordinates
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -460,7 +949,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       required
                       value={formData.date}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -478,7 +967,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       name="start_time"
                       value={formData.start_time}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -494,7 +983,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       name="end_time"
                       value={formData.end_time}
                       onChange={handleInputChange}
-                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -521,7 +1010,12 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, meeting_type: 'online' }))}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, meeting_type: 'online' }));
+                      if (hasGoogleIntegration && !formData.conferencing_url) {
+                        setTimeout(() => createGoogleMeet(), 100);
+                      }
+                    }}
                     className={`
                       px-4 py-3 rounded-lg text-sm font-medium transition-all border
                       ${formData.meeting_type === 'online'
@@ -535,7 +1029,12 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, meeting_type: 'hybrid' }))}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, meeting_type: 'hybrid' }));
+                      if (hasGoogleIntegration && !formData.conferencing_url) {
+                        setTimeout(() => createGoogleMeet(), 100);
+                      }
+                    }}
                     className={`
                       px-4 py-3 rounded-lg text-sm font-medium transition-all border
                       ${formData.meeting_type === 'hybrid'
@@ -564,7 +1063,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                         type="button"
                         onClick={createGoogleMeet}
                         disabled={creatingMeet || !formData.name || !formData.date}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-white hover:bg-gray-100 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="btn-primary-green flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <Video size={14} />
                         {creatingMeet ? 'Creating...' : 'Generate Google Meet'}
@@ -582,14 +1081,20 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                       placeholder={hasGoogleIntegration ? "Generate Google Meet or enter another video link" : "e.g., Zoom or Teams meeting link"}
                     />
                   </div>
-                  {hasGoogleIntegration && (
+                  {hasGoogleIntegration && !formData.conferencing_url && (
                     <p className="mt-1 text-xs text-slate-400">
                       Click "Generate Google Meet" to automatically create a meeting link, or enter your own Zoom/Teams link
                     </p>
                   )}
+                  {hasGoogleIntegration && formData.conferencing_url && (
+                    <p className="mt-1 text-xs text-emerald-400 flex items-center gap-1">
+                      <Check size={12} />
+                      Google Meet link generated
+                    </p>
+                  )}
                   {!hasGoogleIntegration && (
-                    <p className="mt-1 text-xs text-slate-400">
-                      Connect Google Calendar in Settings to automatically generate Google Meet links
+                    <p className="mt-1 text-xs text-amber-400">
+                      Google Calendar is not connected. Go to Settings &gt; Integrations to connect Google and auto-generate Meet links, or paste a Zoom/Teams link above.
                     </p>
                   )}
                 </div>
@@ -612,6 +1117,15 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                 </div>
               </div>
             
+              {!meeting && (
+                <RecurrenceSelector
+                  formData={formData}
+                  setFormData={setFormData}
+                  recurrenceLabels={recurrenceLabels}
+                  recurrencePreviewDates={recurrencePreviewDates}
+                />
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">
@@ -650,7 +1164,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
               <button
                 type="button"
                 onClick={handleAddAgendaItem}
-                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200"
+                className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200"
               >
                 <Plus size={18} />
                 Add Item
@@ -747,7 +1261,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
                   <button
                     type="button"
                     onClick={handleAddAgendaItem}
-                    className="mt-2 px-3 py-1.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 text-sm transition-all"
+                    className="btn-primary-green mt-2 px-3 py-1.5 text-white rounded-lg hover:shadow-lg text-sm transition-all"
                   >
                     Add First Item
                   </button>
@@ -771,7 +1285,7 @@ export const MeetingForm: React.FC<MeetingFormProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
+              className="btn-primary-green flex items-center gap-2 px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100"
             >
               {loading ? (
                 <>

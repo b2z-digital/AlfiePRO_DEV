@@ -1,33 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  CreditCard,
-  Calendar,
-  AlertCircle,
-  CheckCircle,
-  Mail,
-  Phone,
-  MapPin,
-  FileText,
-  Download,
-  Edit2,
-  X,
-  Sailboat,
-  Shield,
-  Clock,
-  ChevronRight,
-  User,
-  Anchor,
-  Heart,
-  Users,
-  TrendingUp,
-  Award,
-  Activity
-} from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { CreditCard, Calendar, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Mail, Phone, MapPin, FileText, Download, SquarePen as Edit2, X, Sailboat, Shield, Clock, ChevronRight, User, Anchor, Heart, Users, TrendingUp, Award, Activity, ArrowRightLeft, Info, Landmark, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { formatDate } from '../../utils/date';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 import { MyClubMembershipsWidget } from '../membership/MyClubMembershipsWidget';
 import { MemberEditModal } from '../membership/MemberEditModal';
 import { Avatar } from '../ui/Avatar';
@@ -71,6 +51,8 @@ interface MembershipType {
   amount: number;
   currency: string;
   renewal_period: string;
+  is_active: boolean;
+  replaces_membership_type_id: string | null;
 }
 
 interface PaymentRecord {
@@ -125,7 +107,10 @@ const RenewalRing: React.FC<{ daysLeft: number; totalDays: number }> = ({ daysLe
 
 export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ darkMode }) => {
   const { currentClub, user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const { addNotification } = useNotifications();
+  const location = useLocation();
+  const pendingEditOpen = useRef(!!(location.state as any)?.edit);
   const [loading, setLoading] = useState(true);
   const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [boats, setBoats] = useState<BoatData[]>([]);
@@ -137,47 +122,88 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
   const [selectedMembershipType, setSelectedMembershipType] = useState<string>('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [migrationNotice, setMigrationNotice] = useState<{ from: string; to: string } | null>(null);
+  const [bankDetails, setBankDetails] = useState<{ bank_name: string; bsb: string; account_number: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [clubHasStripe, setClubHasStripe] = useState(false);
+
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
+  const effectiveMemberId = isImpersonating ? impersonationSession?.targetMemberId : null;
 
   useEffect(() => {
-    if (currentClub?.clubId && user?.id) {
+    if (currentClub?.clubId && (effectiveUserId || effectiveMemberId)) {
       fetchAllData();
     } else {
       setLoading(false);
     }
-  }, [currentClub, user]);
+  }, [currentClub, effectiveUserId, effectiveMemberId]);
+
+  useEffect(() => {
+    if (pendingEditOpen.current && memberData && !loading) {
+      pendingEditOpen.current = false;
+      window.history.replaceState({}, '');
+      setShowEditModal(true);
+    }
+  }, [memberData, loading]);
 
   const fetchAllData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const [memberResult, typesResult] = await Promise.all([
-        supabase
-          .from('members')
-          .select(`
-            id, first_name, last_name, email, phone,
-            street, city, state, postcode,
-            is_financial, renewal_date,
-            membership_level, membership_level_custom,
-            emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-            avatar_url, country, category, date_joined
-          `)
-          .eq('club_id', currentClub?.clubId)
-          .eq('user_id', user?.id)
-          .maybeSingle(),
+      let memberQuery = supabase
+        .from('members')
+        .select(`
+          id, first_name, last_name, email, phone,
+          street, city, state, postcode,
+          is_financial, renewal_date, payment_status,
+          membership_level, membership_level_custom,
+          emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+          avatar_url, country, category, date_joined
+        `)
+        .eq('club_id', currentClub?.clubId);
+
+      if (effectiveMemberId) {
+        memberQuery = memberQuery.eq('id', effectiveMemberId);
+      } else {
+        memberQuery = memberQuery.eq('user_id', effectiveUserId);
+      }
+
+      const [memberResult, activeTypesResult, allTypesResult] = await Promise.all([
+        memberQuery.maybeSingle(),
         supabase
           .from('membership_types')
           .select('*')
           .eq('club_id', currentClub?.clubId)
           .eq('is_active', true)
           .neq('name', 'Life Member')
-          .order('amount', { ascending: true })
+          .order('amount', { ascending: true }),
+        supabase
+          .from('membership_types')
+          .select('id, name, is_active, replaces_membership_type_id')
+          .eq('club_id', currentClub?.clubId)
       ]);
 
       if (memberResult.error) throw memberResult.error;
 
+      const activeTypes = activeTypesResult.data || [];
+      const allTypes = allTypesResult.data || [];
+
       if (memberResult.data) {
         setMemberData(memberResult.data as MemberData);
+
+        const memberLevel = memberResult.data.membership_level_custom || memberResult.data.membership_level;
+        const currentInactiveType = allTypes.find(t => !t.is_active && t.name === memberLevel);
+
+        if (currentInactiveType) {
+          const replacementType = allTypes.find(
+            t => t.is_active && t.replaces_membership_type_id === currentInactiveType.id
+          );
+          if (replacementType) {
+            setMigrationNotice({ from: currentInactiveType.name, to: replacementType.name });
+            setSelectedMembershipType(replacementType.id);
+          }
+        }
 
         const [boatsResult, paymentsResult] = await Promise.all([
           supabase
@@ -206,7 +232,23 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
         setError('Member record not found');
       }
 
-      setMembershipTypes(typesResult.data || []);
+      setMembershipTypes(activeTypes);
+
+      const { data: clubBankData } = await supabase
+        .from('clubs')
+        .select('bank_name, bsb, account_number, stripe_account_id, stripe_enabled')
+        .eq('id', currentClub?.clubId)
+        .maybeSingle();
+      if (clubBankData) {
+        if (clubBankData.bank_name || clubBankData.bsb || clubBankData.account_number) {
+          setBankDetails({ bank_name: clubBankData.bank_name, bsb: clubBankData.bsb, account_number: clubBankData.account_number });
+        }
+        const hasStripe = !!(clubBankData.stripe_account_id && clubBankData.stripe_enabled);
+        setClubHasStripe(hasStripe);
+        if (!hasStripe) {
+          setSelectedPaymentMethod('bank_transfer');
+        }
+      }
     } catch (err) {
       console.error('Error fetching member data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load membership data');
@@ -215,15 +257,25 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     }
   };
 
+  const handleCopyBankField = (value: string, field: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
   const membershipStatus = useMemo(() => {
-    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, daysLeft: 0 };
+    if (!memberData) return { status: 'unknown', text: 'Unknown', color: 'slate', needsRenewal: false, pendingPayment: false, daysLeft: 0 };
+
+    if (memberData.payment_status === 'pending') {
+      return { status: 'pending_payment', text: 'Awaiting Payment', color: 'yellow', needsRenewal: false, pendingPayment: true, daysLeft: 0 };
+    }
 
     if (!memberData.is_financial) {
-      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, daysLeft: 0 };
+      return { status: 'expired', text: 'Not Financial', color: 'red', needsRenewal: true, pendingPayment: false, daysLeft: 0 };
     }
 
     if (!memberData.renewal_date) {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: 365 };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, pendingPayment: false, daysLeft: 365 };
     }
 
     const renewalDate = new Date(memberData.renewal_date);
@@ -231,11 +283,11 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
     const daysUntilRenewal = Math.ceil((renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysUntilRenewal < 0) {
-      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, daysLeft: 0 };
+      return { status: 'expired', text: 'Expired', color: 'red', needsRenewal: true, pendingPayment: false, daysLeft: 0 };
     } else if (daysUntilRenewal <= 30) {
-      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, daysLeft: daysUntilRenewal };
+      return { status: 'expiring', text: 'Expiring Soon', color: 'yellow', needsRenewal: true, pendingPayment: false, daysLeft: daysUntilRenewal };
     } else {
-      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, daysLeft: daysUntilRenewal };
+      return { status: 'active', text: 'Financial', color: 'green', needsRenewal: false, pendingPayment: false, daysLeft: daysUntilRenewal };
     }
   }, [memberData]);
 
@@ -302,6 +354,36 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
           });
 
         if (renewalError) throw renewalError;
+
+        await supabase
+          .from('membership_payments')
+          .insert({
+            member_id: memberData.id,
+            membership_type_id: selectedType.id,
+            amount: selectedType.amount,
+            currency: selectedType.currency,
+            status: 'pending',
+            payment_method: 'bank_transfer'
+          });
+
+        await supabase
+          .from('members')
+          .update({
+            payment_status: 'pending',
+            membership_level: selectedType.name,
+          })
+          .eq('id', memberData.id);
+
+        await createMembershipTransaction({
+          clubId: currentClub.clubId,
+          memberId: memberData.id,
+          membershipTypeId: selectedType.id,
+          memberName: `${memberData.first_name} ${memberData.last_name}`,
+          membershipTypeName: selectedType.name,
+          amount: selectedType.amount,
+          paymentMethod: 'bank_transfer',
+        }, 'pending');
+
         addNotification('success', 'Renewal request submitted! Please complete the bank transfer and notify your club administrator.');
         setShowRenewalModal(false);
         setProcessingPayment(false);
@@ -454,7 +536,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             </div>
             <button
               onClick={() => setShowEditModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
+              className="btn-primary-green flex items-center gap-2 px-5 py-2.5 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
             >
               <Edit2 size={16} />
               <span className="hidden sm:inline">Edit Details</span>
@@ -479,7 +561,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                     className="w-20 h-20 rounded-2xl ring-2 ring-slate-600/50"
                   />
                   {membershipStatus.status === 'active' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-slate-800 flex items-center justify-center">
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-slate-800 flex items-center justify-center">
                       <CheckCircle size={12} className="text-white" />
                     </div>
                   )}
@@ -527,6 +609,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                           : 'bg-red-500/15 text-red-400 border border-red-500/20'
                       }`}>
                         {membershipStatus.status === 'active' && <CheckCircle size={16} />}
+                        {membershipStatus.status === 'pending_payment' && <Clock size={16} />}
                         {(membershipStatus.status === 'expiring' || membershipStatus.status === 'expired') && <AlertCircle size={16} />}
                         <span className="text-sm font-semibold">{membershipStatus.text}</span>
                       </div>
@@ -534,6 +617,71 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                 </div>
               </div>
+
+              {membershipStatus.pendingPayment && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 overflow-hidden"
+                >
+                  <div className="p-4 flex items-center gap-3">
+                    <Clock size={20} className="text-yellow-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-yellow-400">Renewal Submitted - Awaiting Payment</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Your renewal has been submitted. Please complete the bank transfer below and notify your club administrator.
+                      </p>
+                    </div>
+                  </div>
+                  {bankDetails && (
+                    <div className="px-4 pb-4">
+                      <div className="bg-slate-800/60 rounded-xl p-4 space-y-3 border border-slate-700/40">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Landmark size={16} className="text-blue-400" />
+                          <p className="text-sm font-medium text-slate-200">Bank Transfer Details</p>
+                        </div>
+                        {bankDetails.bank_name && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bank Name</p>
+                              <p className="text-sm text-white font-medium">{bankDetails.bank_name}</p>
+                            </div>
+                          </div>
+                        )}
+                        {bankDetails.bsb && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">BSB</p>
+                              <p className="text-sm text-white font-medium font-mono">{bankDetails.bsb}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-banner')}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === 'bsb-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                        {bankDetails.account_number && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Account Number</p>
+                              <p className="text-sm text-white font-medium font-mono">{bankDetails.account_number}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-banner')}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === 'acc-banner' ? <Check size={14} className="text-green-400" /> : <Copy size={14} className="text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
               {membershipStatus.needsRenewal && (
                 <motion.div
@@ -559,7 +707,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                   <button
                     onClick={() => setShowRenewalModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all flex-shrink-0"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all flex-shrink-0"
                   >
                     <CreditCard size={14} />
                     Renew Now
@@ -621,7 +769,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               <div className="relative">
                 <div className="h-2 rounded-full bg-slate-700/50 overflow-hidden">
                   <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500"
+                    className="h-full rounded-full from-blue-500 via-cyan-500"
                     initial={{ width: 0 }}
                     animate={{ width: `${Math.max(5, Math.min(100, ((365 - membershipStatus.daysLeft) / 365) * 100))}%` }}
                     transition={{ duration: 1, ease: 'easeOut', delay: 0.5 }}
@@ -643,13 +791,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-800/15 border border-blue-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-blue-600/15 to-blue-800/15 border border-blue-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-blue-400/40 transition-colors group/card"
             >
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20">
                   <User size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Contact Details</h3>
+                <Edit2 size={14} className="text-slate-600 group-hover/card:text-blue-400 transition-colors ml-auto" />
               </div>
               <div className="space-y-4">
                 {[
@@ -679,13 +829,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-green-600/15 to-green-800/15 border border-green-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-green-400/40 transition-colors group/card"
             >
               <div className="flex items-center gap-3 mb-5">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br shadow-lg">
                   <Shield size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Membership Details</h3>
+                <Edit2 size={14} className="text-slate-600 group-hover/card:text-green-400 transition-colors ml-auto" />
               </div>
               <div className="space-y-4">
                 {[
@@ -715,13 +867,15 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-rose-600/15 to-rose-800/15 border border-rose-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-rose-600/15 to-rose-800/15 border border-rose-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-rose-400/40 transition-colors group/card"
             >
               <div className="flex items-center gap-3 mb-5">
                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 shadow-lg shadow-rose-500/20">
                   <Heart size={16} className="text-white" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200">Emergency Contact</h3>
+                <Edit2 size={14} className="text-slate-600 group-hover/card:text-rose-400 transition-colors ml-auto" />
               </div>
               {memberData.emergency_contact_name ? (
                 <div className="space-y-4">
@@ -766,7 +920,8 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              className="rounded-2xl bg-gradient-to-br from-cyan-600/15 to-cyan-800/15 border border-cyan-500/25 backdrop-blur-sm p-6"
+              onClick={() => setShowEditModal(true)}
+              className="rounded-2xl bg-gradient-to-br from-cyan-600/15 to-cyan-800/15 border border-cyan-500/25 backdrop-blur-sm p-6 cursor-pointer hover:border-cyan-400/40 transition-colors group/card"
             >
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
@@ -911,7 +1066,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
             >
               <button
                 onClick={() => setShowRenewalModal(true)}
-                className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105 transition-all duration-200"
+                className="btn-primary-green flex items-center gap-2 px-8 py-3 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-xl hover:shadow-blue-500/25 hover:scale-105 transition-all duration-200"
               >
                 <CreditCard size={18} />
                 Renew Membership
@@ -966,6 +1121,19 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
               </div>
 
               <div className="p-6">
+                {migrationNotice && (
+                  <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                    <ArrowRightLeft size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-300">Membership Type Updated</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Your previous "{migrationNotice.from}" membership has been replaced by "{migrationNotice.to}".
+                        This has been pre-selected for you below.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-slate-400 mb-6">Choose your membership type to continue with renewal:</p>
 
                 <div className="space-y-3 mb-6">
@@ -995,19 +1163,21 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
 
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-slate-300 mb-3">Payment Method</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setSelectedPaymentMethod('credit_card')}
-                      className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                        selectedPaymentMethod === 'credit_card'
-                          ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
-                          : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
-                      }`}
-                    >
-                      <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
-                      <h4 className="font-medium text-white mb-1">Credit Card</h4>
-                      <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
-                    </button>
+                  <div className={`grid ${clubHasStripe ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+                    {clubHasStripe && (
+                      <button
+                        onClick={() => setSelectedPaymentMethod('credit_card')}
+                        className={`p-4 rounded-xl border text-left transition-all duration-200 ${
+                          selectedPaymentMethod === 'credit_card'
+                            ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
+                            : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                        }`}
+                      >
+                        <CreditCard className={`mb-2 ${selectedPaymentMethod === 'credit_card' ? 'text-blue-400' : 'text-slate-400'}`} size={24} />
+                        <h4 className="font-medium text-white mb-1">Credit Card</h4>
+                        <p className="text-xs text-slate-400">Pay instantly via Stripe</p>
+                      </button>
+                    )}
                     <button
                       onClick={() => setSelectedPaymentMethod('bank_transfer')}
                       className={`p-4 rounded-xl border text-left transition-all duration-200 ${
@@ -1023,6 +1193,61 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   </div>
                 </div>
 
+                {selectedPaymentMethod === 'bank_transfer' && bankDetails && (
+                  <div className="mb-6 bg-slate-800/60 border border-sky-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Landmark className="w-5 h-5 text-sky-400" />
+                      <h3 className="text-white font-semibold text-sm">Bank Transfer Details</h3>
+                    </div>
+                    <p className="text-slate-400 text-xs mb-4">
+                      Please transfer the membership fee to the following account using your name as the payment reference:
+                    </p>
+                    <div className="space-y-3">
+                      {bankDetails.bank_name && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">Bank</p>
+                            <p className="text-white text-sm font-medium">{bankDetails.bank_name}</p>
+                          </div>
+                        </div>
+                      )}
+                      {bankDetails.bsb && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">BSB</p>
+                            <p className="text-white text-sm font-medium font-mono">{bankDetails.bsb}</p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyBankField(bankDetails.bsb, 'bsb-modal')}
+                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            {copiedField === 'bsb-modal' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      )}
+                      {bankDetails.account_number && (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-slate-500 text-xs">Account Number</p>
+                            <p className="text-white text-sm font-medium font-mono">{bankDetails.account_number}</p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyBankField(bankDetails.account_number, 'acc-modal')}
+                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            {copiedField === 'acc-modal' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-700/50">
+                      <p className="text-slate-500 text-xs">
+                        Reference: <span className="text-slate-300">Your full name</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowRenewalModal(false)}
@@ -1033,7 +1258,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                   <button
                     onClick={handleRenewal}
                     disabled={!selectedMembershipType || processingPayment}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary-green flex-1 px-4 py-2.5 from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {processingPayment ? (
                       <div className="flex items-center justify-center gap-2">
@@ -1041,7 +1266,7 @@ export const MemberMembershipView: React.FC<MemberMembershipViewProps> = ({ dark
                         Processing...
                       </div>
                     ) : (
-                      selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Renewal Request'
+                      selectedPaymentMethod === 'credit_card' ? 'Continue to Payment' : 'Submit Membership Renewal'
                     )}
                   </button>
                 </div>

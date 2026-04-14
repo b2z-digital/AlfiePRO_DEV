@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Plus, Trash2, GripVertical, Save, Loader2, Image as ImageIcon, Upload, Video } from 'lucide-react';
+import { LogOut, Plus, Trash2, GripVertical, Save, Loader as Loader2, Image as ImageIcon, Upload, Video } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -1287,7 +1287,7 @@ export const SliderManagementModal: React.FC<Props> = ({ isOpen, onClose, websit
                     <button
                       onClick={handleSaveOrder}
                       disabled={isSaving}
-                      className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="btn-primary-green w-full px-4 py-2 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {isSaving ? (
                         <>

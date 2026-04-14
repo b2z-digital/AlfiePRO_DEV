@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Download, Edit, Trash2, Send, FileText, Receipt, TrendingDown, TrendingUp, AlertTriangle, ArrowLeft, Calendar, X } from 'lucide-react';
+import { Plus, Search, Download, CreditCard as Edit, Trash2, Send, FileText, Receipt, TrendingDown, TrendingUp, TriangleAlert as AlertTriangle, ArrowLeft, Calendar, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -245,7 +245,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
   const handleCreateExpense = () => {
     setShowCreateExpense(true);
   };
-  
+
   const handleCreateDeposit = () => {
     setShowCreateDeposit(true);
   };
@@ -396,13 +396,13 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'bg-green-900/30 text-green-400';
+        return 'bg-green-500/15 text-green-600';
       case 'sent':
-        return 'bg-blue-900/30 text-blue-400';
+        return 'bg-blue-500/15 text-blue-600';
       case 'overdue':
-        return 'bg-red-900/30 text-red-400';
+        return 'bg-red-500/15 text-red-600';
       default:
-        return 'bg-slate-700 text-slate-300';
+        return `${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600'}`;
     }
   };
 
@@ -578,14 +578,14 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
           .filter(inv => inv.status === 'paid')
           .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
         const outstandingAmount = totalAmount - paidAmount;
-        
+
         return {
           count: totalInvoices,
           total: totalAmount,
           paid: paidAmount,
           outstanding: outstandingAmount
         };
-        
+
       case 'expenses':
         const totalExpenses = filteredExpenses.length;
         const totalExpenseAmount = filteredExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
@@ -593,25 +593,25 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
           .filter(exp => exp.payment_status === 'completed' || exp.payment_status === 'paid')
           .reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
         const pendingExpenses = totalExpenseAmount - paidExpenses;
-        
+
         return {
           count: totalExpenses,
           total: totalExpenseAmount,
           paid: paidExpenses,
           outstanding: pendingExpenses
         };
-        
+
       case 'deposits':
         const totalDeposits = filteredDeposits.length;
         const totalDepositAmount = filteredDeposits.reduce((sum, dep) => sum + (parseFloat(dep.amount) || 0), 0);
-        
+
         return {
           count: totalDeposits,
           total: totalDepositAmount,
           paid: totalDepositAmount, // Deposits are considered "received"
           outstanding: 0
         };
-        
+
       default:
         return { count: 0, total: 0, paid: 0, outstanding: 0 };
     }
@@ -668,7 +668,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
     if (activeTab === 'invoices') {
       if (filteredInvoices.length === 0) {
         return (
-          <div className="text-center py-12 text-slate-400">
+          <div className={`text-center py-12 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             <FileText size={48} className="mx-auto mb-4 opacity-50" />
             <p>No invoices found</p>
           </div>
@@ -679,22 +679,22 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left py-3 px-4 font-medium text-slate-300">INVOICE #</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">CONTACT</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DESCRIPTION</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DATE</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DUE DATE</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">STATUS</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">AMOUNT</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">ACTIONS</th>
+              <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>INVOICE #</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>CONTACT</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DESCRIPTION</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DATE</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DUE DATE</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>STATUS</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>AMOUNT</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredInvoices.map((invoice) => (
                 <tr
                   key={invoice.id}
-                  className="border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer"
+                  className={`border-b cursor-pointer ${darkMode ? 'border-slate-800 hover:bg-slate-800/30' : 'border-slate-100 hover:bg-slate-50'}`}
                   onClick={() => handleEditInvoice(invoice)}
                 >
                   <td className="py-4 px-4">
@@ -704,19 +704,19 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                   </td>
                   <td className="py-4 px-4">
                     <div>
-                      <p className="text-white font-medium">{invoice.customer_name}</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{invoice.customer_name}</p>
                       {invoice.customer_email && (
-                        <p className="text-slate-400 text-sm">{invoice.customer_email}</p>
+                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{invoice.customer_email}</p>
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {invoice.reference || 'No description'}
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {new Date(invoice.date).toLocaleDateString()}
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
                   </td>
                   <td className="py-4 px-4">
@@ -724,7 +724,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                       {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-white font-medium">
+                  <td className={`py-4 px-4 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     ${parseFloat(invoice.total_amount).toFixed(2)}
                   </td>
                   <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
@@ -734,7 +734,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                           e.stopPropagation();
                           handleEditInvoice(invoice);
                         }}
-                        className="p-2 text-slate-400 hover:text-white transition-colors"
+                        className={`p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`}
                         title="Edit invoice"
                       >
                         <Edit size={16} />
@@ -768,11 +768,11 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
         </div>
       );
     }
-    
+
     if (activeTab === 'expenses') {
       if (filteredExpenses.length === 0) {
         return (
-          <div className="text-center py-12 text-slate-400">
+          <div className={`text-center py-12 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             <Receipt size={48} className="mx-auto mb-4 opacity-50" />
             <p>No expenses found</p>
           </div>
@@ -783,52 +783,52 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left py-3 px-4 font-medium text-slate-300">EXPENSE #</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DESCRIPTION</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">PAYEE</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DATE</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">AMOUNT</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">STATUS</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">ACTIONS</th>
+              <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>EXPENSE #</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DESCRIPTION</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>PAYEE</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DATE</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>AMOUNT</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>STATUS</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredExpenses.map((expense) => (
                 <tr
                   key={expense.id}
-                  className="border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer"
+                  className={`border-b cursor-pointer ${darkMode ? 'border-slate-800 hover:bg-slate-800/30' : 'border-slate-100 hover:bg-slate-50'}`}
                   onClick={() => handleEditExpense(expense)}
                 >
                   <td className="py-4 px-4">
-                    <span className="font-medium text-white">
+                    <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                       {expense.expense_number || `EXP-${expense.id.slice(-6).toUpperCase()}`}
                     </span>
                   </td>
                   <td className="py-4 px-4">
                     <div>
-                      <p className="text-white font-medium">{expense.description}</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{expense.description}</p>
                       {expense.budget_categories && (
-                        <p className="text-slate-400 text-sm">{expense.budget_categories.name}</p>
+                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{expense.budget_categories.name}</p>
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {expense.payee || 'N/A'}
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {new Date(expense.date).toLocaleDateString()}
                   </td>
-                  <td className="py-4 px-4 text-white font-medium">
+                  <td className={`py-4 px-4 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     ${parseFloat(expense.amount).toFixed(2)}
                   </td>
                   <td className="py-4 px-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       expense.payment_status === 'completed' || expense.payment_status === 'paid'
-                        ? 'bg-green-900/30 text-green-400'
+                        ? 'bg-green-500/15 text-green-600'
                         : expense.payment_status === 'failed'
-                        ? 'bg-red-900/30 text-red-400'
-                        : 'bg-orange-900/30 text-orange-400'
+                        ? 'bg-red-500/15 text-red-600'
+                        : 'bg-orange-500/15 text-orange-600'
                     }`}>
                       {expense.payment_status === 'completed' || expense.payment_status === 'paid'
                         ? 'Paid'
@@ -844,7 +844,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                           e.stopPropagation();
                           handleEditExpense(expense);
                         }}
-                        className="p-2 text-slate-400 hover:text-white transition-colors"
+                        className={`p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`}
                         title="Edit expense"
                       >
                         <Edit size={16} />
@@ -868,11 +868,11 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
         </div>
       );
     }
-    
+
     if (activeTab === 'deposits') {
       if (filteredDeposits.length === 0) {
         return (
-          <div className="text-center py-12 text-slate-400">
+          <div className={`text-center py-12 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             <TrendingUp size={48} className="mx-auto mb-4 opacity-50" />
             <p>No deposits found</p>
           </div>
@@ -883,42 +883,42 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DEPOSIT #</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DESCRIPTION</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">PAYER</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">DATE</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">AMOUNT</th>
-                <th className="text-left py-3 px-4 font-medium text-slate-300">ACTIONS</th>
+              <tr className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DEPOSIT #</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DESCRIPTION</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>PAYER</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>DATE</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>AMOUNT</th>
+                <th className={`text-left py-3 px-4 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredDeposits.map((deposit) => (
                 <tr
                   key={deposit.id}
-                  className="border-b border-slate-800 hover:bg-slate-800/30 cursor-pointer"
+                  className={`border-b cursor-pointer ${darkMode ? 'border-slate-800 hover:bg-slate-800/30' : 'border-slate-100 hover:bg-slate-50'}`}
                   onClick={() => handleEditDeposit(deposit)}
                 >
                   <td className="py-4 px-4">
-                    <span className="font-medium text-white">
+                    <span className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                       {deposit.transaction_reference || `DEP-${deposit.id.slice(-6).toUpperCase()}`}
                     </span>
                   </td>
                   <td className="py-4 px-4">
                     <div>
-                      <p className="text-white font-medium">{deposit.description}</p>
+                      <p className={`font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>{deposit.description}</p>
                       {deposit.budget_categories && (
-                        <p className="text-slate-400 text-sm">{deposit.budget_categories.name}</p>
+                        <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{deposit.budget_categories.name}</p>
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {deposit.payer || 'N/A'}
                   </td>
-                  <td className="py-4 px-4 text-slate-300">
+                  <td className={`py-4 px-4 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {new Date(deposit.date).toLocaleDateString()}
                   </td>
-                  <td className="py-4 px-4 text-white font-medium">
+                  <td className={`py-4 px-4 font-medium ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                     ${parseFloat(deposit.amount).toFixed(2)}
                   </td>
                   <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
@@ -928,7 +928,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                           e.stopPropagation();
                           handleEditDeposit(deposit);
                         }}
-                        className="p-2 text-slate-400 hover:text-white transition-colors"
+                        className={`p-2 transition-colors ${darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`}
                         title="Edit deposit"
                       >
                         <Edit size={16} />
@@ -959,14 +959,14 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="border-b border-slate-700">
+      <div className={`border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
         <div className="flex space-x-1">
           <button
             onClick={() => setActiveTab('invoices')}
             className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
               activeTab === 'invoices'
                 ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'
+                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`
             }`}
           >
             <div className="flex items-center gap-2">
@@ -974,13 +974,13 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <span>Invoices</span>
             </div>
           </button>
-          
+
           <button
             onClick={() => setActiveTab('expenses')}
             className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
               activeTab === 'expenses'
                 ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'
+                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`
             }`}
           >
             <div className="flex items-center gap-2">
@@ -988,13 +988,13 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <span>Expenses</span>
             </div>
           </button>
-          
+
           <button
             onClick={() => setActiveTab('deposits')}
             className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 ${
               activeTab === 'deposits'
                 ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-300'
+                : `border-transparent ${darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}`
             }`}
           >
             <div className="flex items-center gap-2">
@@ -1017,13 +1017,13 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`
                 pl-10 pr-4 py-2 rounded-lg border w-80
-                ${darkMode 
-                  ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' 
+                ${darkMode
+                  ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
                   : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500'}
               `}
             />
           </div>
-          
+
           <div className="relative">
             <button
               onClick={() => setShowDateFilter(!showDateFilter)}
@@ -1039,53 +1039,53 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
             </button>
 
             {showDateFilter && (
-              <div className="absolute top-full mt-2 right-0 bg-slate-800 rounded-lg shadow-xl border border-slate-700 z-50 min-w-[280px]">
+              <div className={`absolute top-full mt-2 right-0 rounded-lg shadow-xl border z-50 min-w-[280px] ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className="p-2">
                   <button
                     onClick={() => setQuickFilter('This Financial Year')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     This Financial Year
                   </button>
                   <button
                     onClick={() => setQuickFilter('Last Financial Year')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     Last Financial Year
                   </button>
                   <button
                     onClick={() => setQuickFilter('This Month')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     This Month
                   </button>
                   <button
                     onClick={() => setQuickFilter('Last Month')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     Last Month
                   </button>
                   <button
                     onClick={() => setQuickFilter('This Quarter')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     This Quarter
                   </button>
                   <button
                     onClick={() => setQuickFilter('This Year')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     This Year
                   </button>
                   <button
                     onClick={() => setQuickFilter('All Time')}
-                    className="w-full text-left px-4 py-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+                    className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-slate-50 text-slate-900'}`}
                   >
                     All Time
                   </button>
 
-                  <div className="border-t border-slate-700 mt-2 pt-2">
-                    <p className="text-xs text-slate-400 px-4 mb-2">Custom Range</p>
+                  <div className={`border-t mt-2 pt-2 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                    <p className={`text-xs px-4 mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Custom Range</p>
                     <div className="px-4 py-2 space-y-2">
                       <input
                         type="date"
@@ -1094,7 +1094,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                           setDateFrom(e.target.value);
                           setFilterPeriod('Custom');
                         }}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
                       />
                       <input
                         type="date"
@@ -1103,7 +1103,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
                           setDateTo(e.target.value);
                           setFilterPeriod('Custom');
                         }}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                        className={`w-full px-3 py-2 border rounded-lg text-sm ${darkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
                       />
                     </div>
                   </div>
@@ -1126,10 +1126,10 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
             <Download size={16} />
             Export CSV
           </button>
-          
+
           <button
             onClick={handleCreateNew}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors"
           >
             <Plus size={16} />
             New {activeTab === 'invoices' ? 'Invoice' : activeTab === 'expenses' ? 'Expense' : 'Deposit'}
@@ -1148,10 +1148,10 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <FileText className="text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-sm text-slate-400">
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Total {activeTab === 'invoices' ? 'Invoices' : activeTab === 'expenses' ? 'Expenses' : 'Deposits'}
               </p>
-              <p className="text-2xl font-bold text-white">{stats.count}</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{stats.count}</p>
             </div>
           </div>
         </div>
@@ -1165,8 +1165,8 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <Receipt className="text-blue-400" size={20} />
             </div>
             <div>
-              <p className="text-sm text-slate-400">Total Amount</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(stats.total)}</p>
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Amount</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{formatCurrency(stats.total)}</p>
             </div>
           </div>
         </div>
@@ -1180,7 +1180,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <TrendingDown className="text-green-400" size={20} />
             </div>
             <div>
-              <p className="text-sm text-slate-400">Paid</p>
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Paid</p>
               <p className="text-2xl font-bold text-green-400">{formatCurrency(stats.paid)}</p>
             </div>
           </div>
@@ -1195,7 +1195,7 @@ export const FinancesInvoices: React.FC<FinancesInvoicesProps> = ({ darkMode, as
               <TrendingDown className="text-orange-400" size={20} />
             </div>
             <div>
-              <p className="text-sm text-slate-400">
+              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 {activeTab === 'invoices' ? 'Outstanding' : 'Pending'}
               </p>
               <p className="text-2xl font-bold text-orange-400">{formatCurrency(stats.outstanding)}</p>

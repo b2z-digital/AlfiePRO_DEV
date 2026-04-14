@@ -527,7 +527,9 @@ export type RaceStatus = 'live' | 'on_hold' | 'completed_for_day' | 'event_compl
 export async function updateRaceStatus(
   eventId: string,
   status: RaceStatus,
-  notes?: string
+  notes?: string,
+  clubId?: string,
+  day?: number
 ): Promise<boolean> {
   try {
     const normalizedEventId = normalizeEventIdForLiveTracking(eventId);
@@ -535,6 +537,8 @@ export async function updateRaceStatus(
       p_event_id: normalizedEventId,
       p_status: status,
       p_notes: notes || null,
+      p_club_id: clubId || null,
+      p_day: day || null,
     });
 
     if (error) throw error;
@@ -549,22 +553,41 @@ export async function getRaceStatus(eventId: string): Promise<{
   status: RaceStatus;
   lastUpdate: string | null;
   notes: string | null;
+  day: number | null;
 } | null> {
   try {
     const normalizedEventId = normalizeEventIdForLiveTracking(eventId);
     const { data, error } = await supabase
       .from('live_tracking_events')
-      .select('race_status, last_status_update, status_notes')
+      .select('race_status, last_status_update, status_notes, status_day')
       .eq('event_id', normalizedEventId)
       .maybeSingle();
 
     if (error) throw error;
     if (!data) return null;
 
+    let status = (data.race_status as RaceStatus) || 'on_hold';
+
+    if (status === 'completed_for_day' && data.last_status_update) {
+      const statusDate = new Date(data.last_status_update);
+      const now = new Date();
+      const statusDay = statusDate.toDateString();
+      const today = now.toDateString();
+      if (statusDay !== today) {
+        status = 'on_hold';
+        supabase.rpc('update_live_tracking_status', {
+          p_event_id: normalizedEventId,
+          p_status: 'on_hold',
+          p_notes: 'Auto-reset for new day',
+        }).catch(() => {});
+      }
+    }
+
     return {
-      status: (data.race_status as RaceStatus) || 'on_hold',
+      status,
       lastUpdate: data.last_status_update,
       notes: data.status_notes,
+      day: data.status_day,
     };
   } catch (error) {
     console.error('Error getting race status:', error);

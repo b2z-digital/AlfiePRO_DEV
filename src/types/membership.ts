@@ -13,7 +13,8 @@ export interface MembershipType {
   is_active: boolean;
   stripe_product_id: string | null;
   stripe_price_id: string | null;
-  requires_association_fees: boolean; // true = Full/Primary, false = Associate/Secondary
+  requires_association_fees: boolean;
+  replaces_membership_type_id: string | null;
   created_at: string;
   updated_at: string;
 }

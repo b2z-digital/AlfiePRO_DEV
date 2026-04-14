@@ -1,22 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNavigate } from 'react-router-dom';
-import {
-  Play,
-  Plus,
-  Search,
-  Info,
-  Volume2,
-  VolumeX,
-  ChevronLeft,
-  ChevronRight,
-  Settings,
-  X,
-  LogOut,
-  Youtube,
-  Filter,
-  Lightbulb
-} from 'lucide-react';
+import { Play, Plus, Search, Info, Volume2, VolumeX, ChevronLeft, ChevronRight, Settings, X, LogOut, Youtube, ListFilter as Filter, Lightbulb, Radio, Calendar, Square } from 'lucide-react';
 import { alfieTVStorage, AlfieTVVideo } from '../utils/alfieTVStorage';
 import { useNotification } from '../contexts/NotificationContext';
 import { supabase } from '../utils/supabase';
@@ -25,6 +11,7 @@ import { SuggestChannelModal } from '../components/alfie-tv/SuggestChannelModal'
 import { Logo } from '../components/Logo';
 import { getPersonalizedVideos, trackVideoView, getUserPreferences } from '../utils/alfieTVPersonalization';
 import { AdDisplay } from '../components/advertising/AdDisplay';
+import type { LivestreamSession, LivestreamArchive } from '../types/livestream';
 
 interface AlfieTVPageProps {
   darkMode?: boolean;
@@ -36,9 +23,13 @@ interface YouTubePlaylist {
   description: string;
   thumbnail_url: string;
   video_count: number;
+  channel_id?: string;
   playlist_category?: string;
   is_featured?: boolean;
+  is_visible?: boolean;
   view_count?: number;
+  display_order?: number;
+  published_at?: string;
   last_synced_at?: string;
 }
 
@@ -49,6 +40,387 @@ interface Channel {
   is_visible?: boolean;
   category?: string;
 }
+
+const LiveStreamPlayerWrapper = ({ session, onClose, venueImage, clubName }: {
+  session: LivestreamSession | null;
+  onClose: () => void;
+  venueImage?: string;
+  clubName?: string;
+}) => {
+  const [playerKey, setPlayerKey] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(session?.is_paused || false);
+  const [isEnded, setIsEnded] = React.useState(session?.status === 'ended');
+  const isPausedRef = React.useRef(session?.is_paused || false);
+  const isEndedRef = React.useRef(session?.status === 'ended');
+
+  React.useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel(`live-player-wrapper-${session.id}-${Date.now()}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'livestream_sessions',
+        filter: `id=eq.${session.id}`,
+      }, (payload: any) => {
+        const updated = payload.new;
+        const nowPaused = !!updated.is_paused;
+        const nowEnded = updated.status === 'ended';
+        const wasPaused = isPausedRef.current;
+
+        if (nowEnded && !isEndedRef.current) {
+          isEndedRef.current = true;
+          setIsEnded(true);
+        }
+        if (nowPaused !== wasPaused) {
+          isPausedRef.current = nowPaused;
+          setIsPaused(nowPaused);
+          if (!nowPaused && wasPaused) {
+            setTimeout(() => setPlayerKey(k => k + 1), 2000);
+          }
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.id]);
+
+  React.useEffect(() => {
+    if (!session) return;
+    const pollInterval = setInterval(async () => {
+      if (isEndedRef.current) return;
+      try {
+        const { data } = await supabase
+          .from('livestream_sessions')
+          .select('is_paused, status')
+          .eq('id', session.id)
+          .maybeSingle();
+        if (data) {
+          const nowPaused = !!data.is_paused;
+          const nowEnded = data.status === 'ended';
+          const wasPaused = isPausedRef.current;
+
+          if (nowEnded && !isEndedRef.current) {
+            isEndedRef.current = true;
+            setIsEnded(true);
+          }
+          if (nowPaused !== wasPaused) {
+            isPausedRef.current = nowPaused;
+            setIsPaused(nowPaused);
+            if (!nowPaused && wasPaused) {
+              setTimeout(() => setPlayerKey(k => k + 1), 2000);
+            }
+          }
+        }
+      } catch (_e) {}
+    }, 3000);
+    return () => clearInterval(pollInterval);
+  }, [session?.id]);
+
+  if (!session) return null;
+
+  if (isPaused || isEnded) {
+    const iframeEmbedUrl = session.cloudflare_customer_code && session.cloudflare_live_input_id
+      ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe`
+      : null;
+    if (!session.cloudflare_whip_playback_url && !iframeEmbedUrl) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+        {venueImage && <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />}
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
+          {venueImage && <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative z-10 text-center max-w-lg px-8">
+            <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mx-auto mb-6 border border-white/20">
+              {isEnded ? (
+                <Square className="w-8 h-8 text-white/80" />
+              ) : (
+                <Radio className="w-8 h-8 text-amber-400" />
+              )}
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-3">
+              {isEnded ? 'Stream Ended' : 'Event on Hold'}
+            </h2>
+            <p className="text-white/70 text-lg mb-2">
+              {isEnded
+                ? 'This livestream has ended. Thank you for watching!'
+                : 'The broadcast is temporarily paused. Come back soon!'}
+            </p>
+            <p className="text-white font-semibold text-xl mt-6">{session.title}</p>
+            {clubName && <p className="text-white/60 mt-1">Hosted by {clubName}</p>}
+            {isEnded && (
+              <button onClick={onClose} className="mt-8 px-8 py-3 bg-white text-black font-bold rounded-lg hover:bg-white/90 transition-all">
+                Back to AlfieTV
+              </button>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
+          style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999, cursor: 'pointer' }}
+          title="Close (ESC)"
+          type="button"
+        >
+          <LogOut className="w-7 h-7 stroke-[2.5]" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <LiveStreamPlayer
+      key={playerKey}
+      session={session}
+      onClose={onClose}
+      venueImage={venueImage}
+      clubName={clubName}
+    />
+  );
+};
+
+const LiveStreamPlayer = React.memo(({ session, onClose, venueImage, clubName }: {
+  session: LivestreamSession;
+  onClose: () => void;
+  venueImage?: string;
+  clubName?: string;
+}) => {
+  const [isConnecting, setIsConnecting] = React.useState(true);
+  const [connectionError, setConnectionError] = React.useState<string | null>(null);
+  const [isMuted, setIsMuted] = React.useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const pcRef = React.useRef<RTCPeerConnection | null>(null);
+  const retryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stallCheckRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = React.useRef(0);
+  const isFallbackRef = React.useRef(false);
+  const [usingFallback, setUsingFallback] = React.useState(false);
+
+  const whepUrl = session.cloudflare_whip_playback_url;
+  const iframeEmbedUrl = session.cloudflare_customer_code && session.cloudflare_live_input_id
+    ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
+    : null;
+  const whepUrlRef = React.useRef(whepUrl);
+  const iframeEmbedUrlRef = React.useRef(iframeEmbedUrl);
+  whepUrlRef.current = whepUrl;
+  iframeEmbedUrlRef.current = iframeEmbedUrl;
+
+  const cleanupConnection = React.useCallback(() => {
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+    if (stallCheckRef.current) { clearTimeout(stallCheckRef.current); stallCheckRef.current = null; }
+    if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
+  }, []);
+
+  const connectWhep = React.useCallback(async () => {
+    const url = whepUrlRef.current;
+    if (!url) return;
+
+    setIsConnecting(true);
+    setConnectionError(null);
+    if (pcRef.current) { pcRef.current.onconnectionstatechange = null; pcRef.current.ontrack = null; pcRef.current.close(); pcRef.current = null; }
+
+    try {
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.cloudflare.com:3478' },
+          { urls: 'stun:stun.l.google.com:19302' },
+        ],
+        bundlePolicy: 'max-bundle',
+      });
+      pcRef.current = pc;
+
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+
+      pc.ontrack = (event) => {
+        if (videoRef.current && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+          videoRef.current.play().catch(() => {});
+          setIsConnecting(false);
+          setConnectionError(null);
+          retryCountRef.current = 0;
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc !== pcRef.current) return;
+        const state = pc.connectionState;
+        if (state === 'connected') {
+          setIsConnecting(false);
+          setConnectionError(null);
+        } else if (state === 'failed' || state === 'disconnected') {
+          const fallbackUrl = iframeEmbedUrlRef.current;
+          if (retryCountRef.current < 10) {
+            retryCountRef.current += 1;
+            const delay = Math.min(retryCountRef.current * 2000, 10000);
+            retryTimerRef.current = setTimeout(() => connectWhep(), delay);
+          } else if (!isFallbackRef.current && fallbackUrl) {
+            isFallbackRef.current = true;
+            setUsingFallback(true);
+            setIsConnecting(false);
+          } else {
+            setConnectionError('Connection lost. The stream may have ended.');
+            setIsConnecting(false);
+          }
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') { resolve(); return; }
+        const check = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', check);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', check);
+        setTimeout(() => { pc.removeEventListener('icegatheringstatechange', check); resolve(); }, 3000);
+      });
+
+      const localDesc = pc.localDescription;
+      if (!localDesc) throw new Error('No local description');
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: localDesc.sdp,
+      });
+
+      if (!response.ok) {
+        throw new Error(`WHEP error: ${response.status}`);
+      }
+
+      const answerSdp = await response.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+    } catch (err: any) {
+      console.error('[WHEP] Connection error:', err);
+      const fallbackUrl = iframeEmbedUrlRef.current;
+      if (retryCountRef.current < 10) {
+        retryCountRef.current += 1;
+        const delay = Math.min(retryCountRef.current * 2000, 10000);
+        retryTimerRef.current = setTimeout(() => connectWhep(), delay);
+      } else if (!isFallbackRef.current && fallbackUrl) {
+        isFallbackRef.current = true;
+        setUsingFallback(true);
+        setIsConnecting(false);
+      } else {
+        setConnectionError('Unable to connect to the live stream.');
+        setIsConnecting(false);
+      }
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  React.useEffect(() => {
+    if (whepUrl) {
+      connectWhep();
+    } else if (iframeEmbedUrl) {
+      isFallbackRef.current = true;
+      setUsingFallback(true);
+      setIsConnecting(false);
+    }
+    return () => { cleanupConnection(); };
+  }, []);
+
+  if (!whepUrl && !iframeEmbedUrl) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+      {venueImage && (
+        <img src={venueImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
+      )}
+
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isMuted}
+        className="absolute inset-0 w-full h-full object-contain bg-black"
+        style={{ zIndex: 1, display: !usingFallback ? 'block' : 'none' }}
+      />
+
+      {usingFallback && iframeEmbedUrl && (
+        <iframe
+          src={iframeEmbedUrl}
+          className="absolute inset-0 w-full h-full"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          allowFullScreen
+          title={session.title || 'Live Stream'}
+          loading="eager"
+          style={{ border: 'none', zIndex: 1 }}
+        />
+      )}
+
+      {isConnecting && (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
+          <div className="text-center">
+            <div className="w-14 h-14 border-4 border-white/20 border-t-red-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-white/80 text-base font-medium">Connecting to live stream...</p>
+            <p className="text-white/40 text-sm mt-1">{session.title}</p>
+          </div>
+        </div>
+      )}
+
+      {connectionError && (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
+          <div className="text-center max-w-md px-8">
+            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+              <Radio className="w-8 h-8 text-red-400" />
+            </div>
+            <p className="text-white/80 text-lg font-medium mb-2">{connectionError}</p>
+            <button
+              onClick={() => { retryCountRef.current = 0; isFallbackRef.current = false; setUsingFallback(false); connectWhep(); }}
+              className="mt-4 px-6 py-2.5 bg-red-600 text-white font-bold rounded-lg hover:bg-red-500 transition-all"
+            >
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={onClose}
+        className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
+        style={{ position: 'fixed', top: '24px', right: '24px', zIndex: 9999, cursor: 'pointer' }}
+        title="Close (ESC)"
+        type="button"
+      >
+        <LogOut className="w-7 h-7 stroke-[2.5]" />
+      </button>
+
+      {!usingFallback && !isConnecting && (
+        <button
+          onClick={() => { setIsMuted(m => !m); if (videoRef.current) videoRef.current.muted = !videoRef.current.muted; }}
+          className="p-3 rounded-full bg-black/60 hover:bg-black/80 text-white/80 hover:text-white transition-all backdrop-blur-sm border border-white/20 hover:border-white/40"
+          style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999, cursor: 'pointer' }}
+          title={isMuted ? 'Unmute' : 'Mute'}
+          type="button"
+        >
+          {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+        </button>
+      )}
+
+      <div
+        className="bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3"
+        style={{ position: 'fixed', top: '24px', left: '24px', zIndex: 9998, pointerEvents: 'none', maxWidth: '60%' }}
+      >
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+        </span>
+        <span className="text-white font-medium text-sm">{session.title}</span>
+      </div>
+    </div>
+  );
+});
 
 // Hero video background component - MUST be outside to prevent re-creation on parent renders
 // Uses internal state to track current video and prevent reloads
@@ -90,7 +462,7 @@ const HeroVideoBackground = React.memo(({ videoId, thumbnailUrl }: { videoId: st
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/30 to-transparent" />
+      <div className="absolute inset-0 from-black/80 via-black/30 to-transparent" />
     </div>
   );
 });
@@ -172,16 +544,8 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 
   if (!currentVideo) return null;
 
-  // Parameters:
-  // - rel=0: No related videos at end
-  // - modestbranding=1: Hide YouTube logo
-  // - enablejsapi=1: Enable postMessage API for video end detection
-  // - fs=0: Disable fullscreen button (keeps users in app)
-  // - origin: Required for postMessage API
-  // - disablekb=1: Disable keyboard controls (prevents accidental navigation)
-  // - playsinline=1: Play inline on mobile
   const currentOrigin = window.location.origin;
-  const videoUrl = `https://www.youtube-nocookie.com/embed/${currentVideo.youtube_id}?autoplay=1&controls=1&modestbranding=1&rel=0&fs=0&iv_load_policy=3&cc_load_policy=0&enablejsapi=1&disablekb=1&playsinline=1&origin=${encodeURIComponent(currentOrigin)}`;
+  const videoUrl = `https://www.youtube-nocookie.com/embed/${currentVideo.youtube_id}?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&iv_load_policy=3&cc_load_policy=0&enablejsapi=1&playsinline=1&origin=${encodeURIComponent(currentOrigin)}`;
 
   const handleCloseClick = () => {
     console.log('✅✅✅ CLOSE BUTTON CLICKED - CLOSING VIDEO!');
@@ -190,19 +554,17 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 
   return (
     <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
-      {/* Video iframe */}
       <iframe
         ref={iframeRef}
         src={videoUrl}
         className="absolute inset-0 w-full h-full"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        allowFullScreen
         title={currentVideo?.title || 'Video'}
         loading="eager"
-        frameBorder="0"
+        style={{ border: 'none' }}
       />
 
-      {/* Overlays to block YouTube UI */}
-      <div className="absolute top-0 right-0 w-80 h-28" style={{ zIndex: 9001, pointerEvents: 'auto', background: 'transparent' }} onClick={handleCloseClick} />
       <div className="absolute bottom-0 right-0 w-36 h-20" style={{ zIndex: 9001, pointerEvents: 'auto', background: 'transparent' }} />
 
       {/* Close button - subtle design */}
@@ -250,6 +612,8 @@ const FullscreenVideoModal = React.memo(({ video, onClose }: { video: AlfieTVVid
 
 export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const { user, currentClub, currentOrganization, isSuperAdmin } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
   const { addNotification } = useNotification();
 
@@ -286,6 +650,11 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [watchlist, setWatchlist] = useState<AlfieTVVideo[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [showSuggestChannel, setShowSuggestChannel] = useState(false);
+  const [liveStreams, setLiveStreams] = useState<(LivestreamSession & { venue_image?: string; club_name?: string })[]>([]);
+  const [upcomingStreams, setUpcomingStreams] = useState<(LivestreamSession & { venue_image?: string; club_name?: string })[]>([]);
+  const [replayArchives, setReplayArchives] = useState<LivestreamArchive[]>([]);
+  const [selectedLiveStream, setSelectedLiveStream] = useState<(LivestreamSession & { venue_image?: string; club_name?: string }) | null>(null);
+  const [selectedReplay, setSelectedReplay] = useState<LivestreamArchive | null>(null);
   const heroVideoRef = useRef<HTMLVideoElement>(null);
 
   // Get organization ID for both clubs and associations
@@ -316,6 +685,159 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       loadContent();
     }
   }, [organizationId]);
+
+  useEffect(() => {
+    const enrichStreamsWithClubData = async (streams: LivestreamSession[]) => {
+      const clubIds = [...new Set(streams.map(s => s.club_id))];
+      if (clubIds.length === 0) return streams;
+      const { data: clubs } = await supabase
+        .from('clubs')
+        .select('id, name, cover_image_url, featured_image_url')
+        .in('id', clubIds);
+      const clubMap = new Map((clubs || []).map(c => [c.id, c]));
+
+      const eventIds = streams
+        .map(s => s.event_id)
+        .filter((id): id is string => !!id);
+      const rawEventIds = eventIds.map(id => id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, ''));
+      const uniqueEventIds = [...new Set(rawEventIds)];
+
+      const venueImageMap = new Map<string, string>();
+
+      if (uniqueEventIds.length > 0) {
+        const { data: publicEvents } = await supabase
+          .from('public_events')
+          .select('id, venue_id')
+          .in('id', uniqueEventIds);
+
+        const matchedPublicEventIds = new Set((publicEvents || []).map(e => e.id));
+        const venueIds = (publicEvents || []).map(e => e.venue_id).filter((id): id is string => !!id);
+
+        if (venueIds.length > 0) {
+          const { data: venues } = await supabase
+            .from('venues')
+            .select('id, name, image')
+            .in('id', [...new Set(venueIds)]);
+          if (venues) {
+            const venueById = new Map(venues.map(v => [v.id, v]));
+            for (const event of (publicEvents || [])) {
+              if (event.venue_id && venueById.has(event.venue_id)) {
+                const v = venueById.get(event.venue_id)!;
+                if (v.image) venueImageMap.set(event.id, v.image);
+              }
+            }
+          }
+        }
+
+        const unmatchedIds = uniqueEventIds.filter(id => !matchedPublicEventIds.has(id));
+        if (unmatchedIds.length > 0) {
+          const { data: quickRaces } = await supabase
+            .from('quick_races')
+            .select('id, race_venue, club_id')
+            .in('id', unmatchedIds);
+
+          if (quickRaces && quickRaces.length > 0) {
+            const venueNames = quickRaces
+              .map(r => r.race_venue)
+              .filter((name): name is string => !!name && name.trim() !== '');
+            const raceClubIds = quickRaces.map(r => r.club_id).filter((id): id is string => !!id);
+            const allClubIds = [...new Set([...clubIds, ...raceClubIds])];
+
+            if (venueNames.length > 0) {
+              const { data: clubVenueRows } = await supabase
+                .from('club_venues')
+                .select('venue_id, club_id')
+                .in('club_id', allClubIds);
+
+              if (clubVenueRows && clubVenueRows.length > 0) {
+                const cvVenueIds = [...new Set(clubVenueRows.map(cv => cv.venue_id))];
+                const { data: allVenues } = await supabase
+                  .from('venues')
+                  .select('id, name, image')
+                  .in('id', cvVenueIds);
+
+                if (allVenues) {
+                  const venueByName = new Map<string, typeof allVenues[0]>();
+                  for (const v of allVenues) {
+                    if (v.name) venueByName.set(v.name.toLowerCase().trim(), v);
+                  }
+                  for (const race of quickRaces) {
+                    if (race.race_venue) {
+                      const venue = venueByName.get(race.race_venue.toLowerCase().trim());
+                      if (venue?.image) venueImageMap.set(race.id, venue.image);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return streams.map(s => {
+        const club = clubMap.get(s.club_id);
+        let venueImage: string | undefined;
+        if (s.event_id) {
+          const baseEventId = s.event_id.replace(/-round-\d+$/, '').replace(/-day-\d+$/, '');
+          venueImage = venueImageMap.get(s.event_id) || venueImageMap.get(baseEventId);
+        }
+        if (!venueImage) {
+          venueImage = club?.cover_image_url || club?.featured_image_url || undefined;
+        }
+        return {
+          ...s,
+          venue_image: venueImage,
+          club_name: club?.name || undefined,
+        };
+      });
+    };
+
+    const loadLiveStreams = async () => {
+      try {
+        const { data } = await supabase
+          .from('livestream_sessions')
+          .select('*')
+          .in('status', ['live', 'testing'])
+          .eq('is_public', true)
+          .not('cloudflare_live_input_id', 'is', null)
+          .not('cloudflare_customer_code', 'is', null)
+          .order('actual_start_time', { ascending: false });
+        const liveWithVenues = await enrichStreamsWithClubData(data || []);
+        setLiveStreams(liveWithVenues);
+
+        const oneWeekFromNow = new Date();
+        oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+        const { data: upcoming } = await supabase
+          .from('livestream_sessions')
+          .select('*')
+          .eq('status', 'scheduled')
+          .eq('is_public', true)
+          .not('scheduled_start_time', 'is', null)
+          .gte('scheduled_start_time', new Date().toISOString())
+          .lte('scheduled_start_time', oneWeekFromNow.toISOString())
+          .order('scheduled_start_time', { ascending: true })
+          .limit(3);
+        const upcomingWithVenues = await enrichStreamsWithClubData(upcoming || []);
+        setUpcomingStreams(upcomingWithVenues);
+
+        const { data: archives } = await supabase
+          .from('livestream_archives')
+          .select('*')
+          .eq('is_public', true)
+          .or('youtube_url.not.is.null,cloudflare_playback_url.not.is.null')
+          .not('duration', 'is', null)
+          .gt('duration', 0)
+          .order('recorded_at', { ascending: false })
+          .limit(20);
+        setReplayArchives(archives || []);
+      } catch (err) {
+        console.error('Error loading live streams:', err);
+      }
+    };
+    loadLiveStreams();
+    const interval = setInterval(loadLiveStreams, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadCachedData = () => {
     try {
@@ -356,16 +878,68 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     }
   };
 
-  // Auto-rotate hero carousel - single timer to avoid glitching
+  const loadPlaylistVideosForChannel = async (channelId: string) => {
+    const channelPlaylists = playlists.filter(p => p.channel_id === channelId);
+    const unloadedPlaylists = channelPlaylists.filter(p => !playlistVideos[p.id]);
+    if (unloadedPlaylists.length === 0) return;
+
+    const newVideoMap: { [key: string]: AlfieTVVideo[] } = {};
+    const promises = unloadedPlaylists.map(async (playlist) => {
+      const { data: playlistVideoIds } = await supabase
+        .from('alfie_tv_youtube_playlist_videos')
+        .select('video_id')
+        .eq('youtube_playlist_id', playlist.id)
+        .order('position')
+        .limit(10);
+
+      if (playlistVideoIds && playlistVideoIds.length > 0) {
+        const orderedIds = playlistVideoIds.map(pv => pv.video_id);
+        const { data: videos } = await supabase
+          .from('alfie_tv_videos')
+          .select('*')
+          .in('id', orderedIds);
+        const idToIndex = new Map(orderedIds.map((id, i) => [id, i]));
+        const sorted = (videos || []).sort((a, b) => (idToIndex.get(a.id) ?? 99) - (idToIndex.get(b.id) ?? 99));
+        return { playlistId: playlist.id, videos: sorted };
+      }
+      return { playlistId: playlist.id, videos: [] };
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(r => { newVideoMap[r.playlistId] = r.videos; });
+    setPlaylistVideos(prev => ({ ...prev, ...newVideoMap }));
+  };
+
+  const handleSelectChannel = (channelId: string | null) => {
+    setSelectedChannelId(channelId);
+    if (channelId) {
+      loadPlaylistVideosForChannel(channelId);
+    }
+  };
+
+  type HeroSlide =
+    | { type: 'live'; stream: LivestreamSession & { venue_image?: string; club_name?: string } }
+    | { type: 'upcoming'; stream: LivestreamSession & { venue_image?: string; club_name?: string } }
+    | { type: 'video'; video: AlfieTVVideo };
+
+  const heroSlides = useMemo<HeroSlide[]>(() => {
+    const slides: HeroSlide[] = [];
+    liveStreams.forEach(s => slides.push({ type: 'live', stream: s }));
+    upcomingStreams.forEach(s => slides.push({ type: 'upcoming', stream: s }));
+    heroVideos.forEach(v => slides.push({ type: 'video', video: v }));
+    return slides;
+  }, [liveStreams, upcomingStreams, heroVideos]);
+
   useEffect(() => {
-    if (heroVideos.length === 0) return;
+    if (heroSlides.length === 0) return;
+    if (currentHeroIndex >= heroSlides.length) setCurrentHeroIndex(0);
 
     const interval = setInterval(() => {
-      setCurrentHeroIndex((prev) => (prev + 1) % heroVideos.length);
-    }, 30000); // Change every 30 seconds
+      setCurrentHeroIndex((prev) => (prev + 1) % heroSlides.length);
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [heroVideos.length]);
+  }, [heroSlides.length]);
 
   const loadContent = async () => {
     if (!organizationId) {
@@ -400,7 +974,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         setChannels(channelsData);
       }
 
-      // Load YouTube playlists
+      // Load YouTube playlists (all visible playlists, no limit)
       const { data: playlistsData } = await supabase
         .from('alfie_tv_youtube_playlists')
         .select(`
@@ -412,12 +986,17 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           channel_id,
           playlist_category,
           is_featured,
+          is_visible,
           view_count,
+          display_order,
+          published_at,
           last_synced_at
         `)
         .in('channel_id', channelsData?.map(c => c.id) || [])
-        .order('video_count', { ascending: false })
-        .limit(20);
+        .eq('is_visible', true)
+        .order('is_featured', { ascending: false })
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false });
 
       // Initialize playlistVideoMap
       let playlistVideoMap: { [key: string]: AlfieTVVideo[] } = {};
@@ -425,8 +1004,16 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       if (playlistsData) {
         setPlaylists(playlistsData);
 
-        // Load videos for each playlist (first 10 videos)
-        const playlistVideoPromises = playlistsData.map(async (playlist) => {
+        // Load videos for top playlists (featured first, then by video count)
+        const sortedForVideoLoad = [...playlistsData]
+          .sort((a, b) => {
+            if (a.is_featured && !b.is_featured) return -1;
+            if (!a.is_featured && b.is_featured) return 1;
+            return (b.video_count || 0) - (a.video_count || 0);
+          })
+          .slice(0, 40);
+
+        const playlistVideoPromises = sortedForVideoLoad.map(async (playlist) => {
           const { data: playlistVideoIds } = await supabase
             .from('alfie_tv_youtube_playlist_videos')
             .select('video_id')
@@ -435,12 +1022,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
             .limit(10);
 
           if (playlistVideoIds && playlistVideoIds.length > 0) {
+            const orderedIds = playlistVideoIds.map(pv => pv.video_id);
             const { data: videos } = await supabase
               .from('alfie_tv_videos')
               .select('*')
-              .in('id', playlistVideoIds.map(pv => pv.video_id));
-
-            return { playlistId: playlist.id, videos: videos || [] };
+              .in('id', orderedIds);
+            const idToIndex = new Map(orderedIds.map((id, i) => [id, i]));
+            const sorted = (videos || []).sort((a, b) => (idToIndex.get(a.id) ?? 99) - (idToIndex.get(b.id) ?? 99));
+            return { playlistId: playlist.id, videos: sorted };
           }
           return { playlistId: playlist.id, videos: [] };
         });
@@ -542,7 +1131,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               view_count
             )
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId!)
           .order('added_at', { ascending: false });
 
         if (watchlistData) {
@@ -637,85 +1226,259 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     return `${minutes}m`;
   };
 
-  const HeroCarousel = () => {
-    const currentHero = heroVideos[currentHeroIndex];
-    if (!currentHero) return null;
+  const formatScheduledDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) return 'Starting soon';
+    if (diffHours < 24) return `In ${diffHours} hour${diffHours === 1 ? '' : 's'}`;
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays < 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const LiveHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => {
+    const venueImg = stream.venue_image;
+    const clubName = stream.club_name;
 
     return (
       <div className="relative h-[85vh] w-full overflow-hidden">
-        {/* Memoized Video Background - only re-renders when videoId changes */}
-        <HeroVideoBackground
-          videoId={currentHero.youtube_id}
-          thumbnailUrl={currentHero.thumbnail_high_url || currentHero.thumbnail_url}
-        />
+        {venueImg ? (
+          <img src={venueImg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
+        <div className="absolute inset-0 from-black/70 via-transparent to-transparent" />
 
-
-        {/* Navigation Dots */}
-        <div className="absolute bottom-[15%] left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
-          {heroVideos.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                setCurrentHeroIndex(index);
-              }}
-              className={`h-1 rounded-full transition-all ${
-                index === currentHeroIndex ? 'w-8 bg-white' : 'w-1 bg-white/50'
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="absolute bottom-[25%] left-20 right-0 px-12">
+        <div className="absolute bottom-[20%] left-20 right-0 px-12">
           <div className="max-w-3xl">
-            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl">
-              {currentHero.title}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
+                <Radio className="w-4 h-4 text-white" />
+                <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
+              </div>
+              {stream.viewer_count > 0 && (
+                <span className="text-white/70 text-sm">{stream.viewer_count} watching</span>
+              )}
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
+              {stream.title}
             </h1>
-            <p className="text-base text-white/90 mb-6 line-clamp-2 drop-shadow-lg">
-              {currentHero.description}
-            </p>
-            <div className="flex items-center space-x-3">
+            {clubName && (
+              <p className="text-lg text-white/70 mb-6 drop-shadow-lg">
+                Hosted by {clubName}
+              </p>
+            )}
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => handleVideoClick(currentHero)}
-                className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white text-black font-bold hover:bg-white/90 transition-all shadow-2xl"
+                onClick={() => setSelectedLiveStream(stream)}
+                className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
               >
-                <Play className="w-5 h-5 fill-current" />
-                <span>Play</span>
-              </button>
-              <button
-                onClick={(e) => handleAddToWatchlist(e, currentHero)}
-                className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white/20 backdrop-blur-md text-white font-bold hover:bg-white/30 transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                <span>My List</span>
-              </button>
-              <button
-                onClick={() => setShowHeroInfo(!showHeroInfo)}
-                className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all"
-              >
-                <Info className="w-5 h-5" />
+                <Radio className="w-5 h-5" />
+                <span>Watch Live</span>
               </button>
             </div>
           </div>
         </div>
+      </div>
+    );
+  };
 
-        {/* Navigation Arrows */}
-        <button
-          onClick={() => {
-            setCurrentHeroIndex((prev) => (prev - 1 + heroVideos.length) % heroVideos.length);
-          }}
-          className="absolute left-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
-        >
-          <ChevronLeft className="w-8 h-8" />
-        </button>
-        <button
-          onClick={() => {
-            setCurrentHeroIndex((prev) => (prev + 1) % heroVideos.length);
-          }}
-          className="absolute right-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
-        >
-          <ChevronRight className="w-8 h-8" />
-        </button>
+  const UpcomingStreamHero = ({ stream }: { stream: LivestreamSession & { venue_image?: string; club_name?: string } }) => (
+    <div className="relative h-[85vh] w-full overflow-hidden">
+      {stream.venue_image ? (
+        <img src={stream.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
+      <div className="absolute inset-0 from-black/80 via-black/30 to-transparent" />
+
+      <div className="absolute bottom-[20%] left-20 right-0 px-12">
+        <div className="max-w-3xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-3 py-1.5 rounded-md">
+              <Radio className="w-4 h-4 text-white" />
+              <span className="text-sm font-bold text-white uppercase tracking-wider">Coming Soon</span>
+            </div>
+            <span className="text-white/70 text-sm font-medium">
+              {formatScheduledDate(stream.scheduled_start_time!)}
+            </span>
+          </div>
+          <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">
+            {stream.title}
+          </h1>
+          {stream.club_name && (
+            <p className="text-lg text-white/70 mb-6 drop-shadow-lg">
+              Hosted by {stream.club_name}
+            </p>
+          )}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 backdrop-blur-md text-white font-semibold border border-white/20">
+              <Calendar className="w-5 h-5" />
+              <span>
+                {new Date(stream.scheduled_start_time!).toLocaleDateString('en-US', {
+                  weekday: 'long', month: 'long', day: 'numeric'
+                })}
+                {' at '}
+                {new Date(stream.scheduled_start_time!).toLocaleTimeString('en-US', {
+                  hour: 'numeric', minute: '2-digit'
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const HeroCarousel = () => {
+    const slide = heroSlides[currentHeroIndex];
+    if (!slide) return null;
+
+    const renderSlideBackground = () => {
+      if (slide.type === 'live') {
+        const s = slide.stream;
+        return (
+          <>
+            {s.venue_image ? (
+              <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-red-950/30 to-gray-900" />
+            )}
+          </>
+        );
+      }
+      if (slide.type === 'upcoming') {
+        const s = slide.stream;
+        return s.venue_image
+          ? <img src={s.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          : <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-950/20 to-gray-900" />;
+      }
+      const v = slide.video;
+      return <HeroVideoBackground videoId={v.youtube_id} thumbnailUrl={v.thumbnail_high_url || v.thumbnail_url} />;
+    };
+
+    const renderSlideContent = () => {
+      if (slide.type === 'live') {
+        const s = slide.stream;
+        return (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-md">
+                <Radio className="w-4 h-4 text-white" />
+                <span className="text-sm font-bold text-white uppercase tracking-wider">Live Now</span>
+              </div>
+              {s.viewer_count > 0 && <span className="text-white/70 text-sm">{s.viewer_count} watching</span>}
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">{s.title}</h1>
+            {s.club_name && <p className="text-lg text-white/70 mb-6 drop-shadow-lg">Hosted by {s.club_name}</p>}
+            <button
+              onClick={() => setSelectedLiveStream(s)}
+              className="flex items-center gap-2 px-10 py-3.5 rounded-lg bg-red-600 text-white font-bold hover:bg-red-500 transition-all shadow-2xl shadow-red-600/30 text-lg"
+            >
+              <Radio className="w-5 h-5" />
+              <span>Watch Live</span>
+            </button>
+          </>
+        );
+      }
+      if (slide.type === 'upcoming') {
+        const s = slide.stream;
+        return (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-3 py-1.5 rounded-md">
+                <Radio className="w-4 h-4 text-white" />
+                <span className="text-sm font-bold text-white uppercase tracking-wider">Coming Soon</span>
+              </div>
+              <span className="text-white/70 text-sm font-medium">{formatScheduledDate(s.scheduled_start_time!)}</span>
+            </div>
+            <h1 className="text-5xl font-bold text-white mb-3 drop-shadow-2xl leading-tight">{s.title}</h1>
+            {s.club_name && <p className="text-lg text-white/70 mb-6 drop-shadow-lg">Hosted by {s.club_name}</p>}
+            <div className="flex items-center gap-2 px-6 py-3 rounded-lg bg-white/10 backdrop-blur-md text-white font-semibold border border-white/20 w-fit">
+              <Calendar className="w-5 h-5" />
+              <span>
+                {new Date(s.scheduled_start_time!).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {' at '}
+                {new Date(s.scheduled_start_time!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            </div>
+          </>
+        );
+      }
+      const v = slide.video;
+      return (
+        <>
+          <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl">{v.title}</h1>
+          <p className="text-base text-white/90 mb-6 line-clamp-2 drop-shadow-lg">{v.description}</p>
+          <div className="flex items-center space-x-3">
+            <button onClick={() => handleVideoClick(v)} className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white text-black font-bold hover:bg-white/90 transition-all shadow-2xl">
+              <Play className="w-5 h-5 fill-current" />
+              <span>Play</span>
+            </button>
+            <button onClick={(e) => handleAddToWatchlist(e, v)} className="flex items-center space-x-2 px-8 py-3 rounded-lg bg-white/20 backdrop-blur-md text-white font-bold hover:bg-white/30 transition-all">
+              <Plus className="w-5 h-5" />
+              <span>My List</span>
+            </button>
+            <button onClick={() => setShowHeroInfo(!showHeroInfo)} className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all">
+              <Info className="w-5 h-5" />
+            </button>
+          </div>
+        </>
+      );
+    };
+
+    return (
+      <div className="relative h-[85vh] w-full overflow-hidden">
+        {renderSlideBackground()}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-black/50" />
+        <div className="absolute inset-0 from-black/70 via-transparent to-transparent" />
+
+        {heroSlides.length > 1 && (
+          <div className="absolute bottom-[15%] left-1/2 transform -translate-x-1/2 flex space-x-2 z-20">
+            {heroSlides.map((s, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentHeroIndex(index)}
+                className={`h-1.5 rounded-full transition-all ${
+                  index === currentHeroIndex
+                    ? `w-8 ${s.type === 'live' ? 'bg-red-500' : s.type === 'upcoming' ? 'bg-blue-400' : 'bg-white'}`
+                    : 'w-1.5 bg-white/40 hover:bg-white/60'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="absolute bottom-[20%] left-20 right-0 px-12">
+          <div className="max-w-3xl">
+            {renderSlideContent()}
+          </div>
+        </div>
+
+        {heroSlides.length > 1 && (
+          <>
+            <button
+              onClick={() => setCurrentHeroIndex((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
+              className="absolute left-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            <button
+              onClick={() => setCurrentHeroIndex((prev) => (prev + 1) % heroSlides.length)}
+              className="absolute right-8 top-1/2 transform -translate-y-1/2 p-4 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-all z-20"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          </>
+        )}
       </div>
     );
   };
@@ -866,7 +1629,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           {canScrollLeft && (
             <button
               onClick={() => scroll('left')}
-              className="absolute left-0 top-0 bottom-0 z-[90] w-12 bg-gradient-to-r from-black/80 to-transparent flex items-center justify-start pl-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
+              className="btn-primary-green absolute left-0 top-0 bottom-0 z-[90] w-12 from-black/80 to-transparent flex items-center justify-start pl-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
             >
               <ChevronLeft className="w-10 h-10 text-white" />
             </button>
@@ -1054,22 +1817,112 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                 <ChevronLeft className="w-5 h-5 mr-2" />
                 Back to all channels
               </button>
-              <h1 className="text-4xl font-bold text-white mb-4">
-                {channels.find(c => c.id === selectedChannelId)?.channel_name}
-              </h1>
+              {(() => {
+                const selectedChannel = channels.find(c => c.id === selectedChannelId);
+                const channelPlaylists = playlists
+                  .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+                  .sort((a, b) => {
+                    if (a.is_featured && !b.is_featured) return -1;
+                    if (!a.is_featured && b.is_featured) return 1;
+                    const dateA = a.published_at || a.last_synced_at || '';
+                    const dateB = b.published_at || b.last_synced_at || '';
+                    return dateB.localeCompare(dateA);
+                  });
+                return (
+                  <>
+                    <div className="flex items-center gap-4 mb-6">
+                      {selectedChannel?.channel_thumbnail && (
+                        <img
+                          src={selectedChannel.channel_thumbnail}
+                          alt={selectedChannel.channel_name}
+                          className="w-16 h-16 rounded-full ring-2 ring-white/20"
+                        />
+                      )}
+                      <div>
+                        <h1 className="text-4xl font-bold text-white">
+                          {selectedChannel?.channel_name}
+                        </h1>
+                        <p className="text-gray-400 text-sm mt-1">
+                          {channelPlaylists.length} playlist{channelPlaylists.length !== 1 ? 's' : ''}
+                          {selectedChannel?.video_count ? ` / ${selectedChannel.video_count} videos` : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    {channelPlaylists.length > 0 && (
+                      <div className="-mx-12 px-12 py-6 mb-6 bg-gradient-to-b from-white/[0.03] via-white/[0.02] to-transparent border-t border-b border-white/[0.06]">
+                        <h2 className="text-lg font-semibold text-white mb-4">
+                          All Playlists
+                          <span className="text-sm font-normal text-gray-500 ml-2">({channelPlaylists.length})</span>
+                        </h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                          {channelPlaylists.map(playlist => (
+                              <div
+                                key={playlist.id}
+                                onClick={() => {
+                                  const firstVideoRow = document.getElementById(`playlist-row-${playlist.id}`);
+                                  if (firstVideoRow) {
+                                    firstVideoRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  }
+                                }}
+                                className="group cursor-pointer"
+                              >
+                                <div className={`relative aspect-video rounded-lg overflow-hidden bg-slate-800 mb-2 transition-all ${
+                                  playlist.is_featured ? 'ring-2 ring-amber-500/50 group-hover:ring-amber-500' : 'ring-1 ring-white/[0.06] group-hover:ring-white/20'
+                                }`}>
+                                  {playlist.thumbnail_url ? (
+                                    <img
+                                      src={playlist.thumbnail_url}
+                                      alt={playlist.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full bg-gradient-to-br from-slate-700 to-slate-900">
+                                      <Play className="w-8 h-8 text-slate-500" />
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                  {playlist.is_featured && (
+                                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-amber-500/90 text-white text-[10px] font-semibold uppercase tracking-wider">
+                                      Featured
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-white text-xs font-medium">
+                                    {playlist.video_count} videos
+                                  </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-white line-clamp-2 group-hover:text-blue-400 transition-colors">
+                                  {playlist.title}
+                                </h3>
+                              </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
-            {/* Channel Playlists */}
+
             {playlists
-              .filter(p => p.channel_id === selectedChannelId)
+              .filter(p => p.channel_id === selectedChannelId && p.is_visible !== false)
+              .sort((a, b) => {
+                if (a.is_featured && !b.is_featured) return -1;
+                if (!a.is_featured && b.is_featured) return 1;
+                const dateA = a.published_at || a.last_synced_at || '';
+                const dateB = b.published_at || b.last_synced_at || '';
+                return dateB.localeCompare(dateA);
+              })
               .map(playlist => {
                 const videos = playlistVideos[playlist.id] || [];
                 if (videos.length === 0) return null;
                 return (
-                  <VideoRow
-                    key={playlist.id}
-                    title={playlist.title}
-                    videos={videos}
-                  />
+                  <div key={playlist.id} id={`playlist-row-${playlist.id}`}>
+                    <VideoRow
+                      title={playlist.is_featured ? `${playlist.title}` : playlist.title}
+                      videos={videos}
+                    />
+                  </div>
                 );
               })}
           </div>
@@ -1080,30 +1933,36 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
               <p className="text-gray-400">Browse content by channel</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 px-12">
-              {channels.map(channel => (
-                <div
-                  key={channel.id}
-                  onClick={() => setSelectedChannelId(channel.id)}
-                  className="group cursor-pointer"
-                >
-                  <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
-                    {channel.channel_thumbnail ? (
-                      <img
-                        src={channel.channel_thumbnail}
-                        alt={channel.channel_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full">
-                        <Youtube className="w-16 h-16 text-red-600" />
-                      </div>
-                    )}
+              {channels.map(channel => {
+                const channelPlaylistCount = playlists.filter(p => p.channel_id === channel.id).length;
+                return (
+                  <div
+                    key={channel.id}
+                    onClick={() => handleSelectChannel(channel.id)}
+                    className="group cursor-pointer"
+                  >
+                    <div className="relative aspect-square rounded-full overflow-hidden bg-gray-800 mb-4 transform transition-transform group-hover:scale-110">
+                      {channel.channel_thumbnail ? (
+                        <img
+                          src={channel.channel_thumbnail}
+                          alt={channel.channel_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <Youtube className="w-16 h-16 text-red-600" />
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
+                      {channel.channel_name}
+                    </h3>
+                    <p className="text-gray-500 text-center text-xs mt-1">
+                      {channelPlaylistCount > 0 && `${channelPlaylistCount} playlist${channelPlaylistCount !== 1 ? 's' : ''} / `}{channel.video_count || 0} videos
+                    </p>
                   </div>
-                  <h3 className="text-white text-center font-semibold group-hover:text-gray-300 transition-colors">
-                    {channel.channel_name}
-                  </h3>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Suggest a Channel Button */}
@@ -1144,14 +2003,14 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
         </div>
       ) : (
         <>
-          {/* Hero Carousel */}
-          {loading && heroVideos.length === 0 ? (
+          {/* Hero Section: Unified carousel with live/upcoming/video slides */}
+          {loading && heroSlides.length === 0 ? (
             <div className="relative h-[85vh] w-full overflow-hidden bg-gray-900">
               <div className="absolute inset-0 bg-gray-800/50 animate-pulse" />
             </div>
-          ) : (
-            heroVideos.length > 0 && <HeroCarousel />
-          )}
+          ) : heroSlides.length > 0 ? (
+            <HeroCarousel />
+          ) : null}
 
           {/* Content Rows */}
           <div className="relative -mt-32 z-10 px-12">
@@ -1188,6 +2047,159 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                       );
                     }
                   };
+
+                  // Additional live streams (shown as tiles if more than 1)
+                  if (liveStreams.length > 1) {
+                    rows.push(
+                      <div key="more-live" className="mb-10">
+                        <div className="flex items-center gap-3 mb-5">
+                          <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                          </span>
+                          <h2 className="text-2xl font-bold text-white">Also Live</h2>
+                        </div>
+                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
+                          {liveStreams.slice(1).map(stream => (
+                            <div
+                              key={stream.id}
+                              onClick={() => setSelectedLiveStream(stream)}
+                              className="group flex-shrink-0 cursor-pointer"
+                              style={{ width: '400px' }}
+                            >
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border-2 border-red-500/50 group-hover:border-red-500 transition-colors">
+                                {stream.venue_image ? (
+                                  <img src={stream.venue_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Radio className="w-12 h-12 text-red-500 animate-pulse" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                                  </span>
+                                  Live
+                                </div>
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                    <Play className="w-7 h-7 text-white fill-white ml-1" />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="mt-2.5">
+                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{stream.title}</h3>
+                                {stream.description && (
+                                  <p className="text-gray-500 text-xs mt-0.5 truncate">{stream.description}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                    rowIndex++;
+                  }
+
+                  // Upcoming streams row (when not already in hero)
+                  if (upcomingStreams.length > (liveStreams.length === 0 ? 1 : 0)) {
+                    const streamsToShow = liveStreams.length === 0 ? upcomingStreams.slice(1) : upcomingStreams;
+                    if (streamsToShow.length > 0) {
+                      rows.push(
+                        <div key="upcoming-streams" className="mb-10">
+                          <div className="flex items-center gap-3 mb-5">
+                            <Calendar className="w-5 h-5 text-blue-400" />
+                            <h2 className="text-2xl font-bold text-white">Coming Soon</h2>
+                          </div>
+                          <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide">
+                            {streamsToShow.map(stream => (
+                              <div
+                                key={stream.id}
+                                className="flex-shrink-0 rounded-lg overflow-hidden bg-gray-800/50 border border-gray-700/50"
+                                style={{ width: '400px' }}
+                              >
+                                <div className="relative aspect-video bg-gradient-to-br from-gray-800 via-blue-950/20 to-gray-800 flex items-center justify-center">
+                                  <Radio className="w-12 h-12 text-blue-400/50" />
+                                  <div className="absolute top-3 left-3 flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm px-2.5 py-1 rounded text-[11px] font-bold text-white uppercase tracking-wider">
+                                    <Calendar className="w-3 h-3" />
+                                    {formatScheduledDate(stream.scheduled_start_time!)}
+                                  </div>
+                                </div>
+                                <div className="p-3">
+                                  <h3 className="text-white font-semibold text-sm truncate">{stream.title}</h3>
+                                  <p className="text-gray-500 text-xs mt-1">
+                                    {new Date(stream.scheduled_start_time!).toLocaleDateString('en-US', {
+                                      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                      rowIndex++;
+                    }
+                  }
+
+                  if (replayArchives.length > 0) {
+                    rows.push(
+                      <div key="race-replays" className="mb-10">
+                        <div className="flex items-center gap-3 mb-5 px-12">
+                          <Play className="w-5 h-5 text-blue-400" />
+                          <h2 className="text-2xl font-bold text-white">Race Replays</h2>
+                        </div>
+                        <div className="flex gap-5 overflow-x-auto pb-2 scrollbar-hide px-12">
+                          {replayArchives.map(archive => (
+                            <div
+                              key={archive.id}
+                              onClick={() => setSelectedReplay(archive)}
+                              className="group flex-shrink-0 cursor-pointer"
+                              style={{ width: '320px' }}
+                            >
+                              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 border border-gray-700/50 group-hover:border-blue-500/50 transition-colors">
+                                {archive.thumbnail_url ? (
+                                  <img
+                                    src={archive.thumbnail_url}
+                                    alt={archive.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-blue-950/30 to-gray-800 flex items-center justify-center">
+                                    <Play className="w-10 h-10 text-gray-600" />
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                                    <Play className="w-6 h-6 text-white fill-white ml-0.5" />
+                                  </div>
+                                </div>
+                                {archive.duration && archive.duration > 0 && (
+                                  <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-0.5 rounded text-[11px] text-white font-medium">
+                                    {formatDuration(archive.duration)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-2.5">
+                                <h3 className="text-white font-semibold text-sm truncate group-hover:text-gray-300 transition-colors">{archive.title}</h3>
+                                <div className="flex items-center gap-3 mt-1 text-gray-500 text-xs">
+                                  {archive.view_count > 0 && (
+                                    <span>{archive.view_count.toLocaleString()} views</span>
+                                  )}
+                                  <span>{new Date(archive.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                    rowIndex++;
+                    maybeAddAd();
+                  }
 
                   // Continue Watching
                   if (continueWatching.length > 0) {
@@ -1304,15 +2316,32 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     maybeAddAd();
                   }
 
-                  // Playlists as Rows
+                  // Featured Playlists - show as video rows prioritized on home screen
+                  const featuredPlaylists = playlists.filter(p => p.is_featured);
+                  featuredPlaylists.forEach(playlist => {
+                    const videos = playlistVideos[playlist.id] || [];
+                    const channel = channels.find(c => c.id === playlist.channel_id);
+                    if (videos.length > 0) {
+                      rows.push(
+                        <VideoRow
+                          key={`featured-playlist-${playlist.id}`}
+                          title={`${playlist.title}${channel ? ` - ${channel.channel_name}` : ''}`}
+                          videos={videos}
+                        />
+                      );
+                      rowIndex++;
+                      maybeAddAd();
+                    }
+                  });
+
+                  // Playlists as Rows (exclude featured - already shown above)
+                  const featuredPlaylistIds = new Set(featuredPlaylists.map(p => p.id));
                   playlists
                     .filter(playlist => {
-                      // Filter by playlist category
+                      if (featuredPlaylistIds.has(playlist.id)) return false;
                       if (selectedPlaylistCategory !== 'all' && playlist.playlist_category !== selectedPlaylistCategory) {
                         return false;
                       }
-
-                      // Filter by channel visibility
                       const channel = channels.find(c => c.id === playlist.channel_id);
                       if (!channel) return false;
                       return channel.is_visible !== false;
@@ -1321,7 +2350,6 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
                     .forEach((playlist, index) => {
                       const videos = (playlistVideos[playlist.id] || [])
                         .filter(video => {
-                          // Apply search filter
                           if (!searchTerm.trim()) return true;
                           const searchLower = searchTerm.toLowerCase();
                           return (
@@ -1355,6 +2383,52 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
       <div className="h-32" />
     </div>
     <FullscreenVideoModal video={selectedVideo} onClose={handleCloseVideo} />
+    <LiveStreamPlayerWrapper
+      session={selectedLiveStream}
+      onClose={() => setSelectedLiveStream(null)}
+      venueImage={selectedLiveStream?.venue_image}
+      clubName={selectedLiveStream?.club_name}
+    />
+    {selectedReplay && (
+      <div className="fixed inset-0 bg-black" style={{ zIndex: 9000 }}>
+        {selectedReplay.source === 'cloudflare' && selectedReplay.cloudflare_playback_url ? (
+          <iframe
+            src={`${selectedReplay.cloudflare_playback_url}?autoplay=true&muted=false&preload=auto&letterboxColor=000000`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            allowFullScreen
+            title={selectedReplay.title}
+            style={{ border: 'none' }}
+          />
+        ) : selectedReplay.youtube_video_id ? (
+          <iframe
+            src={`https://www.youtube.com/embed/${selectedReplay.youtube_video_id}?autoplay=1`}
+            className="absolute inset-0 w-full h-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title={selectedReplay.title}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <p className="text-gray-400">Replay not available</p>
+          </div>
+        )}
+        <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/80 to-transparent z-10 flex items-start justify-between">
+          <div>
+            <h2 className="text-white text-xl font-bold">{selectedReplay.title}</h2>
+            {selectedReplay.description && (
+              <p className="text-gray-400 text-sm mt-1 max-w-2xl">{selectedReplay.description}</p>
+            )}
+          </div>
+          <button
+            onClick={() => setSelectedReplay(null)}
+            className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors ml-4 flex-shrink-0"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+        </div>
+      </div>
+    )}
     <SuggestChannelModal
       isOpen={showSuggestChannel}
       onClose={() => setShowSuggestChannel(false)}

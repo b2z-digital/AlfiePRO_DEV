@@ -15,8 +15,9 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  let channelId: string | undefined;
   try {
-    const { channelId } = await req.json();
+    ({ channelId } = await req.json());
 
     if (!channelId) {
       return new Response(
@@ -52,6 +53,16 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const recordSyncError = async (chId: string, errorMsg: string) => {
+      await supabase
+        .from("alfie_tv_channels")
+        .update({
+          last_sync_error: errorMsg,
+          last_sync_attempted_at: new Date().toISOString(),
+        })
+        .eq("id", chId);
+    };
+
     // Get channel from database
     const { data: channel, error: channelError } = await supabase
       .from("alfie_tv_channels")
@@ -72,6 +83,11 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    await supabase
+      .from("alfie_tv_channels")
+      .update({ last_sync_attempted_at: new Date().toISOString() })
+      .eq("id", channelId);
 
     // Extract YouTube channel ID from URL
     let youtubeChannelId = channel.channel_id;
@@ -103,8 +119,9 @@ Deno.serve(async (req: Request) => {
         console.log('Search API response:', JSON.stringify(searchData));
         
         if (searchData.error) {
+          await recordSyncError(channelId, `YouTube API error: ${searchData.error.message}`);
           return new Response(
-            JSON.stringify({ 
+            JSON.stringify({
               error: `YouTube API error: ${searchData.error.message}`,
               details: searchData.error
             }),
@@ -203,8 +220,9 @@ Deno.serve(async (req: Request) => {
     console.log('Channel details response:', JSON.stringify(channelDetailsData));
 
     if (channelDetailsData.error) {
+      await recordSyncError(channelId, `YouTube API error: ${channelDetailsData.error.message}`);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: `YouTube API error: ${channelDetailsData.error.message}`,
           details: channelDetailsData.error
         }),
@@ -500,12 +518,13 @@ Deno.serve(async (req: Request) => {
       console.log(`Imported playlist "${playlist.snippet.title}" with ${playlistVideoItems.length} videos`);
     }
 
-    // Update channel video count and last import time
+    // Update channel video count and last import time, clear any previous error
     await supabase
       .from("alfie_tv_channels")
       .update({
         video_count: videosToInsert.length,
         last_imported_at: new Date().toISOString(),
+        last_sync_error: null,
       })
       .eq("id", channelId);
 
@@ -528,6 +547,17 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err) {
     console.error("Error syncing YouTube channel:", err);
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const sb = createClient(supabaseUrl, supabaseKey);
+      if (channelId) {
+        await sb.from("alfie_tv_channels").update({
+          last_sync_error: err.message || "Unknown error",
+          last_sync_attempted_at: new Date().toISOString(),
+        }).eq("id", channelId);
+      }
+    } catch (_) {}
     return new Response(
       JSON.stringify({ error: "Failed to sync channel", details: err.message }),
       {

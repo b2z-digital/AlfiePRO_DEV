@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Eye, Clock, Globe, Calendar, ArrowUp, ArrowDown, Loader2, Info } from 'lucide-react';
+import { ChartBar as BarChart3, TrendingUp, Users, Eye, Clock, Globe, Calendar, ArrowUp, ArrowDown, Loader as Loader2, Info } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
@@ -431,7 +431,7 @@ export const EventWebsiteAnalytics: React.FC<EventWebsiteAnalyticsProps> = ({ we
                 <div className="flex items-center gap-3">
                   <div className="w-32 bg-slate-700 rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500"
+                      className="from-cyan-500 to-blue-500 h-full transition-all duration-500"
                       style={{ width: `${referrer.count}%` }}
                     ></div>
                   </div>

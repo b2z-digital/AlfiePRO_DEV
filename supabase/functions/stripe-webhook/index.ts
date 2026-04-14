@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
           })
         }
 
-        const { data: membershipType, error: membershipTypeError } = await supabaseAdmin
+        let { data: membershipType, error: membershipTypeError } = await supabaseAdmin
           .from('membership_types')
           .select('*')
           .eq('id', membership_type_id)
@@ -91,6 +91,21 @@ Deno.serve(async (req: Request) => {
             status: 404,
             headers: { 'Content-Type': 'application/json' },
           })
+        }
+
+        if (!membershipType.is_active) {
+          const { data: replacementType } = await supabaseAdmin
+            .from('membership_types')
+            .select('*')
+            .eq('replaces_membership_type_id', membershipType.id)
+            .eq('is_active', true)
+            .eq('club_id', club_id)
+            .maybeSingle()
+
+          if (replacementType) {
+            console.log(`Auto-migrating from "${membershipType.name}" to "${replacementType.name}"`)
+            membershipType = replacementType
+          }
         }
 
         const { data: club, error: clubError } = await supabaseAdmin
@@ -146,16 +161,24 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        const effectiveTypeId = membershipType.id;
+
         if (member) {
+          const memberUpdate: Record<string, any> = {
+            is_financial: true,
+            payment_status: 'paid',
+            payment_confirmed_at: new Date().toISOString(),
+            payment_method: 'credit_card',
+            renewal_date: expiryDate.toISOString().split('T')[0],
+          };
+
+          if (effectiveTypeId !== membership_type_id) {
+            memberUpdate.membership_level_custom = membershipType.name;
+          }
+
           const { error: updateError } = await supabaseAdmin
             .from('members')
-            .update({
-              is_financial: true,
-              payment_status: 'paid',
-              payment_confirmed_at: new Date().toISOString(),
-              payment_method: 'credit_card',
-              renewal_date: expiryDate.toISOString().split('T')[0],
-            })
+            .update(memberUpdate)
             .eq('id', member.id)
 
           if (updateError) {
@@ -166,11 +189,19 @@ Deno.serve(async (req: Request) => {
             })
           }
 
+          if (effectiveTypeId !== membership_type_id) {
+            await supabaseAdmin
+              .from('club_memberships')
+              .update({ membership_type_id: effectiveTypeId })
+              .eq('member_id', member.id)
+              .eq('club_id', club_id)
+          }
+
           const { error: renewalError } = await supabaseAdmin
             .from('membership_renewals')
             .insert({
               member_id: member.id,
-              membership_type_id,
+              membership_type_id: effectiveTypeId,
               renewal_date: today.toISOString().split('T')[0],
               expiry_date: expiryDate.toISOString().split('T')[0],
               amount_paid: membershipType.amount,
@@ -232,7 +263,7 @@ Deno.serve(async (req: Request) => {
                 club_id: club_id,
                 member_id: member.id,
                 transaction_id: transaction.id,
-                membership_type_id: membership_type_id,
+                membership_type_id: effectiveTypeId,
                 amount: baseAmount,
                 tax_amount: taxAmount,
                 total_amount: amount,
@@ -248,7 +279,7 @@ Deno.serve(async (req: Request) => {
           .from('membership_payments')
           .insert({
             member_id: member?.id,
-            membership_type_id,
+            membership_type_id: effectiveTypeId,
             amount: membershipType.amount,
             currency: membershipType.currency,
             status: 'completed',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, ChevronRight, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Calendar, MapPin, ChevronRight, X, Users, Clock, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../utils/supabase';
@@ -8,7 +9,10 @@ import { useWidgetTheme } from './ThemedWidgetWrapper';
 import { getStoredRaceEvents, getStoredRaceSeries } from '../../../utils/raceStorage';
 import { getPublicEvents } from '../../../utils/publicEventStorage';
 import { getBoatClassBadge, getRaceFormatBadge } from '../../../constants/colors';
+import { getBoatClassImage } from '../../../utils/boatClassImages';
 import { useOrganizationContext } from '../../../hooks/useOrganizationContext';
+import { CalendarMeetingDetailsModal } from '../../meetings/CalendarMeetingDetailsModal';
+import { CalendarMeeting } from '../../../utils/calendarMeetingStorage';
 
 interface RaceEvent {
   id: string;
@@ -27,18 +31,30 @@ interface RaceEvent {
   registrationCount?: number;
   eventLevel?: 'state' | 'national';
   isPublicEvent?: boolean;
+  isExternalEvent?: boolean;
+  sourceUrl?: string;
+  registrationUrl?: string;
+  isMeeting?: boolean;
+  isClubMeeting?: boolean;
+  meetingCategory?: 'general' | 'committee';
+  meetingTime?: string;
+  meetingAttendingCount?: number;
+  meetingAttendees?: { first_name: string; last_name: string; avatar_url: string | null }[];
+  organizationName?: string;
+  meetingType?: 'in_person' | 'online' | 'hybrid';
+  rawMeeting?: any;
 }
 
 export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
-  const { currentClub, currentOrganization } = useAuth();
+  const { currentClub, currentOrganization, user } = useAuth();
   const orgContext = useOrganizationContext();
   const [upcomingEvents, setUpcomingEvents] = useState<RaceEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMeeting, setSelectedMeeting] = useState<CalendarMeeting | null>(null);
   const darkMode = true;
   const themeColors = useWidgetTheme(colorTheme);
 
-  // Determine the widget title based on organization type
   const getWidgetTitle = () => {
     if (orgContext.type === 'state') {
       return 'Upcoming State Events';
@@ -52,6 +68,167 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     fetchUpcomingEvents();
   }, [currentClub, currentOrganization]);
 
+  const fetchUpcomingMeetings = async (todayStr: string): Promise<RaceEvent[]> => {
+    try {
+      const isAssociation = !!currentOrganization;
+      const clubId = isAssociation ? undefined : currentClub?.clubId;
+      const associationId = currentOrganization?.id;
+      const associationType = currentOrganization?.type;
+
+      let allMeetings: any[] = [];
+
+      if (isAssociation) {
+        let query = supabase
+          .from('meetings')
+          .select('id, name, date, start_time, location, meeting_type, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
+          .gte('date', todayStr)
+          .eq('status', 'upcoming')
+          .order('date', { ascending: true });
+
+        if (associationType === 'state') {
+          query = query.eq('state_association_id', associationId!);
+        } else {
+          query = query.eq('national_association_id', associationId!);
+        }
+
+        const { data, error } = await query.limit(10);
+        if (error) throw error;
+        allMeetings = data || [];
+      } else if (clubId) {
+        const { data: clubMeetings, error: clubErr } = await supabase
+          .from('meetings')
+          .select('id, name, date, start_time, location, meeting_type, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
+          .gte('date', todayStr)
+          .eq('status', 'upcoming')
+          .eq('club_id', clubId)
+          .order('date', { ascending: true })
+          .limit(10);
+
+        if (clubErr) throw clubErr;
+        allMeetings = clubMeetings || [];
+
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', clubId)
+          .maybeSingle();
+
+        if (clubData?.state_association_id) {
+          const { data: assocMeetings } = await supabase
+            .from('meetings')
+            .select('id, name, date, start_time, location, meeting_type, meeting_category, organization_name, club_id, state_association_id, national_association_id, visible_to_member_clubs, description, created_at, updated_at, status')
+            .gte('date', todayStr)
+            .eq('status', 'upcoming')
+            .eq('state_association_id', clubData.state_association_id)
+            .order('date', { ascending: true })
+            .limit(10);
+
+          if (assocMeetings) {
+            allMeetings = [...allMeetings, ...assocMeetings];
+          }
+        }
+      } else {
+        return [];
+      }
+
+      if (allMeetings.length === 0) return [];
+
+      const generalMeetings = allMeetings.filter(m => {
+        if (m.meeting_category === 'committee') return false;
+        if (m.club_id) return true;
+        return m.visible_to_member_clubs === true;
+      });
+
+      const committeeMeetings = allMeetings.filter(m => m.meeting_category === 'committee');
+      let visibleCommitteeIds: string[] = [];
+
+      if (committeeMeetings.length > 0 && user?.id) {
+        const { data: positions } = await supabase
+          .from('committee_positions')
+          .select('id, club_id, state_association_id, national_association_id')
+          .eq('user_id', user.id);
+
+        if (positions && positions.length > 0) {
+          visibleCommitteeIds = committeeMeetings
+            .filter(m => {
+              return positions.some(p => {
+                if (m.club_id && p.club_id === m.club_id) return true;
+                if (m.state_association_id && p.state_association_id === m.state_association_id) return true;
+                if (m.national_association_id && p.national_association_id === m.national_association_id) return true;
+                return false;
+              });
+            })
+            .map(m => m.id);
+        }
+      }
+
+      const visibleMeetings = [
+        ...generalMeetings,
+        ...committeeMeetings.filter(m => visibleCommitteeIds.includes(m.id))
+      ];
+
+      const meetingIds = visibleMeetings.map(m => m.id);
+      let attendanceByMeeting: Record<string, { first_name: string; last_name: string; avatar_url: string | null }[]> = {};
+      if (meetingIds.length > 0) {
+        const { data: attendance } = await supabase
+          .from('meeting_attendance')
+          .select('meeting_id, member_id, user_id, member:members(first_name, last_name, avatar_url)')
+          .in('meeting_id', meetingIds)
+          .eq('status', 'attending');
+
+        if (attendance) {
+          const needsProfile = attendance.filter((a: any) => !a.member_id && a.user_id);
+          let profileMap: Record<string, any> = {};
+          if (needsProfile.length > 0) {
+            const userIds = [...new Set(needsProfile.map((a: any) => a.user_id))];
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, avatar_url')
+              .in('id', userIds);
+            if (profiles) {
+              profiles.forEach((p: any) => { profileMap[p.id] = p; });
+            }
+          }
+
+          attendance.forEach((a: any) => {
+            const profile = a.member ? null : profileMap[a.user_id];
+            const info = a.member || profile;
+            if (!info) return;
+            if (!attendanceByMeeting[a.meeting_id]) {
+              attendanceByMeeting[a.meeting_id] = [];
+            }
+            attendanceByMeeting[a.meeting_id].push({
+              first_name: info.first_name || '',
+              last_name: info.last_name || '',
+              avatar_url: info.avatar_url || null,
+            });
+          });
+        }
+      }
+
+      return visibleMeetings.map(m => ({
+        id: m.id,
+        eventName: m.name,
+        clubName: m.organization_name || '',
+        date: m.date,
+        venue: m.location || '',
+        raceClass: '',
+        isMeeting: true,
+        isClubMeeting: !!m.club_id && !m.state_association_id && !m.national_association_id,
+        meetingCategory: m.meeting_category as 'general' | 'committee',
+        meetingTime: m.start_time ? m.start_time.substring(0, 5) : undefined,
+        meetingType: m.meeting_type as 'in_person' | 'online' | 'hybrid' | undefined,
+        meetingAttendingCount: (attendanceByMeeting[m.id] || []).length,
+        meetingAttendees: attendanceByMeeting[m.id] || [],
+        organizationName: m.organization_name || '',
+        rawMeeting: m,
+      }));
+    } catch (error) {
+      console.error('Error fetching meetings:', error);
+      return [];
+    }
+  };
+
   const fetchUpcomingEvents = async () => {
     if ((!currentClub?.clubId && !currentOrganization?.id) || !navigator.onLine) {
       setLoading(false);
@@ -62,10 +239,12 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
+      const todayStr = today.toISOString().split('T')[0];
 
       let allUpcoming: RaceEvent[] = [];
 
-      // For associations, fetch approved public events from database
+      const meetingsPromise = fetchUpcomingMeetings(todayStr);
+
       if (currentOrganization) {
         const { data: publicEvents, error } = await supabase
           .from('public_events')
@@ -73,7 +252,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           .gte('date', todayISO)
           .eq('approval_status', 'approved')
           .order('date', { ascending: true })
-          .limit(4);
+          .limit(8);
 
         if (error) throw error;
 
@@ -90,9 +269,12 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           registrationOpen: true
         }));
       } else {
-        // For clubs, fetch club events and public events
-        // Fetch quick races
-        const raceEvents = await getStoredRaceEvents();
+        const [raceEvents, raceSeries, publicEvents] = await Promise.all([
+          getStoredRaceEvents(),
+          getStoredRaceSeries(),
+          getPublicEvents(),
+        ]);
+
         const upcomingQuickRaces = raceEvents.filter(event => {
           const eventDate = new Date(event.date);
           eventDate.setHours(0, 0, 0, 0);
@@ -108,8 +290,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           skippers: event.skippers || []
         }));
 
-        // Fetch series
-        const raceSeries = await getStoredRaceSeries();
         const upcomingSeriesEvents: RaceEvent[] = [];
         raceSeries.forEach(series => {
           series.rounds.forEach((round: any, roundIndex: number) => {
@@ -137,8 +317,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           });
         });
 
-        // Get upcoming public events with proper mapping
-        const publicEvents = await getPublicEvents();
         const upcomingPublicEvents = publicEvents
           .filter(event => {
             const eventDate = new Date(event.date);
@@ -155,17 +333,60 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             raceFormat: event.race_format,
             eventLevel: event.event_level as 'state' | 'national' | undefined,
             isPublicEvent: true,
-            registrationOpen: true // Public events have registration by default
+            registrationOpen: true
           }));
 
-        // Combine and sort by date
-        allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents]
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .slice(0, 4);
+        let clubStateAssociationId: string | null = null;
+        if (currentClub?.clubId) {
+          const { data: clubData } = await supabase
+            .from('clubs')
+            .select('state_association_id')
+            .eq('id', currentClub.clubId)
+            .maybeSingle();
+          clubStateAssociationId = clubData?.state_association_id || null;
+        }
+
+        const { data: externalData } = await supabase
+          .from('external_events')
+          .select('*, external_event_sources!inner(name)')
+          .eq('is_visible', true)
+          .eq('event_status', 'active')
+          .gte('event_date', todayStr)
+          .order('event_date', { ascending: true })
+          .limit(20);
+
+        const externalEvents: RaceEvent[] = (externalData || [])
+          .filter((ext: any) => {
+            const isTrulyNational = ext.event_type === 'national' || ext.event_type === 'world';
+            const isMyState = clubStateAssociationId && ext.display_category?.startsWith('state_') &&
+              ext.display_category.replace('state_', '') === clubStateAssociationId;
+            return isTrulyNational || isMyState;
+          })
+          .map((ext: any) => ({
+            id: `external-${ext.id}`,
+            eventName: ext.event_name,
+            clubName: (ext.external_event_sources as any)?.name || ext.venue || '',
+            date: ext.event_date || '',
+            venue: ext.location || ext.venue || '',
+            raceClass: ext.boat_class_mapped || ext.boat_class_raw || '',
+            isPublicEvent: true,
+            isExternalEvent: true,
+            eventLevel: (ext.event_type === 'national' || ext.event_type === 'world') ? 'national' as const : 'state' as const,
+            registrationOpen: !!ext.registration_url,
+            sourceUrl: ext.source_url || ext.registration_url || null,
+            registrationUrl: ext.registration_url || null,
+          }));
+
+        allUpcoming = [...upcomingQuickRaces, ...upcomingSeriesEvents, ...upcomingPublicEvents, ...externalEvents];
       }
 
-      // Fetch venue images
-      const venueNames = [...new Set(allUpcoming.map(e => e.venue).filter(Boolean))];
+      const meetingEvents = await meetingsPromise;
+      allUpcoming = [...allUpcoming, ...meetingEvents]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 4);
+
+      const nonMeetingEvents = allUpcoming.filter(e => !e.isMeeting);
+      const venueNames = [...new Set(nonMeetingEvents.map(e => e.venue).filter(Boolean))];
       const venueImages: Record<string, string> = {};
 
       if (venueNames.length > 0) {
@@ -174,22 +395,29 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
             .from('venues')
             .select('name, image')
             .in('name', venueNames);
-
           (venues || []).forEach(v => {
             if (v.image) venueImages[v.name] = v.image;
           });
-
-          allUpcoming = allUpcoming.map(event => ({
-            ...event,
-            venueImage: event.venue ? venueImages[event.venue] : undefined
-          }));
         } catch (error) {
           console.error('Error fetching venue images:', error);
         }
       }
 
-      // Fetch attendees with avatars
-      allUpcoming = await enrichEventsWithAttendance(allUpcoming);
+      allUpcoming = allUpcoming.map(event => {
+        if (event.isMeeting) return event;
+        const venueImg = event.venue ? venueImages[event.venue] : undefined;
+        return {
+          ...event,
+          venueImage: venueImg || getBoatClassImage(event.raceClass) || undefined
+        };
+      });
+
+      const eventsToEnrich = allUpcoming.filter(e => !e.isMeeting);
+      if (eventsToEnrich.length > 0) {
+        const enriched = await enrichEventsWithAttendance(eventsToEnrich);
+        const enrichedMap = new Map(enriched.map(e => [e.id, e]));
+        allUpcoming = allUpcoming.map(e => e.isMeeting ? e : (enrichedMap.get(e.id) || e));
+      }
 
       setUpcomingEvents(allUpcoming);
     } catch (err) {
@@ -203,12 +431,10 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
     if (!currentClub?.clubId || events.length === 0) return events;
 
     try {
-      // Fetch attendance for all events and series rounds separately
       const eventIds = events.filter(e => !e.isSeriesEvent).map(e => e.id);
 
       let allAttendanceData: any[] = [];
 
-      // Get attendance for single events
       if (eventIds.length > 0) {
         const { data: eventAttendance } = await supabase
           .from('event_attendance')
@@ -219,7 +445,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         if (eventAttendance) allAttendanceData = [...allAttendanceData, ...eventAttendance];
       }
 
-      // Get attendance for series rounds
       const seriesEvents = events.filter(e => e.isSeriesEvent);
       for (const seriesEvent of seriesEvents) {
         if (seriesEvent.seriesId && seriesEvent.roundName) {
@@ -271,7 +496,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         }
       });
 
-      // Get member avatars for skipper matching
       const { data: members } = await supabase
         .from('members')
         .select('first_name, last_name, avatar_url')
@@ -289,7 +513,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           const key = `${event.seriesId}-${event.roundName}`;
           attendees = seriesRoundAttendanceMap[key] || [];
 
-          // If no attendance but has skippers, show them as attendees
           if (attendees.length === 0 && event.skippers && event.skippers.length > 0) {
             attendees = event.skippers.map((skipper: any) => ({
               name: skipper.name,
@@ -299,7 +522,6 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
         } else {
           attendees = singleEventAttendanceMap[event.id] || [];
 
-          // If no attendance but has skippers (quick races), show them as attendees
           if (attendees.length === 0 && event.skippers && event.skippers.length > 0) {
             attendees = event.skippers.map((skipper: any) => ({
               name: skipper.name,
@@ -311,7 +533,7 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
           ...event,
           attendees,
           registrationCount: event.skippers?.length || attendees.length,
-          registrationOpen: event.registrationOpen !== false // default true unless explicitly false
+          registrationOpen: event.registrationOpen !== false
         };
       });
     } catch (error) {
@@ -319,6 +541,280 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       return events;
     }
   };
+
+  const handleMeetingClick = (event: RaceEvent) => {
+    if (isEditMode) return;
+    if (event.isClubMeeting) {
+      navigate('/meetings');
+      return;
+    }
+    const raw = event.rawMeeting;
+    if (!raw) return;
+    const calMeeting: CalendarMeeting = {
+      id: raw.id,
+      club_id: raw.club_id || '',
+      name: raw.name,
+      location: raw.location || null,
+      date: raw.date,
+      start_time: raw.start_time || null,
+      end_time: null,
+      conferencing_url: null,
+      description: raw.description || null,
+      chairperson_id: null,
+      minute_taker_id: null,
+      created_at: raw.created_at || '',
+      updated_at: raw.updated_at || '',
+      status: raw.status || 'upcoming',
+      minutes_status: 'not_started',
+      organization_name: raw.organization_name || '',
+      meeting_category: raw.meeting_category || 'general',
+      state_association_id: raw.state_association_id || undefined,
+      national_association_id: raw.national_association_id || undefined,
+      visible_to_member_clubs: raw.visible_to_member_clubs,
+      organizationLevel: raw.state_association_id ? 'state_association' : raw.national_association_id ? 'national_association' : 'club',
+      attendingCount: event.meetingAttendingCount || 0,
+      attendees: [],
+    };
+    setSelectedMeeting(calMeeting);
+  };
+
+  const formatMeetingTime = (time: string): string => {
+    const [hourStr, minStr] = time.split(':');
+    const hour = parseInt(hourStr, 10);
+    const min = minStr || '00';
+    const suffix = hour >= 12 ? 'pm' : 'am';
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${displayHour}:${min} ${suffix}`;
+  };
+
+  const renderMeetingCard = (event: RaceEvent) => (
+    <div
+      key={event.id}
+      onClick={() => handleMeetingClick(event)}
+      className={`
+        group relative overflow-hidden rounded-xl border transition-all duration-300
+        ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
+        bg-slate-800/50 border-slate-700/50 hover:border-slate-600/70
+      `}
+    >
+      <div className="flex h-32">
+        <div className="relative w-32 h-32 flex-shrink-0 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/30 to-teal-700/30 flex items-center justify-center">
+            <Users size={40} className="text-emerald-400/60" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          </div>
+          <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b via-emerald-500" />
+          <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
+            <div className="text-center">
+              <div className="text-xs font-semibold text-slate-900">{new Date(event.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>
+              <div className="text-lg font-bold text-slate-900 leading-none">{new Date(event.date + 'T00:00:00').getDate()}</div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+          <div>
+            <h3 className="text-base font-semibold text-white mb-1 truncate">
+              {event.eventName}
+            </h3>
+            <div className="flex items-center gap-3 text-sm text-slate-400 mb-2">
+              {event.meetingTime && (
+                <span className="flex items-center gap-1">
+                  <Clock size={14} />
+                  {formatMeetingTime(event.meetingTime)}
+                </span>
+              )}
+              {event.meetingType === 'online' ? (
+                <span className="flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.382v7.236a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                  </svg>
+                  <span>Online Meeting</span>
+                </span>
+              ) : event.meetingType === 'hybrid' ? (
+                <>
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.382v7.236a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                  </svg>
+                  {event.venue && (
+                    <span className="flex items-center gap-1 truncate">
+                      <MapPin size={14} />
+                      <span className="truncate">{event.venue}</span>
+                    </span>
+                  )}
+                </>
+              ) : event.venue ? (
+                <span className="flex items-center gap-1 truncate">
+                  <MapPin size={14} />
+                  <span className="truncate">{event.venue}</span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {event.meetingCategory === 'committee' ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/30 text-amber-400">
+                <Shield size={12} />
+                Committee
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-900/30 text-emerald-400">
+                <Users size={12} />
+                Meeting
+              </span>
+            )}
+            {event.meetingAttendingCount !== undefined && event.meetingAttendingCount > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="flex -space-x-1.5">
+                  {(event.meetingAttendees || []).slice(0, 3).map((att, idx) => (
+                    <div
+                      key={idx}
+                      className="w-5 h-5 rounded-full border border-slate-800 bg-slate-700 overflow-hidden flex-shrink-0"
+                      title={`${att.first_name} ${att.last_name}`}
+                    >
+                      {att.avatar_url ? (
+                        <img src={att.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[8px] font-semibold text-slate-300">
+                          {att.first_name?.[0]}{att.last_name?.[0]}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {event.meetingAttendingCount > 3 && (
+                    <div className="w-5 h-5 rounded-full border border-slate-800 bg-slate-700 flex items-center justify-center text-[8px] font-semibold text-slate-300 flex-shrink-0">
+                      +{event.meetingAttendingCount - 3}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-slate-400">
+                  {event.meetingAttendingCount} attending
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderEventCard = (event: RaceEvent) => (
+    <div
+      key={event.id}
+      onClick={() => {
+        if (isEditMode) return;
+        if (event.isExternalEvent) {
+          const url = event.sourceUrl || event.registrationUrl;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+        if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
+          navigate('/calendar');
+        } else {
+          navigate('/race-management', { state: { eventId: event.id, isSeriesEvent: event.isSeriesEvent, seriesId: event.seriesId } });
+        }
+      }}
+      className={`
+        group relative overflow-hidden rounded-xl border transition-all duration-300
+        ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
+        bg-slate-800/50 border-slate-700/50 hover:border-slate-600/70
+      `}
+    >
+      <div className="flex h-32">
+        <div className="relative w-32 h-32 flex-shrink-0 overflow-hidden">
+          <div
+            className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600"
+            style={{
+              backgroundImage: event.venueImage ? `url(${event.venueImage})` : 'url(https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=400)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          </div>
+          <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-400 via-blue-500 to-blue-400" />
+          <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
+            <div className="text-center">
+              <div className="text-xs font-semibold text-slate-900">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>
+              <div className="text-lg font-bold text-slate-900 leading-none">{new Date(event.date).getDate()}</div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+          <div>
+            <h3 className="text-base font-semibold text-white mb-1 truncate">
+              {event.eventName}
+            </h3>
+            {event.venue ? (
+              <div className="flex items-center text-sm text-slate-400 mb-2">
+                <MapPin size={14} className="mr-1 flex-shrink-0" />
+                <span className="truncate">{event.venue}</span>
+              </div>
+            ) : event.clubName ? (
+              <div className="flex items-center text-sm text-slate-400 mb-2">
+                <MapPin size={14} className="mr-1 flex-shrink-0" />
+                <span className="truncate">{event.clubName}</span>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {!event.isExternalEvent && event.raceFormat && (
+                <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
+                  {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                </span>
+              )}
+              {event.raceClass && (
+                <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
+                  {event.raceClass}
+                </span>
+              )}
+              {event.attendees && event.attendees.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="flex -space-x-2">
+                    {event.attendees.slice(0, 5).map((attendee, idx) => (
+                      <div
+                        key={idx}
+                        className="w-7 h-7 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center overflow-hidden"
+                        title={attendee.name}
+                      >
+                        {attendee.avatarUrl ? (
+                          <img src={attendee.avatarUrl} alt={attendee.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xs text-slate-300">{attendee.name.charAt(0)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {event.attendees.length > 5 && (
+                    <span className="text-xs text-slate-300 font-medium">
+                      +{event.attendees.length - 5}
+                    </span>
+                  )}
+                </div>
+              )}
+              {event.registrationOpen && !event.attendees?.length && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-blue-400">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Registration open
+                </span>
+              )}
+            </div>
+            {event.eventLevel && (
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                event.eventLevel === 'national'
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                  : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+              }`}>
+                {event.eventLevel === 'national' ? 'National Event' : 'State Event'}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className={`relative rounded-2xl p-6 w-full h-full border backdrop-blur-sm ${themeColors.background}`}>
@@ -363,114 +859,18 @@ export const UpcomingEventsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMo
       ) : (
         <div className="space-y-3">
           {upcomingEvents.map((event) => (
-            <div
-              key={event.id}
-              onClick={() => {
-                if (isEditMode) return;
-
-                // For associations, always route to calendar
-                // For clubs, route to race management for their own events or calendar for public events
-                if (orgContext.type === 'state' || orgContext.type === 'national' || event.isPublicEvent) {
-                  navigate('/calendar');
-                } else {
-                  // Navigate to race management which will handle event selection
-                  navigate('/race-management', { state: { eventId: event.id, isSeriesEvent: event.isSeriesEvent, seriesId: event.seriesId } });
-                }
-              }}
-              className={`
-                group relative overflow-hidden rounded-xl border transition-all duration-300
-                ${isEditMode ? 'pointer-events-none' : 'hover:shadow-xl hover:scale-[1.02] cursor-pointer'}
-                bg-slate-800/50 border-slate-700/50 hover:border-slate-600/70
-              `}
-            >
-              <div className="flex h-32">
-                <div className="relative w-32 h-32 flex-shrink-0 overflow-hidden">
-                  <div
-                    className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600"
-                    style={{
-                      backgroundImage: event.venueImage ? `url(${event.venueImage})` : 'url(https://images.pexels.com/photos/163236/sailing-ship-vessel-boat-sea-163236.jpeg?auto=compress&cs=tinysrgb&w=400)',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center'
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  </div>
-                  <div className="absolute top-0 right-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-400 via-blue-500 to-blue-400" />
-                  <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-1.5 shadow-lg">
-                    <div className="text-center">
-                      <div className="text-xs font-semibold text-slate-900">{new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</div>
-                      <div className="text-lg font-bold text-slate-900 leading-none">{new Date(event.date).getDate()}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                  <div>
-                    <h3 className="text-base font-semibold text-white mb-1 truncate">
-                      {event.eventName}
-                    </h3>
-                    <div className="flex items-center text-sm text-slate-400 mb-2">
-                      <MapPin size={14} className="mr-1" />
-                      <span className="truncate">{event.venue}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {event.raceFormat && (
-                        <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                          {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                        </span>
-                      )}
-                      <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
-                        {event.raceClass}
-                      </span>
-                      {event.attendees && event.attendees.length > 0 && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex -space-x-2">
-                            {event.attendees.slice(0, 5).map((attendee, idx) => (
-                              <div
-                                key={idx}
-                                className="w-7 h-7 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center overflow-hidden"
-                                title={attendee.name}
-                              >
-                                {attendee.avatarUrl ? (
-                                  <img src={attendee.avatarUrl} alt={attendee.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-xs text-slate-300">{attendee.name.charAt(0)}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          {event.attendees.length > 5 && (
-                            <span className="text-xs text-slate-300 font-medium">
-                              +{event.attendees.length - 5}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {event.registrationOpen && !event.attendees?.length && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-blue-400">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          Registration open
-                        </span>
-                      )}
-                    </div>
-                    {event.eventLevel && (
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                        event.eventLevel === 'national'
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                          : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                      }`}>
-                        {event.eventLevel === 'national' ? 'National Event' : 'State Event'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            event.isMeeting ? renderMeetingCard(event) : renderEventCard(event)
           ))}
         </div>
+      )}
+
+      {selectedMeeting && createPortal(
+        <CalendarMeetingDetailsModal
+          meeting={selectedMeeting}
+          darkMode={darkMode}
+          onClose={() => setSelectedMeeting(null)}
+        />,
+        document.body
       )}
     </div>
   );

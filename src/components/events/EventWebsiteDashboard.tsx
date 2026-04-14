@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, BarChart3, ExternalLink, Plus, Loader2, CheckCircle, AlertCircle, Menu, MapPin, BookTemplate, LayoutGrid } from 'lucide-react';
+import { X, Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, ChartBar as BarChart3, ExternalLink, Plus, Loader as Loader2, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Menu, MapPin, LayoutTemplate as BookTemplate, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { EventWebsite, EventWebsiteSettings } from '../../types/eventWebsite';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
@@ -188,7 +188,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({
                 console.log('🎯 Task Manager button clicked!', eventId);
                 navigate(`/event-command-center/${eventId}`);
               }}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              className="btn-primary-green px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               style={{ border: '3px solid yellow' }}
             >
               <LayoutGrid size={18} />
@@ -239,7 +239,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({
             <div className="space-y-6">
               {/* Draft Preview Banner */}
               {!website.website_published && (
-                <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-2 border-blue-500/50 rounded-xl p-6">
+                <div className="from-blue-600/20 to-purple-600/20 border-2 border-blue-500/50 rounded-xl p-6">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
                       <Eye className="w-8 h-8 text-blue-400" />
@@ -275,7 +275,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({
                         </button>
                         <button
                           onClick={() => setActiveTab('settings')}
-                          className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                          className="btn-primary-green px-6 py-3 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                         >
                           <Globe size={20} />
                           Publish to Domain
@@ -288,7 +288,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({
 
               {/* Published Banner */}
               {website.website_published && (
-                <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-2 border-green-500/50 rounded-xl p-6">
+                <div className="from-green-600/20 to-emerald-600/20 border-2 border-green-500/50 rounded-xl p-6">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
                       <CheckCircle className="w-8 h-8 text-green-400" />
@@ -316,7 +316,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({
                       </div>
                       <button
                         onClick={() => window.open(getSiteUrl(), '_blank')}
-                        className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                        className="btn-primary-green px-6 py-3 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
                       >
                         <ExternalLink size={20} />
                         Visit Live Website

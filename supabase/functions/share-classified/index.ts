@@ -241,11 +241,10 @@ Deno.serve(async (req: Request) => {
         .insert({
           user_id: recipientMember.user_id,
           type: 'classified_shared',
-          title: 'Classified Listing Shared With You',
-          message: notificationMessage,
+          subject: 'Classified Listing Shared With You',
+          body: notificationMessage,
           sender_id: senderId,
-          related_id: classified.id,
-          action_url: `/classifieds?listing=${classified.id}`,
+          link_url: `/classifieds?listing=${classified.id}`,
           read: false
         });
 

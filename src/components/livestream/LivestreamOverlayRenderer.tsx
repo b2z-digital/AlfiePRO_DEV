@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Wind, Trophy, Users, Hash, Timer, AlertCircle } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Wind, Trophy, Users, Hash, Timer, CircleAlert as AlertCircle } from 'lucide-react';
 import type { LivestreamSession, LivestreamOverlay } from '../../types/livestream';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import { getActiveSessionsForEvent, getRaceStatus } from '../../utils/liveTrackingStorage';
@@ -9,13 +9,18 @@ interface LivestreamOverlayRendererProps {
   session: LivestreamSession;
   raceData?: any;
   weatherData?: any;
+  showTitleCard?: boolean;
+  titleCardTrigger?: number;
 }
 
-export function LivestreamOverlayRenderer({ session, raceData, weatherData }: LivestreamOverlayRendererProps) {
+export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0 }, ref) {
   const [overlays, setOverlays] = useState<LivestreamOverlay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
   const [liveSkippers, setLiveSkippers] = useState<any[]>([]);
+  const [titleCardVisible, setTitleCardVisible] = useState(false);
+  const [titleCardPhase, setTitleCardPhase] = useState<'entering' | 'visible' | 'exiting' | 'hidden'>('hidden');
+  const titleCardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadOverlays();
@@ -24,7 +29,9 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
   }, [session.id]);
 
   useEffect(() => {
-    // Subscribe to live tracking if event is linked
+    setLiveTrackingData(null);
+    setLiveSkippers([]);
+
     if (session.event_id) {
       loadLiveTrackingData();
 
@@ -55,6 +62,35 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
       };
     }
   }, [session.event_id]);
+
+  useEffect(() => {
+    if (showTitleCard || titleCardTrigger > 0) {
+      if (titleCardTimerRef.current) clearTimeout(titleCardTimerRef.current);
+      setTitleCardVisible(true);
+      setTitleCardPhase('entering');
+
+      const enterTimer = setTimeout(() => setTitleCardPhase('visible'), 100);
+      const holdTimer = setTimeout(() => setTitleCardPhase('exiting'), 8000);
+      const hideTimer = setTimeout(() => {
+        setTitleCardPhase('hidden');
+        setTitleCardVisible(false);
+      }, 9500);
+
+      titleCardTimerRef.current = hideTimer;
+
+      return () => {
+        clearTimeout(enterTimer);
+        clearTimeout(holdTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [showTitleCard, titleCardTrigger]);
+
+  useEffect(() => {
+    return () => {
+      if (titleCardTimerRef.current) clearTimeout(titleCardTimerRef.current);
+    };
+  }, []);
 
   const loadLiveTrackingData = async () => {
     if (!session.event_id) {
@@ -93,7 +129,8 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
             num_races,
             series_id,
             current_day,
-            round_index
+            round_index,
+            last_completed_race
           `)
           .eq('series_id', seriesId)
           .eq('round_index', dayNumber)
@@ -113,7 +150,8 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
             heat_management: data.heat_management,
             num_races: data.num_races,
             current_day: dayNumber,
-            public_event_id: null
+            public_event_id: null,
+            last_completed_race: (data as any).last_completed_race
           };
         }
         error = roundError;
@@ -133,7 +171,8 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
             heat_management,
             num_races,
             current_day,
-            public_event_id
+            public_event_id,
+            last_completed_race
           `)
           .eq('id', session.event_id)
           .maybeSingle();
@@ -235,47 +274,86 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
           });
         }
 
-        // Extract heat/race info from heat_management if available
         const heatManagement = quickRaces.heat_management as any;
-        const isHeatManagement = !!heatManagement;
+        const hasLegacyHeats = !!heatManagement?.heats && Array.isArray(heatManagement.heats) && heatManagement.heats.length > 0;
+        const hasSHRSRounds = !!heatManagement?.rounds && Array.isArray(heatManagement.rounds) && heatManagement.rounds.length > 0;
+        const isHeatManagement = hasLegacyHeats || hasSHRSRounds;
 
-        // Determine which heat/race to show based on manual selection or auto-detection
-        let displayHeatNumber = session.heat_number; // Manual selection takes priority
-        let currentHeat = null;
+        let displayHeatLabel: string | null = null;
+        let displayRoundNumber: number | null = null;
+        let heatSkipperIndices: number[] | null = null;
 
-        if (isHeatManagement && heatManagement.heats) {
-          if (displayHeatNumber) {
-            // Find manually selected heat
-            currentHeat = heatManagement.heats.find((h: any) => h.heat_number === displayHeatNumber);
-          } else {
-            // Auto-detect: Use current_day from quick_races or find first incomplete heat
-            if (quickRaces.current_day) {
-              currentHeat = heatManagement.heats.find((h: any) => h.heat_number === quickRaces.current_day);
+        if (hasSHRSRounds) {
+          const activeRoundNum = heatManagement.currentRound || 1;
+          const activeHeatDesig = heatManagement.currentHeat || 'A';
+          displayRoundNumber = activeRoundNum;
+
+          const activeRound = heatManagement.rounds.find((r: any) => r.round === activeRoundNum) || heatManagement.rounds[0];
+
+          if (activeRound?.heatAssignments && Array.isArray(activeRound.heatAssignments)) {
+            const activeAssignment = activeRound.heatAssignments.find((ha: any) => ha.heatDesignation === activeHeatDesig);
+            if (activeAssignment?.skipperIndices) {
+              heatSkipperIndices = activeAssignment.skipperIndices;
+              displayHeatLabel = `Qualifying Rd ${activeRoundNum} - Heat ${activeHeatDesig}`;
             }
-            if (!currentHeat) {
-              currentHeat = heatManagement.heats.find((h: any) => !h.completed);
-            }
-            if (currentHeat) {
-              displayHeatNumber = currentHeat.heat_number;
+          }
+
+          console.log('[Overlay Debug] SHRS format: round', activeRoundNum, 'heat', activeHeatDesig, 'indices:', heatSkipperIndices?.length);
+        } else if (hasLegacyHeats) {
+          let currentHeat: any = null;
+          if (quickRaces.current_day) {
+            currentHeat = heatManagement.heats.find((h: any) => h.heat_number === quickRaces.current_day);
+          }
+          if (!currentHeat) {
+            currentHeat = heatManagement.heats.find((h: any) => !h.completed);
+          }
+          if (!currentHeat) {
+            currentHeat = heatManagement.heats[0];
+          }
+
+          if (currentHeat) {
+            displayHeatLabel = `Heat ${currentHeat.heat_number}`;
+            displayRoundNumber = currentHeat.heat_number;
+
+            if (currentHeat.skippers && Array.isArray(currentHeat.skippers) && currentHeat.skippers.length > 0) {
+              const heatSkipperSet = new Set(
+                currentHeat.skippers.map((hs: any) => String(hs.sailNo || hs.sail_number || '').trim())
+              );
+              const filtered = allSkippers.filter((skipper: any) => {
+                const sailNum = String(skipper.sail_number || skipper.sailNo || '').trim();
+                return heatSkipperSet.has(sailNum);
+              });
+              if (filtered.length > 0) {
+                allSkippers = filtered;
+              }
             }
           }
         }
 
-        // Filter skippers for heat racing
-        if (isHeatManagement && currentHeat && currentHeat.skippers) {
-          console.log('[Overlay Debug] Filtering skippers for heat', displayHeatNumber, ':', currentHeat.skippers);
+        if (hasSHRSRounds && heatSkipperIndices && heatSkipperIndices.length > 0) {
+          const skippersArray = quickRaces.skippers as any[];
+          if (skippersArray && Array.isArray(skippersArray)) {
+            const heatSkippers = heatSkipperIndices
+              .filter((idx: number) => idx >= 0 && idx < skippersArray.length)
+              .map((idx: number, pos: number) => {
+                const skipper = skippersArray[idx];
+                return {
+                  id: idx,
+                  skipper_name: skipper.name || skipper.skipper_name,
+                  sail_number: skipper.sailNo || skipper.sail_number,
+                  sailNo: skipper.sailNo,
+                  hull: skipper.hull || skipper.boatModel,
+                  boatModel: skipper.boatModel || skipper.hull,
+                  position: null,
+                  score: null,
+                };
+              });
 
-          // Filter to only show skippers in the current heat
-          allSkippers = allSkippers.filter((skipper: any) => {
-            // Match by sail number or skipper name
-            return currentHeat.skippers.some((heatSkipper: any) =>
-              heatSkipper.sailNo === skipper.sail_number ||
-              heatSkipper.sailNo === skipper.sailNo ||
-              heatSkipper.name === skipper.skipper_name
-            );
-          });
-
-          console.log('[Overlay Debug] Filtered to', allSkippers.length, 'skippers in heat');
+            if (heatSkippers.length > 0) {
+              allSkippers = heatSkippers;
+            }
+          }
+          console.log('[Overlay Debug] SHRS filtered to', allSkippers.length, 'skippers');
         }
 
         console.log('[Overlay Debug] Final skippers list:', allSkippers);
@@ -289,12 +367,16 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
           raceStatus = 'in_progress';
         }
 
-        // Update live tracking data with race info
+        const currentRaceNumber = isHeatManagement
+          ? (displayRoundNumber || 1)
+          : ((quickRaces.last_completed_race || 0) + 1);
+
         setLiveTrackingData((prev: any) => ({
           ...prev,
           race_type: isHeatManagement ? 'heat' : 'fleet',
-          heat_number: displayHeatNumber || null,
-          race_number: quickRaces.current_day || 1,
+          heat_label: displayHeatLabel || null,
+          heat_number: displayRoundNumber || null,
+          race_number: currentRaceNumber,
           event_name: eventData?.event_name || quickRaces.event_name,
           event_id: session.event_id,
           status: raceStatusData?.status || raceStatus,
@@ -366,14 +448,11 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
   const themeStyles = getThemeStyles();
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-10">
+    <div ref={ref} className="absolute inset-0 pointer-events-none z-10">
 
       {config.showWeather && weatherData && (
         <div
           className={`absolute top-3 right-3 bg-gradient-to-br ${themeStyles.bg} backdrop-blur-md px-2.5 py-2 rounded-md border ${themeStyles.border} shadow-lg`}
-          style={{
-            animation: 'slideLeft 0.5s ease-out'
-          }}
         >
           <div className="flex items-center gap-2">
             <Wind className={`w-4 h-4 ${config.theme === 'light' ? 'text-cyan-600' : 'text-cyan-400'}`} />
@@ -393,38 +472,31 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
         </div>
       )}
 
-      {/* Skippers List - Top Left - Simple Design like example */}
+      {/* Skippers List - Top Left */}
       {config.showSkippers && displaySkippers && displaySkippers.length > 0 && (
-        <div
-          className="absolute top-3 left-3"
-          style={{
-            animation: 'slideRight 0.5s ease-out'
-          }}
-        >
-          <div className="bg-slate-700/70 backdrop-blur-md rounded-md shadow-lg overflow-hidden max-w-[280px]">
-            {/* Header */}
-            <div className="px-2 py-0.5 bg-slate-800/70">
-              <div className="flex items-center gap-1.5">
-                <Users className="w-2.5 h-2.5 text-slate-300" />
-                <p className="text-[10px] font-semibold text-white">
+        <div className="absolute top-4 left-8">
+          <div className="bg-slate-800/80 backdrop-blur-md rounded-lg shadow-lg overflow-hidden min-w-[240px] max-w-[340px]">
+            <div className="px-3 py-1.5 bg-slate-900/80 border-b border-slate-600/40">
+              <div className="flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-yellow-400" />
+                <p className="text-sm font-bold text-white tracking-wide">
                   Skippers
                 </p>
               </div>
             </div>
 
-            {/* Skipper List - Minimal like example */}
-            <div className="max-h-[400px] overflow-y-auto">
-              <table className="w-full text-[10px]">
+            <div className="max-h-[500px] overflow-y-auto">
+              <table className="w-full">
                 <tbody className="text-white">
-                  {displaySkippers.slice(0, 20).map((skipper: any, index: number) => (
+                  {displaySkippers.slice(0, 25).map((skipper: any, index: number) => (
                     <tr
                       key={skipper.id || index}
-                      className="hover:bg-slate-600/30 transition-colors"
+                      className={index % 2 === 0 ? 'bg-slate-700/30' : ''}
                     >
-                      <td className="pl-2 pr-0.5 font-medium w-[40px]">
-                        {skipper.sail_number || skipper.sailNo || 'N/A'}
+                      <td className="pl-3 pr-1 py-0.5 text-sm font-semibold text-yellow-400 w-[50px]">
+                        {skipper.sail_number || skipper.sailNo || ''}
                       </td>
-                      <td className="pl-0.5 pr-2">
+                      <td className="pl-1 pr-3 py-0.5 text-sm font-medium">
                         {skipper.skipper_name || skipper.name || `Skipper ${index + 1}`}
                       </td>
                     </tr>
@@ -432,10 +504,10 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
                 </tbody>
               </table>
 
-              {displaySkippers.length > 20 && (
-                <div className="px-2 py-0.5 bg-slate-800/50 text-center border-t border-slate-600/30">
-                  <p className="text-[9px] text-white/70">
-                    +{displaySkippers.length - 20} more
+              {displaySkippers.length > 25 && (
+                <div className="px-3 py-1 bg-slate-900/60 text-center border-t border-slate-600/30">
+                  <p className="text-xs text-white/60">
+                    +{displaySkippers.length - 25} more
                   </p>
                 </div>
               )}
@@ -482,23 +554,120 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
         </div>
       )}
 
-      {/* Race Number - Bottom Left - Yellow like example */}
       {config.showHeatNumber && (displayData || session.heat_number) && (
         <div className="absolute bottom-6 left-6">
           <p className="text-4xl font-bold text-yellow-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-            {displayData?.race_type === 'heat' ? 'Heat' : 'Race'} {session.heat_number || displayData?.heat_number || displayData?.race_number || '1'}
+            {displayData?.heat_label || (
+              `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || '1'}`
+            )}
           </p>
         </div>
       )}
 
       {/* Alfie Logo Watermark - Bottom Right */}
-      <div className="absolute bottom-4 right-4">
-        <img
-          src="/alfie_app_logo.svg"
-          alt="Alfie Logo"
-          className="w-16 h-16 opacity-40"
-        />
+      <div className="absolute bottom-4 right-4 opacity-60">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-16 h-16">
+          <path fill="#0066b4" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+          <path fill="#0078d3" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+        </svg>
       </div>
+
+      {titleCardVisible && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(10,15,30,0.97) 40%, rgba(5,10,25,0.97) 60%, rgba(0,0,0,0.95) 100%)',
+            opacity: titleCardPhase === 'entering' ? 0 : titleCardPhase === 'exiting' ? 0 : 1,
+            transition: 'opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'radial-gradient(ellipse at center, rgba(0,102,180,0.12) 0%, transparent 70%)',
+            }}
+          />
+
+          <div
+            className="absolute top-0 left-0 right-0 h-1"
+            style={{
+              background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.6) 30%, rgba(0,120,211,0.8) 50%, rgba(0,102,180,0.6) 70%, transparent 90%)',
+            }}
+          />
+
+          <div className="relative text-center px-8" style={{
+            transform: titleCardPhase === 'entering' ? 'scale(0.95)' :
+                       titleCardPhase === 'exiting' ? 'scale(1.02)' : 'scale(1)',
+            transition: 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}>
+            <div
+              className="flex items-center justify-center gap-4 mb-8"
+              style={{
+                opacity: titleCardPhase === 'visible' ? 1 : 0,
+                transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(-10px)',
+                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s',
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-10 h-10">
+                <path fill="#0078d3" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+                <path fill="#0066b4" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+              </svg>
+              <span
+                className="text-xl font-bold tracking-[0.35em] uppercase"
+                style={{
+                  background: 'linear-gradient(135deg, #0078d3, #00a3ff)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                AlfiePRO
+              </span>
+            </div>
+
+            <h1
+              className="text-4xl font-bold text-white mb-4 leading-tight"
+              style={{
+                opacity: titleCardPhase === 'visible' ? 1 : 0,
+                transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
+                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s',
+                textShadow: '0 2px 20px rgba(0,0,0,0.5)',
+              }}
+            >
+              {displayData?.event_name || session.title || 'Live Race'}
+            </h1>
+
+            <div
+              className="flex items-center justify-center gap-4 text-base"
+              style={{
+                opacity: titleCardPhase === 'visible' ? 1 : 0,
+                transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
+                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.9s',
+              }}
+            >
+              <span className="text-slate-400 font-medium">
+                {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </span>
+              {(displayData?.heat_label || displayData?.heat_number || displayData?.race_number || session.heat_number) && (
+                <>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-yellow-400 font-semibold">
+                    {displayData?.heat_label || (
+                      `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || 1}`
+                    )}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div
+            className="absolute bottom-0 left-0 right-0 h-1"
+            style={{
+              background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.4) 30%, rgba(0,120,211,0.6) 50%, rgba(0,102,180,0.4) 70%, transparent 90%)',
+            }}
+          />
+        </div>
+      )}
 
       {overlays.map((overlay) => (
         <CustomOverlay key={overlay.id} overlay={overlay} />
@@ -569,7 +738,7 @@ export function LivestreamOverlayRenderer({ session, raceData, weatherData }: Li
       `}</style>
     </div>
   );
-}
+});
 
 function CustomOverlay({ overlay }: { overlay: LivestreamOverlay }) {
   const style = {

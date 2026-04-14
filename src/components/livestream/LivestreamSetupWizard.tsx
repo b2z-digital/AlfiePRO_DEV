@@ -103,37 +103,7 @@ export function LivestreamSetupWizard({
 
   useEffect(() => {
     loadEvents();
-    checkYouTubeIntegration();
   }, [clubId]);
-
-  const checkYouTubeIntegration = async () => {
-    try {
-      const { data: integration, error } = await supabase
-        .from('integrations')
-        .select('platform, is_active, credentials')
-        .eq('club_id', clubId)
-        .eq('platform', 'youtube')
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error checking YouTube integration:', error);
-        return;
-      }
-
-      if (!integration) {
-        addNotification('info', 'Streaming via AlfiePRO default YouTube account.', 4000);
-        return;
-      }
-
-      const credentials = integration.credentials as any;
-      if (credentials?.channel_name) {
-        addNotification('success', `YouTube connected: ${credentials.channel_name}`, 3000);
-      }
-    } catch (error) {
-      console.error('Error checking YouTube integration:', error);
-    }
-  };
 
   const loadEvents = async () => {
     try {
@@ -432,177 +402,21 @@ export function LivestreamSetupWizard({
           sessionData.cloudflare_whip_playback_url = cfData.liveInput.webRTCPlayback?.url;
           sessionData.cloudflare_rtmps_url = cfData.liveInput.rtmps?.url;
           sessionData.cloudflare_rtmps_stream_key = cfData.liveInput.rtmps?.streamKey;
-          console.log('[LivestreamWizard] Cloudflare RTMPS ingest URL:', cfData.liveInput.rtmps?.url);
 
-          // Step 2: Create YouTube broadcast (always if integration exists)
-          try {
-            setLoadingMessage('Creating YouTube broadcast...');
-            console.log('[LivestreamWizard] Creating YouTube broadcast...');
-
-            // For immediate streams, set scheduled time to now + 1 minute (YouTube requirement)
-            let scheduledStartTime = wizardData.scheduledTime;
-            if (wizardData.timing === 'now' || !scheduledStartTime) {
-              const now = new Date();
-              now.setMinutes(now.getMinutes() + 1);
-              scheduledStartTime = now.toISOString();
-            }
-
-            const ytResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                action: 'createBroadcast',
-                clubId,
-                sessionData: {
-                  title: wizardData.title,
-                  description: wizardData.description,
-                  scheduledStartTime: scheduledStartTime,
-                  privacyStatus: wizardData.visibility === 'public' ? 'public' : 'unlisted'
-                }
-              })
-            });
-
-            const ytData = await ytResponse.json();
-
-            console.log('[LivestreamWizard] YouTube broadcast response:', {
-              ok: ytResponse.ok,
-              status: ytResponse.status,
-              data: ytData
-            });
-
-            if (ytResponse.ok && ytData.broadcast) {
-              sessionData.youtube_broadcast_id = ytData.broadcast.id;
-              console.log('✅ YouTube broadcast created:', ytData.broadcast.id);
-              addNotification('success', 'Successfully created YouTube broadcast', 3000);
-
-              // Step 3: Create YouTube stream and get RTMP details
-              setLoadingMessage('Configuring YouTube stream...');
-              const streamResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                  action: 'createStream',
-                  clubId,
-                  sessionData: {
-                    title: wizardData.title,
-                    description: wizardData.description
-                  }
-                })
-              });
-
-              const streamData = await streamResponse.json();
-
-              if (streamResponse.ok && streamData.stream) {
-                const rtmpsUrl = streamData.stream.cdn?.ingestionInfo?.rtmpsIngestionAddress;
-                const rtmpUrl = streamData.stream.cdn?.ingestionInfo?.ingestionAddress;
-                const streamKey = streamData.stream.cdn?.ingestionInfo?.streamName;
-                const preferredUrl = rtmpsUrl || rtmpUrl;
-
-                console.log('[LivestreamWizard] YouTube ingestion URLs:', {
-                  rtmps: rtmpsUrl,
-                  rtmp: rtmpUrl,
-                  using: preferredUrl
-                });
-
-                sessionData.youtube_stream_key = streamKey;
-                sessionData.youtube_stream_url = preferredUrl;
-                sessionData.youtube_rtmp_url = preferredUrl ? `${preferredUrl}/${streamKey}` : undefined;
-
-                // Bind broadcast to stream
-                setLoadingMessage('Connecting broadcast to stream...');
-                const bindResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-youtube-livestream`, {
-                  method: 'POST',
-                  headers,
-                  body: JSON.stringify({
-                    action: 'bindBroadcastToStream',
-                    clubId,
-                    sessionData: {
-                      broadcastId: ytData.broadcast.id,
-                      streamId: streamData.stream.id
-                    }
-                  })
-                });
-
-                const bindData = await bindResponse.json();
-                if (bindResponse.ok) {
-                  console.log('[LivestreamWizard] Broadcast bound to stream');
-
-                  setLoadingMessage('Creating Cloudflare → YouTube relay output...');
-                  try {
-                    const outputStreamUrl = rtmpUrl || rtmpsUrl;
-                    console.log('[LivestreamWizard] Creating Cloudflare output to YouTube RTMP:', outputStreamUrl, 'key:', streamKey?.substring(0, 4) + '...');
-                    const outputResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`, {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify({
-                        action: 'addOutput',
-                        clubId,
-                        sessionData: {
-                          liveInputId: cfData.liveInput.uid,
-                          streamUrl: outputStreamUrl,
-                          streamKey: streamKey
-                        }
-                      })
-                    });
-                    const outputData = await outputResponse.json();
-                    if (outputResponse.ok && outputData.output) {
-                      sessionData.cloudflare_output_id = outputData.output.uid;
-                      console.log('[LivestreamWizard] Cloudflare output created:', outputData.output.uid);
-                    } else {
-                      console.warn('[LivestreamWizard] Failed to create Cloudflare output:', outputData);
-                    }
-                  } catch (outputError) {
-                    console.warn('[LivestreamWizard] Cloudflare output creation error:', outputError);
-                  }
-
-                  addNotification('success', 'YouTube broadcast created successfully', 3000);
-                  setLoadingMessage('Finalizing YouTube configuration...');
-                } else {
-                  console.error('❌ Failed to bind broadcast to stream:', bindData);
-                  addNotification('error', 'Failed to bind YouTube broadcast to stream', 5000);
-                }
-              }
-            } else {
-              console.error('❌ YouTube broadcast creation failed:', {
-                status: ytResponse.status,
-                error: ytData.error,
-                fullResponse: ytData
-              });
-              addNotification(
-                'error',
-                `YouTube broadcast failed: ${ytData.error?.message || ytData.error || 'Unknown error'}. Stream will work via Cloudflare only.`,
-                8000
-              );
-            }
-          } catch (ytError: any) {
-            console.error('❌ YouTube integration error:', ytError);
-            addNotification(
-              'error',
-              `YouTube error: ${ytError.message}. Stream will work via Cloudflare only.`,
-              8000
-            );
+          const playbackUrl = cfData.liveInput.webRTCPlayback?.url || cfData.liveInput.rtmpsPlayback?.url || '';
+          const customerMatch = playbackUrl.match(/customer-([a-z0-9]+)\./);
+          if (customerMatch) {
+            sessionData.cloudflare_customer_code = customerMatch[1];
+            console.log('[LivestreamWizard] Extracted Cloudflare customer code:', customerMatch[1]);
           }
+          console.log('[LivestreamWizard] Cloudflare RTMPS ingest URL:', cfData.liveInput.rtmps?.url);
         } else {
           console.warn('[LivestreamWizard] Cloudflare Stream not configured:', cfData.error);
           addNotification('warning', cfData.hint || 'Cloudflare Stream not configured. Please set it up in Settings > Integrations.', 8000);
-          sessionData.streaming_mode = 'direct_youtube';
         }
       } catch (cfError: any) {
         console.error('[LivestreamWizard] Cloudflare error:', cfError);
         addNotification('warning', 'Cloudflare Stream setup failed. Please check your integration settings.', 6000);
-        sessionData.streaming_mode = 'direct_youtube';
-      }
-
-      // Validate YouTube setup if enabled
-      if (wizardData.youtubeEnabled && !sessionData.youtube_broadcast_id) {
-        console.error('[LivestreamWizard] YouTube was enabled but no broadcast was created!');
-        addNotification(
-          'error',
-          'Failed to create YouTube broadcast. Please check your YouTube integration in Settings or disable YouTube streaming.',
-          10000
-        );
-        setLoading(false);
-        return; // Don't save session if YouTube setup failed
       }
 
       setLoadingMessage('Finalizing setup...');
@@ -659,7 +473,7 @@ export function LivestreamSetupWizard({
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
         <div className="bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-700/50">
         {/* Header */}
-        <div className="bg-gradient-to-r from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
+        <div className="from-cyan-600 via-cyan-700 to-blue-800 p-6 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center justify-between relative z-10">
             <div className="flex items-center gap-3">
@@ -1156,7 +970,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleNext}
               disabled={currentStep === 'details' && (!wizardData.title || !wizardData.eventId)}
-              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
+              className="btn-primary-green flex items-center space-x-2 px-6 py-2.5 from-cyan-600 to-blue-600 text-white rounded-xl hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30"
             >
               <span>Next</span>
               <ArrowRight className="w-4 h-4" />
@@ -1165,7 +979,7 @@ export function LivestreamSetupWizard({
             <button
               onClick={handleComplete}
               disabled={loading || !wizardData.title || !wizardData.eventId}
-              className="flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-500 hover:to-green-500 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20"
+              className="btn-primary-green flex items-center space-x-2 px-6 py-2.5 text-white rounded-xl disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               <Check className="w-4 h-4" />
               <span>{loading ? 'Creating...' : wizardData.timing === 'now' ? 'Go Live' : 'Schedule Stream'}</span>

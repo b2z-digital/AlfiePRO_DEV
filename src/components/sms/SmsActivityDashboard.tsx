@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, CheckCircle, XCircle, HelpCircle, Clock, ThumbsUp, ThumbsDown, Minus, BarChart3, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageSquare, Send, CircleCheck as CheckCircle, Circle as XCircle, Circle as HelpCircle, Clock, ThumbsUp, ThumbsDown, Minus, ChartBar as BarChart3, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface EventLog {
@@ -243,7 +243,7 @@ export const SmsActivityDashboard: React.FC<SmsActivityDashboardProps> = ({ dark
                   <div className="mt-3 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
                     {log.yes_count > 0 && (
                       <div
-                        className="bg-green-500 rounded-l-full"
+                        className="rounded-l-full"
                         style={{ width: `${(log.yes_count / log.total_sent) * 100}%` }}
                       ></div>
                     )}

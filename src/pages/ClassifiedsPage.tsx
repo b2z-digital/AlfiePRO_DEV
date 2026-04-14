@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, Edit2, Trash2, Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
+import { Search, ListFilter as Filter, Plus, Heart, MapPin, Calendar, Eye, Tag, X, SquarePen as Edit2, Trash2, Grid2x2 as Grid, List, ArrowUpDown, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassifieds, getUserClassifieds, getUserFavorites, toggleClassifiedFavorite, deleteClassified } from '../utils/classifiedStorage';
 import type { Classified } from '../types/classified';
@@ -13,7 +13,7 @@ type DisplayMode = 'grid' | 'list';
 type SortOption = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'title';
 
 export default function ClassifiedsPage() {
-  const { user, currentClub } = useAuth();
+  const { user, currentClub, isSuperAdmin, isStateOrgAdmin } = useAuth();
   const { addNotification } = useNotifications();
   const [classifieds, setClassifieds] = useState<Classified[]>([]);
   const [filteredClassifieds, setFilteredClassifieds] = useState<Classified[]>([]);
@@ -189,7 +189,22 @@ export default function ClassifiedsPage() {
     }
   };
 
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number, classified?: { is_external?: boolean; title?: string }) => {
+    if (price === 0 && classified?.is_external) {
+      const titleMatch = classified.title?.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
+      if (titleMatch) {
+        const extracted = parseFloat(titleMatch[1].replace(/,/g, ''));
+        if (extracted > 0) {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          }).format(extracted);
+        }
+      }
+      return 'Contact Seller';
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -204,6 +219,10 @@ export default function ClassifiedsPage() {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const canManageListing = (classified: Classified) => {
+    return classified.user_id === user?.id || classified.created_by_user_id === user?.id || isSuperAdmin || isStateOrgAdmin;
   };
 
   const getCategoryLabel = (categoryValue: string) => {
@@ -349,7 +368,7 @@ export default function ClassifiedsPage() {
             {/* Create Listing Button */}
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 flex items-center gap-2 animate-pulse"
+              className="btn-primary-green px-6 py-2 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 flex items-center gap-2 animate-pulse"
             >
               <Plus size={18} />
               Create Listing
@@ -491,10 +510,26 @@ export default function ClassifiedsPage() {
                       src={classified.images[0]}
                       alt={classified.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.classList.add('bg-gradient-to-br', 'from-slate-700', 'to-slate-800');
+                          const placeholder = parent.querySelector('.no-img-placeholder') as HTMLElement | null;
+                          if (placeholder) placeholder.style.display = 'flex';
+                        }
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Tag size={48} className="text-slate-600" />
+                  ) : null}
+                  {(!classified.images || classified.images.length === 0) && (
+                    <div className="no-img-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                      <img src="/alfie_app_logo.svg" alt="Alfie" className="w-16 h-16 opacity-40" />
+                    </div>
+                  )}
+                  {classified.images && classified.images.length > 0 && (
+                    <div className="no-img-placeholder w-full h-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 absolute inset-0" style={{ display: 'none' }}>
+                      <img src="/alfie_app_logo.svg" alt="Alfie" className="w-16 h-16 opacity-40" />
                     </div>
                   )}
 
@@ -506,7 +541,7 @@ export default function ClassifiedsPage() {
                   {/* Action Buttons */}
                   <div className="absolute top-3 right-3 flex gap-2">
                     {/* Edit/Delete buttons - only show for user's own listings */}
-                    {classified.user_id === user?.id && (
+                    {canManageListing(classified) && (
                       <>
                         <button
                           onClick={(e) => handleEdit(classified, e)}
@@ -552,7 +587,7 @@ export default function ClassifiedsPage() {
                   </div>
 
                   <div className="text-2xl font-bold text-blue-400 mb-3">
-                    {formatPrice(classified.price)}
+                    {formatPrice(classified.price, classified)}
                   </div>
 
                   <p className="text-slate-300 text-sm mb-4 line-clamp-2">
@@ -580,10 +615,14 @@ export default function ClassifiedsPage() {
                     {classified.condition}
                   </div>
 
-                  {/* Public Badge */}
                   {classified.is_public && (
                     <div className="mt-2 inline-block ml-2 px-3 py-1 bg-green-500/20 text-green-300 text-xs font-medium rounded-full">
                       Public Listing
+                    </div>
+                  )}
+                  {classified.is_external && (
+                    <div className="mt-2 inline-block ml-2 px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-medium rounded-full">
+                      External
                     </div>
                   )}
                 </div>
@@ -603,10 +642,26 @@ export default function ClassifiedsPage() {
                         src={classified.images[0]}
                         alt={classified.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.classList.add('bg-gradient-to-br', 'from-slate-700', 'to-slate-800');
+                            const placeholder = parent.querySelector('.no-img-placeholder') as HTMLElement | null;
+                            if (placeholder) placeholder.style.display = 'flex';
+                          }
+                        }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Tag size={32} className="text-slate-600" />
+                    ) : null}
+                    {(!classified.images || classified.images.length === 0) && (
+                      <div className="no-img-placeholder w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800">
+                        <img src="/alfie_app_logo.svg" alt="Alfie" className="w-12 h-12 opacity-40" />
+                      </div>
+                    )}
+                    {classified.images && classified.images.length > 0 && (
+                      <div className="no-img-placeholder w-full h-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-800 absolute inset-0" style={{ display: 'none' }}>
+                        <img src="/alfie_app_logo.svg" alt="Alfie" className="w-12 h-12 opacity-40" />
                       </div>
                     )}
                   </div>
@@ -616,10 +671,10 @@ export default function ClassifiedsPage() {
                     <div className="flex items-start justify-between gap-4 mb-2">
                       <div className="flex-1">
                         <h3 className="text-xl font-bold text-white mb-1">{classified.title}</h3>
-                        <p className="text-2xl font-bold text-green-400">{formatPrice(classified.price)}</p>
+                        <p className="text-2xl font-bold text-green-400">{formatPrice(classified.price, classified)}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {classified.user_id === user?.id && (
+                        {canManageListing(classified) && (
                           <>
                             <button
                               onClick={(e) => handleEdit(classified, e)}
@@ -673,6 +728,11 @@ export default function ClassifiedsPage() {
                       {classified.is_public && (
                         <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded text-xs">
                           Public Listing
+                        </span>
+                      )}
+                      {classified.is_external && (
+                        <span className="px-2 py-1 bg-amber-500/20 text-amber-300 rounded text-xs">
+                          External
                         </span>
                       )}
                     </div>

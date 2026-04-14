@@ -638,6 +638,14 @@ export const BoatDetailView: React.FC<BoatDetailViewProps> = ({
                         #{boat.sail_number}
                       </span>
                     </div>
+                    {boat.hull_registration_number && (
+                      <div className="flex justify-between">
+                        <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Hull Reg #:</span>
+                        <span className={`font-mono font-semibold tracking-wide ${darkMode ? 'text-cyan-300' : 'text-cyan-700'}`}>
+                          {boat.hull_registration_number}
+                        </span>
+                      </div>
+                    )}
                     {boat.hull && (
                       <div className="flex justify-between">
                         <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Hull:</span>

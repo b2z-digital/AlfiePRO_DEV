@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, CheckSquare, Camera, DollarSign, AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
+import { Trophy, Users, Calendar, ChevronRight, MapPin, Clock, TrendingUp, Award, UserCheck, Medal, Zap, Target, Globe, SquareCheck as CheckSquare, Camera, DollarSign, CircleAlert as AlertCircle, Wind, CloudRain, Droplets, Mail, MessageSquare, Bell, Plus, FileText, CreditCard, UserPlus, Send } from 'lucide-react';
 import { getStoredRaceEvents, getStoredRaceSeries, combineAllDayResults } from '../utils/raceStorage';
 import { getTopFinishers } from '../utils/standingsCalculator';
 import { getStoredMembers } from '../utils/storage';
@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { supabase, retryQuery } from '../utils/supabase';
 import { protectedQuery, protectedCount, QUERY_TIMEOUTS } from '../utils/queryHelpers';
 import { isValidUUID } from '../utils/storage';
@@ -19,6 +20,8 @@ import { usePermissions } from '../hooks/usePermissions';
 import { TrialStatusBanner } from './TrialStatusBanner';
 import { getBoatClassBadge, getRaceFormatBadge, getEventTypeBadge } from '../constants/colors';
 import { CustomizableDashboard } from './dashboard/CustomizableDashboard';
+import { ClubSetupChecklist } from './dashboard/ClubSetupChecklist';
+import { ProfileCompletionBanner } from './dashboard/ProfileCompletionBanner';
 
 // Register ChartJS components
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -50,6 +53,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user, currentClub } = useAuth();
+  const { isImpersonating, effectiveProfile: impersonatedProfile } = useImpersonation();
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const [taskCount, setTaskCount] = useState<number>(0);
   const [userFirstName, setUserFirstName] = useState<string>('');
@@ -165,11 +169,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, [currentClub?.clubId]);
 
   const fetchUserAvatar = async () => {
+    if (isImpersonating && impersonatedProfile) {
+      setUserFirstName(impersonatedProfile.firstName);
+      setUserAvatarUrl(impersonatedProfile.avatarUrl);
+      return;
+    }
+
     if (!user) return;
 
-    // Skip if offline
     if (!navigator.onLine) {
-      console.log('Offline - skipping user avatar fetch');
       setUserFirstName(user?.user_metadata?.first_name || '');
       return;
     }
@@ -188,12 +196,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
       if (result.data) {
         setUserAvatarUrl(result.data.avatar_url);
-        // Use profile first_name which is synced from members table
         setUserFirstName(result.data.first_name || user?.user_metadata?.first_name || '');
       }
     } catch (err) {
       console.error('Error fetching user avatar:', err);
-      // Fallback to user metadata
       setUserFirstName(user?.user_metadata?.first_name || '');
     }
   };
@@ -1391,7 +1397,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
         <div className="absolute inset-0 bg-black opacity-10 pointer-events-none" />
 
-        {isAdmin && (
+        {isAdmin && !isImpersonating && (
           <button
             onClick={() => setShowCoverImageModal(true)}
             className="absolute top-4 right-4 p-3 bg-slate-900 bg-opacity-30 hover:bg-opacity-50 text-white rounded-lg backdrop-blur-sm transition-all flex items-center gap-2"
@@ -1439,6 +1445,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       <div className="p-4 sm:p-6 lg:p-16">
         {/* Trial Status Banner */}
         <TrialStatusBanner />
+
+        {/* Club Setup Checklist - shown for new clubs until dismissed */}
+        <ClubSetupChecklist />
+
+        {/* Profile completion banner - shown for imported members needing to fill in details */}
+        <ProfileCompletionBanner />
 
         {/* Customizable Dashboard - Full Widget System (includes all widgets) */}
         <CustomizableDashboard />

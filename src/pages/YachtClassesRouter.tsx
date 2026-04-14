@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { YachtClassesPage } from './YachtClassesPage';
 import { BoatClassManagement } from '../components/BoatClassManagement';
 import { supabase } from '../utils/supabase';
@@ -10,6 +11,8 @@ interface YachtClassesRouterProps {
 
 export const YachtClassesRouter: React.FC<YachtClassesRouterProps> = ({ darkMode }) => {
   const { user, isNationalOrgAdmin, isStateOrgAdmin, currentClub, currentOrganization, isSuperAdmin } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const [nationalAssociationId, setNationalAssociationId] = useState<string | null>(null);
   const [nationalAssociationName, setNationalAssociationName] = useState<string | null>(null);
   const [stateAssociationId, setStateAssociationId] = useState<string | null>(null);
@@ -111,7 +114,7 @@ export const YachtClassesRouter: React.FC<YachtClassesRouterProps> = ({ darkMode
               name
             )
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId!)
           .eq('role', 'admin')
           .single();
 
@@ -138,7 +141,7 @@ export const YachtClassesRouter: React.FC<YachtClassesRouterProps> = ({ darkMode
               name
             )
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId!)
           .eq('role', 'admin')
           .single();
 

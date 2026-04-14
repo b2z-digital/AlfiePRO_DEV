@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Wrench, Plus, TrendingUp,
-  Bell, Award, Activity, ChevronRight, Zap,
-  Image as ImageIcon, Anchor, Trophy,
-  Edit2, Trash2
-} from 'lucide-react';
+import { Wrench, Plus, TrendingUp, Bell, Award, Activity, ChevronRight, Zap, Image as ImageIcon, Anchor, Trophy, SquarePen as Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { BoatDetailView } from '../components/garage/BoatDetailView';
 import { AddBoatModal } from '../components/garage/AddBoatModal';
@@ -53,6 +49,8 @@ interface MyGaragePageProps {
 
 export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
   const { user, currentClub, currentOrganization } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const { addNotification } = useNotifications();
   const [boats, setBoats] = useState<Boat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +64,10 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
   const [boatForImageUpload, setBoatForImageUpload] = useState<Boat | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
+    if (effectiveUserId) {
       fetchGarageData();
     }
-  }, [currentClub, currentOrganization, user]);
+  }, [currentClub, currentOrganization, effectiveUserId]);
 
   const fetchGarageData = async () => {
     try {
@@ -80,7 +78,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
       const { data: memberData, error: memberError } = await supabase
         .from('members')
         .select('id, club_id')
-        .eq('user_id', user?.id);
+        .eq('user_id', effectiveUserId);
 
       if (memberError) throw memberError;
       if (!memberData || memberData.length === 0) {
@@ -376,7 +374,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
             </div>
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 animate-pulse"
+              className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-xl font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 animate-pulse"
             >
               <Plus size={20} />
               <span className="hidden sm:inline">Add Boat</span>
@@ -429,7 +427,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
                 ? 'bg-slate-800/50 border border-slate-700/50'
                 : 'bg-white border border-slate-200'}
             `}>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/20 flex-shrink-0">
+              <div className="p-3 rounded-xl bg-gradient-to-br shadow-lg flex-shrink-0">
                 <Trophy className="text-white" size={24} />
               </div>
               <div className="flex-1 min-w-0">
@@ -489,7 +487,7 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200 font-medium animate-pulse"
+                  className="btn-primary-green inline-flex items-center gap-2 px-6 py-3 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-200 font-medium animate-pulse"
                 >
                   <Plus size={20} />
                   <span>Add Your First Boat</span>
@@ -619,7 +617,13 @@ export const MyGaragePage: React.FC<MyGaragePageProps> = ({ darkMode }) => {
                           <h3 className="text-xl font-bold text-white mb-1">
                             {boat.boat_type}
                           </h3>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {boat.hull_registration_number && (
+                              <>
+                                <span className="text-cyan-300/90 text-sm font-mono">{boat.hull_registration_number}</span>
+                                <span className="text-white/50">|</span>
+                              </>
+                            )}
                             <span className="text-white/90 text-sm">Sail #{boat.sail_number}</span>
                             {boat.hull && (
                               <>

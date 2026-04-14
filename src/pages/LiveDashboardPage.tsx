@@ -1,22 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Bell,
-  Trophy,
-  TrendingUp,
-  TrendingDown,
-  Sailboat,
-  RefreshCw,
-  LogOut,
-  Target,
-  Award,
-  Activity,
-  BarChart2,
-  List,
-  Home,
-  Layers,
-  Flag,
-} from 'lucide-react';
+import { Bell, Trophy, TrendingUp, TrendingDown, Sailboat, RefreshCw, LogOut, Target, Award, Activity, ChartBar as BarChart2, List, Hop as Home, Layers, Flag } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import {
   getCurrentTrackingSession,
@@ -25,6 +9,7 @@ import {
   savePushSubscription,
   getRaceStatus,
   subscribeToRaceStatus,
+  getLiveTrackingEventByToken,
   RaceStatus,
 } from '../utils/liveTrackingStorage';
 import { calculateEventStandings } from '../utils/standingsCalculator';
@@ -43,6 +28,8 @@ type TabView = 'overview' | 'results' | 'performance' | 'heat';
 export default function LiveDashboardPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const isShortCode = window.location.pathname.startsWith('/t/');
+  const basePrefix = isShortCode ? `/t/${token}` : `/live/${token}`;
 
   const [session, setSession] = useState<LiveTrackingSession | null>(null);
   const [tracking, setTracking] = useState<SessionSkipperTracking | null>(null);
@@ -100,17 +87,20 @@ export default function LiveDashboardPage() {
     try {
       setLoading(true);
 
-      const { data: trackingEvent, error: eventError } = await supabase
-        .from('live_tracking_events')
-        .select('event_id')
-        .eq('access_token', token)
-        .single();
+      if (!token) {
+        navigate('/');
+        return;
+      }
 
-      if (eventError) throw eventError;
+      const trackingEvent = await getLiveTrackingEventByToken(token);
+      if (!trackingEvent) {
+        navigate(basePrefix);
+        return;
+      }
 
       const currentSession = await getCurrentTrackingSession(trackingEvent.event_id);
       if (!currentSession) {
-        navigate(`/live/${token}`);
+        navigate(basePrefix);
         return;
       }
 
@@ -464,7 +454,7 @@ export default function LiveDashboardPage() {
           console.log('🔄 Redirecting to skipper selection page...');
           localStorage.removeItem('alfie_current_tracking_session');
           localStorage.removeItem('alfie_tracking_skipper');
-          navigate(`/live/${token}`);
+          navigate(basePrefix);
           return;
         }
       }
@@ -742,7 +732,7 @@ export default function LiveDashboardPage() {
     sessionStorage.removeItem('alfie_live_notifications_enabled');
 
     // Navigate to skipper selection
-    navigate(`/live/${token}`);
+    navigate(basePrefix);
   };
 
   const getHeatColor = (heat: HeatDesignation): string => {
@@ -774,7 +764,7 @@ export default function LiveDashboardPage() {
 
     const badges = {
       promoted: (
-        <div className="flex items-center gap-2 px-6 py-3 bg-green-500 text-white rounded-xl shadow-lg font-bold text-lg">
+        <div className="flex items-center gap-2 px-6 py-3 text-white rounded-xl shadow-lg font-bold text-lg">
           <TrendingUp size={24} />
           <span>Promoted!</span>
         </div>
@@ -1061,7 +1051,7 @@ export default function LiveDashboardPage() {
 
         {/* Create Account CTA */}
         {!session?.member_id && (
-          <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl shadow-lg p-6 text-white">
+          <div className="rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-white/20 rounded-xl">
                 <Trophy size={32} />
@@ -1073,7 +1063,7 @@ export default function LiveDashboardPage() {
                 </p>
                 <button
                   onClick={() => navigate('/register')}
-                  className="px-6 py-3 bg-white hover:bg-green-50 text-green-600 font-bold rounded-lg transition-all shadow-md"
+                  className="btn-primary-green px-6 py-3 bg-white text-green-600 font-bold rounded-lg transition-all shadow-md"
                 >
                   Create Free Account
                 </button>
@@ -1090,7 +1080,7 @@ export default function LiveDashboardPage() {
             alt="Alfie Logo"
             className="w-6 h-6"
           />
-          <span className="text-sm font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+          <span className="text-sm font-bold from-cyan-600 to-blue-600 bg-clip-text text-transparent">
             AlfiePRO
           </span>
         </div>

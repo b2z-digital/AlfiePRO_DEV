@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, CheckCircle, Loader2, AlertCircle, Shield, Server, Clock } from 'lucide-react';
+import { Globe, CircleCheck as CheckCircle, Loader as Loader2, CircleAlert as AlertCircle, Shield, Server, Clock } from 'lucide-react';
 
 interface PublishingPreloaderModalProps {
   isOpen: boolean;
@@ -205,7 +205,7 @@ export const PublishingPreloaderModal: React.FC<PublishingPreloaderModalProps> =
           <div className="mt-8">
             <div className="relative h-3 bg-slate-700/50 rounded-full overflow-hidden">
               <div
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500 transition-all duration-300 ease-out rounded-full"
+                className="absolute inset-y-0 left-0 from-blue-500 via-purple-500 transition-all duration-300 ease-out rounded-full"
                 style={{ width: `${progress}%` }}
               >
                 <div className="absolute inset-0 bg-white/20 animate-pulse" />

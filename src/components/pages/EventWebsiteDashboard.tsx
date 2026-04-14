@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, BarChart3, ExternalLink, Loader2, CheckCircle, AlertCircle, X, Edit, Plus, Trash2, Menu, MapPin } from 'lucide-react';
+import { Globe, Eye, Settings, FileText, Image, Trophy, Users, Newspaper, ChartBar as BarChart3, ExternalLink, Loader as Loader2, CircleCheck as CheckCircle, CircleAlert as AlertCircle, X, CreditCard as Edit, Plus, Trash2, Menu, MapPin } from 'lucide-react';
 import type { EventWebsite, EventWebsiteSettings } from '../../types/eventWebsite';
 import { eventWebsiteStorage } from '../../utils/eventWebsiteStorage';
 import { EventWebsitePageManager } from '../events/EventWebsitePageManager';
@@ -212,7 +212,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
                   console.log('🎯 Task Manager button clicked!', website?.event_id);
                   navigate(`/event-command-center/${website?.event_id}`);
                 }}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-xl hover:shadow-lg hover:shadow-purple-500/30 transition-all hover:scale-[1.02] font-medium"
+                className="btn-primary-green flex items-center gap-2 px-6 py-3 from-purple-600 to-violet-600 text-white rounded-xl hover:shadow-lg hover:shadow-purple-500/30 transition-all hover:scale-[1.02] font-medium"
               >
                 <Menu size={18} />
                 Task Manager
@@ -222,7 +222,7 @@ export const EventWebsiteDashboard: React.FC<EventWebsiteDashboardProps> = ({ da
                   href={getSiteUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 transition-all hover:scale-[1.02] font-medium"
+                  className="flex items-center gap-2 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all hover:scale-[1.02] font-medium"
                 >
                   <Eye size={18} />
                   View Website

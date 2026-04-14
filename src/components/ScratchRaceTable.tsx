@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Users, TrendingUp, Home, X, Settings, Flag, Timer, Award, Moon, Sun, RefreshCw, Trophy, Maximize2, Minimize2 } from 'lucide-react';
+import { Users, TrendingUp, Hop as Home, X, Settings, Flag, Timer, Award, Moon, Sun, RefreshCw, Trophy, Maximize2, Minimize2 } from 'lucide-react';
 import { SettingsDropdown } from './Controls';
 import { Skipper, LetterScore } from '../types';
 import { calculateScratchResults, applyDropRules } from '../utils/scratchCalculations';
@@ -863,7 +863,7 @@ export const ScratchRaceTable: React.FC<ScratchRaceTableProps> = ({
                 e.stopPropagation();
                 onCompleteScoring();
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-semibold"
             >
               <Trophy size={18} />
               <span className="text-sm font-medium">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CheckCircle, Loader2, Calendar } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Building, Palette, Sailboat, MapPin, Users, DollarSign, UserPlus, CircleCheck as CheckCircle, Loader as Loader2, Calendar } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -140,7 +140,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         logoPreview: club.logo || '',
         clubIntroduction: club.club_introduction || '',
         featuredImageFile: null,
-        featuredImagePreview: club.featured_image_url || '',
+        featuredImagePreview: club.featured_image_url || club.cover_image_url || '',
         venueName: venue?.name || '',
         venueAddress: venue?.address || '',
         venueDescription: venue?.description || '',
@@ -155,6 +155,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           boat_class_id: sd.boat_class_id,
           description: sd.description || '',
           is_active: sd.is_active,
+          frequency: sd.frequency || 'every_week',
         })),
         membershipTypes: (membershipTypes || []).map(mt => ({
           id: mt.id,
@@ -555,20 +556,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         .maybeSingle();
 
       if (existingMember?.user_id) {
-        const { data: existingRole } = await supabase
-          .from('user_clubs')
-          .select('id')
-          .eq('user_id', existingMember.user_id)
-          .eq('club_id', id)
-          .maybeSingle();
-
-        if (!existingRole) {
-          await supabase.from('user_clubs').insert({
-            user_id: existingMember.user_id,
-            club_id: id,
-            role: 'admin'
-          });
-        }
+        await supabase.from('user_clubs').upsert({
+          user_id: existingMember.user_id,
+          club_id: id,
+          role: 'admin'
+        }, { onConflict: 'user_id,club_id' });
       } else {
         await supabase.from('members').insert({
           club_id: id,
@@ -591,6 +583,21 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           });
         }
       }
+    }
+
+    await supabase.from('club_sailing_days').delete().eq('club_id', id);
+    if (formData.sailingDays.length > 0) {
+      const sailingDaysToInsert = formData.sailingDays.map(day => ({
+        club_id: id,
+        day_of_week: day.day_of_week,
+        start_time: day.start_time,
+        end_time: day.end_time,
+        boat_class_id: day.boat_class_id || null,
+        description: day.description || null,
+        is_active: day.is_active,
+        frequency: day.frequency || 'every_week',
+      }));
+      await supabase.from('club_sailing_days').insert(sailingDaysToInsert);
     }
 
     addNotification('success', `${formData.name} has been updated successfully!`);
@@ -693,6 +700,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
         boat_class_id: day.boat_class_id,
         description: day.description || null,
         is_active: day.is_active,
+        frequency: day.frequency || 'every_week',
       }));
       await supabase.from('club_sailing_days').insert(sailingDaysToInsert);
     }
@@ -719,11 +727,11 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
       if (existingMember?.user_id) {
         await supabase
           .from('user_clubs')
-          .insert({
+          .upsert({
             user_id: existingMember.user_id,
             club_id: club.id,
             role: 'admin'
-          });
+          }, { onConflict: 'user_id,club_id' });
       } else {
         await supabase
           .from('members')
@@ -833,7 +841,7 @@ export const ClubOnboardingWizard: React.FC<ClubOnboardingWizardProps> = ({
           </div>
           <div className={`mt-3 h-1 rounded-full overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
             <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500 ease-out rounded-full"
+              className="h-full transition-all duration-500 ease-out rounded-full"
               style={{ width: `${progress}%` }}
             />
           </div>

@@ -7,6 +7,7 @@ interface Member {
   first_name: string;
   last_name: string;
   avatar_url?: string | null;
+  club?: string | null;
 }
 
 interface MemberSelectProps {
@@ -37,11 +38,12 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
 
   const selectedMember = members.find(m => m.id === value);
 
-  const filteredMembers = members.filter(member =>
-    `${member.first_name} ${member.last_name}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const filteredMembers = members.filter(member => {
+    const term = searchTerm.toLowerCase();
+    const fullName = `${member.first_name} ${member.last_name}`.toLowerCase();
+    const clubName = (member.club || '').toLowerCase();
+    return fullName.includes(term) || clubName.includes(term);
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -114,7 +116,7 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search members..."
+                placeholder="Search by name or club..."
                 className="w-full pl-9 pr-3 py-2 bg-slate-600 text-slate-200 rounded-lg border border-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
@@ -160,9 +162,16 @@ export const MemberSelect: React.FC<MemberSelectProps> = ({
                     imageUrl={member.avatar_url}
                     size="xs"
                   />
-                  <span className="text-slate-200 text-sm truncate">
-                    {member.first_name} {member.last_name}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-slate-200 text-sm truncate block">
+                      {member.first_name} {member.last_name}
+                    </span>
+                    {member.club && (
+                      <span className="text-slate-400 text-xs truncate block">
+                        {member.club}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))
             )}

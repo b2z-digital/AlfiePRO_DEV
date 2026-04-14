@@ -17,6 +17,9 @@ export interface Article {
   updated_at?: string;
   status: 'draft' | 'published';
   tags?: string[];
+  is_scraped?: boolean;
+  scraped_url?: string;
+  scraped_author?: string;
   author_name?: string; // Derived field
   source_type?: 'club' | 'state' | 'national'; // Derived field
   source_name?: string; // Derived field
@@ -213,11 +216,16 @@ export const getArticles = async (
 
     // Map author names, transform tags, and add source info
     const articlesWithAuthors = articles.map(article => {
-      // Find author
-      const author = users?.find(user => user.id === article.author_id);
-      const authorName = author
-        ? `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author'
-        : 'Unknown Author';
+      // Find author — scraped articles use scraped_author field
+      let authorName: string;
+      if (article.is_scraped && article.scraped_author) {
+        authorName = article.scraped_author;
+      } else {
+        const author = users?.find(user => user.id === article.author_id);
+        authorName = author
+          ? `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author'
+          : 'Unknown Author';
+      }
 
       // Extract tags
       const tags = article.article_tags?.map(tag => tag.tag) || [];
@@ -267,6 +275,63 @@ export const getArticles = async (
   }
 };
 
+export const getDraftArticles = async (
+  clubId?: string,
+  associationId?: string,
+  associationType?: 'state' | 'national'
+): Promise<Article[]> => {
+  try {
+    let query = supabase
+      .from('articles')
+      .select(`
+        *,
+        article_tags(tag),
+        clubs(name),
+        state_associations(name, abbreviation),
+        national_associations(name, abbreviation)
+      `)
+      .eq('status', 'draft')
+      .order('updated_at', { ascending: false });
+
+    if (clubId) {
+      query = query.eq('club_id', clubId);
+    } else if (associationId && associationType === 'state') {
+      query = query.eq('state_association_id', associationId);
+    } else if (associationId && associationType === 'national') {
+      query = query.eq('national_association_id', associationId);
+    } else {
+      return [];
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    const authorIds = data.map(a => a.author_id).filter(Boolean);
+    const { data: users } = authorIds.length > 0
+      ? await supabase.from('profiles').select('id, first_name, last_name').in('id', authorIds)
+      : { data: [] };
+
+    return data.map(article => {
+      let authorName = 'Unknown Author';
+      if (article.is_scraped && article.scraped_author) {
+        authorName = article.scraped_author;
+      } else {
+        const author = users?.find(u => u.id === article.author_id);
+        if (author) {
+          authorName = `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author';
+        }
+      }
+      const tags = article.article_tags?.map((t: any) => t.tag) || [];
+      const { article_tags, clubs, state_associations, national_associations, ...articleData } = article;
+      return { ...articleData, tags, author_name: authorName } as Article;
+    });
+  } catch (error) {
+    console.error('Error fetching draft articles:', error);
+    return [];
+  }
+};
+
 // Get a single article by ID
 export const getArticleById = async (id: string): Promise<Article | null> => {
   try {
@@ -289,15 +354,17 @@ export const getArticleById = async (id: string): Promise<Article | null> => {
     
     if (!article) return null;
     
-    // Fetch author name
+    // Fetch author name — scraped articles use scraped_author directly
     let authorName = 'Unknown Author';
-    if (article.author_id) {
+    if (article.is_scraped && article.scraped_author) {
+      authorName = article.scraped_author;
+    } else if (article.author_id) {
       const { data: author } = await supabase
         .from('profiles')
         .select('first_name, last_name')
         .eq('id', article.author_id)
         .maybeSingle();
-      
+
       if (author) {
         authorName = `${author.first_name || ''} ${author.last_name || ''}`.trim() || 'Unknown Author';
       }
@@ -329,23 +396,25 @@ export const createArticle = async (
     // Generate a new ID
     const id = uuidv4();
 
-    // Insert article
+    // Insert article — only include defined fields to avoid nulling association columns
+    const insertData: any = {
+      id,
+      title: article.title,
+      content: article.content,
+      excerpt: article.excerpt,
+      author_id: article.author_id,
+      published_at: article.status === 'published' ? new Date().toISOString() : null,
+      cover_image: article.cover_image,
+      status: article.status
+    };
+    if (article.club_id !== undefined) insertData.club_id = article.club_id;
+    if (article.state_association_id !== undefined) insertData.state_association_id = article.state_association_id;
+    if (article.national_association_id !== undefined) insertData.national_association_id = article.national_association_id;
+    if (article.event_website_id !== undefined) insertData.event_website_id = article.event_website_id;
+
     const { data: newArticle, error } = await supabase
       .from('articles')
-      .insert({
-        id,
-        title: article.title,
-        content: article.content,
-        excerpt: article.excerpt,
-        author_id: article.author_id,
-        club_id: article.club_id,
-        state_association_id: article.state_association_id,
-        national_association_id: article.national_association_id,
-        event_website_id: article.event_website_id,
-        published_at: article.status === 'published' ? new Date().toISOString() : null,
-        cover_image: article.cover_image,
-        status: article.status
-      })
+      .insert(insertData)
       .select()
       .single();
     
@@ -382,9 +451,11 @@ export const updateArticle = async (
   tags?: string[]
 ): Promise<Article> => {
   try {
-    // Update article
-    const updateData: any = { ...article };
-    
+    // Update article — strip undefined values to avoid nulling out existing columns
+    const updateData: any = Object.fromEntries(
+      Object.entries({ ...article }).filter(([, v]) => v !== undefined)
+    );
+
     // If publishing, set published_at
     if (article.status === 'published' && !article.published_at) {
       updateData.published_at = new Date().toISOString();

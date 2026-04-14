@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Bug, Lightbulb, Clock, CheckCircle2, ArrowRight, CircleDot, XCircle, Copy } from 'lucide-react';
+import { Plus, Bug, Lightbulb, Clock, CircleCheck as CheckCircle2, ArrowRight, CircleDot, Circle as XCircle, Copy } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { BugReportDetail } from './BugReportDetail';
@@ -10,6 +10,7 @@ interface BugReportListProps {
   onClose: () => void;
   onNewReport: () => void;
   onRefresh: () => void;
+  embedded?: boolean;
 }
 
 interface BugReport {
@@ -49,7 +50,7 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: 'bg-blue-500',
 };
 
-export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose, onNewReport, onRefresh }) => {
+export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose, onNewReport, onRefresh, embedded = false }) => {
   const { user, isSuperAdmin } = useAuth();
   const [reports, setReports] = useState<BugReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +105,7 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
   };
 
   if (selectedReport) {
-    return (
+    const detailContent = (
       <BugReportDetail
         darkMode={darkMode}
         report={selectedReport}
@@ -116,31 +117,36 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
         onClose={onClose}
       />
     );
+    return embedded ? detailContent : detailContent;
   }
 
-  return createPortal(
+  const listContent = (
     <div
-      className={`fixed bottom-24 right-6 z-[9991] w-[380px] max-h-[70vh] rounded-2xl shadow-2xl border overflow-hidden flex flex-col ${
-        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+      className={`${
+        embedded
+          ? `rounded-xl border overflow-hidden flex flex-col ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`
+          : `fixed bottom-24 right-6 z-[9991] w-[380px] max-h-[70vh] rounded-2xl shadow-2xl border overflow-hidden flex flex-col ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`
       }`}
     >
-      <div className={`flex items-center justify-between px-4 py-3 border-b ${
-        darkMode ? 'border-slate-700' : 'border-slate-200'
-      }`}>
-        <div className="flex items-center gap-2">
-          <Bug className="w-5 h-5 text-red-500" />
-          <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-            Feedback
-          </h3>
+      {!embedded && (
+        <div className={`flex items-center justify-between px-4 py-3 border-b ${
+          darkMode ? 'border-slate-700' : 'border-slate-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Bug className="w-5 h-5 text-red-500" />
+            <h3 className={`font-semibold text-sm ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              Feedback
+            </h3>
+          </div>
+          <button
+            onClick={onNewReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New
+          </button>
         </div>
-        <button
-          onClick={onNewReport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-medium transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New
-        </button>
-      </div>
+      )}
 
       <div className={`flex items-center gap-1 px-3 py-2 border-b overflow-x-auto ${
         darkMode ? 'border-slate-700' : 'border-slate-200'
@@ -156,7 +162,7 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
             onClick={() => setStatusFilter(f.key)}
             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
               statusFilter === f.key
-                ? 'bg-red-500/10 text-red-500'
+                ? 'bg-cyan-500/10 text-cyan-500'
                 : darkMode
                   ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
@@ -167,10 +173,10 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className={`flex-1 overflow-y-auto min-h-0 ${embedded ? 'max-h-[600px]' : ''}`}>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
           </div>
         ) : reports.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
@@ -234,7 +240,9 @@ export const BugReportList: React.FC<BugReportListProps> = ({ darkMode, onClose,
           </div>
         )}
       </div>
-    </div>,
-    document.body
+    </div>
   );
+
+  if (embedded) return listContent;
+  return createPortal(listContent, document.body);
 };

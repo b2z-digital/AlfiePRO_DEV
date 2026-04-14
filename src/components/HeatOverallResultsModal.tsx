@@ -4,6 +4,7 @@ import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation } from '../types/heat';
 import { convertHeatResultsToRaceResults } from '../utils/heatUtils';
 import { compareWithCountback } from '../utils/scratchCalculations';
+import { breakTie } from '../utils/hmsHeatSystem';
 
 interface HeatOverallResultsModalProps {
   isOpen: boolean;
@@ -117,6 +118,26 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
       };
     });
 
+    const isHms = !isShrs;
+    const numberOfHeats = heatManagement.configuration.numberOfHeats || 2;
+    const useHMSTieBreak = isHms && numberOfHeats > 1;
+
+    const hmsBreakTieCompare = (a: typeof baseStandings[0], b: typeof baseStandings[0]): number => {
+      const allRaceResults = raceResults.map(r => ({
+        ...r,
+        race: r.race,
+        skipperIndex: r.skipperIndex,
+        position: r.position || null,
+      }));
+      const tieResult = breakTie(
+        [a.skipperIndex, b.skipperIndex],
+        allRaceResults,
+        new Map(),
+        useHMSTieBreak
+      );
+      return tieResult.indexOf(a.skipperIndex) - tieResult.indexOf(b.skipperIndex);
+    };
+
     if (hasFinals) {
       return baseStandings.sort((a, b) => {
         if (a.fleet !== b.fleet) {
@@ -133,9 +154,12 @@ export const HeatOverallResultsModal: React.FC<HeatOverallResultsModalProps> = (
       if (a.net !== b.net) {
         return a.net - b.net;
       }
+      if (isHms) {
+        return hmsBreakTieCompare(a, b);
+      }
       return compareWithCountback(a.points, b.points, a.drops, b.drops);
     });
-  }, [skippers, raceResults, dropRules, skipperFleetMap, hasFinals]);
+  }, [skippers, raceResults, dropRules, skipperFleetMap, hasFinals, isShrs, heatManagement]);
 
   const getRaceLabel = (raceNum: number): string => {
     if (!isShrs) return `R${raceNum}`;

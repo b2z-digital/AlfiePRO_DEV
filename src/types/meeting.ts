@@ -1,3 +1,6 @@
+export type MeetingCategory = 'general' | 'committee';
+export type RecurrenceType = 'none' | 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'yearly';
+
 export interface Meeting {
   id: string;
   club_id: string;
@@ -17,6 +20,16 @@ export interface Meeting {
   minutes_locked?: boolean;
   members_present?: { id: string; name: string }[];
   guests_present?: { name: string }[];
+  meeting_category?: MeetingCategory;
+  recurrence_type?: RecurrenceType;
+  recurrence_end_date?: string | null;
+  recurrence_parent_id?: string | null;
+  recurrence_index?: number;
+  meeting_type?: 'in_person' | 'online' | 'hybrid';
+  state_association_id?: string | null;
+  national_association_id?: string | null;
+  visible_to_member_clubs?: boolean;
+  organization_name?: string | null;
   chairperson?: {
     first_name: string;
     last_name: string;
@@ -60,6 +73,11 @@ export interface MeetingFormData {
   description?: string;
   chairperson_id?: string;
   minute_taker_id?: string;
+  meeting_category?: MeetingCategory;
+  recurrence_type?: RecurrenceType;
+  recurrence_end_date?: string;
+  meeting_type?: 'in_person' | 'online' | 'hybrid';
+  visible_to_member_clubs?: boolean;
   agenda_items: {
     item_number: number;
     item_name: string;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MessageSquare, X, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useImpersonation } from '../../../contexts/ImpersonationContext';
 import { supabase } from '../../../utils/supabase';
 import { WidgetProps } from '../../../types/dashboard';
 import { useWidgetTheme } from './ThemedWidgetWrapper';
@@ -9,17 +10,21 @@ import { useWidgetTheme } from './ThemedWidgetWrapper';
 export const UnreadCommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onRemove, colorTheme = 'default' }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const themeColors = useWidgetTheme(colorTheme);
 
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
+
   useEffect(() => {
     fetchUnreadCount();
-  }, [user]);
+  }, [effectiveUserId]);
 
   const fetchUnreadCount = async () => {
-    if (!user?.id) {
+    if (!effectiveUserId) {
       setLoading(false);
+      setUnreadCount(0);
       return;
     }
 
@@ -27,7 +32,7 @@ export const UnreadCommunicationsWidget: React.FC<WidgetProps> = ({ widgetId, is
       const { count, error } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
-        .eq('recipient_id', user.id)
+        .eq('recipient_id', effectiveUserId)
         .eq('read', false);
 
       if (error) throw error;

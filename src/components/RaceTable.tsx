@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, MoreHorizontal, Trophy, TrendingUp, Settings, Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, MoveHorizontal as MoreHorizontal, Trophy, TrendingUp, Settings, Hop as Home, Users, Sailboat, Flag, X, Award, Maximize2, Minimize2, RotateCcw } from 'lucide-react';
 import { Skipper, LetterScore } from '../types';
 import { RaceEvent } from '../types/race';
 import { RaceInput } from './RaceInput';
@@ -125,26 +125,39 @@ export const RaceTable: React.FC<RaceTableProps> = ({
     console.log('🔍 RaceTable dropRules changed:', dropRules, 'isArray:', Array.isArray(dropRules), 'length:', Array.isArray(dropRules) ? dropRules.length : 'N/A');
   }, [dropRules]);
 
-  // Auto-update race status to "live" when scoring starts
+  const prevCompletedRaceRef = useRef(lastCompletedRace);
+
   useEffect(() => {
     const autoUpdateRaceStatus = async () => {
-      if (!currentEvent?.id) return;
+      if (!currentEvent?.id || !currentEvent?.enableLiveTracking) return;
 
-      // Import the live tracking utilities dynamically
       const { getRaceStatus, updateRaceStatus } = await import('../utils/liveTrackingStorage');
 
-      // Check current status
-      const statusData = await getRaceStatus(currentEvent.id);
+      const raceJustCompleted = lastCompletedRace > prevCompletedRaceRef.current;
+      prevCompletedRaceRef.current = lastCompletedRace;
+
+      if (raceJustCompleted && lastCompletedRace > 0) {
+        await updateRaceStatus(
+          currentEvent.id,
+          'on_hold',
+          `Race ${lastCompletedRace} complete`,
+          currentEvent.clubId,
+          currentEvent.currentDay || 1
+        );
+
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
       const activeRace = lastCompletedRace + 1;
       const raceNote = `Race ${activeRace}`;
 
-      // If status is not "live", automatically set it to "live" with race number
-      if (statusData && statusData.status !== 'live') {
-        console.log('🟢 Auto-updating race status to "live" as scoring has begun');
+      const statusData = await getRaceStatus(currentEvent.id);
+      if (!statusData || (statusData.status !== 'live' && statusData.status !== 'event_complete')) {
+        await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
+      } else if (statusData.status === 'live' && statusData.notes !== raceNote) {
         await updateRaceStatus(currentEvent.id, 'live', raceNote);
-      } else if (statusData && statusData.status === 'live' && statusData.notes !== raceNote) {
-        // Update race number if it has changed
-        await updateRaceStatus(currentEvent.id, 'live', raceNote);
+      } else if (statusData.status === 'on_hold') {
+        await updateRaceStatus(currentEvent.id, 'live', raceNote, currentEvent.clubId, currentEvent.currentDay || 1);
       }
     };
 
@@ -904,7 +917,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                 e.stopPropagation();
                 onCompleteScoring();
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors font-semibold"
             >
               <Trophy size={18} />
               <span className="text-sm font-medium">
@@ -970,6 +983,19 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                     <div className="flex items-center justify-center gap-1">
                       <div className="w-2 h-2 rounded-full bg-amber-400"></div>
                       H'cap
+                      {!hasR1BeenScored && (
+                        <button
+                          onClick={() => {
+                            setManualHandicaps({});
+                            setHasManualHandicaps(false);
+                            skippers.forEach((_, index) => updateStartHcap(index, 0));
+                          }}
+                          title="Scratch Start - Reset all handicaps to 0"
+                          className={`ml-1 p-0.5 rounded transition-colors ${darkMode ? 'text-slate-500 hover:text-amber-400' : 'text-slate-400 hover:text-amber-600'}`}
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+                      )}
                     </div>
                   </th>
                   {/* Conditional columns based on event settings */}
@@ -1391,7 +1417,7 @@ export const RaceTable: React.FC<RaceTableProps> = ({
                                       e.stopPropagation();
                                       setShowLetterScoreSelector({ race, skipperIndex: index });
                                     }}
-                                    className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-slate-700 text-slate-300 hover:bg-green-600 transition-colors flex items-center justify-center text-sm shadow-lg border border-slate-500"
+                                    className="btn-primary-green absolute -top-1 -right-1 w-7 h-7 rounded-full bg-slate-700 text-slate-300 transition-colors flex items-center justify-center text-sm shadow-lg border border-slate-500"
                                     title="Letter Score"
                                   >
                                     +

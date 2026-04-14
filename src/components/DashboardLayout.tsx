@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trophy, Building, Calendar, Users, ChevronLeft, Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug } from 'lucide-react';
+import { Trophy, Building, Calendar, CalendarDays, Users, ChevronLeft, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronRight, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, FileCheck, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -21,6 +21,7 @@ import { OfflineIndicator } from './OfflineIndicator';
 import { useAuth } from '../contexts/AuthContext';
 import { SettingsPage } from './pages/SettingsPage';
 import { MembershipDashboard } from './pages/MembershipDashboard';
+import { MemberMembershipView } from './pages/MemberMembershipView';
 import { useNotifications } from '../contexts/NotificationContext';
 import { SuperAdminEventModal } from './SuperAdminEventModal';
 import { getPublicEvents } from '../utils/publicEventStorage';
@@ -35,9 +36,12 @@ import { TasksPage } from './tasks/TasksPage';
 import { EventDetails } from './EventDetails';
 import { usePermissions } from '../hooks/usePermissions';
 import { useFeatureAccess } from '../hooks/useFeatureAccess';
+import { useCapabilities } from '../hooks/useCapabilities';
 import { YachtClassesRouter } from '../pages/YachtClassesRouter';
 import { BugReportButton } from './bug-report/BugReportButton';
 import { BugReportDashboard } from './bug-report/BugReportDashboard';
+import { AskAlfieOrb } from './ask-alfie/AskAlfieOrb';
+import SupportPage from '../pages/SupportPage';
 
 // Import Website section components
 import WebsiteOverview from './pages/WebsiteOverview';
@@ -72,6 +76,7 @@ import { StateRemittanceDashboard } from './membership/StateRemittanceDashboard'
 import { NationalRemittanceDashboard } from './membership/NationalRemittanceDashboard';
 import { AssociationsManagementPage } from './pages/AssociationsManagementPage';
 import { ClubsManagementPage } from './pages/ClubsManagementPage';
+import { CommitteeManagement } from './pages/CommitteeManagement';
 import { AssociationFinancesPage } from '../pages/AssociationFinancesPage';
 import { AssociationResourcesPage } from './pages/AssociationResourcesPage';
 import WeatherPage from '../pages/WeatherPage';
@@ -86,15 +91,25 @@ import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage'
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 import LivestreamPage from '../pages/LivestreamPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
+import AskAlfieManagementPage from '../pages/AskAlfieManagementPage';
+import HelpSupportPage from './help-support/HelpSupportPage';
 import { UsageStatisticsTab } from './super-admin/UsageStatisticsTab';
 import { PlatformBillingTab } from './super-admin/PlatformBillingTab';
 import { FeatureAccessTab } from './super-admin/FeatureAccessTab';
+import { AccessLevelDefaultsTab } from './super-admin/AccessLevelDefaultsTab';
 import { BackupManagementTab } from './super-admin/BackupManagementTab';
 import { UserManagementTab } from './super-admin/UserManagementTab';
 import { PlatformIntegrationsTab } from './super-admin/PlatformIntegrationsTab';
 import { EngagementAnalyticsTab } from './super-admin/EngagementAnalyticsTab';
 import { ResourceCostsTab } from './super-admin/ResourceCostsTab';
+import { ImpersonationAuditTab } from './super-admin/ImpersonationAuditTab';
+import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
+import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapingTab';
+import { ClassifiedsScrapingTab } from './super-admin/ClassifiedsScrapingTab';
+import { EventsScrapingTab } from './super-admin/EventsScrapingTab';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
+import { ImpersonationBanner } from './ImpersonationBanner';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -167,6 +182,7 @@ interface DashboardLayoutProps {
   onClearSelectedEvent: () => void;
 }
 
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   darkMode,
   selectedEvent,
@@ -185,6 +201,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
   const { isFeatureEnabled } = useFeatureAccess();
+  const { canView: canViewFeature } = useCapabilities();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -207,7 +226,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
   const { addNotification } = useNotifications();
 
-  const orgType = currentOrganization?.type === 'national_association' ? 'national' : currentOrganization?.type === 'state_association' ? 'state' : null;
+  const orgType = currentOrganization?.type === 'national' ? 'national' : currentOrganization?.type === 'state' ? 'state' : null;
   const { trackPageView } = usePlatformTracking(
     currentClub?.clubId || null,
     currentOrganization?.id || null,
@@ -223,6 +242,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [unreadTasksCount, setUnreadTasksCount] = useState(0);
   const [membershipActionCount, setMembershipActionCount] = useState(0);
+  const [unreadConversationsCount, setUnreadConversationsCount] = useState(0);
+  const [unreadCommunityCount, setUnreadCommunityCount] = useState(0);
   const [showImportMembersModal, setShowImportMembersModal] = useState(false);
   const [isHoveringNav, setIsHoveringNav] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
@@ -316,6 +337,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     fetchUnreadNotificationsCount();
     fetchUnreadTasksCount();
     fetchMembershipActionCount();
+    fetchUnreadConversationsCount();
+    fetchUnreadCommunityCount();
   }, [currentClub]);
 
   // Subscribe to realtime changes on members table
@@ -349,6 +372,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     // Refresh counts when navigating between pages
     fetchUnreadNotificationsCount();
     fetchUnreadTasksCount();
+    fetchUnreadConversationsCount();
+    fetchUnreadCommunityCount();
   }, [location.pathname]);
 
   useEffect(() => {
@@ -411,6 +436,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           table: 'membership_remittances',
           filter: `club_id=eq.${clubId}`
         }, () => fetchMembershipActionCount()).subscribe()
+      },
+      {
+        name: `conversation-messages-${userId}`,
+        setup: (ch: any) => ch.on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversation_messages'
+        }, () => fetchUnreadConversationsCount()).subscribe()
+      },
+      {
+        name: `social-notifications-${userId}`,
+        setup: (ch: any) => ch.on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'social_notifications',
+          filter: `user_id=eq.${userId}`
+        }, () => fetchUnreadCommunityCount()).subscribe()
       }
     ];
 
@@ -528,6 +570,51 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     } catch (err) {
       console.error('Error fetching active tasks count:', err);
       setUnreadTasksCount(0);
+    }
+  };
+
+  const fetchUnreadConversationsCount = async () => {
+    if (!user) return;
+    if (!navigator.onLine) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, last_read_at, conversations!inner(last_message_at)')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const unread = (data || []).filter((p: any) => {
+        const lastMsg = p.conversations?.last_message_at;
+        if (!lastMsg) return false;
+        if (!p.last_read_at) return true;
+        return new Date(lastMsg) > new Date(p.last_read_at);
+      }).length;
+
+      setUnreadConversationsCount(unread);
+    } catch (err) {
+      console.error('Error fetching unread conversations count:', err);
+      setUnreadConversationsCount(0);
+    }
+  };
+
+  const fetchUnreadCommunityCount = async () => {
+    if (!user) return;
+    if (!navigator.onLine) return;
+
+    try {
+      const { count, error } = await supabase
+        .from('social_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      setUnreadCommunityCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching unread community count:', err);
+      setUnreadCommunityCount(0);
     }
   };
 
@@ -680,7 +767,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           id: 'home',
           label: 'Dashboard',
-          icon: Home,
+          icon: LayoutDashboard,
           description: 'Overview',
           path: '/'
         }
@@ -701,11 +788,227 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         }
       ]
     }] : []),
+    ...(currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? [{
+      id: 'membership-assoc',
+      label: 'Membership',
+      collapsible: true,
+      icon: Users,
+      items: [
+        ...(currentOrganization?.type === 'state' ? [{
+          id: 'clubs',
+          label: 'Clubs',
+          icon: Building,
+          description: 'Manage member clubs',
+          path: '/clubs',
+          permission: 'membership.manage'
+        }] : []),
+        {
+          id: 'association-members',
+          label: 'Club Members',
+          icon: Users,
+          description: currentOrganization?.type === 'national' ? 'View all members across associations' : 'View all members in member clubs',
+          path: '/association-members',
+          permission: 'membership.view'
+        },
+        {
+          id: 'association-committee',
+          label: 'Committee',
+          icon: Shield,
+          description: 'Manage association committee positions and members',
+          path: '/association-committee',
+          permission: 'membership.manage'
+        },
+        {
+          id: 'association-member-reports',
+          label: 'Member Reports',
+          icon: TrendingUp,
+          description: 'View member analytics and custom reports',
+          path: '/association-member-reports',
+          permission: 'membership.view'
+        },
+        {
+          id: 'association-remittances',
+          label: 'Remittances',
+          icon: Receipt,
+          description: 'Track membership fee remittances',
+          path: '/association-remittances',
+          permission: 'finance.manage'
+        },
+        {
+          id: 'finances-assoc',
+          label: 'Finances',
+          icon: DollarSign,
+          description: 'Manage association finances',
+          path: '/finances',
+          permission: 'finance.manage'
+        },
+        {
+          id: 'meetings-assoc',
+          label: 'Meetings',
+          icon: Calendar,
+          description: 'Manage association meetings',
+          path: '/meetings'
+        },
+        ...(currentOrganization?.type === 'national' ? [{
+          id: 'rankings',
+          label: 'National Rankings',
+          icon: Award,
+          description: 'Manage national skipper rankings',
+          path: '/rankings',
+          permission: 'membership.manage'
+        }, {
+          id: 'name-mapping',
+          label: 'Name Mapping',
+          icon: Link,
+          description: 'Map rankings to member records',
+          path: '/name-mapping',
+          permission: 'membership.manage'
+        }] : [])
+      ]
+    }] : []),
+    ...(!currentOrganization ? [{
+      id: 'club-operations',
+      label: 'Club Stuff',
+      collapsible: true,
+      icon: Users,
+      items: [
+        {
+          id: 'membership-dashboard',
+          label: isMember ? 'My Membership' : 'Club Membership',
+          icon: Users,
+          description: isMember ? 'Manage your membership' : 'Manage Club Memberships',
+          path: '/membership-dashboard',
+          featureKey: 'membership'
+        },
+        {
+          id: 'meetings',
+          label: 'Meetings',
+          icon: Calendar,
+          description: 'Manage club meetings',
+          path: '/meetings',
+          featureKey: 'meetings'
+        },
+        {
+          id: 'tasks',
+          label: 'Tasks',
+          icon: CheckSquare,
+          description: 'Manage club tasks',
+          path: '/tasks',
+          featureKey: 'tasks'
+        },
+        {
+          id: 'finances',
+          label: 'Finances',
+          icon: DollarSign,
+          description: 'Manage club finances',
+          path: '/finances',
+          permission: 'finance.manage',
+          featureKey: 'finance'
+        },
+        {
+          id: 'resources',
+          label: 'Documents',
+          icon: FolderOpen,
+          description: 'Manage documents, files, and links',
+          path: '/resources',
+          featureKey: 'resources'
+        },
+        ...(!isAssociationViewer ? [{
+          id: 'website',
+          label: 'Website Manager',
+          icon: Monitor,
+          description: 'Manage club website',
+          path: '/website',
+          permission: 'website.manage',
+          featureKey: 'website_management'
+        }] : [])
+      ]
+    }] : []),
+    {
+      id: 'resources-tools',
+      label: 'My Stuff',
+      collapsible: true,
+      icon: FolderOpen,
+      items: [
+        ...(!isMember ? [{
+          id: 'my-membership',
+          label: 'My Membership',
+          icon: UserCircle,
+          description: 'View your personal membership details',
+          path: '/my-membership',
+          featureKey: 'membership'
+        }] : []),
+        {
+          id: 'my-garage',
+          label: 'Boat Shed',
+          icon: Wrench,
+          description: 'Manage your boats, maintenance, and rig tuning',
+          path: '/my-garage',
+          featureKey: 'boat_shed'
+        },
+        {
+          id: 'weather',
+          label: 'Weather',
+          icon: Wind,
+          description: 'Live marine weather forecast',
+          path: '/weather',
+          featureKey: 'weather'
+        },
+        {
+          id: 'classifieds',
+          label: 'Classifieds',
+          icon: Tag,
+          description: 'Buy, sell, and trade sailing gear',
+          path: '/classifieds',
+          featureKey: 'classifieds'
+        },
+      ]
+    },
+    {
+      id: 'content-media',
+      label: 'News & Media',
+      collapsible: true,
+      icon: TvMinimalPlay,
+      items: [
+        {
+          id: 'news',
+          label: 'News',
+          icon: Newspaper,
+          description: 'Club news and announcements',
+          path: '/news',
+          featureKey: 'news'
+        },
+        {
+          id: 'media',
+          label: 'Media',
+          icon: Camera,
+          description: 'Manage club media',
+          path: '/media',
+          featureKey: 'media'
+        },
+        {
+          id: 'alfie-tv',
+          label: 'AlfieTV',
+          icon: Tv,
+          description: 'Watch RC yachting videos',
+          path: '/alfie-tv',
+          featureKey: 'alfie_tv'
+        },
+        ...(!isMember ? [{
+          id: 'livestream',
+          label: 'Livestream',
+          icon: Video,
+          description: 'Broadcast races to YouTube',
+          path: '/livestream',
+          featureKey: 'livestream'
+        }] : [])
+      ]
+    },
     {
       id: 'racing',
-      label: 'Racing',
+      label: 'Sailing',
       collapsible: true,
-      icon: Flag,
+      icon: ShipWheel,
       items: [
         {
           id: 'race-management',
@@ -759,167 +1062,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       ]
     },
     {
-      id: 'content-media',
-      label: 'Content & Media',
-      collapsible: true,
-      icon: Camera,
-      items: [
-        {
-          id: 'news',
-          label: 'News',
-          icon: Newspaper,
-          description: 'Club news and announcements',
-          path: '/news',
-          featureKey: 'news'
-        },
-        {
-          id: 'media',
-          label: 'Media',
-          icon: Camera,
-          description: 'Manage club media',
-          path: '/media',
-          featureKey: 'media'
-        },
-        {
-          id: 'alfie-tv',
-          label: 'AlfieTV',
-          icon: Tv,
-          description: 'Watch RC yachting videos',
-          path: '/alfie-tv',
-          featureKey: 'alfie_tv'
-        },
-        ...(!isMember ? [{
-          id: 'livestream',
-          label: 'Livestream',
-          icon: Video,
-          description: 'Broadcast races to YouTube',
-          path: '/livestream',
-          featureKey: 'livestream'
-        }] : [])
-      ]
-    },
-    ...(currentOrganization?.type === 'state' || currentOrganization?.type === 'national' ? [{
-      id: 'membership-assoc',
-      label: 'Membership',
-      collapsible: true,
-      icon: Users,
-      items: [
-        ...(currentOrganization?.type === 'state' ? [{
-          id: 'clubs',
-          label: 'Clubs',
-          icon: Building,
-          description: 'Manage member clubs',
-          path: '/clubs',
-          permission: 'membership.manage'
-        }] : []),
-        {
-          id: 'association-members',
-          label: 'Club Members',
-          icon: Users,
-          description: currentOrganization?.type === 'national' ? 'View all members across associations' : 'View all members in member clubs',
-          path: '/association-members',
-          permission: 'membership.view'
-        },
-        {
-          id: 'association-member-reports',
-          label: 'Member Reports',
-          icon: TrendingUp,
-          description: 'View member analytics and custom reports',
-          path: '/association-member-reports',
-          permission: 'membership.view'
-        },
-        {
-          id: 'association-remittances',
-          label: 'Remittances',
-          icon: Receipt,
-          description: 'Track membership fee remittances',
-          path: '/association-remittances',
-          permission: 'finance.manage'
-        },
-        {
-          id: 'finances-assoc',
-          label: 'Finances',
-          icon: DollarSign,
-          description: 'Manage association finances',
-          path: '/finances',
-          permission: 'finance.manage'
-        },
-        {
-          id: 'meetings-assoc',
-          label: 'Meetings',
-          icon: Calendar,
-          description: 'Manage association meetings',
-          path: '/meetings'
-        },
-        ...(currentOrganization?.type === 'national' ? [{
-          id: 'rankings',
-          label: 'National Rankings',
-          icon: Award,
-          description: 'Manage national skipper rankings',
-          path: '/rankings',
-          permission: 'membership.manage'
-        }, {
-          id: 'name-mapping',
-          label: 'Name Mapping',
-          icon: Link,
-          description: 'Map rankings to member records',
-          path: '/name-mapping',
-          permission: 'membership.manage'
-        }] : [])
-      ]
-    }] : []),
-    ...(!currentOrganization ? [{
-      id: 'club-operations',
-      label: 'Club Operations',
-      collapsible: true,
-      icon: Users,
-      items: [
-        {
-          id: 'membership-dashboard',
-          label: isMember ? 'My Membership' : 'Club Membership',
-          icon: Users,
-          description: isMember ? 'Manage your membership' : 'Manage Club Memberships',
-          path: '/membership-dashboard',
-          featureKey: 'membership'
-        },
-        {
-          id: 'meetings',
-          label: 'Meetings',
-          icon: Calendar,
-          description: 'Manage club meetings',
-          path: '/meetings',
-          featureKey: 'meetings'
-        },
-        {
-          id: 'tasks',
-          label: 'Tasks',
-          icon: CheckSquare,
-          description: 'Manage club tasks',
-          path: '/tasks',
-          featureKey: 'tasks'
-        },
-        {
-          id: 'finances',
-          label: 'Finances',
-          icon: DollarSign,
-          description: 'Manage club finances',
-          path: '/finances',
-          permission: 'finance.manage',
-          featureKey: 'finance'
-        }
-      ]
-    }] : []),
-    {
       id: 'communications',
       label: 'Communications',
       collapsible: true,
-      icon: Mail,
+      icon: MessageCircle,
       items: [
         {
           id: 'comms',
-          label: 'Inbox & Notifications',
-          icon: Mail,
-          description: 'Send and manage member communications',
+          label: 'Conversations',
+          icon: MessageCircle,
+          description: 'Messages, notifications, and conversations',
           path: '/comms',
           featureKey: 'notifications'
         },
@@ -941,66 +1093,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           featureKey: 'community'
         }
       ]
-    },
-    {
-      id: 'resources-tools',
-      label: 'Resources & Tools',
-      collapsible: true,
-      icon: FolderOpen,
-      items: [
-        {
-          id: 'resources',
-          label: 'Resources',
-          icon: FolderOpen,
-          description: currentOrganization
-            ? 'Manage documents, files, and links for clubs'
-            : 'Manage documents, files, and links',
-          path: '/resources',
-          featureKey: 'resources'
-        },
-        {
-          id: 'my-garage',
-          label: 'Boat Shed',
-          icon: Wrench,
-          description: 'Manage your boats, maintenance, and rig tuning',
-          path: '/my-garage',
-          featureKey: 'boat_shed'
-        },
-        {
-          id: 'weather',
-          label: 'Weather',
-          icon: Wind,
-          description: 'Live marine weather forecast',
-          path: '/weather',
-          featureKey: 'weather'
-        },
-        {
-          id: 'classifieds',
-          label: 'Classifieds',
-          icon: Tag,
-          description: 'Buy, sell, and trade sailing gear',
-          path: '/classifieds',
-          featureKey: 'classifieds'
-        }
-      ]
-    },
-    ...(!isAssociationViewer ? [{
-      id: 'website',
-      label: 'Website',
-      collapsible: true,
-      icon: Monitor,
-      items: [
-        {
-          id: 'website',
-          label: 'Website Manager',
-          icon: Monitor,
-          description: 'Manage club website',
-          path: '/website',
-          permission: 'website.manage',
-          featureKey: 'website_management'
-        }
-      ]
-    }] : [])
+    }
   ];
 
   const isPlatformMode = (currentOrganization as any)?.type === 'platform';
@@ -1012,13 +1105,21 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'home', label: 'Dashboard', icon: Home, description: 'Platform Overview', path: '/' },
           { id: 'usage', label: 'Usage Statistics', icon: BarChart3, description: 'Platform analytics', path: '/usage' },
           { id: 'engagement', label: 'Engagement Analytics', icon: Activity, description: 'Login & usage tracking', path: '/engagement' },
-          { id: 'resources', label: 'Resource & Costs', icon: Server, description: 'Hosting & DB costs', path: '/resources' },
+          { id: 'resource-costs', label: 'Resource & Costs', icon: Server, description: 'Hosting & DB costs', path: '/resource-costs' },
           { id: 'billing', label: 'Platform Billing', icon: DollarSign, description: 'Fee management', path: '/billing' },
           { id: 'integrations', label: 'Platform Integrations', icon: Link, description: 'Manage integrations', path: '/integrations' },
           { id: 'features', label: 'Feature Access', icon: ToggleLeft, description: 'Control features', path: '/features' },
+          { id: 'access-level-defaults', label: 'Access Level Defaults', icon: Shield, description: 'Role permission defaults', path: '/access-level-defaults' },
           { id: 'backups', label: 'Backup & Recovery', icon: Database, description: 'Database & app backups', path: '/backups' },
           { id: 'user-management', label: 'User Management', icon: Users, description: 'Manage users', path: '/user-management' },
           { id: 'bug-reports', label: 'Feedback Hub', icon: Bug, description: 'Bug reports & feature requests', path: '/bug-reports' },
+          { id: 'impersonation-log', label: 'Impersonation Log', icon: Eye, description: 'Admin audit trail', path: '/impersonation-log' },
+          { id: 'ask-alfie-management', label: 'Ask Alfie', icon: Bot, description: 'AI knowledge management', path: '/ask-alfie-management' },
+          { id: 'help-support', label: 'Help & Support', icon: LifeBuoy, description: 'FAQs, tutorials & tickets', path: '/help-support' },
+          { id: 'news-scraping', label: 'News Scraping', icon: Newspaper, description: 'Automated news scrapers', path: '/news-scraping' },
+          { id: 'results-scraping', label: 'Results Scraping', icon: Trophy, description: 'External race results feeds', path: '/results-scraping' },
+          { id: 'classifieds-scraping', label: 'Classifieds Scraping', icon: Tag, description: 'External classifieds feeds', path: '/classifieds-scraping' },
+          { id: 'events-scraping', label: 'Events Scraping', icon: CalendarDays, description: 'External events feeds', path: '/events-scraping' },
         ]}
       ]
     : allNavigationSections.map(section => ({
@@ -1026,12 +1127,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         items: section.items.filter((item: any) => {
           if (item.permission && !can(item.permission as any)) return false;
           if (item.featureKey && !isFeatureEnabled(item.featureKey)) return false;
+          if (item.featureKey && !canViewFeature(item.featureKey)) return false;
           return true;
         })
       })).filter(section => section.items.length > 0);
 
   return (
     <div className={`min-h-screen ${lightMode ? 'bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200' : 'bg-gradient-to-br from-[#0f172a] via-[#131c31] to-[#0f172a]'}`}>
+      <ImpersonationBanner />
       {/* Loading overlay when switching organizations or clubs */}
       {(isTransitioning || isSwitchingClub || localSwitchingClub) && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
@@ -1050,7 +1153,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       {!isPageEditor && (
       <div
         className={`
-          fixed inset-y-0 left-0 z-40 transition-all duration-300 ease-in-out
+          fixed left-0 z-40 transition-all duration-300 ease-in-out
+          ${isImpersonating ? 'top-[44px]' : 'top-0'} bottom-0
           ${(collapsed && !isHoveringNav) ? 'w-[70px]' : 'w-64'}
           ${lightMode ? 'bg-white/60' : darkMode ? 'bg-slate-800/50 border-r border-slate-700/50' : 'bg-white/10 border-r border-slate-200/20'}
           backdrop-blur-xl
@@ -1095,6 +1199,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   location.pathname === item.path ||
                   (item.path !== '/' && location.pathname.startsWith(item.path))
                 );
+                const commsSectionTotal = section.id === 'communications'
+                  ? (unreadNotificationsCount + unreadConversationsCount + unreadCommunityCount)
+                  : 0;
 
                 return (
                 <div key={sectionId}>
@@ -1119,7 +1226,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           title={section.label}
                         >
                           {SectionIcon && <SectionIcon size={18} className="opacity-70" />}
-                          {hasActiveItem && !isExpanded && (
+                          {section.id === 'communications' && commsSectionTotal > 0 && (
+                            <div className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                              {commsSectionTotal}
+                            </div>
+                          )}
+                          {hasActiveItem && !isExpanded && section.id !== 'communications' && (
                             <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500"></div>
                           )}
                         </button>
@@ -1145,7 +1257,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           <span className="text-xs font-semibold uppercase tracking-wider">
                             {section.label}
                           </span>
-                          {hasActiveItem && !isExpanded && (
+                          {section.id === 'communications' && !isExpanded && commsSectionTotal > 0 && (
+                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                              {commsSectionTotal}
+                            </div>
+                          )}
+                          {hasActiveItem && !isExpanded && !(section.id === 'communications' && commsSectionTotal > 0) && (
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                           )}
                         </div>
@@ -1192,7 +1309,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             ${(collapsed && !isHoveringNav) ? 'justify-center' : 'gap-3'}
                             ${section.collapsible && (!collapsed || isHoveringNav) ? 'pl-5' : ''}
                             ${isActive
-                              ? 'bg-blue-600 text-white shadow-lg'
+                              ? 'bg-cyan-600 text-white shadow-lg'
                               : lightMode
                                 ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                                 : darkMode
@@ -1206,19 +1323,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           {(!collapsed || isHoveringNav) && (
                             <div className="text-left flex-1 flex items-center gap-2">
                               <div className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</div>
-                              {item.id === 'comms' && unreadNotificationsCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
-                                  {unreadNotificationsCount}
+                              {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                  {unreadNotificationsCount + unreadConversationsCount}
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
+                                </div>
+                              )}
+                              {item.id === 'community' && unreadCommunityCount > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                  {unreadCommunityCount}
                                 </div>
                               )}
                             </div>
@@ -1251,45 +1373,40 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     });
                     setCurrentClub(null);
                     setIsTransitioning(false);
+                    setLocalSwitchingClub(false);
                     navigate('/');
+                    setDashboardRefreshKey(prev => prev + 1);
                     return;
                   }
 
                   const club = userClubs.find(c => c.clubId === orgId);
                   if (club) {
-                    // Check if we're actually switching clubs (not just selecting the current one)
-                    const isActualSwitch = currentClub?.clubId !== club.clubId;
+                    const isActualSwitch = currentClub?.clubId !== club.clubId || currentOrganization !== null;
 
                     if (isActualSwitch) {
-                      // Show switching overlay
                       setLocalSwitchingClub(true);
                     }
 
-                    // Switching to a club
                     setCurrentClub(club);
                     setCurrentOrganization(null);
-
-                    // Always navigate to home when switching contexts
                     navigate('/');
 
                     if (isActualSwitch) {
-                      // Force dashboard refresh with new key after a brief moment
-                      // This ensures the overlay is visible before the content remounts
-                      setTimeout(() => {
-                        setDashboardRefreshKey(prev => prev + 1);
-                      }, 100);
-
-                      // Clear the switching overlay after content loads
                       setTimeout(() => {
                         setLocalSwitchingClub(false);
-                      }, 1500);
+                      }, 600);
                     }
-                  } else {
-                    // Only show loader when fetching association data from database
-                    setIsTransitioning(true);
+                    return;
+                  }
 
-                    // First, check what type of organization this is
-                    // Check if it's a state association (direct lookup)
+                  setLocalSwitchingClub(true);
+
+                  const transitionTimeout = setTimeout(() => {
+                    setLocalSwitchingClub(false);
+                    setIsTransitioning(false);
+                  }, 8000);
+
+                  try {
                     const { data: stateAssocInfo } = await supabase
                       .from('state_associations')
                       .select('id, name, short_name, national_association_id')
@@ -1297,29 +1414,30 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                       .maybeSingle();
 
                     if (stateAssocInfo) {
-                      // It's a state association - check if user has access
-                      // 1. Check for direct role
                       const { data: directRole } = await supabase
                         .from('user_state_associations')
                         .select('role')
-                        .eq('user_id', user?.id)
+                        .eq('user_id', effectiveUserId)
                         .eq('state_association_id', orgId)
                         .maybeSingle();
 
                       let userRole = directRole?.role;
 
-                      // 2. If no direct role, check if user is national admin of parent
                       if (!userRole && stateAssocInfo.national_association_id) {
                         const { data: nationalAdminRole } = await supabase
                           .from('user_national_associations')
                           .select('role')
-                          .eq('user_id', user?.id)
+                          .eq('user_id', effectiveUserId)
                           .eq('national_association_id', stateAssocInfo.national_association_id)
                           .maybeSingle();
 
                         if (nationalAdminRole?.role === 'national_admin') {
-                          userRole = 'national_admin'; // Inherited role
+                          userRole = 'national_admin';
                         }
+                      }
+
+                      if (!userRole && isSuperAdmin) {
+                        userRole = 'super_admin';
                       }
 
                       if (userRole) {
@@ -1330,17 +1448,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           role: userRole
                         });
                         setCurrentClub(null);
+                        clearTimeout(transitionTimeout);
                         setIsTransitioning(false);
+                        setLocalSwitchingClub(false);
                         navigate('/');
+                        setDashboardRefreshKey(prev => prev + 1);
                         return;
                       }
                     }
 
-                    // Check if this is a national association
                     const { data: nationalAssoc } = await supabase
                       .from('user_national_associations')
                       .select('national_association_id, role, national_associations(name, short_name)')
-                      .eq('user_id', user?.id)
+                      .eq('user_id', effectiveUserId)
                       .eq('national_association_id', orgId)
                       .maybeSingle();
 
@@ -1353,15 +1473,99 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         role: nationalAssoc.role
                       });
                       setCurrentClub(null);
+                      clearTimeout(transitionTimeout);
                       setIsTransitioning(false);
+                      setLocalSwitchingClub(false);
                       navigate('/');
-                    } else {
-                      setIsTransitioning(false);
+                      setDashboardRefreshKey(prev => prev + 1);
+                      return;
                     }
+
+                    const { data: clubInfo } = await supabase
+                      .from('clubs')
+                      .select('id, name, abbreviation, logo, state_association_id')
+                      .eq('id', orgId)
+                      .maybeSingle();
+
+                    if (clubInfo) {
+                      let adminRole: string | null = null;
+
+                      if (isSuperAdmin) {
+                        adminRole = 'admin';
+                      } else if (clubInfo.state_association_id) {
+                        const { data: stateRole } = await supabase
+                          .from('user_state_associations')
+                          .select('role')
+                          .eq('user_id', effectiveUserId)
+                          .eq('state_association_id', clubInfo.state_association_id)
+                          .maybeSingle();
+
+                        if (stateRole?.role === 'state_admin') {
+                          adminRole = 'admin';
+                        } else {
+                          const { data: stateAssoc } = await supabase
+                            .from('state_associations')
+                            .select('national_association_id')
+                            .eq('id', clubInfo.state_association_id)
+                            .maybeSingle();
+
+                          if (stateAssoc?.national_association_id) {
+                            const { data: natRole } = await supabase
+                              .from('user_national_associations')
+                              .select('role')
+                              .eq('user_id', effectiveUserId)
+                              .eq('national_association_id', stateAssoc.national_association_id)
+                              .maybeSingle();
+
+                            if (natRole?.role === 'national_admin') {
+                              adminRole = 'admin';
+                            }
+                          }
+                        }
+                      }
+
+                      if (adminRole) {
+                        const virtualClub: typeof userClubs[number] = {
+                          id: `virtual-${clubInfo.id}`,
+                          clubId: clubInfo.id,
+                          role: adminRole as any,
+                          club: {
+                            id: clubInfo.id,
+                            name: clubInfo.name,
+                            abbreviation: clubInfo.abbreviation,
+                            logo: clubInfo.logo,
+                          } as any,
+                        };
+
+                        setCurrentClub(virtualClub);
+                        setCurrentOrganization(null);
+                        clearTimeout(transitionTimeout);
+                        setIsTransitioning(false);
+                        navigate('/');
+
+                        setTimeout(() => {
+                          setLocalSwitchingClub(false);
+                        }, 600);
+                      } else {
+                        clearTimeout(transitionTimeout);
+                        setIsTransitioning(false);
+                        setLocalSwitchingClub(false);
+                      }
+                    } else {
+                      clearTimeout(transitionTimeout);
+                      setIsTransitioning(false);
+                      setLocalSwitchingClub(false);
+                    }
+                  } catch (innerError) {
+                    console.error('Error during organization lookup:', innerError);
+                    clearTimeout(transitionTimeout);
+                    setIsTransitioning(false);
+                    setLocalSwitchingClub(false);
                   }
                 } catch (error) {
                   console.error('Error switching organization:', error);
                   setIsTransitioning(false);
+                  setLocalSwitchingClub(false);
                 }
               }}
               className={(collapsed && !isHoveringNav) ? "w-10 h-10 overflow-hidden p-0" : "w-full"}
@@ -1371,13 +1575,34 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
             {/* Bottom Actions */}
             <div className={`space-y-1 mt-3 ${(collapsed && !isHoveringNav) ? 'flex flex-col items-center' : ''}`}>
+              {(currentOrganization?.type !== 'platform') && (isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && (
+                <button
+                  onClick={() => handleSectionChange('/support')}
+                  className={`
+                    ${(collapsed && !isHoveringNav) ? 'flex items-center justify-center' : 'w-full flex items-center gap-3'} px-3 py-2.5
+                    rounded-lg transition-colors
+                    ${location.pathname === '/support'
+                      ? 'bg-cyan-600 text-white shadow-lg'
+                      : lightMode
+                        ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
+                        : darkMode
+                          ? 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                          : 'text-slate-200 hover:text-white hover:bg-white/10'
+                    }
+                  `}
+                  title={(collapsed && !isHoveringNav) ? "Quick Start Guide" : ""}
+                >
+                  <Rocket size={16} className={location.pathname === '/support' ? '!text-white' : ''} />
+                  {(!collapsed || isHoveringNav) && <span className={`text-sm ${location.pathname === '/support' ? '!text-white' : ''}`}>Quick Start Guide</span>}
+                </button>
+              )}
               <button
                 onClick={() => handleSectionChange('/settings')}
                 className={`
                   ${(collapsed && !isHoveringNav) ? 'flex items-center justify-center' : 'w-full flex items-center gap-3'} px-3 py-2.5
                   rounded-lg transition-colors
                   ${location.pathname === '/settings'
-                    ? 'bg-blue-600 text-white shadow-lg'
+                    ? 'bg-cyan-600 text-white shadow-lg'
                     : lightMode
                       ? 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'
                       : darkMode
@@ -1457,6 +1682,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     location.pathname === item.path ||
                     (item.path !== '/' && location.pathname.startsWith(item.path))
                   );
+                  const commsSectionTotal = section.id === 'communications'
+                    ? (unreadNotificationsCount + unreadConversationsCount + unreadCommunityCount)
+                    : 0;
 
                   return (
                   <div key={sectionId}>
@@ -1481,7 +1709,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           <span className="text-xs font-semibold uppercase tracking-wider">
                             {section.label}
                           </span>
-                          {hasActiveItem && !isExpanded && (
+                          {section.id === 'communications' && !isExpanded && commsSectionTotal > 0 && (
+                            <div className="flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                              {commsSectionTotal}
+                            </div>
+                          )}
+                          {hasActiveItem && !isExpanded && !(section.id === 'communications' && commsSectionTotal > 0) && (
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                           )}
                         </div>
@@ -1535,19 +1768,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                             <Icon size={18} className={`flex-shrink-0 ${isActive ? '!text-white' : ''}`} />
                             <div className="ml-3 flex-1 flex items-center gap-2">
                               <span className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</span>
-                              {item.id === 'comms' && unreadNotificationsCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
-                                  {unreadNotificationsCount}
+                              {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                  {unreadNotificationsCount + unreadConversationsCount}
                                 </div>
                               )}
                               {item.id === 'tasks' && unreadTasksCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
                                   {unreadTasksCount}
                                 </div>
                               )}
                               {item.id === 'membership-dashboard' && membershipActionCount > 0 && (
-                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-green-500 text-white text-xs font-bold rounded-full">
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
                                   {membershipActionCount}
+                                </div>
+                              )}
+                              {item.id === 'community' && unreadCommunityCount > 0 && (
+                                <div className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                                  {unreadCommunityCount}
                                 </div>
                               )}
                             </div>
@@ -1567,7 +1805,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[70px]' : 'ml-64')}`}>
+      <div className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[70px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}>
         <div className="h-full">
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <Routes>
@@ -1599,7 +1837,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <EngagementAnalyticsTab darkMode={true} />
                 </div></div>
               } />
-              <Route path="/resources" element={
+              <Route path="/resource-costs" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <ResourceCostsTab darkMode={true} />
                 </div></div>
@@ -1619,6 +1857,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <FeatureAccessTab darkMode={true} />
                 </div></div>
               } />
+              <Route path="/access-level-defaults" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <AccessLevelDefaultsTab darkMode={true} />
+                </div></div>
+              } />
               <Route path="/backups" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <BackupManagementTab darkMode={true} />
@@ -1634,6 +1877,33 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <BugReportDashboard darkMode={true} />
                 </div></div>
               } />
+              <Route path="/impersonation-log" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ImpersonationAuditTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={true} />} />
+              <Route path="/help-support" element={<HelpSupportPage darkMode={true} />} />
+              <Route path="/news-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <NewsScrapingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/results-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ExternalResultsScrapingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/classifieds-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <ClassifiedsScrapingTab darkMode={true} />
+                </div></div>
+              } />
+              <Route path="/events-scraping" element={
+                <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
+                  <EventsScrapingTab darkMode={true} />
+                </div></div>
+              } />
               <Route path="/github" element={<Navigate to="/backups" replace />} />
               <Route path="/associations" element={<AssociationsManagementPage darkMode={darkMode} />} />
               <Route path="/clubs" element={<ClubsManagementPage darkMode={darkMode} />} />
@@ -1645,6 +1915,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                     darkMode={darkMode}
                     stateAssociationId={currentOrganization.id}
                   />
+                ) : null
+              } />
+              <Route path="/association-committee" element={
+                currentOrganization ? (
+                  <div className="h-full overflow-y-auto">
+                    <div className="p-4 sm:p-6 lg:p-16">
+                      <CommitteeManagement
+                        darkMode={darkMode}
+                        associationId={currentOrganization.id}
+                        associationType={currentOrganization.type as 'state' | 'national'}
+                      />
+                    </div>
+                  </div>
                 ) : null
               } />
               <Route path="/association-member-reports" element={
@@ -1721,6 +2004,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/results" element={<ResultsPage />} />
               <Route path="/results/:id" element={<ResultsPage />} />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
+              <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={
                 <FormBuilderPage 
@@ -1741,6 +2025,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <WysiwygDocumentBuilder />
               } />
               <Route path="/membership-dashboard" element={<MembershipDashboard darkMode={darkMode} />} />
+              <Route path="/my-membership" element={<MemberMembershipView darkMode={darkMode} />} />
               <Route path="/community" element={<CommunityPage darkMode={darkMode} />} />
               <Route path="/membership/:clubId" element={<MembershipPage />} />
               <Route path="/membership/:clubId/renew/:memberId" element={<MembershipPage />} />
@@ -1783,6 +2068,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/media" element={<MediaPage darkMode={darkMode} />} />
               <Route path="/alfie-tv" element={<AlfieTVPage darkMode={darkMode} />} />
               <Route path="/alfie-tv/admin" element={<AlfieTVAdmin darkMode={darkMode} />} />
+              <Route path="/ask-alfie-management" element={<AskAlfieManagementPage darkMode={darkMode} />} />
               <Route path="/livestream" element={<LivestreamPage />} />
 
               {/* Website Routes */}
@@ -1862,8 +2148,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         />
       )}
 
-      {(isSuperAdmin || can('membership.manage')) && (
-        <BugReportButton darkMode={darkMode} />
+      {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && (
+        <AskAlfieOrb darkMode={darkMode} />
       )}
     </div>
   );

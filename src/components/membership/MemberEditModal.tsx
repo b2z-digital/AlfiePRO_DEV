@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, User, Mail, Phone, Home, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, AlertCircle, Star } from 'lucide-react';
+import { X, User, Mail, Phone, House, Building, Sailboat, Plus, Trash2, DollarSign, Calendar, CircleCheck as CheckCircle, Clock, Upload, Camera, Globe, Link, Unlink, Shield, CircleAlert as AlertCircle, Star, Users, Anchor, Hash, Trophy, ChevronDown, ChevronUp, Award, UserPlus } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { BoatType, MembershipLevel } from '../../types/member';
@@ -7,6 +7,8 @@ import { Avatar } from '../ui/Avatar';
 import { AvatarCropModal } from '../ui/AvatarCropModal';
 import imageCompression from 'browser-image-compression';
 import { SAILING_NATIONS, getCountryFlag } from '../../utils/countryFlags';
+import { AdminAddToClubModal } from './AdminAddToClubModal';
+import { createMembershipTransaction } from '../../utils/membershipFinanceUtils';
 
 interface MemberEditModalProps {
   isOpen: boolean;
@@ -66,13 +68,16 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const [showCropModal, setShowCropModal] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string }>>([]);
+  const [membershipTypes, setMembershipTypes] = useState<Array<{ id: string; name: string; amount: number }>>([]);
+  const [originalMembershipLevel, setOriginalMembershipLevel] = useState<string | null>(null);
   const [linkEmail, setLinkEmail] = useState('');
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [linkedUserEmail, setLinkedUserEmail] = useState<string | null>(null);
   const [memberClubs, setMemberClubs] = useState<Array<{ club_id: string; club_name: string }>>([]);
   const [defaultClubId, setDefaultClubId] = useState<string | null>(null);
   const [settingDefaultClub, setSettingDefaultClub] = useState(false);
+  const [showAddToClubModal, setShowAddToClubModal] = useState(false);
+  const [availableClubs, setAvailableClubs] = useState<Array<{ id: string; name: string; abbreviation?: string }>>([]);
 
   useEffect(() => {
     if (isOpen && memberId) {
@@ -131,6 +136,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
       }
 
       setMemberData(member);
+      setOriginalMembershipLevel(member.membership_level || null);
       setBoats(memberBoats || [{ boat_type: '', sail_number: '', hull: '' }]);
     } catch (error: any) {
       console.error('Error fetching member:', error);
@@ -144,15 +150,27 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
     try {
       const { data, error } = await supabase
         .from('membership_types')
-        .select('id, name')
+        .select('id, name, amount')
         .eq('club_id', clubId)
         .order('name', { ascending: true });
 
       if (error) throw error;
 
-      setMembershipTypes(data || []);
+      setMembershipTypes((data || []).map(t => ({ ...t, amount: t.amount || 0 })));
     } catch (error: any) {
       console.error('Error fetching membership types:', error);
+    }
+  };
+
+  const fetchAvailableClubs = async () => {
+    try {
+      const { data } = await supabase
+        .from('clubs')
+        .select('id, name, abbreviation')
+        .order('name', { ascending: true });
+      setAvailableClubs(data || []);
+    } catch (err) {
+      console.error('Error fetching clubs:', err);
     }
   };
 
@@ -327,6 +345,36 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
 
       if (updateError) throw updateError;
 
+      const membershipChanged = memberData.membership_level &&
+        memberData.membership_level !== originalMembershipLevel;
+
+      if (membershipChanged) {
+        const selectedType = membershipTypes.find(t => t.name === memberData.membership_level);
+        if (selectedType && selectedType.amount > 0) {
+          const { data: existingTx } = await supabase
+            .from('membership_transactions')
+            .select('id')
+            .eq('member_id', memberId)
+            .eq('club_id', clubId)
+            .eq('membership_type_id', selectedType.id)
+            .in('payment_status', ['pending', 'paid'])
+            .limit(1);
+
+          if (!existingTx || existingTx.length === 0) {
+            const memberName = `${memberData.first_name} ${memberData.last_name}`;
+            await createMembershipTransaction({
+              clubId,
+              memberId,
+              membershipTypeId: selectedType.id,
+              memberName,
+              membershipTypeName: selectedType.name,
+              amount: selectedType.amount,
+              paymentMethod: 'bank_transfer',
+            }, 'pending');
+          }
+        }
+      }
+
       const existingBoatIds = boats.filter(b => b.id).map(b => b.id);
       const { data: currentBoats } = await supabase
         .from('member_boats')
@@ -351,6 +399,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               boat_type: boat.boat_type,
               sail_number: boat.sail_number,
               hull: boat.hull,
+              handicap: boat.handicap || 0,
               updated_at: new Date().toISOString(),
             })
             .eq('id', boat.id);
@@ -362,6 +411,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               boat_type: boat.boat_type,
               sail_number: boat.sail_number,
               hull: boat.hull,
+              handicap: boat.handicap || 0,
             });
         }
       }
@@ -388,21 +438,44 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
   const updateBoat = (index: number, field: string, value: string | number) => {
     const newBoats = [...boats];
     newBoats[index] = { ...newBoats[index], [field]: value };
+
+    if (field === 'handicap' && newBoats[index].boat_type) {
+      const boatType = newBoats[index].boat_type;
+      newBoats.forEach((b, i) => {
+        if (i !== index && b.boat_type === boatType) {
+          newBoats[i] = { ...newBoats[i], handicap: value as number };
+        }
+      });
+    }
+
+    if (field === 'boat_type' && value) {
+      const existingBoatOfClass = newBoats.find((b, i) => i !== index && b.boat_type === value && b.handicap !== undefined);
+      if (existingBoatOfClass) {
+        newBoats[index] = { ...newBoats[index], handicap: existingBoatOfClass.handicap };
+      }
+    }
+
     setBoats(newBoats);
   };
 
   if (!isOpen) return null;
 
+  const inputClass = `w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+    darkMode ? 'bg-slate-700 text-slate-200 border-slate-600 placeholder-slate-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-400'
+  }`;
+  const labelClass = `block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`;
+  const sectionHeaderClass = `text-lg font-medium mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`;
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border ${
-        darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className={`w-full max-w-4xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] ${
+        darkMode ? 'bg-slate-800' : 'bg-white'
       }`}>
-        {/* Blue Banner Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-transparent"></div>
+        {/* Header - matches Add Member gradient style */}
+        <div className="bg-gradient-to-br from-cyan-600 via-cyan-700 to-blue-800 p-6 flex items-center justify-between relative overflow-hidden flex-shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 to-transparent"></div>
           <div className="flex items-center gap-4 relative z-10">
-            {memberData && (
+            {memberData ? (
               <div className="relative group">
                 <Avatar
                   name={`${memberData.first_name} ${memberData.last_name}`}
@@ -421,23 +494,17 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                     <Camera size={24} className="text-white" />
                   )}
                 </button>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarSelect}
-                  className="hidden"
-                />
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+              </div>
+            ) : (
+              <div className="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm ring-1 ring-white/20">
+                <User className="text-white drop-shadow-lg" size={24} />
               </div>
             )}
             <div>
-              <h2 className="text-2xl font-bold text-white drop-shadow-lg">
-                Edit Member
-              </h2>
+              <h2 className="text-2xl font-bold text-white drop-shadow-lg">Edit Member</h2>
               {memberData && (
-                <p className="text-blue-100 text-sm mt-0.5">
-                  {memberData.first_name} {memberData.last_name}
-                </p>
+                <p className="text-cyan-100 text-sm mt-0.5">{memberData.first_name} {memberData.last_name}</p>
               )}
             </div>
           </div>
@@ -449,265 +516,230 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className={`border-b ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
-          <div className="flex gap-2 px-6 py-4">
+        {/* Tab Navigation - matches Add Member underline style */}
+        <div className={`flex border-b flex-shrink-0 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+          {([
+            { key: 'details', icon: User, label: 'Details' },
+            { key: 'boats', icon: Sailboat, label: 'Boats' },
+            { key: 'membership', icon: DollarSign, label: 'Membership' },
+          ] as const).map(({ key, icon: Icon, label }) => (
             <button
-              onClick={() => setActiveTab('details')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'details'
-                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
-                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                activeTab === key
+                  ? darkMode
+                    ? 'text-blue-400 border-b-2 border-blue-400 bg-slate-700/50'
+                    : 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : darkMode
+                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'
+                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <User size={16} className="inline mr-2" />
-              Details
+              <div className="flex items-center justify-center gap-2">
+                <Icon size={18} />
+                <span className="text-sm">{label}</span>
+              </div>
             </button>
-            <button
-              onClick={() => setActiveTab('boats')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'boats'
-                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
-                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <Sailboat size={16} className="inline mr-2" />
-              Boats
-            </button>
-            <button
-              onClick={() => setActiveTab('membership')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                activeTab === 'membership'
-                  ? darkMode ? 'bg-blue-500 text-white' : 'bg-blue-500 text-white'
-                  : darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <DollarSign size={16} className="inline mr-2" />
-              Membership
-            </button>
-          </div>
+          ))}
         </div>
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Loading...
-            </div>
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mx-auto mb-3"></div>
+            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Loading member data...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+            <div className="p-6 space-y-6">
             {activeTab === 'details' && memberData && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.first_name}
-                      onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.last_name}
-                      onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={memberData.email}
-                      onChange={(e) => setMemberData({ ...memberData, email: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      value={memberData.phone}
-                      onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                </div>
-
+                {/* Personal Information */}
                 <div>
-                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                    Street Address
-                  </label>
-                  <input
-                    type="text"
-                    value={memberData.street}
-                    onChange={(e) => setMemberData({ ...memberData, street: e.target.value })}
-                    className={`w-full px-4 py-2 rounded-lg ${
-                      darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                    } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.city}
-                      onChange={(e) => setMemberData({ ...memberData, city: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.state}
-                      onChange={(e) => setMemberData({ ...memberData, state: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Postcode
-                    </label>
-                    <input
-                      type="text"
-                      value={memberData.postcode}
-                      onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Country
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={memberData.country_code || 'AU'}
-                        onChange={(e) => {
-                          const country = SAILING_NATIONS.find(c => c.code === e.target.value);
-                          setMemberData({
-                            ...memberData,
-                            country_code: e.target.value,
-                            country: country?.name || e.target.value
-                          });
-                        }}
-                        className={`w-full pl-12 pr-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none`}
-                      >
-                        {SAILING_NATIONS.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.name}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-2xl pointer-events-none">
-                        {getCountryFlag(memberData.country_code || 'AU')}
-                      </span>
+                  <h3 className={sectionHeaderClass}>
+                    <User size={20} className="text-blue-400" />
+                    Personal Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelClass}>First Name *</label>
+                      <input
+                        type="text"
+                        value={memberData.first_name}
+                        onChange={(e) => setMemberData({ ...memberData, first_name: e.target.value })}
+                        className={inputClass}
+                        placeholder="Enter first name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Last Name *</label>
+                      <input
+                        type="text"
+                        value={memberData.last_name}
+                        onChange={(e) => setMemberData({ ...memberData, last_name: e.target.value })}
+                        className={inputClass}
+                        placeholder="Enter last name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Email Address</label>
+                      <div className="relative">
+                        <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="email"
+                          value={memberData.email}
+                          onChange={(e) => setMemberData({ ...memberData, email: e.target.value })}
+                          className={`${inputClass} pl-10`}
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Phone Number</label>
+                      <div className="relative">
+                        <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="tel"
+                          value={memberData.phone}
+                          onChange={(e) => setMemberData({ ...memberData, phone: e.target.value })}
+                          className={`${inputClass} pl-10`}
+                          placeholder="Enter phone number"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                      Category
-                    </label>
-                    <select
-                      value={memberData.category || ''}
-                      onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}
-                      className={`w-full px-4 py-2 rounded-lg ${
-                        darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                      } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    >
-                      <option value="">Select Category</option>
-                      <option value="Junior">Junior</option>
-                      <option value="Open">Open</option>
-                      <option value="Master">Master</option>
-                      <option value="Grand Master">Grand Master</option>
-                      <option value="Legend">Legend</option>
-                    </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label className={labelClass}>Country <span className="text-red-400">*</span></label>
+                      <div className="relative">
+                        <Globe size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                        <div className="absolute left-10 top-1/2 -translate-y-1/2 text-2xl z-10 pointer-events-none">
+                          {getCountryFlag(memberData.country_code || 'AU')}
+                        </div>
+                        <select
+                          value={memberData.country_code || 'AU'}
+                          onChange={(e) => {
+                            const country = SAILING_NATIONS.find(c => c.code === e.target.value);
+                            setMemberData({ ...memberData, country_code: e.target.value, country: country?.name || e.target.value });
+                          }}
+                          className={`${inputClass} pl-20`}
+                        >
+                          {SAILING_NATIONS.map((country) => (
+                            <option key={country.code} value={country.code}>{country.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Category</label>
+                      <div className="relative">
+                        <Award size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <select
+                          value={memberData.category || ''}
+                          onChange={(e) => setMemberData({ ...memberData, category: e.target.value })}
+                          className={`${inputClass} pl-10`}
+                        >
+                          <option value="">Select Category</option>
+                          <option value="Junior">Junior</option>
+                          <option value="Open">Open</option>
+                          <option value="Master">Master</option>
+                          <option value="Grand Master">Grand Master</option>
+                          <option value="Legend">Legend</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className={`border-t pt-4 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                  <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {/* Address */}
+                <div>
+                  <h3 className={sectionHeaderClass}>
+                    <House size={20} className="text-blue-400" />
+                    Address
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className={labelClass}>Street Address</label>
+                      <input
+                        type="text"
+                        value={memberData.street}
+                        onChange={(e) => setMemberData({ ...memberData, street: e.target.value })}
+                        className={inputClass}
+                        placeholder="Enter street address"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className={labelClass}>City/Suburb</label>
+                        <input
+                          type="text"
+                          value={memberData.city}
+                          onChange={(e) => setMemberData({ ...memberData, city: e.target.value })}
+                          className={inputClass}
+                          placeholder="Enter city"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>State</label>
+                        <input
+                          type="text"
+                          value={memberData.state}
+                          onChange={(e) => setMemberData({ ...memberData, state: e.target.value })}
+                          className={inputClass}
+                          placeholder="Enter state"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Postcode</label>
+                        <input
+                          type="text"
+                          value={memberData.postcode}
+                          onChange={(e) => setMemberData({ ...memberData, postcode: e.target.value })}
+                          className={inputClass}
+                          placeholder="Enter postcode"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Emergency Contact */}
+                <div>
+                  <h3 className={sectionHeaderClass}>
+                    <Phone size={20} className="text-blue-400" />
                     Emergency Contact
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Name
-                      </label>
+                      <label className={labelClass}>Contact Name</label>
                       <input
                         type="text"
                         value={memberData.emergency_contact_name}
                         onChange={(e) => setMemberData({ ...memberData, emergency_contact_name: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className={inputClass}
+                        placeholder="Emergency contact name"
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Phone
-                      </label>
+                      <label className={labelClass}>Contact Phone</label>
                       <input
                         type="tel"
                         value={memberData.emergency_contact_phone}
                         onChange={(e) => setMemberData({ ...memberData, emergency_contact_phone: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className={inputClass}
+                        placeholder="Emergency contact phone"
                       />
                     </div>
                     <div>
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Relationship
-                      </label>
+                      <label className={labelClass}>Relationship</label>
                       <input
                         type="text"
                         value={memberData.emergency_contact_relationship}
                         onChange={(e) => setMemberData({ ...memberData, emergency_contact_relationship: e.target.value })}
-                        className={`w-full px-4 py-2 rounded-lg ${
-                          darkMode ? 'bg-slate-700 text-slate-200 border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                        } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className={inputClass}
+                        placeholder="e.g., Spouse, Parent"
                       />
                     </div>
                   </div>
@@ -715,112 +747,266 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'boats' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    Boats
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={addBoat}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    <Plus size={16} />
-                    Add Boat
-                  </button>
-                </div>
+            {activeTab === 'boats' && (() => {
+              const classHandicaps: Record<string, number> = {};
+              boats.forEach(b => {
+                if (b.boat_type && !classHandicaps.hasOwnProperty(b.boat_type)) {
+                  classHandicaps[b.boat_type] = b.handicap || 0;
+                }
+              });
+              const uniqueClasses = [...new Set(boats.filter(b => b.boat_type).map(b => b.boat_type))];
 
-                {boats.map((boat, index) => (
-                  <div key={index} className={`p-4 rounded-lg ${darkMode ? 'bg-slate-800/50 border border-slate-700/50' : 'bg-slate-50'}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        Boat {index + 1}
-                      </span>
-                      {boats.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeBoat(index)}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        Fleet
+                      </h3>
+                      <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {boats.length} {boats.length === 1 ? 'boat' : 'boats'} registered
+                      </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Boat Type
-                        </label>
-                        <select
-                          value={boat.boat_type}
-                          onChange={(e) => updateBoat(index, 'boat_type', e.target.value)}
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        >
-                          <option value="">Select boat type</option>
-                          <option value="10R">10R</option>
-                          <option value="IOM">IOM</option>
-                          <option value="DF65">DF65</option>
-                          <option value="DF95">DF95</option>
-                          <option value="Marblehead">Marblehead</option>
-                          <option value="A Class">A Class</option>
-                          <option value="RC Laser">RC Laser</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Sail Number
-                        </label>
-                        <input
-                          type="text"
-                          value={boat.sail_number}
-                          onChange={(e) => updateBoat(index, 'sail_number', e.target.value)}
-                          placeholder="e.g., 911"
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Hull Name
-                        </label>
-                        <input
-                          type="text"
-                          value={boat.hull}
-                          onChange={(e) => updateBoat(index, 'hull', e.target.value)}
-                          placeholder="e.g., Trance"
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Handicap
-                          <span className={`ml-2 text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            (Auto-updated after races)
-                          </span>
-                        </label>
-                        <input
-                          type="number"
-                          value={boat.handicap || 0}
-                          onChange={(e) => updateBoat(index, 'handicap', parseInt(e.target.value) || 0)}
-                          placeholder="0"
-                          min="0"
-                          step="1"
-                          className={`w-full px-3 py-2 rounded-lg ${
-                            darkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-900 border-slate-300'
-                          } border focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                        />
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={addBoat}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-500/20 transition-all text-sm font-medium border border-blue-500/20"
+                    >
+                      <Plus size={15} />
+                      Add Boat
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {uniqueClasses.length > 0 && (
+                    <div className={`rounded-xl p-3 ${darkMode ? 'bg-slate-800/60' : 'bg-slate-50'}`}>
+                      <p className={`text-[10px] uppercase tracking-wider font-semibold mb-2 ${
+                        darkMode ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        Class Handicaps
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {uniqueClasses.map(cls => (
+                          <div key={cls} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                            darkMode ? 'bg-slate-700/60' : 'bg-white border border-slate-200'
+                          }`}>
+                            <span className={`text-xs font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{cls}</span>
+                            <input
+                              type="number"
+                              value={classHandicaps[cls] || 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                const firstIdx = boats.findIndex(b => b.boat_type === cls);
+                                if (firstIdx >= 0) updateBoat(firstIdx, 'handicap', val);
+                              }}
+                              min="0"
+                              step="1"
+                              className={`w-16 px-2 py-0.5 rounded-md text-center text-sm font-bold ${
+                                darkMode
+                                  ? 'bg-slate-600/60 text-white border-slate-500/50'
+                                  : 'bg-slate-50 text-slate-900 border-slate-200'
+                              } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <p className={`text-[10px] mt-1.5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Handicap is shared across all boats of the same class. Auto-updated after races.
+                      </p>
+                    </div>
+                  )}
+
+                  {boats.length === 0 && (
+                    <div className={`flex flex-col items-center justify-center py-12 rounded-2xl border-2 border-dashed ${
+                      darkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-slate-50'
+                    }`}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                        darkMode ? 'bg-slate-700/50' : 'bg-slate-200'
+                      }`}>
+                        <Sailboat size={24} className={darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                      </div>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>No boats registered</p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Add a boat to get started</p>
+                    </div>
+                  )}
+
+                  {boats.map((boat, index) => {
+                    const classColor = boat.boat_type === '10R' ? 'blue' :
+                      boat.boat_type === 'IOM' ? 'emerald' :
+                      boat.boat_type === 'DF65' ? 'amber' :
+                      boat.boat_type === 'DF95' ? 'orange' :
+                      boat.boat_type === 'Marblehead' ? 'cyan' :
+                      boat.boat_type === 'A Class' ? 'rose' :
+                      boat.boat_type === 'RC Laser' ? 'teal' : 'slate';
+
+                    const accentMap: Record<string, string> = {
+                      blue: 'from-blue-500/20 to-blue-600/5',
+                      emerald: 'from-emerald-500/20 to-emerald-600/5',
+                      amber: 'from-amber-500/20 to-amber-600/5',
+                      orange: 'from-orange-500/20 to-orange-600/5',
+                      cyan: 'from-cyan-500/20 to-cyan-600/5',
+                      rose: 'from-rose-500/20 to-rose-600/5',
+                      teal: 'from-teal-500/20 to-teal-600/5',
+                      slate: 'from-slate-500/20 to-slate-600/5',
+                    };
+                    const badgeMap: Record<string, string> = {
+                      blue: 'bg-blue-500/20 text-blue-300',
+                      emerald: 'bg-emerald-500/20 text-emerald-300',
+                      amber: 'bg-amber-500/20 text-amber-300',
+                      orange: 'bg-orange-500/20 text-orange-300',
+                      cyan: 'bg-cyan-500/20 text-cyan-300',
+                      rose: 'bg-rose-500/20 text-rose-300',
+                      teal: 'bg-teal-500/20 text-teal-300',
+                      slate: 'bg-slate-500/20 text-slate-300',
+                    };
+                    const iconMap: Record<string, string> = {
+                      blue: 'text-blue-400',
+                      emerald: 'text-emerald-400',
+                      amber: 'text-amber-400',
+                      orange: 'text-orange-400',
+                      cyan: 'text-cyan-400',
+                      rose: 'text-rose-400',
+                      teal: 'text-teal-400',
+                      slate: 'text-slate-400',
+                    };
+
+                    return (
+                      <div
+                        key={index}
+                        className={`relative rounded-2xl overflow-hidden transition-all ${
+                          darkMode
+                            ? 'bg-slate-800/70 border border-slate-700/60 hover:border-slate-600/80'
+                            : 'bg-white border border-slate-200 shadow-sm hover:shadow-md'
+                        }`}
+                      >
+                        {darkMode && (
+                          <div className={`absolute inset-0 bg-gradient-to-br ${accentMap[classColor] || accentMap.slate} pointer-events-none`} />
+                        )}
+
+                        <div className="relative p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                darkMode ? 'bg-slate-700/80' : 'bg-slate-100'
+                              }`}>
+                                <Sailboat size={18} className={darkMode ? (iconMap[classColor] || 'text-slate-400') : 'text-slate-500'} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    {boat.hull || boat.boat_type || `Boat ${index + 1}`}
+                                  </span>
+                                  {boat.boat_type && (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                                      darkMode ? (badgeMap[classColor] || badgeMap.slate) : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {boat.boat_type}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className={`flex items-center gap-3 mt-0.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {boat.sail_number && (
+                                    <span className="flex items-center gap-1">
+                                      <Hash size={10} />
+                                      {boat.sail_number}
+                                    </span>
+                                  )}
+                                  {boat.boat_type && (
+                                    <span className="flex items-center gap-1">
+                                      <Trophy size={10} />
+                                      Hcap: {boat.handicap || 0}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {boats.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeBoat(index)}
+                                className={`p-2 rounded-xl transition-all shrink-0 ${
+                                  darkMode
+                                    ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+                                    : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
+                                }`}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className={`grid grid-cols-3 gap-2 pt-3 border-t ${
+                            darkMode ? 'border-slate-700/40' : 'border-slate-100'
+                          }`}>
+                            <div>
+                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
+                                darkMode ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                Class
+                              </label>
+                              <select
+                                value={boat.boat_type}
+                                onChange={(e) => updateBoat(index, 'boat_type', e.target.value)}
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm font-medium ${
+                                  darkMode
+                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50'
+                                    : 'bg-slate-50 text-slate-900 border-slate-200'
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                              >
+                                <option value="">Select</option>
+                                <option value="10R">10R</option>
+                                <option value="IOM">IOM</option>
+                                <option value="DF65">DF65</option>
+                                <option value="DF95">DF95</option>
+                                <option value="Marblehead">Marblehead</option>
+                                <option value="A Class">A Class</option>
+                                <option value="RC Laser">RC Laser</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
+                                darkMode ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                Sail No.
+                              </label>
+                              <input
+                                type="text"
+                                value={boat.sail_number}
+                                onChange={(e) => updateBoat(index, 'sail_number', e.target.value)}
+                                placeholder="58"
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm ${
+                                  darkMode
+                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50 placeholder-slate-500'
+                                    : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-400'
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                              />
+                            </div>
+                            <div>
+                              <label className={`block text-[10px] uppercase tracking-wider font-semibold mb-1 ${
+                                darkMode ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                Hull / Design
+                              </label>
+                              <input
+                                type="text"
+                                value={boat.hull}
+                                onChange={(e) => updateBoat(index, 'hull', e.target.value)}
+                                placeholder="Trance"
+                                className={`w-full px-2.5 py-2 rounded-xl text-sm ${
+                                  darkMode
+                                    ? 'bg-slate-700/60 text-slate-100 border-slate-600/50 placeholder-slate-500'
+                                    : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-400'
+                                } border focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {activeTab === 'membership' && memberData && (
               <div className="space-y-6">
@@ -865,7 +1051,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                         Date Joined
                       </label>
                       <div className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {new Date(memberData.date_joined).toLocaleDateString()}
+                        {memberData.date_joined ? new Date(memberData.date_joined).toLocaleDateString() : 'Not set'}
                       </div>
                     </div>
                     <div>
@@ -893,6 +1079,49 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
                       </span>
                     )}
                   </div>
+                </div>
+
+                <div className={`border-t pt-6 mt-6 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                  <h3 className={`text-lg font-semibold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    <Users size={20} className="text-blue-400" />
+                    Club Memberships
+                  </h3>
+                  {memberClubs.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {memberClubs.map(mc => (
+                        <div
+                          key={mc.club_id}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-lg ${
+                            mc.club_id === clubId
+                              ? darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'
+                              : darkMode ? 'bg-slate-800/50 border border-slate-700/30' : 'bg-slate-50 border border-slate-200'
+                          }`}
+                        >
+                          <Building size={14} className={mc.club_id === clubId ? 'text-blue-400' : darkMode ? 'text-slate-500' : 'text-slate-400'} />
+                          <span className={`text-sm font-medium ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                            {mc.club_name}
+                          </span>
+                          {mc.club_id === clubId && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">Current</span>
+                          )}
+                          {mc.club_id === defaultClubId && (
+                            <Star size={12} className="text-amber-400 fill-amber-400" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchAvailableClubs();
+                      setShowAddToClubModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus size={16} />
+                    Add to Another Club
+                  </button>
                 </div>
 
                 {memberData.user_id && memberClubs.length > 1 && (
@@ -1018,12 +1247,15 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               </div>
             )}
 
-            <div className="flex gap-3 mt-6 pt-6 border-t border-slate-700">
+            </div>
+
+            {/* Footer buttons - sticky at bottom */}
+            <div className={`flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
               <button
                 type="button"
                 onClick={onClose}
-                className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
-                  darkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                  darkMode ? 'text-slate-300 hover:text-slate-100' : 'text-slate-700 hover:text-slate-900'
                 }`}
               >
                 Cancel
@@ -1031,7 +1263,7 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+                className="btn-primary-green px-6 py-2 text-white rounded-lg font-semibold transition-all disabled:opacity-50"
               >
                 {submitting ? 'Saving...' : 'Save Changes'}
               </button>
@@ -1052,6 +1284,18 @@ export const MemberEditModal: React.FC<MemberEditModalProps> = ({
           darkMode={darkMode}
         />
       )}
+
+      <AdminAddToClubModal
+        isOpen={showAddToClubModal}
+        onClose={() => setShowAddToClubModal(false)}
+        memberIds={[memberId]}
+        availableClubs={availableClubs}
+        darkMode={darkMode}
+        onSuccess={() => {
+          fetchMemberData();
+          onSuccess?.();
+        }}
+      />
     </div>
   );
 };

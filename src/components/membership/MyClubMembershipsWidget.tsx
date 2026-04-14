@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Crown, Users, Calendar, CreditCard, AlertCircle, Star } from 'lucide-react';
+import { Building2, Plus, Crown, Users, Calendar, CreditCard, CircleAlert as AlertCircle, Star, Landmark, Copy, Check, X, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { JoinAnotherClubModal } from './JoinAnotherClubModal';
 
 interface ClubMembership {
@@ -28,6 +29,8 @@ interface MyClubMembershipsWidgetProps {
 
 export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = ({ darkMode }) => {
   const { user } = useAuth();
+  const { isImpersonating, session: impersonationSession } = useImpersonation();
+  const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
   const [memberships, setMemberships] = useState<ClubMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -38,34 +41,37 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
   }>({ total: 0, paid: 0, pending: 0 });
   const [defaultClubId, setDefaultClubId] = useState<string | null>(null);
   const [settingDefault, setSettingDefault] = useState<string | null>(null);
+  const [expandedBankDetails, setExpandedBankDetails] = useState<string | null>(null);
+  const [bankDetailsCache, setBankDetailsCache] = useState<Record<string, { bank_name: string; bsb: string; account_number: string } | null>>({});
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       fetchMemberships();
       fetchDefaultClub();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   const fetchDefaultClub = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
     const { data } = await supabase
       .from('profiles')
       .select('default_club_id')
-      .eq('id', user.id)
+      .eq('id', effectiveUserId)
       .maybeSingle();
 
     setDefaultClubId(data?.default_club_id || null);
   };
 
   const handleSetDefault = async (clubId: string) => {
-    if (!user) return;
+    if (!effectiveUserId || isImpersonating) return;
 
     setSettingDefault(clubId);
     try {
       const { error } = await supabase
         .from('profiles')
         .update({ default_club_id: clubId })
-        .eq('id', user.id);
+        .eq('id', effectiveUserId);
 
       if (error) throw error;
       setDefaultClubId(clubId);
@@ -77,7 +83,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
   };
 
   const fetchMemberships = async () => {
-    if (!user) return;
+    if (!effectiveUserId) return;
 
     try {
       setLoading(true);
@@ -93,7 +99,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
             logo
           )
         `)
-        .eq('member_id', user.id)
+        .eq('member_id', effectiveUserId)
         .in('status', ['active', 'pending'])
         .order('relationship_type', { ascending: false });
 
@@ -146,13 +152,48 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
     }
   };
 
+  const handleCopyBankField = (value: string, field: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const toggleBankDetails = async (clubId: string) => {
+    if (expandedBankDetails === clubId) {
+      setExpandedBankDetails(null);
+      return;
+    }
+
+    if (!bankDetailsCache[clubId]) {
+      const { data } = await supabase
+        .from('clubs')
+        .select('bank_name, bsb, account_number')
+        .eq('id', clubId)
+        .maybeSingle();
+
+      setBankDetailsCache(prev => ({
+        ...prev,
+        [clubId]: data && (data.bank_name || data.bsb || data.account_number) ? data : null
+      }));
+    }
+
+    setExpandedBankDetails(clubId);
+  };
+
   const getPaymentStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
         return (
           <span className="inline-flex items-center text-xs font-medium text-green-400">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></div>
+            <div className="w-1.5 h-1.5 rounded-full mr-1.5"></div>
             Paid
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="inline-flex items-center text-xs font-medium text-yellow-400">
+            <Clock className="w-3 h-3 mr-1" />
+            Pending Payment
           </span>
         );
       case 'unpaid':
@@ -210,7 +251,7 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
             </div>
             <button
               onClick={() => setShowJoinModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 hover:scale-105 transition-all duration-200"
             >
               <Plus className="w-4 h-4" />
               <span>Join Another Club</span>
@@ -251,85 +292,157 @@ export const MyClubMembershipsWidget: React.FC<MyClubMembershipsWidgetProps> = (
               </p>
               <button
                 onClick={() => setShowJoinModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all"
+                className="btn-primary-green inline-flex items-center gap-2 px-4 py-2 from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-blue-500/20 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 <span>Join a Club</span>
               </button>
             </div>
           ) : (
-            memberships.map((membership) => (
-              <div
-                key={membership.id}
-                className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/40 hover:border-slate-600/60 transition-all duration-200"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {membership.clubs.logo ? (
-                      <img
-                        src={membership.clubs.logo}
-                        alt={membership.clubs.name}
-                        className="w-11 h-11 rounded-xl object-cover ring-1 ring-slate-600/50 flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-11 h-11 rounded-xl bg-slate-700/50 border border-slate-600/30 flex items-center justify-center flex-shrink-0">
-                        <Building2 className="w-5 h-5 text-slate-400" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <h3 className="font-semibold text-white text-sm truncate">{membership.clubs.name}</h3>
-                        {getRelationshipBadge(membership.relationship_type)}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="text-slate-400">
-                            Joined {new Date(membership.joined_date).toLocaleDateString()}
-                          </span>
+            memberships.map((membership) => {
+              const isUnpaid = membership.payment_status === 'unpaid' || membership.payment_status === 'pending' || membership.payment_status === 'overdue';
+              const isExpanded = expandedBankDetails === membership.club_id;
+              const details = bankDetailsCache[membership.club_id];
+
+              return (
+                <div
+                  key={membership.id}
+                  className="rounded-xl bg-slate-800/40 border border-slate-700/40 hover:border-slate-600/60 transition-all duration-200 overflow-hidden"
+                >
+                  <div
+                    className={`p-4 ${isUnpaid ? 'cursor-pointer' : ''}`}
+                    onClick={isUnpaid ? () => toggleBankDetails(membership.club_id) : undefined}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {membership.clubs.logo ? (
+                          <img
+                            src={membership.clubs.logo}
+                            alt={membership.clubs.name}
+                            className="w-11 h-11 rounded-xl object-cover ring-1 ring-slate-600/50 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-xl bg-slate-700/50 border border-slate-600/30 flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-5 h-5 text-slate-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <h3 className="font-semibold text-white text-sm truncate">{membership.clubs.name}</h3>
+                            {getRelationshipBadge(membership.relationship_type)}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="text-slate-400">
+                                Joined {new Date(membership.joined_date).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <CreditCard className="w-3.5 h-3.5 text-slate-500" />
+                              <span className="text-slate-300 font-medium">
+                                ${parseFloat(membership.annual_fee_amount || '0').toFixed(2)}/year
+                              </span>
+                            </div>
+                            {getPaymentStatusBadge(membership.payment_status)}
+                          </div>
+                          {!membership.pays_association_fees && membership.relationship_type === 'associate' && (
+                            <div className="mt-2 text-[11px] text-slate-500">
+                              <AlertCircle className="w-3 h-3 inline mr-1" />
+                              State & national fees covered by primary membership
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <CreditCard className="w-3.5 h-3.5 text-slate-500" />
-                          <span className="text-slate-300 font-medium">
-                            ${parseFloat(membership.annual_fee_amount || '0').toFixed(2)}/year
-                          </span>
-                        </div>
-                        {getPaymentStatusBadge(membership.payment_status)}
                       </div>
-                      {!membership.pays_association_fees && membership.relationship_type === 'associate' && (
-                        <div className="mt-2 text-[11px] text-slate-500">
-                          <AlertCircle className="w-3 h-3 inline mr-1" />
-                          State & national fees covered by primary membership
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                        {memberships.length > 1 && (
+                          <>
+                            {defaultClubId === membership.club_id ? (
+                              <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                                <Star className="w-3.5 h-3.5 mr-1 fill-current" />
+                                Default
+                              </span>
+                            ) : (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleSetDefault(membership.club_id); }}
+                                disabled={settingDefault === membership.club_id}
+                                className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 border border-slate-700/50 hover:border-amber-500/20 transition-colors disabled:opacity-50"
+                              >
+                                {settingDefault === membership.club_id ? (
+                                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current mr-1"></div>
+                                ) : (
+                                  <Star className="w-3.5 h-3.5 mr-1" />
+                                )}
+                                Set Default
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {isUnpaid && (
+                          isExpanded
+                            ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                            : <ChevronDown className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {memberships.length > 1 && (
-                    <div className="flex-shrink-0 ml-3">
-                      {defaultClubId === membership.club_id ? (
-                        <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20">
-                          <Star className="w-3.5 h-3.5 mr-1 fill-current" />
-                          Default
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleSetDefault(membership.club_id)}
-                          disabled={settingDefault === membership.club_id}
-                          className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 border border-slate-700/50 hover:border-amber-500/20 transition-colors disabled:opacity-50"
-                        >
-                          {settingDefault === membership.club_id ? (
-                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current mr-1"></div>
-                          ) : (
-                            <Star className="w-3.5 h-3.5 mr-1" />
-                          )}
-                          Set Default
-                        </button>
-                      )}
+                  {isExpanded && details && (
+                    <div className="px-4 pb-4 border-t border-slate-700/30 pt-3">
+                      <div className="bg-slate-800/60 rounded-xl p-4 space-y-3 border border-slate-700/40">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Landmark className="w-4 h-4 text-blue-400" />
+                          <p className="text-sm font-medium text-slate-200">Bank Transfer Details</p>
+                        </div>
+                        {details.bank_name && (
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bank Name</p>
+                            <p className="text-sm text-white font-medium">{details.bank_name}</p>
+                          </div>
+                        )}
+                        {details.bsb && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">BSB</p>
+                              <p className="text-sm text-white font-medium font-mono">{details.bsb}</p>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCopyBankField(details.bsb, `bsb-${membership.club_id}`); }}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === `bsb-${membership.club_id}` ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                        {details.account_number && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Account Number</p>
+                              <p className="text-sm text-white font-medium font-mono">{details.account_number}</p>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCopyBankField(details.account_number, `acc-${membership.club_id}`); }}
+                              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                            >
+                              {copiedField === `acc-${membership.club_id}` ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-500 mt-2">
+                          Complete the bank transfer and notify your club administrator to confirm payment.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {isExpanded && !details && bankDetailsCache.hasOwnProperty(membership.club_id) && (
+                    <div className="px-4 pb-4 border-t border-slate-700/30 pt-3">
+                      <p className="text-xs text-slate-500 text-center py-2">
+                        No bank details configured for this club. Please contact the club administrator.
+                      </p>
                     </div>
                   )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

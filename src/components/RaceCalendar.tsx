@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid, X, ChevronDown, ChevronRight, ChevronLeft, Filter, Map, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, MapIcon } from 'lucide-react';
+import { Trophy, Calendar, CalendarDays, CalendarRange, List, Grid2x2 as Grid, X, ChevronDown, ChevronRight, ChevronLeft, ListFilter as Filter, Map, FileImage, Download, Medal, Maximize2, Minimize2, TrendingUp as TrendyUp, FileText, Globe, MapPin, Link2, Map as MapIcon, Clock } from 'lucide-react';
 import { RaceType } from '../types';
 import { RaceEvent, RaceSeries } from '../types/race';
 import { formatDate } from '../utils/date';
@@ -12,14 +12,19 @@ import { boatTypeColors, defaultColorScheme, getBoatClassBadge, getRaceFormatBad
 import { SeriesLeaderboard } from './SeriesLeaderboard';
 import { EventDetails } from './EventDetails';
 import html2canvas from 'html2canvas';
+import { getBoatClassImage } from '../utils/boatClassImages';
 import '../styles/yacht-race.css';
 import { getPublicEvents, convertToRaceEvent } from '../utils/publicEventStorage';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { generateICalFile, downloadICalFile } from '../utils/calendarSync';
 import { LocationExplorer } from './LocationExplorer';
+import { getCalendarMeetings, CalendarMeeting } from '../utils/calendarMeetingStorage';
+import { CalendarMeetingDetailsModal } from './meetings/CalendarMeetingDetailsModal';
+import { Users, Shield, Building2, Globe as Globe2, Flag } from 'lucide-react';
 
 type CalendarView = 'list' | 'grid' | 'month' | 'year';
+type EventScope = 'all' | 'club' | 'my_state' | 'national' | 'all_states';
 
 interface RaceCalendarProps {
   events?: RaceEvent[];
@@ -45,7 +50,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const [activeFilters, setActiveFilters] = useState<{
     raceFormat?: 'handicap' | 'scratch';
     raceClass?: string;
-    eventType?: 'all' | 'club' | 'public';
+    eventType?: 'all' | 'club' | 'public' | 'state' | 'national';
   }>({
     eventType: 'all'
   });
@@ -65,6 +70,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   const [showSubscribeMenu, setShowSubscribeMenu] = useState(false);
   const [showLocationExplorer, setShowLocationExplorer] = useState(false);
   const [sailingDays, setSailingDays] = useState<any[]>([]);
+  const [calendarMeetings, setCalendarMeetings] = useState<CalendarMeeting[]>([]);
+  const [selectedMeeting, setSelectedMeeting] = useState<CalendarMeeting | null>(null);
+  const [calendarTypeFilter, setCalendarTypeFilter] = useState<'all' | 'events' | 'meetings'>('all');
+  const [eventScope, setEventScope] = useState<EventScope>(() => {
+    const saved = localStorage.getItem('raceCalendarEventScope');
+    return (saved as EventScope) || 'all';
+  });
+  const [clubStateAssociationId, setClubStateAssociationId] = useState<string | null>(null);
+  const [stateAssociationNames, setStateAssociationNames] = useState<Record<string, string>>({});
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const filterDropdownRef = useRef<HTMLDivElement>(null);
   const subscribeMenuRef = useRef<HTMLDivElement>(null);
@@ -202,33 +216,126 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   // Fetch all public events and venues from all clubs for Location Explorer
   const fetchAllPublicEvents = async () => {
     try {
-      console.log('[RaceCalendar] Fetching all public events and venues for Location Explorer');
+      const today = new Date().toISOString().split('T')[0];
+      const allEvents: RaceEvent[] = [];
+      const seenIds = new Set<string>();
 
-      // Fetch all public events
-      const publicEvents = await getPublicEvents();
+      const [publicEventsResult, quickRacesResult, seriesRoundsResult, allVenuesResult] = await Promise.all([
+        getPublicEvents(),
+        supabase
+          .from('quick_races')
+          .select('id, event_name, club_name, race_date, end_date, race_venue, race_class, race_format, club_id, multi_day, number_of_days, is_paid, entry_fee, notice_of_race_url, sailing_instructions_url, is_interclub, other_club_name, completed')
+          .eq('completed', false)
+          .gte('race_date', today)
+          .order('race_date', { ascending: true }),
+        supabase
+          .from('race_series_rounds')
+          .select('id, round_name, date, venue, race_class, race_format, club_id, series_id, completed, cancelled')
+          .eq('cancelled', false)
+          .eq('completed', false)
+          .gte('date', today)
+          .order('date', { ascending: true }),
+        supabase
+          .from('venues')
+          .select('*')
+          .order('name')
+      ]);
 
-      // Convert public events to RaceEvent format
-      const allEvents = publicEvents
+      const publicEvents = publicEventsResult || [];
+      publicEvents
         .map(pe => convertToRaceEvent(pe))
-        .filter((event): event is RaceEvent => event !== null);
+        .filter((event): event is RaceEvent => event !== null)
+        .forEach(event => {
+          if (!seenIds.has(event.id)) {
+            seenIds.add(event.id);
+            allEvents.push(event);
+          }
+        });
 
-      console.log('[RaceCalendar] Loaded', allEvents.length, 'public events for Location Explorer');
+      const clubIds = new Set<string>();
+      (quickRacesResult.data || []).forEach(qr => { if (qr.club_id) clubIds.add(qr.club_id); });
+      (seriesRoundsResult.data || []).forEach(sr => { if (sr.club_id) clubIds.add(sr.club_id); });
+
+      let clubNameMap: Record<string, string> = {};
+      if (clubIds.size > 0) {
+        const { data: clubs } = await supabase
+          .from('clubs')
+          .select('id, name')
+          .in('id', [...clubIds]);
+        if (clubs) {
+          clubs.forEach(c => { clubNameMap[c.id] = c.name; });
+        }
+      }
+
+      let seriesNameMap: Record<string, string> = {};
+      const seriesIds = new Set<string>();
+      (seriesRoundsResult.data || []).forEach(sr => { if (sr.series_id) seriesIds.add(sr.series_id); });
+      if (seriesIds.size > 0) {
+        const { data: series } = await supabase
+          .from('race_series')
+          .select('id, series_name')
+          .in('id', [...seriesIds]);
+        if (series) {
+          series.forEach(s => { seriesNameMap[s.id] = s.series_name; });
+        }
+      }
+
+      (quickRacesResult.data || []).forEach(qr => {
+        if (seenIds.has(qr.id)) return;
+        seenIds.add(qr.id);
+        allEvents.push({
+          id: qr.id,
+          eventName: qr.event_name || 'Race Day',
+          clubName: qr.club_name || clubNameMap[qr.club_id] || '',
+          date: qr.race_date,
+          endDate: qr.end_date,
+          venue: qr.race_venue || '',
+          raceClass: qr.race_class as any,
+          raceFormat: qr.race_format as any,
+          multiDay: qr.multi_day,
+          numberOfDays: qr.number_of_days,
+          isPaid: qr.is_paid,
+          entryFee: qr.entry_fee,
+          noticeOfRaceUrl: qr.notice_of_race_url,
+          sailingInstructionsUrl: qr.sailing_instructions_url,
+          isInterclub: qr.is_interclub,
+          otherClubName: qr.other_club_name,
+          clubId: qr.club_id,
+          eventLevel: 'club',
+          completed: qr.completed
+        });
+      });
+
+      (seriesRoundsResult.data || []).forEach(sr => {
+        if (seenIds.has(sr.id)) return;
+        seenIds.add(sr.id);
+        const seriesName = sr.series_id ? seriesNameMap[sr.series_id] : '';
+        allEvents.push({
+          id: sr.id,
+          eventName: seriesName ? `${seriesName} - ${sr.round_name || 'Round'}` : (sr.round_name || 'Series Round'),
+          clubName: clubNameMap[sr.club_id] || '',
+          date: sr.date,
+          venue: sr.venue || '',
+          raceClass: sr.race_class as any,
+          raceFormat: sr.race_format as any,
+          isSeriesEvent: true,
+          seriesId: sr.series_id,
+          roundName: sr.round_name,
+          clubId: sr.club_id,
+          eventLevel: 'club',
+          completed: sr.completed
+        });
+      });
+
       setAllPublicEvents(allEvents);
 
-      // Fetch ALL venues from the database (not just current club)
-      const { data: allVenuesData, error: venuesError } = await supabase
-        .from('venues')
-        .select('*')
-        .order('name');
-
-      if (venuesError) {
-        console.error('[RaceCalendar] Error fetching all venues:', venuesError);
-      } else if (allVenuesData) {
-        console.log('[RaceCalendar] Loaded', allVenuesData.length, 'venues for Location Explorer');
-        setAllVenues(allVenuesData);
+      if (allVenuesResult.error) {
+        console.error('[RaceCalendar] Error fetching all venues:', allVenuesResult.error);
+      } else if (allVenuesResult.data) {
+        setAllVenues(allVenuesResult.data);
       }
     } catch (err) {
-      console.error('[RaceCalendar] Error fetching all public events:', err);
+      console.error('[RaceCalendar] Error fetching events for Location Explorer:', err);
     }
   };
 
@@ -250,13 +357,25 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           return;
         }
         
-        // Otherwise, fetch events
-        const [storedVenues, storedSeries, raceEvents, publicEvents] = await Promise.all([
+        const [storedVenues, storedSeries, raceEvents, publicEvents, meetings, externalEventsResult] = await Promise.all([
           getStoredVenues(),
           getStoredRaceSeries(),
           getStoredRaceEvents(),
-          getPublicEvents(false, currentOrganization?.type, currentOrganization?.id)
+          getPublicEvents(false, currentOrganization?.type, currentOrganization?.id),
+          getCalendarMeetings(
+            currentClub?.clubId,
+            currentOrganization?.type === 'state' ? currentOrganization.id : null,
+            currentOrganization?.type === 'national' ? currentOrganization.id : null
+          ),
+          supabase
+            .from('external_events')
+            .select('*, external_event_sources!inner(name)')
+            .eq('is_visible', true)
+            .eq('event_status', 'active')
+            .order('event_date', { ascending: true })
         ]);
+
+        setCalendarMeetings(meetings);
         
         setVenues(storedVenues);
         
@@ -311,6 +430,32 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           convertToRaceEvent(publicEvent)
         );
 
+        const externalRaceEvents: RaceEvent[] = (externalEventsResult.data || []).map((ext: any) => {
+          return {
+            id: `external-${ext.id}`,
+            eventName: ext.event_name,
+            clubName: (ext.external_event_sources as any)?.name || ext.venue || 'External Event',
+            date: ext.event_date || '',
+            endDate: ext.event_end_date || undefined,
+            venue: ext.location || ext.venue || '',
+            raceClass: (ext.boat_class_mapped || ext.boat_class_raw || 'Unknown') as any,
+            raceFormat: 'scratch' as any,
+            isPublicEvent: true,
+            isExternalEvent: true,
+            externalEventType: ext.event_type || 'national',
+            eventLevel: ext.event_type === 'national' ? 'national' as const : ext.event_type === 'state' ? 'state' as const : 'national' as const,
+            noticeOfRaceUrl: ext.documents_json?.find((d: any) => d.type === 'nor' || d.name?.toLowerCase().includes('notice'))?.url,
+            sailingInstructionsUrl: ext.documents_json?.find((d: any) => d.type === 'si' || d.name?.toLowerCase().includes('sailing instruction'))?.url,
+            sourceUrl: ext.source_url,
+            registrationUrl: ext.registration_url,
+            multiDay: ext.event_end_date ? true : false,
+            numberOfDays: ext.event_end_date ? Math.ceil((new Date(ext.event_end_date).getTime() - new Date(ext.event_date).getTime()) / 86400000) + 1 : undefined,
+            displayCategory: ext.display_category || 'national',
+            stateCode: ext.state_code || undefined,
+            externalDocuments: ext.documents_json || [],
+          };
+        });
+
         // Filter out public events that have local copies in raceEvents
         // Local copies now have a public_event_id field tracking the original event
         const localCopyPublicEventIds = new Set(
@@ -327,8 +472,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
         // For associations, only show public events (state/national level events)
         // For clubs, show all events including club-specific events
         const allEvents = currentOrganization?.type === 'state' || currentOrganization?.type === 'national'
-          ? [...filteredPublicEvents]  // Associations: only public state/national events
-          : [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents];  // Clubs: all events
+          ? [...filteredPublicEvents, ...externalRaceEvents]  // Associations: public + external events
+          : [...raceEvents, ...seriesRaceEvents, ...filteredPublicEvents, ...externalRaceEvents];  // Clubs: all events
 
         const enrichedEvents = await enrichEventsWithAttendance(allEvents);
         setEvents(enrichedEvents);
@@ -342,6 +487,41 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
     loadData();
   }, [propEvents, currentClub, currentOrganization]); // Reload when club/organization changes or component remounts
+
+  useEffect(() => {
+    const loadClubStateAssociation = async () => {
+      if (!currentClub?.clubId) return;
+      try {
+        const { data } = await supabase
+          .from('clubs')
+          .select('state_association_id')
+          .eq('id', currentClub.clubId)
+          .maybeSingle();
+        if (data?.state_association_id) {
+          setClubStateAssociationId(data.state_association_id);
+        }
+
+        const { data: stateAssocs } = await supabase
+          .from('state_associations')
+          .select('id, name, abbreviation');
+        if (stateAssocs) {
+          const nameMap: Record<string, string> = {};
+          stateAssocs.forEach((sa: any) => {
+            nameMap[sa.id] = sa.abbreviation || sa.name;
+          });
+          setStateAssociationNames(nameMap);
+        }
+      } catch (err) {
+        console.error('Error loading club state association:', err);
+      }
+    };
+    loadClubStateAssociation();
+  }, [currentClub?.clubId]);
+
+  const handleEventScopeChange = (scope: EventScope) => {
+    setEventScope(scope);
+    localStorage.setItem('raceCalendarEventScope', scope);
+  };
 
   // Load sailing days for the club
   useEffect(() => {
@@ -407,13 +587,15 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   };
 
   const getVenueImage = (venueName: string, event?: RaceEvent): string | null => {
-    // First check if event has venueImage (for public events with venue data)
     if (event?.venueImage) {
       return event.venueImage;
     }
-    // Fall back to finding venue by name
     const venue = venues.find(v => v.name === venueName);
-    return venue?.image || null;
+    if (venue?.image) return venue.image;
+    if (event?.isExternalEvent) {
+      return getBoatClassImage(event.raceClass as string) || null;
+    }
+    return null;
   };
 
   const isDatePast = (dateStr: string) => {
@@ -482,15 +664,26 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     )
   ).sort((a, b) => b - a); // Sort descending (newest first)
 
+  const isEventInMyState = (event: RaceEvent): boolean => {
+    if (!clubStateAssociationId) return false;
+    if (event.displayCategory?.startsWith('state_')) {
+      const assocId = event.displayCategory.replace('state_', '');
+      return assocId === clubStateAssociationId;
+    }
+    return false;
+  };
+
+  const isEventInAnyState = (event: RaceEvent): boolean => {
+    return event.displayCategory?.startsWith('state_') || event.eventLevel === 'state';
+  };
+
   const filteredEvents = Object.values(uniqueEvents)
     .filter(event => {
-      // Year filter
       const eventDate = new Date(event.date);
       if (eventDate.getFullYear() !== selectedYear) {
         return false;
       }
 
-      // Time filter
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       eventDate.setHours(0, 0, 0, 0);
@@ -514,9 +707,95 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
       if (activeFilters.eventType === 'public' && !event.isPublicEvent) {
         return false;
       }
+      if (activeFilters.eventType === 'state' && event.eventLevel !== 'state') {
+        return false;
+      }
+      if (activeFilters.eventType === 'national' && event.eventLevel !== 'national') {
+        return false;
+      }
+
+      if (eventScope === 'club') {
+        if (event.isExternalEvent || event.isPublicEvent) return false;
+      } else if (eventScope === 'my_state') {
+        if (event.isExternalEvent) {
+          if (!isEventInMyState(event)) return false;
+        } else if (event.isPublicEvent && event.eventLevel === 'state') {
+          // keep
+        } else if (!event.isExternalEvent && !event.isPublicEvent) {
+          return false;
+        } else {
+          return false;
+        }
+      } else if (eventScope === 'national') {
+        if (event.isExternalEvent) {
+          if (event.displayCategory !== 'national' && event.eventLevel !== 'national') return false;
+        } else if (event.isPublicEvent && event.eventLevel === 'national') {
+          // keep
+        } else if (!event.isExternalEvent && !event.isPublicEvent) {
+          return false;
+        } else {
+          return false;
+        }
+      } else if (eventScope === 'all_states') {
+        if (event.isExternalEvent) {
+          if (!isEventInAnyState(event)) return false;
+        } else if (event.isPublicEvent && event.eventLevel === 'state') {
+          // keep
+        } else if (!event.isExternalEvent && !event.isPublicEvent) {
+          return false;
+        } else {
+          return false;
+        }
+      }
+      else if (eventScope === 'all') {
+        if (event.isExternalEvent) {
+          const isTrulyNational = event.externalEventType === 'national' || event.externalEventType === 'world';
+          const isMyState = isEventInMyState(event);
+          if (!isTrulyNational && !isMyState) return false;
+        }
+      }
+
       return true;
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const filteredMeetings = calendarMeetings.filter(meeting => {
+    const meetingDate = new Date(meeting.date);
+    if (meetingDate.getFullYear() !== selectedYear) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const md = new Date(meeting.date);
+    md.setHours(0, 0, 0, 0);
+
+    if (timeFilter === 'upcoming' && md < today) return false;
+    if (timeFilter === 'past' && md >= today) return false;
+
+    if (eventScope === 'club' && meeting.organizationLevel !== 'club') return false;
+    if (eventScope === 'my_state' && meeting.organizationLevel !== 'state_association') return false;
+    if (eventScope === 'national' && meeting.organizationLevel !== 'national_association') return false;
+    if (eventScope === 'all_states' && meeting.organizationLevel !== 'state_association') return false;
+
+    return true;
+  }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  type CalendarItem = { type: 'event'; data: RaceEvent; date: string } | { type: 'meeting'; data: CalendarMeeting; date: string };
+
+  const allCalendarItems: CalendarItem[] = [
+    ...(calendarTypeFilter !== 'meetings' ? filteredEvents.map(e => ({ type: 'event' as const, data: e, date: e.date })) : []),
+    ...(calendarTypeFilter !== 'events' ? filteredMeetings.map(m => ({ type: 'meeting' as const, data: m, date: m.date })) : []),
+  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const getCalendarItemsForDate = (day: number) => {
+    if (!day) return [];
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    return allCalendarItems.filter(item => {
+      const itemDate = new Date(item.date);
+      return itemDate.getDate() === day &&
+             itemDate.getMonth() === date.getMonth() &&
+             itemDate.getFullYear() === date.getFullYear();
+    });
+  };
 
   const toggleFilter = (type: 'raceFormat' | 'raceClass' | 'eventType', value: string) => {
     setActiveFilters(prev => {
@@ -747,24 +1026,172 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     }
   };
 
+  const renderMeetingListCard = (meeting: CalendarMeeting, index: number) => {
+    const orgConfig = meeting.national_association_id
+      ? { label: 'National', color: 'amber', Icon: Globe2 }
+      : meeting.state_association_id
+      ? { label: 'State', color: 'emerald', Icon: Globe2 }
+      : { label: 'Club', color: 'blue', Icon: Building2 };
+
+    const isCommittee = meeting.meeting_category === 'committee';
+    const isPast = isDatePast(meeting.date);
+
+    return (
+      <button
+        key={`meeting-${meeting.id}-${index}`}
+        onClick={() => setSelectedMeeting(meeting)}
+        className={`
+          group w-full flex flex-col sm:flex-row gap-4 p-4 rounded-xl transition-all duration-300
+          ${darkMode
+            ? 'bg-slate-800/50 hover:bg-slate-800 border border-teal-500/20'
+            : 'bg-white hover:bg-slate-50 border border-teal-200'}
+          hover:shadow-lg
+        `}
+      >
+        <div className="flex flex-col sm:flex-row gap-4 flex-1 min-w-0">
+          <div className="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden flex-shrink-0">
+            <div className={`w-full h-full flex flex-col items-center justify-center ${
+              darkMode ? 'bg-gradient-to-br from-teal-900/50 to-slate-800' : 'bg-gradient-to-br from-teal-50 to-slate-100'
+            }`}>
+              <Users size={24} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
+              <span className={`text-xs mt-2 font-medium ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>Meeting</span>
+            </div>
+            <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-lg">
+              <div className="text-center">
+                <div className="text-xs font-semibold text-slate-900 leading-none">
+                  {new Date(meeting.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+                </div>
+                <div className="text-xl font-bold text-slate-900 leading-tight">
+                  {new Date(meeting.date).getDate()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-between min-w-0">
+            <div>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h4 className={`text-base font-semibold truncate ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+                  {meeting.name}
+                </h4>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {meeting.location && (
+                  <>
+                    <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <MapPin size={13} />
+                      <span className="font-medium truncate">{meeting.location}</span>
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-slate-400"></div>
+                  </>
+                )}
+                {meeting.start_time && (
+                  <>
+                    <div className={`flex items-center gap-1 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <Clock size={12} />
+                      <span>{meeting.start_time.substring(0, 5)}</span>
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-slate-400"></div>
+                  </>
+                )}
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                  orgConfig.color === 'amber'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                    : orgConfig.color === 'emerald'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                }`}>
+                  <orgConfig.Icon size={10} className="inline mr-1" />
+                  {meeting.organization_name || orgConfig.label}
+                </span>
+                {isCommittee && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    <Shield size={10} className="inline mr-1" />
+                    Committee
+                  </span>
+                )}
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+                  Meeting
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2">
+              {meeting.attendees && meeting.attendees.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {meeting.attendees.slice(0, 5).map((attendee, i) => {
+                      const initials = `${(attendee.first_name || '').charAt(0)}${(attendee.last_name || '').charAt(0)}`.toUpperCase();
+                      return (
+                        <div
+                          key={i}
+                          title={`${attendee.first_name} ${attendee.last_name}`}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 overflow-hidden ${
+                            darkMode ? 'ring-slate-800' : 'ring-white'
+                          }`}
+                        >
+                          {attendee.avatar_url ? (
+                            <img src={attendee.avatar_url} alt={`${attendee.first_name} ${attendee.last_name}`} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className={`w-full h-full flex items-center justify-center ${
+                              darkMode ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white' : 'bg-gradient-to-br from-teal-400 to-emerald-400 text-white'
+                            }`}>
+                              {initials}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {meeting.attendees.length > 5 && (
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 ${
+                        darkMode ? 'bg-slate-700 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-700'
+                      }`}>
+                        +{meeting.attendees.length - 5}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {meeting.attendees.length} attending
+                  </span>
+                </div>
+              )}
+              {isPast && meeting.minutes_status === 'completed' && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-teal-500/20 text-teal-400 text-xs font-medium">
+                  <FileText size={12} />
+                  Minutes Available
+                </div>
+              )}
+              {isPast && meeting.minutes_status !== 'completed' && (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/20 text-emerald-400 text-xs font-medium">
+                  <Trophy size={12} />
+                  Completed
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </button>
+    );
+  };
+
   const renderListView = () => {
-    const groupedEvents = filteredEvents.reduce((acc, event) => {
-      const date = new Date(event.date);
+    const groupedItems = allCalendarItems.reduce((acc, item) => {
+      const date = new Date(item.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
       if (!acc[monthKey]) {
         acc[monthKey] = {
           year: date.getFullYear(),
           month: date.toLocaleString('default', { month: 'long' }),
-          events: []
+          items: []
         };
       }
-      acc[monthKey].events.push(event);
+      acc[monthKey].items.push(item);
       return acc;
-    }, {} as Record<string, { year: number; month: string; events: RaceEvent[] }>);
+    }, {} as Record<string, { year: number; month: string; items: CalendarItem[] }>);
 
     return (
       <div className="space-y-8">
-        {Object.entries(groupedEvents).map(([key, { month, year, events }]) => (
+        {Object.entries(groupedItems).map(([key, { month, year, items }]) => (
           <div key={key}>
             <div className="flex items-baseline gap-3 mb-4">
               <h3 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
@@ -773,7 +1200,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               <span className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{year}</span>
             </div>
             <div className="space-y-3">
-              {events.map((event, index) => {
+              {items.map((item, index) => {
+                if (item.type === 'meeting') {
+                  return renderMeetingListCard(item.data, index);
+                }
+
+                const event = item.data;
                 const seriesName = getSeriesName(event);
                 const displayTitle = event.isSeriesEvent
                   ? `${event.roundName} - ${seriesName}`
@@ -803,7 +1235,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
                 return (
                   <button
-                    key={index}
+                    key={`event-${event.id}-${index}`}
                     onClick={() => handleEventClick(event)}
                     className={`
                       group w-full flex flex-col sm:flex-row gap-4 p-4 rounded-xl transition-all duration-300
@@ -814,7 +1246,6 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                     `}
                   >
                     <div className="flex flex-col sm:flex-row gap-4 flex-1 min-w-0">
-                      {/* Event Image with Date Badge Overlay */}
                       <div className="relative w-full sm:w-48 h-32 rounded-lg overflow-hidden flex-shrink-0">
                         {venueImage ? (
                           <>
@@ -830,7 +1261,6 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                             <MapPin size={20} className={`${darkMode ? 'text-slate-600' : 'text-slate-400'}`} />
                           </div>
                         )}
-                        {/* Date Badge Overlay */}
                         <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-lg">
                           <div className="text-center">
                             <div className="text-xs font-semibold text-slate-900 leading-none">
@@ -850,21 +1280,34 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {displayTitle}
                             </h4>
                             {isNextEvent && (
-                              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white whitespace-nowrap animate-pulse">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                                Up Next
+                              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold text-white whitespace-nowrap animate-pulse bg-green-500 shadow-lg shadow-green-500/30">
+                                <span className="w-2 h-2 rounded-full bg-white"></span>
+                                UP NEXT
                               </div>
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mb-2">
-                            <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <MapPin size={13} />
-                              <span className="font-medium truncate">{event.venue}</span>
-                            </div>
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                            <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
-                              {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
-                            </span>
+                            {(event.venue || event.clubName) && (
+                              <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                                <MapPin size={13} className="flex-shrink-0" />
+                                <span className="font-medium truncate">{event.venue || event.clubName}</span>
+                              </div>
+                            )}
+                            {event.isExternalEvent ? (
+                              event.displayCategory?.startsWith('state_') ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                  {stateAssociationNames[event.displayCategory.replace('state_', '')] || 'State Event'}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                  National Event
+                                </span>
+                              )
+                            ) : (
+                              <span className={getRaceFormatBadge(event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch', darkMode).className}>
+                                {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
+                              </span>
+                            )}
                             <span className={getBoatClassBadge(event.raceClass, darkMode).className}>
                               {event.raceClass}
                             </span>
@@ -942,16 +1385,16 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
             </div>
           </div>
         ))}
-        
-        {filteredEvents.length === 0 && !loading && (
+
+        {allCalendarItems.length === 0 && !loading && (
           <div className={`
             text-center py-12 rounded-lg border
-            ${darkMode 
-              ? 'bg-slate-700/50 border-slate-600 text-slate-400' 
+            ${darkMode
+              ? 'bg-slate-700/50 border-slate-600 text-slate-400'
               : 'bg-slate-50 border-slate-200 text-slate-600'}
           `}>
             <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="text-lg font-medium mb-2">No Events Found</p>
+            <p className="text-lg font-medium mb-2">No Events or Meetings Found</p>
             <p className="text-sm">Try adjusting your filters or add a new event</p>
           </div>
         )}
@@ -1004,8 +1447,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           </div>
         ))}
         {monthData.map((day, index) => {
-          const dayEvents = day ? getEventsForDate(day) : [];
-          const isToday = day && 
+          const dayItems = day ? getCalendarItemsForDate(day) : [];
+          const isToday = day &&
             currentDate.getMonth() === new Date().getMonth() &&
             currentDate.getFullYear() === new Date().getFullYear() &&
             day === new Date().getDate();
@@ -1028,7 +1471,43 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                     {day}
                   </div>
                   <div className="space-y-1">
-                    {dayEvents.map((event, eventIndex) => {
+                    {dayItems.map((item, itemIndex) => {
+                      if (item.type === 'meeting') {
+                        const meeting = item.data;
+                        return (
+                          <button
+                            key={`m-${itemIndex}`}
+                            onClick={() => setSelectedMeeting(meeting)}
+                            className={`
+                              w-full text-left p-1.5 rounded text-xs
+                              ${darkMode
+                                ? 'bg-teal-900/30 hover:bg-teal-900/50 border border-teal-500/20'
+                                : 'bg-teal-50 hover:bg-teal-100 border border-teal-200'}
+                            `}
+                          >
+                            <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                              {meeting.name}
+                            </div>
+                            <div className="flex flex-wrap gap-1 mb-1">
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
+                                Meeting
+                              </div>
+                              {meeting.meeting_category === 'committee' && (
+                                <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                                  Committee
+                                </div>
+                              )}
+                            </div>
+                            {meeting.start_time && (
+                              <div className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
+                                {meeting.start_time.substring(0, 5)}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      }
+
+                      const event = item.data;
                       const seriesName = getSeriesName(event);
                       const displayTitle = event.isSeriesEvent
                         ? `${event.roundName} - ${seriesName}`
@@ -1038,24 +1517,24 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
                       return (
                         <button
-                          key={eventIndex}
+                          key={`e-${itemIndex}`}
                           onClick={() => handleEventClick(event)}
                           className={`
                             w-full text-left p-1.5 rounded text-xs
-                            ${darkMode 
-                              ? `bg-slate-700 hover:bg-slate-600 ${isNextEvent ? 'ring-1 ring-green-500' : ''}` 
+                            ${darkMode
+                              ? `bg-slate-700 hover:bg-slate-600 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`
                               : `bg-slate-50 hover:bg-slate-100 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`}
                           `}
                         >
                           <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                             {displayTitle}
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-1 mb-1">
                             <div className={`
                               px-1.5 py-0.5 rounded text-[10px] font-medium
                               ${event.raceFormat === 'handicap'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                 : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}
                             `}>
                               {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
@@ -1067,13 +1546,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {event.raceClass}
                             </div>
                             {isNextEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Next
-                              </div>
-                            )}
-                            {event.isPublicEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-                                Public
                               </div>
                             )}
                           </div>
@@ -1094,24 +1568,127 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     </div>
   );
 
+  const renderMeetingGridCard = (meeting: CalendarMeeting, index: number) => {
+    const isPast = isDatePast(meeting.date);
+    const orgLabel = meeting.national_association_id ? 'National' : meeting.state_association_id ? 'State' : 'Club';
+
+    return (
+      <button
+        key={`meeting-grid-${meeting.id}-${index}`}
+        onClick={() => setSelectedMeeting(meeting)}
+        className={`
+          group w-full flex flex-col rounded-xl overflow-hidden transition-all duration-300 text-left
+          ${darkMode
+            ? 'bg-slate-800/50 hover:bg-slate-800 border border-teal-500/20'
+            : 'bg-white hover:bg-slate-50 border border-teal-200'}
+          hover:shadow-xl
+        `}
+      >
+        <div className={`w-full h-40 flex flex-col items-center justify-center ${
+          darkMode ? 'bg-gradient-to-br from-teal-900/40 to-slate-800' : 'bg-gradient-to-br from-teal-50 to-slate-100'
+        }`}>
+          <Users size={32} className={darkMode ? 'text-teal-400' : 'text-teal-600'} />
+          <span className={`text-sm mt-2 font-medium ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>
+            {meeting.organization_name || orgLabel} Meeting
+          </span>
+        </div>
+
+        <div className="p-4 flex flex-col flex-1">
+          <h4 className={`text-base font-semibold mb-2 line-clamp-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+            {meeting.name}
+          </h4>
+
+          <div className={`flex items-center gap-1.5 text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <Calendar size={12} />
+            <span className="font-medium">{formatDate(meeting.date)}</span>
+            {meeting.start_time && (
+              <>
+                <span className="mx-1">at</span>
+                <span>{meeting.start_time.substring(0, 5)}</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-3">
+            <div className="px-2 py-1 rounded-md text-xs font-medium bg-teal-600 text-white">
+              Meeting
+            </div>
+            {meeting.meeting_category === 'committee' && (
+              <div className="px-2 py-1 rounded-md text-xs font-medium bg-amber-600 text-white">
+                Committee
+              </div>
+            )}
+            {isPast && meeting.minutes_status === 'completed' && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-teal-500/20 text-teal-400 text-xs font-medium">
+                <FileText size={11} />
+                Minutes
+              </div>
+            )}
+          </div>
+
+          {meeting.attendees && meeting.attendees.length > 0 && (
+            <div className={`mt-auto pt-3 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+              <div className="flex items-center gap-2">
+                <div className="flex -space-x-2">
+                  {meeting.attendees.slice(0, 4).map((attendee, i) => {
+                    const initials = `${(attendee.first_name || '').charAt(0)}${(attendee.last_name || '').charAt(0)}`.toUpperCase();
+                    return (
+                      <div
+                        key={i}
+                        title={`${attendee.first_name} ${attendee.last_name}`}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 overflow-hidden ${
+                          darkMode ? 'ring-slate-800' : 'ring-white'
+                        }`}
+                      >
+                        {attendee.avatar_url ? (
+                          <img src={attendee.avatar_url} alt={`${attendee.first_name} ${attendee.last_name}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className={`w-full h-full flex items-center justify-center ${
+                            darkMode ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white' : 'bg-gradient-to-br from-teal-400 to-emerald-400 text-white'
+                          }`}>
+                            {initials}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {meeting.attendees.length > 4 && (
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium ring-2 ${
+                      darkMode ? 'bg-slate-700 ring-slate-800 text-slate-300' : 'bg-slate-200 ring-white text-slate-700'
+                    }`}>
+                      +{meeting.attendees.length - 4}
+                    </div>
+                  )}
+                </div>
+                <span className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  {meeting.attendees.length} attending
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </button>
+    );
+  };
+
   const renderGridView = () => {
-    const groupedEvents = filteredEvents.reduce((acc, event) => {
-      const date = new Date(event.date);
+    const groupedItems = allCalendarItems.reduce((acc, item) => {
+      const date = new Date(item.date);
       const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
       if (!acc[monthKey]) {
         acc[monthKey] = {
           year: date.getFullYear(),
           month: date.toLocaleString('default', { month: 'long' }),
-          events: []
+          items: []
         };
       }
-      acc[monthKey].events.push(event);
+      acc[monthKey].items.push(item);
       return acc;
-    }, {} as Record<string, { year: number; month: string; events: RaceEvent[] }>);
+    }, {} as Record<string, { year: number; month: string; items: CalendarItem[] }>);
 
     return (
       <div className="space-y-8">
-        {Object.entries(groupedEvents).map(([key, { month, year, events }]) => (
+        {Object.entries(groupedItems).map(([key, { month, year, items }]) => (
           <div key={key}>
             <div className="flex items-baseline gap-3 mb-4">
               <h3 className={`text-2xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
@@ -1120,7 +1697,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               <span className={`text-lg ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{year}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {events.map((event, index) => {
+              {items.map((item, index) => {
+                if (item.type === 'meeting') {
+                  return renderMeetingGridCard(item.data, index);
+                }
+
+                const event = item.data;
                 const seriesName = getSeriesName(event);
                 const displayTitle = event.isSeriesEvent
                   ? `${event.roundName} - ${seriesName}`
@@ -1150,7 +1732,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
                 return (
                   <button
-                    key={index}
+                    key={`event-grid-${event.id}-${index}`}
                     onClick={() => handleEventClick(event)}
                     className={`
                       group w-full flex flex-col rounded-xl overflow-hidden transition-all duration-300 text-left
@@ -1169,17 +1751,19 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                         {isNextEvent && (
-                          <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-500 text-white animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                            Up Next
+                          <div className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-white animate-pulse bg-green-500 shadow-lg shadow-green-500/30">
+                            <span className="w-2 h-2 rounded-full bg-white"></span>
+                            UP NEXT
                           </div>
                         )}
-                        <div className="absolute bottom-3 left-3 right-3">
-                          <div className="flex items-center gap-1.5 text-white text-sm font-medium">
-                            <MapPin size={14} />
-                            <span className="truncate">{event.venue}</span>
+                        {(event.venue || event.clubName) && (
+                          <div className="absolute bottom-3 left-3 right-3">
+                            <div className="flex items-center gap-1.5 text-white text-sm font-medium">
+                              <MapPin size={14} />
+                              <span className="truncate">{event.venue || event.clubName}</span>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ) : (
                       <div className={`w-full h-40 flex items-center justify-center ${
@@ -1203,7 +1787,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                         <div className={`
                           px-2 py-1 rounded-md text-xs font-medium
                           ${event.raceFormat === 'handicap'
-                            ? 'bg-purple-600 text-white'
+                            ? 'bg-blue-600 text-white'
                             : 'bg-blue-600 text-white'}
                         `}>
                           {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
@@ -1284,7 +1868,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           </div>
         ))}
 
-        {filteredEvents.length === 0 && !loading && (
+        {allCalendarItems.length === 0 && !loading && (
           <div className={`
             text-center py-12 rounded-lg border
             ${darkMode
@@ -1292,7 +1876,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
               : 'bg-slate-50 border-slate-200 text-slate-600'}
           `}>
             <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="text-lg font-medium mb-2">No Events Found</p>
+            <p className="text-lg font-medium mb-2">No Events or Meetings Found</p>
             <p className="text-sm">Try adjusting your filters or add a new event</p>
           </div>
         )}
@@ -1300,9 +1884,16 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
     );
   };
 
+  const getItemsForMonth = (month: number): CalendarItem[] => {
+    return allCalendarItems.filter(item => {
+      const d = new Date(item.date);
+      return d.getMonth() === month && d.getFullYear() === currentDate.getFullYear();
+    });
+  };
+
   const renderYearView = () => {
     const months = Array.from({ length: 12 }, (_, i) => i);
-    
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-6">
@@ -1337,8 +1928,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
         <div className="grid grid-cols-3 lg:grid-cols-4 gap-4">
           {months.map(month => {
-            const monthEvents = getEventsForMonth(month);
-            const isCurrentMonth = 
+            const monthItems = getItemsForMonth(month);
+            const isCurrentMonth =
               new Date().getMonth() === month &&
               new Date().getFullYear() === currentDate.getFullYear();
 
@@ -1355,7 +1946,44 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                   {new Date(currentDate.getFullYear(), month).toLocaleString('default', { month: 'long' })}
                 </h4>
                 <div className="space-y-2">
-                  {monthEvents.map((event, index) => {
+                  {monthItems.map((item, index) => {
+                    if (item.type === 'meeting') {
+                      const meeting = item.data;
+                      const meetingDate = new Date(meeting.date);
+                      return (
+                        <div key={`m-${index}`} className="flex items-center gap-1">
+                          <button
+                            onClick={() => setSelectedMeeting(meeting)}
+                            className={`
+                              flex-1 text-left p-2 rounded text-xs
+                              ${darkMode
+                                ? 'bg-teal-900/30 hover:bg-teal-900/50 border border-teal-500/20'
+                                : 'bg-teal-50 hover:bg-teal-100 border border-teal-200'}
+                            `}
+                          >
+                            <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+                              {meeting.name}
+                            </div>
+                            <div className="flex flex-wrap gap-1 mb-1">
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
+                                Meeting
+                              </div>
+                              {meeting.meeting_category === 'committee' && (
+                                <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                                  Committee
+                                </div>
+                              )}
+                            </div>
+                            <div className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                              {meetingDate.getDate()} {meetingDate.toLocaleString('default', { month: 'short' })}
+                              {meeting.location ? ` - ${meeting.location}` : ''}
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    const event = item.data;
                     const seriesName = getSeriesName(event);
                     const displayTitle = event.isSeriesEvent
                       ? `${event.roundName} - ${seriesName}`
@@ -1365,25 +1993,25 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                     const isNextEvent = isNextUpcomingEvent(event, filteredEvents);
 
                     return (
-                      <div key={index} className="flex items-center gap-1">
+                      <div key={`e-${index}`} className="flex items-center gap-1">
                         <button
                           onClick={() => handleEventClick(event)}
                           className={`
                             flex-1 text-left p-2 rounded text-xs
-                            ${darkMode 
-                              ? `bg-slate-700 hover:bg-slate-600 ${isNextEvent ? 'ring-1 ring-green-500' : ''}` 
+                            ${darkMode
+                              ? `bg-slate-700 hover:bg-slate-600 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`
                               : `bg-slate-50 hover:bg-slate-100 ${isNextEvent ? 'ring-1 ring-green-500' : ''}`}
                           `}
                         >
                           <div className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-slate-800'}`}>
                             {displayTitle}
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-1 mb-1">
                             <div className={`
                               px-1.5 py-0.5 rounded text-[10px] font-medium
                               ${event.raceFormat === 'handicap'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                 : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'}
                             `}>
                               {event.raceFormat === 'handicap' ? 'Handicap' : 'Scratch'}
@@ -1395,13 +2023,8 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                               {event.raceClass}
                             </div>
                             {isNextEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Next
-                              </div>
-                            )}
-                            {event.isPublicEvent && (
-                              <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
-                                Public
                               </div>
                             )}
                           </div>
@@ -1413,7 +2036,7 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                       </div>
                     );
                   })}
-                  {monthEvents.length === 0 && (
+                  {monthItems.length === 0 && (
                     <div className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                       No events
                     </div>
@@ -1430,46 +2053,69 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-4 sm:p-6 lg:p-16">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6 lg:mb-8">
+        {/* Row 1: Title + Close */}
+        <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
               <Calendar className="text-white" size={28} />
             </div>
-            <div>
-              <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-                Race Calendar
-              </h2>
-              {sailingDays.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  {sailingDays.map((day) => (
-                    <div
-                      key={day.id}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                        darkMode ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'
-                      }`}
-                    >
-                      <Calendar size={14} className="text-blue-500" />
-                      <span className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                        {day.day_of_week}
-                      </span>
-                      <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {day.start_time.substring(0, 5)}-{day.end_time.substring(0, 5)}
-                      </span>
-                      {day.boat_class_name && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                          darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {day.boat_class_name}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <h2 className={`text-2xl sm:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>
+              Race Calendar
+            </h2>
           </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className={`
+                rounded-full p-2 transition-colors flex-shrink-0
+                ${darkMode
+                  ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
+              `}
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+        {/* Row 2: Event Scope Tabs (left) + Year & Upcoming/Past (right) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          {currentOrganization?.type !== 'state' && currentOrganization?.type !== 'national' && (
+            <div className={`flex items-center gap-1 p-1 rounded-xl overflow-x-auto ${
+              darkMode ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-100 border border-slate-200'
+            }`}>
+              {([
+                { key: 'all' as EventScope, label: 'My Events', desc: 'Club + My State + National' },
+                { key: 'club' as EventScope, label: 'Club Events', desc: 'Club events only' },
+                { key: 'my_state' as EventScope, label: clubStateAssociationId ? (stateAssociationNames[clubStateAssociationId] || 'My State') : 'My State', desc: 'Your state events' },
+                { key: 'national' as EventScope, label: 'National Events', desc: 'National events' },
+                { key: 'all_states' as EventScope, label: 'All Events', desc: 'All events across all states' },
+              ]).map(tab => {
+                const isActive = eventScope === tab.key;
+
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleEventScopeChange(tab.key)}
+                    title={tab.desc}
+                    className={`
+                      px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex-shrink-0 text-center whitespace-nowrap
+                      ${isActive
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/20'
+                        : darkMode
+                          ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                          : 'text-slate-600 hover:text-slate-800 hover:bg-white'
+                      }
+                    `}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Year Filter */}
             <div className="relative">
               <select
@@ -1498,13 +2144,13 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
 
             {/* Time Filter - Past/Upcoming */}
             <div className={`
-              flex items-center gap-1 rounded-lg overflow-hidden border flex-1 sm:flex-none
+              flex items-center gap-1 rounded-lg overflow-hidden border
               ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
             `}>
               <button
                 onClick={() => setTimeFilter('upcoming')}
                 className={`
-                  flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-medium transition-all whitespace-nowrap
+                  px-3 sm:px-4 py-2 text-sm font-medium transition-all whitespace-nowrap
                   ${timeFilter === 'upcoming'
                     ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
                     : darkMode
@@ -1513,12 +2159,12 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                   }
                 `}
               >
-                Upcoming Events
+                Upcoming
               </button>
               <button
                 onClick={() => setTimeFilter('past')}
                 className={`
-                  flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap
+                  px-3 sm:px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap
                   ${timeFilter === 'past'
                     ? 'bg-slate-600 text-white'
                     : darkMode
@@ -1527,308 +2173,381 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
                   }
                 `}
               >
-                Past Events
+                Past
               </button>
             </div>
+          </div>
+        </div>
 
-            {/* Location Explorer Button */}
-            <button
-              onClick={handleOpenLocationExplorer}
-              className={`
-                relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border overflow-hidden group
-                ${darkMode
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 border-cyan-500 text-white'
-                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 border-cyan-400 text-white'}
-              `}
-            >
-              <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-              <MapIcon size={16} className="relative z-10" />
-              <span className="relative z-10 whitespace-nowrap">Explore Locations</span>
-              <div className="relative z-10 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-            </button>
-
-            {/* Filter Dropdown */}
-            <div className="relative" ref={filterDropdownRef}>
-              <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
-                  ${darkMode
-                    ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
-                `}
-              >
-                <Filter size={16} />
-                Filters
-                <ChevronDown size={16} />
-              </button>
-
-              {showFilterDropdown && (
-                <div className={`
-                  absolute right-0 mt-2 w-80 rounded-lg shadow-xl border py-3 z-50
-                  ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-                `}>
-                  {/* Race Format */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Race Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => toggleFilter('raceFormat', 'scratch')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.raceFormat === 'scratch'
-                            ? 'bg-blue-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Scratch
-                      </button>
-                      <button
-                        onClick={() => toggleFilter('raceFormat', 'handicap')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.raceFormat === 'handicap'
-                            ? 'bg-purple-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Handicap
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-700 my-2"></div>
-
-                  {/* Boat Class */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Class
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(new Set(events.map(e => e.raceClass))).map(type => {
-                        if (!type) return null;
-                        const typeColors = boatTypeColors[type] || defaultColorScheme;
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => toggleFilter('raceClass', type)}
-                            className={`
-                              px-3 py-1.5 rounded text-sm transition-colors
-                              ${activeFilters.raceClass === type
-                                ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
-                                : darkMode
-                                  ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                              }
-                            `}
-                          >
-                            {type}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-700 my-2"></div>
-
-                  {/* Event Type */}
-                  <div className="px-4 py-2">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
-                      Event Type
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => toggleFilter('eventType', 'club')}
-                        className={`
-                          px-3 py-1.5 rounded text-sm transition-all
-                          ${activeFilters.eventType === 'club'
-                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        Club
-                      </button>
-                      <button
-                        onClick={() => toggleFilter('eventType', 'public')}
-                        className={`
-                          flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
-                          ${activeFilters.eventType === 'public'
-                            ? 'bg-indigo-600 text-white'
-                            : darkMode
-                              ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }
-                        `}
-                      >
-                        <Globe size={14} />
-                        Public
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
+        {/* Row 3: Secondary controls */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {/* Calendar Type Filter */}
+          {calendarMeetings.length > 0 && (
             <div className={`
-              flex items-center gap-1 rounded-lg border flex-1 sm:flex-none
-              ${darkMode
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-white border-slate-200'}
+              flex items-center gap-1 rounded-lg overflow-hidden border
+              ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
             `}>
               <button
-                onClick={() => setView('list')}
+                onClick={() => setCalendarTypeFilter('all')}
                 className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'list'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
+                  px-3 py-2 text-sm font-medium transition-all whitespace-nowrap
+                  ${calendarTypeFilter === 'all'
+                    ? 'bg-gradient-to-r from-blue-600 to-teal-600 text-white shadow-lg'
                     : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
+                      ? 'text-slate-300 hover:bg-slate-700'
+                      : 'text-slate-700 hover:bg-slate-100'
                   }
                 `}
               >
-                <List size={18} />
-                <span className="text-sm hidden sm:inline">List</span>
+                All
               </button>
               <button
-                onClick={() => setView('grid')}
+                onClick={() => setCalendarTypeFilter('events')}
                 className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'grid'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
+                  px-3 py-2 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+                  ${calendarTypeFilter === 'events'
+                    ? 'bg-blue-600 text-white'
                     : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
+                      ? 'text-slate-300 hover:bg-slate-700'
+                      : 'text-slate-700 hover:bg-slate-100'
                   }
                 `}
               >
-                <Grid size={18} />
-                <span className="text-sm hidden sm:inline">Grid</span>
+                <Trophy size={14} />
+                Events
               </button>
               <button
-                onClick={() => setView('month')}
+                onClick={() => setCalendarTypeFilter('meetings')}
                 className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'month'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
+                  px-3 py-2 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5
+                  ${calendarTypeFilter === 'meetings'
+                    ? 'bg-teal-600 text-white'
                     : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
+                      ? 'text-slate-300 hover:bg-slate-700'
+                      : 'text-slate-700 hover:bg-slate-100'
                   }
                 `}
               >
-                <CalendarDays size={18} />
-                <span className="text-sm hidden sm:inline">Month</span>
-              </button>
-              <button
-                onClick={() => setView('year')}
-                className={`
-                  flex-1 sm:flex-none p-2 transition-colors flex items-center justify-center gap-1
-                  ${view === 'year'
-                    ? darkMode
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-100 text-slate-800'
-                    : darkMode
-                      ? 'text-slate-400 hover:text-slate-300'
-                      : 'text-slate-600 hover:text-slate-800'
-                  }
-                `}
-              >
-                <CalendarRange size={18} />
-                <span className="text-sm">Year</span>
+                <Users size={14} />
+                Meetings
               </button>
             </div>
+          )}
 
-            {/* Subscribe to Calendar */}
-            <div className="relative" ref={subscribeMenuRef}>
-              <button
-                onClick={() => setShowSubscribeMenu(!showSubscribeMenu)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap
-                  ${darkMode
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white'
-                    : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-blue-400 text-white'}
-                `}
-              >
-                <Link2 size={16} />
-                Subscribe
-              </button>
+          {/* Location Explorer Button */}
+          <button
+            onClick={handleOpenLocationExplorer}
+            className={`
+              relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all border overflow-hidden group
+              ${darkMode
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 border-cyan-500 text-white'
+                : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 border-cyan-400 text-white'}
+            `}
+          >
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+            <MapIcon size={16} className="relative z-10" />
+            <span className="relative z-10 whitespace-nowrap">Explore Locations</span>
+            <div className="relative z-10 w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+          </button>
 
-              {showSubscribeMenu && (
-                <div className={`
-                  absolute right-0 mt-2 w-72 rounded-lg shadow-xl border py-2 z-50
-                  ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
-                `}>
-                  <div className="px-4 py-2 border-b border-slate-700">
-                    <h4 className={`font-semibold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      Subscribe to Calendar
-                    </h4>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Download an iCal file to sync upcoming events to your calendar app
-                    </p>
-                  </div>
+          {/* Filter Dropdown */}
+          <div className="relative" ref={filterDropdownRef}>
+            <button
+              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border
+                ${darkMode
+                  ? 'bg-slate-700 border-slate-600 hover:bg-slate-600 text-slate-200'
+                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}
+              `}
+            >
+              <Filter size={16} />
+              Filters
+              <ChevronDown size={16} />
+            </button>
 
-                  <div className="py-2">
+            {showFilterDropdown && (
+              <div className={`
+                absolute left-0 sm:right-0 sm:left-auto mt-2 w-80 rounded-lg shadow-xl border py-3 z-50
+                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+              `}>
+                {/* Race Format */}
+                <div className="px-4 py-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                    Race Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={handleSubscribeToCalendar}
+                      onClick={() => toggleFilter('raceFormat', 'scratch')}
                       className={`
-                        w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors
-                        ${darkMode
-                          ? 'hover:bg-slate-700 text-slate-200'
-                          : 'hover:bg-slate-50 text-slate-800'}
+                        px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.raceFormat === 'scratch'
+                          ? 'bg-blue-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
                       `}
                     >
-                      <Calendar size={16} />
-                      <div>
-                        <div className="font-medium">Download .ics File</div>
-                        <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Works with Google, Apple, Outlook
-                        </div>
-                      </div>
+                      Scratch
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('raceFormat', 'handicap')}
+                      className={`
+                        px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.raceFormat === 'handicap'
+                          ? 'bg-purple-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      Handicap
                     </button>
                   </div>
+                </div>
 
-                  <div className={`px-4 py-2 border-t text-xs ${darkMode ? 'border-slate-700 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                    <p className="mb-1 font-medium">How to use:</p>
-                    <ul className="space-y-1 list-disc list-inside">
-                      <li>Google Calendar: Import from Settings</li>
-                      <li>Apple Calendar: Double-click the file</li>
-                      <li>Outlook: Import from File menu</li>
-                    </ul>
+                <div className="border-t border-slate-700 my-2"></div>
+
+                {/* Boat Class */}
+                <div className="px-4 py-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                    Class
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(new Set(events.map(e => e.raceClass))).map(type => {
+                      if (!type) return null;
+                      const typeColors = boatTypeColors[type] || defaultColorScheme;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => toggleFilter('raceClass', type)}
+                          className={`
+                            px-3 py-1.5 rounded text-sm transition-colors
+                            ${activeFilters.raceClass === type
+                              ? `${typeColors.bg} ${typeColors.text} ${typeColors.darkBg} ${typeColors.darkText}`
+                              : darkMode
+                                ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }
+                          `}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
-            </div>
 
-            {onClose && (
-              <button
-                onClick={onClose}
-                className={`
-                  rounded-full p-2 transition-colors
-                  ${darkMode 
-                    ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' 
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}
-                `}
-              >
-                <X size={20} />
-              </button>
+                <div className="border-t border-slate-700 my-2"></div>
+
+                {/* Event Type */}
+                <div className="px-4 py-2">
+                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 block">
+                    Event Type
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => toggleFilter('eventType', 'club')}
+                      className={`
+                        px-3 py-1.5 rounded text-sm transition-all
+                        ${activeFilters.eventType === 'club'
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      Club
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('eventType', 'public')}
+                      className={`
+                        flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.eventType === 'public'
+                          ? 'bg-blue-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      <Globe size={14} />
+                      Public
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('eventType', 'state')}
+                      className={`
+                        flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.eventType === 'state'
+                          ? 'bg-amber-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      <MapPin size={14} />
+                      State
+                    </button>
+                    <button
+                      onClick={() => toggleFilter('eventType', 'national')}
+                      className={`
+                        flex items-center gap-1 px-3 py-1.5 rounded text-sm transition-colors
+                        ${activeFilters.eventType === 'national'
+                          ? 'bg-teal-600 text-white'
+                          : darkMode
+                            ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }
+                      `}
+                    >
+                      <Flag size={14} />
+                      National
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className={`
+            flex items-center gap-1 rounded-lg border
+            ${darkMode
+              ? 'bg-slate-800 border-slate-700'
+              : 'bg-white border-slate-200'}
+          `}>
+            <button
+              onClick={() => setView('list')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'list'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <List size={18} />
+              <span className="text-sm hidden sm:inline">List</span>
+            </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'grid'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <Grid size={18} />
+              <span className="text-sm hidden sm:inline">Grid</span>
+            </button>
+            <button
+              onClick={() => setView('month')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'month'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <CalendarDays size={18} />
+              <span className="text-sm hidden sm:inline">Month</span>
+            </button>
+            <button
+              onClick={() => setView('year')}
+              className={`
+                p-2 transition-colors flex items-center justify-center gap-1
+                ${view === 'year'
+                  ? darkMode
+                    ? 'bg-slate-700 text-slate-200'
+                    : 'bg-slate-100 text-slate-800'
+                  : darkMode
+                    ? 'text-slate-400 hover:text-slate-300'
+                    : 'text-slate-600 hover:text-slate-800'
+                }
+              `}
+            >
+              <CalendarRange size={18} />
+              <span className="text-sm">Year</span>
+            </button>
+          </div>
+
+          {/* Subscribe to Calendar */}
+          <div className="relative" ref={subscribeMenuRef}>
+            <button
+              onClick={() => setShowSubscribeMenu(!showSubscribeMenu)}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap
+                ${darkMode
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-blue-500 text-white'
+                  : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-blue-400 text-white'}
+              `}
+            >
+              <Link2 size={16} />
+              Subscribe
+            </button>
+
+            {showSubscribeMenu && (
+              <div className={`
+                absolute right-0 mt-2 w-72 rounded-lg shadow-xl border py-2 z-50
+                ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}
+              `}>
+                <div className="px-4 py-2 border-b border-slate-700">
+                  <h4 className={`font-semibold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    Subscribe to Calendar
+                  </h4>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Download an iCal file to sync upcoming events to your calendar app
+                  </p>
+                </div>
+
+                <div className="py-2">
+                  <button
+                    onClick={handleSubscribeToCalendar}
+                    className={`
+                      w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors
+                      ${darkMode
+                        ? 'hover:bg-slate-700 text-slate-200'
+                        : 'hover:bg-slate-50 text-slate-800'}
+                    `}
+                  >
+                    <Calendar size={16} />
+                    <div>
+                      <div className="font-medium">Download .ics File</div>
+                      <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Works with Google, Apple, Outlook
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className={`px-4 py-2 border-t text-xs ${darkMode ? 'border-slate-700 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                  <p className="mb-1 font-medium">How to use:</p>
+                  <ul className="space-y-1 list-disc list-inside">
+                    <li>Google Calendar: Import from Settings</li>
+                    <li>Apple Calendar: Double-click the file</li>
+                    <li>Outlook: Import from File menu</li>
+                  </ul>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -1889,6 +2608,14 @@ export const RaceCalendar: React.FC<RaceCalendarProps> = ({
           onStartScoring={handleStartScoring}
           onClose={handleCloseEventDetails}
           onViewVenue={(venueName) => handleVenueClick(venueName)}
+        />
+      )}
+
+      {selectedMeeting && (
+        <CalendarMeetingDetailsModal
+          meeting={selectedMeeting}
+          darkMode={darkMode}
+          onClose={() => setSelectedMeeting(null)}
         />
       )}
 

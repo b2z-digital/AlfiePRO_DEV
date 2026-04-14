@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { LogOut, Upload, Download, FileUp, CheckCircle, AlertCircle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { LogOut, Upload, Download, FileUp, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Loader, ChevronDown, ChevronUp, ArrowRight, Link2, TriangleAlert as AlertTriangle, Info } from 'lucide-react';
 import Papa from 'papaparse';
 import { Member, MemberBoat, BoatType, MembershipLevel } from '../types/member';
 import { supabase } from '../utils/supabase';
@@ -26,7 +26,27 @@ interface DuplicateConflict {
   field: string;
 }
 
-type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete';
+interface MembershipTypeOption {
+  id: string;
+  name: string;
+  amount: number;
+}
+
+interface MembershipTypeMapping {
+  csvValue: string;
+  count: number;
+  mappedTypeId: string | null;
+  mappedTypeName: string | null;
+  financialStatus: 'keep_csv' | 'financial' | 'unfinancial';
+}
+
+interface ImportError {
+  row: number;
+  name: string;
+  reason: string;
+}
+
+type ImportStep = 'upload' | 'mapping' | 'membership_mapping' | 'preview' | 'importing' | 'complete';
 
 const FIELD_OPTIONS = [
   { value: 'first_name', label: 'First Name' },
@@ -76,7 +96,12 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   const [conflictResolution, setConflictResolution] = useState<'overwrite' | 'skip' | null>(null);
   const [importedCount, setImportedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
   const [expandedMappings, setExpandedMappings] = useState(true);
+  const [clubMembershipTypes, setClubMembershipTypes] = useState<MembershipTypeOption[]>([]);
+  const [membershipTypeMappings, setMembershipTypeMappings] = useState<MembershipTypeMapping[]>([]);
+  const [importErrors, setImportErrors] = useState<ImportError[]>([]);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
   // Reset modal state when it closes
   const resetModalState = () => {
@@ -92,15 +117,33 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     setConflictResolution(null);
     setImportedCount(0);
     setSkippedCount(0);
+    setErrorCount(0);
     setExpandedMappings(true);
+    setMembershipTypeMappings([]);
+    setImportErrors([]);
+    setShowErrorDetails(false);
   };
 
-  // Reset state when modal closes
   React.useEffect(() => {
     if (!isOpen) {
       resetModalState();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && currentClubId) {
+      const fetchTypes = async () => {
+        const { data } = await supabase
+          .from('membership_types')
+          .select('id, name, amount')
+          .eq('club_id', currentClubId)
+          .eq('is_active', true)
+          .order('name');
+        setClubMembershipTypes((data || []).map(t => ({ ...t, amount: t.amount || 0 })));
+      };
+      fetchTypes();
+    }
+  }, [isOpen, currentClubId]);
 
   const autoDetectField = (csvField: string): { mappedTo: string | null; confidence: 'high' | 'medium' | 'low' | 'none' } => {
     const normalized = csvField.toLowerCase().trim().replace(/[_\s-]/g, '');
@@ -252,54 +295,38 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
   };
 
   const exportToCSV = () => {
-    const exportData = members.flatMap(member => {
-      if (member.boats && member.boats.length > 0) {
-        return member.boats.map(boat => ({
-          'First Name': member.first_name,
-          'Last Name': member.last_name,
-          'Email': member.email || '',
-          'Phone': member.phone || '',
-          'Street': member.street || '',
-          'City': member.city || '',
-          'State': member.state || '',
-          'Postcode': member.postcode || '',
-          'Date Joined': member.date_joined || '',
-          'Membership Level': member.membership_level || member.membership_level_custom || '',
-          'Financial': member.is_financial ? 'Yes' : 'No',
-          'Amount Paid': member.amount_paid || '',
-          'Renewal Date': member.renewal_date || '',
-          'Boat Type': boat.boat_type || '',
-          'Sail Number': boat.sail_number || '',
-          'Hull': boat.hull || '',
-          'Handicap': boat.handicap || '',
-          'Emergency Contact Name': member.emergency_contact_name || '',
-          'Emergency Contact Phone': member.emergency_contact_phone || '',
-          'Emergency Contact Relationship': member.emergency_contact_relationship || ''
-        }));
-      } else {
-        return [{
-          'First Name': member.first_name,
-          'Last Name': member.last_name,
-          'Email': member.email || '',
-          'Phone': member.phone || '',
-          'Street': member.street || '',
-          'City': member.city || '',
-          'State': member.state || '',
-          'Postcode': member.postcode || '',
-          'Date Joined': member.date_joined || '',
-          'Membership Level': member.membership_level || member.membership_level_custom || '',
-          'Financial': member.is_financial ? 'Yes' : 'No',
-          'Amount Paid': member.amount_paid || '',
-          'Renewal Date': member.renewal_date || '',
-          'Boat Type': '',
-          'Sail Number': '',
-          'Hull': '',
-          'Handicap': '',
-          'Emergency Contact Name': member.emergency_contact_name || '',
-          'Emergency Contact Phone': member.emergency_contact_phone || '',
-          'Emergency Contact Relationship': member.emergency_contact_relationship || ''
-        }];
+    const maxBoats = Math.max(1, ...members.map(m => m.boats?.length || 0));
+
+    const exportData = members.map(member => {
+      const row: Record<string, string | number> = {
+        'First Name': member.first_name,
+        'Last Name': member.last_name,
+        'Email': member.email || '',
+        'Phone': member.phone || '',
+        'Street': member.street || '',
+        'City': member.city || '',
+        'State': member.state || '',
+        'Postcode': member.postcode || '',
+        'Date Joined': member.date_joined || '',
+        'Membership Level': member.membership_level || member.membership_level_custom || '',
+        'Financial': member.is_financial ? 'Yes' : 'No',
+        'Amount Paid': member.amount_paid || '',
+        'Renewal Date': member.renewal_date || '',
+        'Emergency Contact Name': member.emergency_contact_name || '',
+        'Emergency Contact Phone': member.emergency_contact_phone || '',
+        'Emergency Contact Relationship': member.emergency_contact_relationship || ''
+      };
+
+      for (let i = 0; i < maxBoats; i++) {
+        const boat = member.boats?.[i];
+        const suffix = maxBoats === 1 ? '' : ` ${i + 1}`;
+        row[`Boat Type${suffix}`] = boat?.boat_type || '';
+        row[`Sail Number${suffix}`] = boat?.sail_number || '';
+        row[`Hull${suffix}`] = boat?.hull || '';
+        row[`Handicap${suffix}`] = boat?.handicap || '';
       }
+
+      return row;
     });
 
     const csv = Papa.unparse(exportData);
@@ -316,11 +343,115 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
     onClose();
   };
 
+  const buildMembershipTypeMappings = () => {
+    const membershipFieldMapping = fieldMappings.find(
+      m => m.mappedTo === 'membership_level' || m.mappedTo === 'membership_level_custom'
+    );
+
+    if (!membershipFieldMapping) {
+      return [];
+    }
+
+    const csvFieldName = membershipFieldMapping.csvField;
+    const valueCounts: Record<string, number> = {};
+
+    csvData.forEach(row => {
+      const val = (row[csvFieldName] || '').toString().trim();
+      if (val) {
+        valueCounts[val] = (valueCounts[val] || 0) + 1;
+      }
+    });
+
+    return Object.entries(valueCounts).map(([csvValue, count]) => {
+      const normalizedCsv = csvValue.toLowerCase().trim();
+      const autoMatch = clubMembershipTypes.find(
+        t => t.name.toLowerCase().trim() === normalizedCsv
+      );
+
+      return {
+        csvValue,
+        count,
+        mappedTypeId: autoMatch?.id || null,
+        mappedTypeName: autoMatch?.name || null,
+        financialStatus: 'keep_csv' as const,
+      };
+    });
+  };
+
+  const proceedToMembershipMapping = () => {
+    const mappings = buildMembershipTypeMappings();
+    if (mappings.length > 0) {
+      setMembershipTypeMappings(mappings);
+      setImportStep('membership_mapping');
+    } else {
+      processImport();
+    }
+  };
+
+  const updateMembershipTypeMapping = (csvValue: string, typeId: string | null) => {
+    const matchedType = typeId ? clubMembershipTypes.find(t => t.id === typeId) : null;
+    setMembershipTypeMappings(prev =>
+      prev.map(m =>
+        m.csvValue === csvValue
+          ? { ...m, mappedTypeId: typeId, mappedTypeName: matchedType?.name || null }
+          : m
+      )
+    );
+  };
+
+  const updateMembershipFinancialStatus = (csvValue: string, status: MembershipTypeMapping['financialStatus']) => {
+    setMembershipTypeMappings(prev =>
+      prev.map(m =>
+        m.csvValue === csvValue ? { ...m, financialStatus: status } : m
+      )
+    );
+  };
+
+  const getMembershipMappingForValue = (csvValue: string): MembershipTypeMapping | undefined => {
+    return membershipTypeMappings.find(m => m.csvValue === csvValue);
+  };
+
+  const parseDateValue = (raw: string): string | null => {
+    if (!raw) return null;
+    const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      const d = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    }
+    const slashMatch = raw.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
+    if (slashMatch) {
+      let day = parseInt(slashMatch[1]);
+      let month = parseInt(slashMatch[2]);
+      let year = parseInt(slashMatch[3]);
+      if (year < 100) year += 2000;
+      if (day > 12) {
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      } else if (month > 12) {
+        const d = new Date(year, day - 1, month);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      } else {
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      }
+    }
+    const fallback = new Date(raw);
+    if (!isNaN(fallback.getTime()) && fallback.getFullYear() > 1970) {
+      return fallback.toISOString().split('T')[0];
+    }
+    return null;
+  };
+
   const processImport = async () => {
     setImportStep('importing');
     setImportProgress(0);
     setImportedCount(0);
     setSkippedCount(0);
+    setErrorCount(0);
+    setImportErrors([]);
+    setShowErrorDetails(false);
+
+    const importedEmails = new Set<string>();
 
     console.log('=== STARTING IMPORT ===');
     console.log('Total existing members:', members.length);
@@ -338,6 +469,39 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
     const validMappings = fieldMappings.filter(m => m.mappedTo && m.mappedTo !== 'ignore');
     let currentResolution: 'overwrite' | 'skip' | null = null;
+
+    const { data: clubSettings } = await supabase
+      .from('clubs')
+      .select('renewal_mode, fixed_renewal_date')
+      .eq('id', currentClubId)
+      .maybeSingle();
+
+    const getFinancialYearDates = (): { startDate: string; endDate: string } => {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      let fyMonth = 6;
+      let fyDay = 1;
+
+      if (clubSettings?.fixed_renewal_date) {
+        const [monthStr, dayStr] = clubSettings.fixed_renewal_date.split('-');
+        fyMonth = parseInt(monthStr, 10) - 1;
+        fyDay = parseInt(dayStr, 10);
+      }
+
+      let fyStart = new Date(currentYear, fyMonth, fyDay);
+      if (fyStart > now) {
+        fyStart = new Date(currentYear - 1, fyMonth, fyDay);
+      }
+      const fyEnd = new Date(fyStart.getFullYear() + 1, fyMonth, fyDay - 1);
+
+      return {
+        startDate: fyStart.toISOString().split('T')[0],
+        endDate: fyEnd.toISOString().split('T')[0],
+      };
+    };
+
+    const fyDates = getFinancialYearDates();
 
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
@@ -367,31 +531,80 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           memberData[field] = ['yes', 'true', '1', 'y'].includes(value.toString().toLowerCase());
         } else if (field === 'amount_paid') {
           memberData[field] = parseFloat(value.toString().replace(/[$,]/g, '')) || null;
+        } else if (field === 'date_joined' || field === 'renewal_date') {
+          const raw = value.toString().trim();
+          const parsed = parseDateValue(raw);
+          if (parsed) {
+            memberData[field] = parsed;
+          }
         } else {
           memberData[field] = value;
         }
       });
 
+      if (membershipTypeMappings.length > 0) {
+        const rawMembershipValue = (memberData.membership_level || memberData.membership_level_custom || '').toString().trim();
+        if (rawMembershipValue) {
+          const typeMapping = getMembershipMappingForValue(rawMembershipValue);
+          if (typeMapping?.mappedTypeName) {
+            memberData.membership_level = typeMapping.mappedTypeName;
+            delete memberData.membership_level_custom;
+          } else {
+            memberData.membership_level_custom = rawMembershipValue;
+            delete memberData.membership_level;
+          }
+
+          if (typeMapping?.financialStatus === 'financial') {
+            memberData.is_financial = true;
+          } else if (typeMapping?.financialStatus === 'unfinancial') {
+            memberData.is_financial = false;
+          }
+        }
+      }
+
+      if (!memberData.date_joined) {
+        memberData.date_joined = fyDates.startDate;
+      }
+      if (!memberData.renewal_date) {
+        memberData.renewal_date = fyDates.endDate;
+      }
+
       console.log(`\n--- Processing row ${i + 1} ---`);
       console.log('Member data built:', memberData);
 
-      // Skip if no first name or last name (required fields)
       if (!memberData.first_name || !memberData.last_name) {
-        console.log('❌ Skipping row - missing required fields');
-        setSkippedCount(prev => prev + 1);
+        console.log('Skipping row - missing required fields');
+        const missingFields = [];
+        if (!memberData.first_name) missingFields.push('First Name');
+        if (!memberData.last_name) missingFields.push('Last Name');
+        setImportErrors(prev => [...prev, {
+          row: i + 1,
+          name: `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim() || `Row ${i + 1}`,
+          reason: `Missing required field(s): ${missingFields.join(', ')}`
+        }]);
+        setErrorCount(prev => prev + 1);
         continue;
       }
 
       console.log(`Checking for duplicate: ${memberData.first_name} ${memberData.last_name} (${memberData.email || 'no email'})`);
 
+      if (memberData.email && importedEmails.has(memberData.email.toLowerCase())) {
+        console.log(`Skipping duplicate email within CSV: ${memberData.email}`);
+        setImportErrors(prev => [...prev, {
+          row: i + 1,
+          name: `${memberData.first_name} ${memberData.last_name}`,
+          reason: `Duplicate email in CSV - "${memberData.email}" was already imported from an earlier row`
+        }]);
+        setErrorCount(prev => prev + 1);
+        continue;
+      }
+
       const existingMember = members.find(m => {
-        // Check email match if both have emails
         if (memberData.email && m.email &&
             memberData.email.toLowerCase() === m.email.toLowerCase()) {
           return true;
         }
 
-        // Check name match if both have first and last names
         if (memberData.first_name && m.first_name &&
             memberData.last_name && m.last_name &&
             memberData.first_name.toLowerCase() === m.first_name.toLowerCase() &&
@@ -402,9 +615,34 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
         return false;
       });
 
+      let crossClubMember: any = null;
+      if (!existingMember && memberData.email) {
+        const { data: otherClubMembers } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, email, phone, street, city, state, postcode, country, country_code, category, user_id, club_id, avatar_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
+          .neq('club_id', currentClubId)
+          .ilike('email', memberData.email)
+          .limit(1);
+
+        if (otherClubMembers && otherClubMembers.length > 0) {
+          crossClubMember = otherClubMembers[0];
+          console.log(`Multi-club member detected: ${memberData.first_name} ${memberData.last_name} already exists in another club`);
+
+          const enrichFields = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'avatar_url', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
+          for (const field of enrichFields) {
+            if (!memberData[field] && crossClubMember[field]) {
+              memberData[field] = crossClubMember[field];
+            }
+          }
+
+          if (crossClubMember.user_id) {
+            memberData.user_id = crossClubMember.user_id;
+          }
+        }
+      }
+
       if (existingMember) {
-        console.log(`🔄 DUPLICATE FOUND: ${memberData.first_name} ${memberData.last_name} matches existing member ID ${existingMember.id}`);
-        console.log('Existing member:', existingMember);
+        console.log(`Duplicate found in same club: ${memberData.first_name} ${memberData.last_name}`);
         setDuplicateConflict({
           existing: existingMember,
           incoming: memberData,
@@ -423,22 +661,16 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
         delete (window as any).__conflictResolutionCallback;
 
         if (currentResolution === 'skip') {
-          console.log(`⏭️  User SKIPPED: ${memberData.first_name} ${memberData.last_name}`);
           setSkippedCount(prev => prev + 1);
           currentResolution = null;
           continue;
         }
-        console.log(`✏️  User chose OVERWRITE for: ${memberData.first_name} ${memberData.last_name}`);
-      } else {
-        console.log(`✅ NO DUPLICATE - Will import: ${memberData.first_name} ${memberData.last_name}`);
       }
 
       try {
         if (existingMember && currentResolution === 'overwrite') {
           memberData.id = existingMember.id;
         }
-
-        console.log('Attempting to insert/update member:', memberData);
 
         const { data: insertedMember, error: memberError } = await supabase
           .from('members')
@@ -448,7 +680,85 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
         if (memberError) throw memberError;
 
-        console.log('Successfully inserted member:', insertedMember);
+        if (crossClubMember) {
+          const profileId = crossClubMember.user_id;
+
+          if (profileId) {
+            const existingCm = await supabase
+              .from('club_memberships')
+              .select('id')
+              .eq('member_id', profileId)
+              .eq('club_id', currentClubId)
+              .maybeSingle();
+
+            if (!existingCm.data) {
+              await supabase
+                .from('club_memberships')
+                .insert({
+                  member_id: profileId,
+                  club_id: currentClubId,
+                  relationship_type: 'affiliate',
+                  status: 'active',
+                  payment_status: memberData.is_financial ? 'paid' : 'unpaid',
+                  joined_date: memberData.date_joined,
+                  expiry_date: memberData.renewal_date,
+                  pays_association_fees: false,
+                });
+            }
+
+            const primaryCm = await supabase
+              .from('club_memberships')
+              .select('id')
+              .eq('member_id', profileId)
+              .eq('club_id', crossClubMember.club_id)
+              .maybeSingle();
+
+            if (!primaryCm.data) {
+              await supabase
+                .from('club_memberships')
+                .insert({
+                  member_id: profileId,
+                  club_id: crossClubMember.club_id,
+                  relationship_type: 'primary',
+                  status: 'active',
+                  payment_status: 'paid',
+                  joined_date: memberData.date_joined,
+                  pays_association_fees: true,
+                });
+            }
+
+            const existingUserClub = await supabase
+              .from('user_clubs')
+              .select('id')
+              .eq('user_id', profileId)
+              .eq('club_id', currentClubId)
+              .maybeSingle();
+
+            if (!existingUserClub.data) {
+              await supabase
+                .from('user_clubs')
+                .insert({
+                  user_id: profileId,
+                  club_id: currentClubId,
+                  role: 'member',
+                });
+            }
+          }
+
+          const enrichFieldsReverse = ['phone', 'street', 'city', 'state', 'postcode', 'country', 'country_code', 'category', 'avatar_url', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const;
+          const enrichUpdates: any = {};
+          for (const field of enrichFieldsReverse) {
+            if (!crossClubMember[field] && memberData[field]) {
+              enrichUpdates[field] = memberData[field];
+            }
+          }
+          if (Object.keys(enrichUpdates).length > 0) {
+            await supabase
+              .from('members')
+              .update(enrichUpdates)
+              .eq('id', crossClubMember.id);
+          }
+        }
 
         if (Object.keys(boatData).length > 0 && boatData.boat_type) {
           boatData.member_id = insertedMember.id;
@@ -459,11 +769,26 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
           if (boatError) console.error('Error inserting boat:', boatError);
         }
 
+        if (memberData.email) {
+          importedEmails.add(memberData.email.toLowerCase());
+        }
         setImportedCount(prev => prev + 1);
-        console.log('Import count increased');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error importing member:', error);
-        setSkippedCount(prev => prev + 1);
+        const memberName = `${memberData.first_name || ''} ${memberData.last_name || ''}`.trim();
+        let reason = error?.message || 'Unknown error';
+        if (reason.includes('duplicate key') && reason.includes('members_club_email_unique')) {
+          reason = `Duplicate email - a member with email "${memberData.email}" already exists in this club`;
+        } else if (reason.includes('duplicate key')) {
+          reason = `Duplicate entry - a member with this data already exists`;
+        } else if (reason.includes('violates check constraint')) {
+          reason = 'Invalid data format for one or more fields';
+        } else if (reason.includes('permission') || reason.includes('policy')) {
+          reason = 'Permission denied - check your admin access to this club';
+        }
+        setImportErrors(prev => [...prev, { row: i + 1, name: memberName || `Row ${i + 1}`, reason }]);
+        setErrorCount(prev => prev + 1);
+        setImportStatus(`Error on row ${i + 1}: ${reason}`);
       }
 
       currentResolution = null;
@@ -495,11 +820,36 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
       <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-2xl shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold">
-            {mode === 'select' && 'Import / Export Members'}
-            {mode === 'import' && 'Import Members'}
-            {mode === 'export' && 'Export Members'}
-          </h2>
+          <div>
+            <h2 className="text-2xl font-bold">
+              {mode === 'select' && 'Import / Export Members'}
+              {mode === 'import' && 'Import Members'}
+              {mode === 'export' && 'Export Members'}
+            </h2>
+            {mode === 'import' && importStep !== 'upload' && importStep !== 'complete' && (
+              <div className="flex items-center gap-2 mt-2">
+                {(['mapping', 'membership_mapping', 'importing'] as const).map((step, idx) => {
+                  const labels = ['Field Mapping', 'Membership Types', 'Importing'];
+                  const stepOrder = ['mapping', 'membership_mapping', 'importing'];
+                  const currentIdx = stepOrder.indexOf(importStep);
+                  const isActive = importStep === step;
+                  const isComplete = currentIdx > idx;
+                  return (
+                    <React.Fragment key={step}>
+                      {idx > 0 && <div className={`w-6 h-px ${isComplete || isActive ? 'bg-blue-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'}`} />}
+                      <span className={`text-xs font-medium px-2 py-1 rounded ${
+                        isActive ? 'bg-blue-500/20 text-blue-400' :
+                        isComplete ? (darkMode ? 'text-green-400' : 'text-green-600') :
+                        darkMode ? 'text-gray-500' : 'text-gray-400'
+                      }`}>
+                        {isComplete ? '✓ ' : `${idx + 1}. `}{labels[idx]}
+                      </span>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
@@ -571,7 +921,7 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
                 <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   or click to browse
                 </p>
-                <label className="inline-flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 transition-colors">
+                <label className="btn-primary-green inline-flex items-center gap-2 px-6 py-3 rounded-lg cursor-pointer transition-all">
                   <Upload className="w-5 h-5" />
                   Choose File
                   <input
@@ -675,9 +1025,154 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
                   Back
                 </button>
                 <button
-                  onClick={processImport}
+                  onClick={proceedToMembershipMapping}
                   disabled={!fieldMappings.some(m => m.mappedTo && m.mappedTo !== 'ignore')}
-                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  Next: Review Membership Types
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mode === 'import' && importStep === 'membership_mapping' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Link2 size={20} className="text-blue-400" />
+                  Map Membership Types
+                </h3>
+                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Match the membership types found in your CSV to your club's configured membership types.
+                  This ensures imported members are correctly assigned.
+                </p>
+              </div>
+
+              {clubMembershipTypes.length === 0 && (
+                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-yellow-900/20 border-yellow-700/50' : 'bg-yellow-50 border-yellow-200'}`}>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle size={18} className="text-yellow-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                        No membership types configured
+                      </p>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-yellow-400/70' : 'text-yellow-700'}`}>
+                        Your club has no membership types set up yet. The membership type labels from the CSV will be stored,
+                        but you will need to manually assign proper membership types to each member after import.
+                        You can configure membership types in Settings &gt; Membership.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {membershipTypeMappings.length > 0 && (
+                <div className="space-y-3">
+                  <div className={`grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    <div className="col-span-3">CSV Value</div>
+                    <div className="col-span-1 text-center">Count</div>
+                    <div className="col-span-4">Map To Membership Type</div>
+                    <div className="col-span-4">Financial Status</div>
+                  </div>
+
+                  {membershipTypeMappings.map((mapping) => (
+                    <div
+                      key={mapping.csvValue}
+                      className={`grid grid-cols-12 gap-4 items-center p-4 rounded-lg border transition-all ${
+                        darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'
+                      } ${mapping.mappedTypeId ? 'ring-2 ring-green-500/20' : ''}`}
+                    >
+                      <div className="col-span-3">
+                        <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                          darkMode ? 'bg-slate-700 text-slate-200' : 'bg-gray-200 text-gray-800'
+                        }`}>
+                          {mapping.csvValue}
+                        </span>
+                      </div>
+                      <div className="col-span-1 text-center">
+                        <span className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {mapping.count}
+                        </span>
+                      </div>
+                      <div className="col-span-4">
+                        <select
+                          value={mapping.mappedTypeId || ''}
+                          onChange={(e) => updateMembershipTypeMapping(mapping.csvValue, e.target.value || null)}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            darkMode
+                              ? 'bg-gray-800 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="">Do not assign (manual later)</option>
+                          {clubMembershipTypes.map(type => (
+                            <option key={type.id} value={type.id}>
+                              {type.name} {type.amount > 0 ? `($${type.amount})` : '(Free)'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-4">
+                        <select
+                          value={mapping.financialStatus}
+                          onChange={(e) => updateMembershipFinancialStatus(mapping.csvValue, e.target.value as MembershipTypeMapping['financialStatus'])}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                            darkMode
+                              ? 'bg-gray-800 border-gray-600 text-white'
+                              : 'bg-white border-gray-300 text-gray-900'
+                          }`}
+                        >
+                          <option value="keep_csv">Use CSV value (if mapped)</option>
+                          <option value="financial">Set all as Financial</option>
+                          <option value="unfinancial">Set all as Unfinancial</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {membershipTypeMappings.length === 0 && (
+                <div className={`p-6 rounded-lg border text-center ${darkMode ? 'bg-gray-750 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <Info size={18} className="text-blue-400" />
+                    <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      No membership type data found in CSV
+                    </p>
+                  </div>
+                  <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                    You can assign membership types to imported members individually after import.
+                  </p>
+                </div>
+              )}
+
+              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-blue-900/20 border-blue-700/40' : 'bg-blue-50 border-blue-200'}`}>
+                <div className="flex items-start gap-3">
+                  <Info size={18} className="text-blue-400 mt-0.5 shrink-0" />
+                  <div className={`text-sm ${darkMode ? 'text-blue-300/80' : 'text-blue-700'}`}>
+                    <p className="font-medium mb-1">How membership mapping works:</p>
+                    <ul className="space-y-0.5 list-disc list-inside">
+                      <li>Matched types will be assigned to members during import</li>
+                      <li>Unmatched types will store the CSV label for you to assign manually later</li>
+                      <li>Members imported from existing systems with paid memberships should use the financial status override to mark them correctly</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setImportStep('mapping')}
+                  className={`px-6 py-3 rounded-lg font-medium ${
+                    darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'
+                  }`}
+                >
+                  Back
+                </button>
+                <button
+                  onClick={processImport}
+                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 flex items-center justify-center gap-2"
                 >
                   Start Import
                 </button>
@@ -706,14 +1201,92 @@ export const MemberImportExportModal: React.FC<MemberImportExportModalProps> = (
 
           {mode === 'import' && importStep === 'complete' && (
             <div className="space-y-6 text-center py-8">
-              <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
+              {errorCount > 0 && importedCount === 0 ? (
+                <AlertCircle className="w-16 h-16 mx-auto text-red-500" />
+              ) : errorCount > 0 ? (
+                <AlertCircle className="w-16 h-16 mx-auto text-yellow-500" />
+              ) : (
+                <CheckCircle className="w-16 h-16 mx-auto text-green-500" />
+              )}
               <div>
-                <h3 className="text-xl font-semibold mb-2">Import Complete!</h3>
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  Successfully imported {importedCount} member(s)
-                  {skippedCount > 0 && ` • Skipped ${skippedCount} duplicate(s)`}
-                </p>
+                <h3 className="text-xl font-semibold mb-2">
+                  {errorCount > 0 && importedCount === 0 ? 'Import Failed' : 'Import Complete!'}
+                </h3>
+                <div className="flex items-center justify-center gap-4 mt-3">
+                  {importedCount > 0 && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
+                    }`}>
+                      <CheckCircle size={14} />
+                      {importedCount} imported
+                    </span>
+                  )}
+                  {skippedCount > 0 && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                    }`}>
+                      {skippedCount} skipped
+                    </span>
+                  )}
+                  {errorCount > 0 && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'
+                    }`}>
+                      <AlertCircle size={14} />
+                      {errorCount} error{errorCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {importErrors.length > 0 && (
+                <div className="text-left max-w-2xl mx-auto">
+                  <button
+                    onClick={() => setShowErrorDetails(!showErrorDetails)}
+                    className={`flex items-center gap-2 text-sm font-medium mb-3 mx-auto ${
+                      darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-500'
+                    }`}
+                  >
+                    {showErrorDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    {showErrorDetails ? 'Hide' : 'Show'} error details ({importErrors.length})
+                  </button>
+
+                  {showErrorDetails && (
+                    <div className={`rounded-lg border overflow-hidden ${
+                      darkMode ? 'border-gray-700' : 'border-gray-200'
+                    }`}>
+                      <div className={`grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium uppercase tracking-wider ${
+                        darkMode ? 'bg-gray-750 text-gray-500' : 'bg-gray-50 text-gray-400'
+                      }`}>
+                        <div className="col-span-1">Row</div>
+                        <div className="col-span-3">Name</div>
+                        <div className="col-span-8">Reason</div>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {importErrors.map((err, idx) => (
+                          <div
+                            key={idx}
+                            className={`grid grid-cols-12 gap-2 px-4 py-2.5 text-sm border-t ${
+                              darkMode ? 'border-gray-700' : 'border-gray-100'
+                            }`}
+                          >
+                            <div className={`col-span-1 font-mono ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                              {err.row}
+                            </div>
+                            <div className={`col-span-3 font-medium truncate ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {err.name}
+                            </div>
+                            <div className={`col-span-8 ${darkMode ? 'text-red-400/80' : 'text-red-600'}`}>
+                              {err.reason}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   onImportComplete();

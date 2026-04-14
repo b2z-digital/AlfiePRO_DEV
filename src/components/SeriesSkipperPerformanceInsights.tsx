@@ -402,10 +402,15 @@ export const SeriesSkipperPerformanceInsights: React.FC<SeriesSkipperPerformance
               return res.position || 999;
             });
 
-            // Calculate drops using event's dropRules array (same as single event results)
             const numRaces = raceNumbers.length;
             let numDrops = 0;
-            const dropRules = selectedRound?.dropRules || series.dropRules || [4, 8, 16, 24, 32, 40]; // Default to HMS rules
+            const roundDropRules = selectedRound?.dropRules;
+            const seriesDropRules = series.dropRules;
+            const dropRules = (roundDropRules && roundDropRules.length > 0)
+              ? roundDropRules
+              : (seriesDropRules && seriesDropRules.length > 0)
+                ? seriesDropRules
+                : [4, 8, 16, 24, 32, 40];
 
             // Count drops based on number of races completed
             for (const threshold of dropRules) {

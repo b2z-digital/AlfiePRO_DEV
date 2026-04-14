@@ -91,7 +91,7 @@ export const SuggestChannelModal: React.FC<SuggestChannelModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-lg">
+            <div className="p-2 from-yellow-500/20 to-orange-500/20 rounded-lg">
               <Lightbulb className="w-6 h-6 text-yellow-400" />
             </div>
             <h2 className="text-2xl font-bold text-white">Suggest a Channel</h2>
@@ -167,7 +167,7 @@ export const SuggestChannelModal: React.FC<SuggestChannelModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary-green flex items-center gap-2 px-6 py-2.5 from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (
                 <>

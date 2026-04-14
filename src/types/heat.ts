@@ -28,6 +28,8 @@ export interface HeatConfiguration {
   skippersPerHeat?: number;
   maxHeatSize?: number; // Safety limit
   allowPromotionCountChange?: boolean; // Allow RO to change promotion count mid-event
+  promotionCountOverrides?: Record<number, number>; // Per-race promotion count overrides (race number → count)
+  manualTieBreaks?: Record<number, number>; // Manual tie-break values (skipper index → priority, lower wins)
   scoringSystem?: 'hms' | 'shrs'; // Heat racing scoring system type
   shrsAssignmentMode?: 'progressive' | 'preset'; // SHR: qualifying assignment method (Progressive or Balanced)
   shrsQualifyingRounds?: number; // SHR: number of qualifying rounds before finals

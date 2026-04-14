@@ -20,11 +20,16 @@ const PWAInstallPrompt: React.FC = () => {
     setIsIOS(isIOSDevice);
     setIsStandalone(isInStandaloneMode);
 
-    // Don't show on public club pages
     const isPublicPage = window.location.pathname.includes('/public/');
-    if (isPublicPage) {
+    const isAuthPage = window.location.pathname === '/login' ||
+                       window.location.pathname === '/register' ||
+                       window.location.pathname === '/forgot-password' ||
+                       window.location.pathname === '/reset-password';
+    if (isPublicPage || isAuthPage) {
       return;
     }
+
+    return;
 
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     const dismissedDate = dismissed ? new Date(dismissed) : null;
@@ -83,7 +88,7 @@ const PWAInstallPrompt: React.FC = () => {
 
   if (isIOS && !deferredPrompt) {
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4 shadow-lg z-50 animate-slideUp">
+      <div className="fixed bottom-0 left-0 right-0 from-blue-600 to-blue-500 text-white p-4 shadow-lg z-50 animate-slideUp">
         <div className="max-w-4xl mx-auto">
           <button
             onClick={handleDismiss}
@@ -112,7 +117,7 @@ const PWAInstallPrompt: React.FC = () => {
 
   if (deferredPrompt) {
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4 shadow-lg z-50 animate-slideUp">
+      <div className="fixed bottom-0 left-0 right-0 from-blue-600 to-blue-500 text-white p-4 shadow-lg z-50 animate-slideUp">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1">
             <Download className="w-6 h-6 flex-shrink-0" />

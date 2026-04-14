@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Video, AlertCircle, Loader2, RefreshCw, Signal, Square, ZoomIn, ZoomOut, RotateCcw, Bug } from 'lucide-react';
+import { Video, CircleAlert as AlertCircle, Loader as Loader2, RefreshCw, Signal, Square, ZoomIn, ZoomOut, RotateCcw, Bug } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
 const BUILD_VERSION = '20260122-v4';
@@ -620,7 +620,7 @@ export default function MobileStreamPage() {
 
     setTimeout(() => {
       initialize();
-    }, 100);
+    }, 500);
   };
 
   const resetZoom = () => {

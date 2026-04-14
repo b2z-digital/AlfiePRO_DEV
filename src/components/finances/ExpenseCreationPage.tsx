@@ -64,8 +64,14 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
   
   // Data
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
+  const [taxEnabled, setTaxEnabled] = useState(false);
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [expenseNumber, setExpenseNumber] = useState('');
+
+  // Quick add category
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
 
   useEffect(() => {
     if (isAssociation || currentClub?.clubId) {
@@ -106,6 +112,7 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
       console.log('ExpenseCreationPage loadData - isAssociation:', isAssociation, 'associationId:', associationId, 'associationType:', associationType);
 
       if (isAssociation) {
+        setTaxEnabled(true);
         // Load association categories and tax rates
         console.log('Loading association budget categories...');
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -133,15 +140,27 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
         if (taxRatesError) throw taxRatesError;
         setTaxRates(taxRatesData || []);
       } else {
-        // Load club tax rates and categories
-        const { data: taxRatesData, error: taxRatesError } = await supabase
-          .from('tax_rates')
-          .select('id, name, rate, currency')
-          .eq('club_id', currentClub?.clubId)
-          .eq('is_active', true);
+        const { data: clubData } = await supabase
+          .from('clubs')
+          .select('tax_enabled')
+          .eq('id', currentClub?.clubId)
+          .maybeSingle();
 
-        if (taxRatesError) throw taxRatesError;
-        setTaxRates(taxRatesData || []);
+        const isTaxEnabled = clubData?.tax_enabled || false;
+        setTaxEnabled(isTaxEnabled);
+
+        if (isTaxEnabled) {
+          const { data: taxRatesData, error: taxRatesError } = await supabase
+            .from('tax_rates')
+            .select('id, name, rate, currency')
+            .eq('club_id', currentClub?.clubId)
+            .eq('is_active', true);
+
+          if (taxRatesError) throw taxRatesError;
+          setTaxRates(taxRatesData || []);
+        } else {
+          setTaxRates([]);
+        }
 
         const { data: categoriesData, error: categoriesError} = await supabase
           .from('budget_categories')
@@ -159,6 +178,47 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleQuickAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setSavingCategory(true);
+    try {
+      if (isAssociation) {
+        const { data, error: insertError } = await supabase
+          .from('association_budget_categories')
+          .insert({
+            association_id: associationId,
+            association_type: associationType,
+            name: newCategoryName.trim(),
+            type: 'expense',
+            is_active: true
+          })
+          .select('id, name, type')
+          .single();
+        if (insertError) throw insertError;
+        if (data) setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('budget_categories')
+          .insert({
+            club_id: currentClub?.clubId,
+            name: newCategoryName.trim(),
+            type: 'expense',
+            is_active: true
+          })
+          .select('id, name, type')
+          .single();
+        if (insertError) throw insertError;
+        if (data) setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      setNewCategoryName('');
+      setShowAddCategory(false);
+    } catch (err) {
+      console.error('Error creating category:', err);
+    } finally {
+      setSavingCategory(false);
     }
   };
 
@@ -509,16 +569,16 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
             <h3 className="text-lg font-semibold text-white mb-4">Line Items</h3>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 text-sm font-medium text-slate-400">
+              <div className={`grid gap-4 text-sm font-medium text-slate-400 ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                 <div className="col-span-3">Description</div>
                 <div className="col-span-2">Amount</div>
                 <div className="col-span-3">Category</div>
-                <div className="col-span-3">Tax</div>
+                {taxEnabled && <div className="col-span-3">Tax</div>}
                 <div className="col-span-1">Actions</div>
               </div>
 
               {lineItems.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-4 items-start">
+                <div key={index} className={`grid gap-4 items-start ${taxEnabled ? 'grid-cols-12' : 'grid-cols-9'}`}>
                   <div className="col-span-3">
                     <input
                       type="text"
@@ -544,7 +604,14 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
                   <div className="col-span-3">
                     <select
                       value={item.categoryId}
-                      onChange={(e) => updateLineItem(index, 'categoryId', e.target.value)}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          e.target.value = item.categoryId;
+                          setShowAddCategory(true);
+                          return;
+                        }
+                        updateLineItem(index, 'categoryId', e.target.value);
+                      }}
                       className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
                     >
                       <option value="">Select category</option>
@@ -553,28 +620,31 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
                           {category.name}
                         </option>
                       ))}
+                      <option value="__add_new__">+ Add a Category...</option>
                     </select>
                   </div>
 
-                  <div className="col-span-3">
-                    <select
-                      value={getTaxSelectionValue(item)}
-                      onChange={(e) => updateLineItem(index, 'taxSelection', e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
-                    >
-                      <option value="">No Tax</option>
-                      {taxRates.map(taxRate => (
-                        <optgroup key={taxRate.id} label={taxRate.name}>
-                          <option value={`${taxRate.id}|included`}>
-                            Tax Included
-                          </option>
-                          <option value={`${taxRate.id}|excluded`}>
-                            Tax Excluded
-                          </option>
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                  {taxEnabled && (
+                    <div className="col-span-3">
+                      <select
+                        value={getTaxSelectionValue(item)}
+                        onChange={(e) => updateLineItem(index, 'taxSelection', e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                      >
+                        <option value="">No Tax</option>
+                        {taxRates.map(taxRate => (
+                          <optgroup key={taxRate.id} label={taxRate.name}>
+                            <option value={`${taxRate.id}|included`}>
+                              Tax Included
+                            </option>
+                            <option value={`${taxRate.id}|excluded`}>
+                              Tax Excluded
+                            </option>
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="col-span-1">
                     {lineItems.length > 1 && (
@@ -629,15 +699,19 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-80 space-y-2">
-              <div className="flex justify-between text-slate-300">
-                <span>Sub Total</span>
-                <span>${totals.subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>Tax</span>
-                <span>${totals.tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-xl font-bold text-white border-t border-slate-600 pt-2">
+              {taxEnabled && (
+                <>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Sub Total</span>
+                    <span>${totals.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>Tax</span>
+                    <span>${totals.tax.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              <div className={`flex justify-between text-xl font-bold text-white ${taxEnabled ? 'border-t border-slate-600 pt-2' : ''}`}>
                 <span>TOTAL</span>
                 <span>${totals.total.toFixed(2)} AUD</span>
               </div>
@@ -656,13 +730,45 @@ export const ExpenseCreationPage: React.FC<ExpenseCreationPageProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="btn-primary-green px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50"
             >
               {loading ? 'Saving...' : 'Save Expense'}
             </button>
           </div>
         </form>
       </div>
+
+      {showAddCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Add Expense Category</h3>
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm mb-4"
+              placeholder="Category name"
+              autoFocus
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                className="px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleQuickAddCategory}
+                disabled={savingCategory || !newCategoryName.trim()}
+                className="btn-primary-green px-4 py-2 text-white rounded-lg text-sm disabled:opacity-50"
+              >
+                {savingCategory ? 'Adding...' : 'Add Category'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { socialStorage, SocialPost } from '../../utils/socialStorage';
 import PostCard from './PostCard';
@@ -7,37 +7,47 @@ interface ActivityFeedProps {
   groupId?: string;
   privacy?: string[];
   darkMode?: boolean;
+  authorId?: string;
 }
 
-export default function ActivityFeed({ groupId, privacy = ['public'], darkMode = false }: ActivityFeedProps) {
+export default function ActivityFeed({ groupId, privacy, darkMode = false, authorId }: ActivityFeedProps) {
   const lightMode = !darkMode;
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const loadIdRef = useRef(0);
+
+  const stablePrivacy = useMemo(() => privacy || ['public'], [privacy?.join(',')]);
 
   const loadPosts = useCallback(async (refresh = false, pageNum?: number) => {
+    const thisLoadId = ++loadIdRef.current;
+
     if (refresh) {
+      setPosts([]);
+      setPage(0);
+      setIsLoading(true);
       setIsRefreshing(true);
     } else {
       setIsLoading(true);
     }
 
     try {
-      const offset = refresh ? 0 : (pageNum ?? page) * 20;
+      const offset = refresh ? 0 : (pageNum ?? 0) * 20;
       const data = await socialStorage.getFeed({
         limit: 20,
         offset,
         groupId,
-        privacy
+        privacy: stablePrivacy,
+        authorId,
       });
+
+      if (thisLoadId !== loadIdRef.current) return;
 
       if (refresh) {
         setPosts(data || []);
-        setPage(0);
       } else {
-        // Remove duplicates when appending
         setPosts(prev => {
           const existingIds = new Set(prev.map(p => p.id));
           const newPosts = (data || []).filter(p => !existingIds.has(p.id));
@@ -47,34 +57,36 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
 
       setHasMore((data || []).length === 20);
     } catch (error) {
+      if (thisLoadId !== loadIdRef.current) return;
       console.error('Error loading posts:', error);
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (thisLoadId === loadIdRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, [page, groupId, privacy]);
+  }, [groupId, stablePrivacy, authorId]);
 
-  // Initial load
   useEffect(() => {
     loadPosts(true);
-  }, [groupId, privacy]);
+  }, [loadPosts]);
 
-  // Subscribe to feed updates
   useEffect(() => {
-    const unsubscribe = socialStorage.subscribeToFeed((payload) => {
-      if (payload.eventType === 'INSERT') {
-        // Just prepend the new post instead of reloading everything
-        if (payload.new) {
-          setPosts(prev => {
-            // Check if post already exists
-            if (prev.some(p => p.id === payload.new.id)) {
-              return prev;
-            }
-            return [payload.new as SocialPost, ...prev];
-          });
+    const unsubscribe = socialStorage.subscribeToFeed(async (payload) => {
+      if (payload.eventType === 'INSERT' && payload.new?.id) {
+        if (posts.some(p => p.id === payload.new.id)) return;
+        try {
+          const fullPost = await socialStorage.getPostById(payload.new.id);
+          if (fullPost) {
+            setPosts(prev => {
+              if (prev.some(p => p.id === fullPost.id)) return prev;
+              return [fullPost, ...prev];
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching new post:', err);
         }
       } else if (payload.eventType === 'DELETE') {
-        // Remove the deleted post from the list
         setPosts(prev => prev.filter(p => p.id !== payload.old?.id));
       }
     });
@@ -87,7 +99,6 @@ export default function ActivityFeed({ groupId, privacy = ['public'], darkMode =
   const handleLoadMore = () => {
     const nextPage = page + 1;
     setPage(nextPage);
-    // Load posts with the next page
     loadPosts(false, nextPage);
   };
 

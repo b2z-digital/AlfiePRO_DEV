@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  DollarSign, Users, CheckCircle, Sparkles, ArrowRight,
-  Plus, LogOut, Calendar, Building2, AlertCircle, Zap, Check,
-  ChevronDown, ChevronRight, TrendingUp, Edit, Trash2
-} from 'lucide-react';
+import { DollarSign, Users, CircleCheck as CheckCircle, Sparkles, ArrowRight, Plus, LogOut, Calendar, Building2, CircleAlert as AlertCircle, Zap, Check, ChevronDown, ChevronRight, TrendingUp, CreditCard as Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 
 interface Payment {
@@ -478,7 +474,7 @@ export const SmartReconciliationTab: React.FC<SmartReconciliationTabProps> = ({
             </h3>
             <button
               onClick={() => setShowQuickAdd(!showQuickAdd)}
-              className="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
+              className="btn-primary-green px-3 py-1.5 rounded-lg text-white text-sm font-medium transition-colors flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Quick Add
@@ -507,7 +503,7 @@ export const SmartReconciliationTab: React.FC<SmartReconciliationTabProps> = ({
               <div className="flex gap-2">
                 <button
                   onClick={handleQuickAddPayment}
-                  className="flex-1 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium"
+                  className="btn-primary-green flex-1 px-3 py-2 rounded-lg text-white text-sm font-medium"
                 >
                   Add Payment
                 </button>

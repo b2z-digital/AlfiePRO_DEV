@@ -131,8 +131,9 @@ export const socialStorage = {
     offset?: number;
     groupId?: string;
     privacy?: string[];
+    authorId?: string;
   } = {}) {
-    const { limit = 20, offset = 0, groupId, privacy = ['public'] } = options;
+    const { limit = 20, offset = 0, groupId, privacy = ['public'], authorId } = options;
 
     let query = supabase
       .from('social_posts')
@@ -145,7 +146,9 @@ export const socialStorage = {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (groupId) {
+    if (authorId) {
+      query = query.eq('author_id', authorId);
+    } else if (groupId) {
       query = query.eq('group_id', groupId);
     } else {
       query = query.in('privacy', privacy);
@@ -171,6 +174,21 @@ export const socialStorage = {
       }));
     }
 
+    return data;
+  },
+
+  async getPostById(postId: string): Promise<SocialPost | null> {
+    const { data, error } = await supabase
+      .from('social_posts')
+      .select(`
+        *,
+        author:profiles(id, full_name, avatar_url),
+        attachments:social_media_attachments(*)
+      `)
+      .eq('id', postId)
+      .maybeSingle();
+
+    if (error) throw error;
     return data;
   },
 
@@ -204,12 +222,10 @@ export const socialStorage = {
   },
 
   async deletePost(postId: string) {
-    const { error } = await supabase
-      .from('social_posts')
-      .delete()
-      .eq('id', postId);
+    const { data, error } = await supabase.rpc('delete_social_post', { p_post_id: postId });
 
     if (error) throw error;
+    if (data === false) throw new Error('Post not found or already deleted');
   },
 
   async getComments(postId: string) {
@@ -217,7 +233,7 @@ export const socialStorage = {
       .from('social_comments')
       .select(`
         *,
-        author:profiles!social_comments_author_id_fkey(id, full_name, avatar_url)
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .eq('post_id', postId)
       .is('parent_comment_id', null)
@@ -239,12 +255,36 @@ export const socialStorage = {
       })
       .select(`
         *,
-        author:profiles!social_comments_author_id_fkey(id, full_name, avatar_url)
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
       `)
       .single();
 
     if (error) throw error;
     return data;
+  },
+
+  async updateComment(commentId: string, content: string) {
+    const { data, error } = await supabase
+      .from('social_comments')
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq('id', commentId)
+      .select(`
+        *,
+        author:profiles!social_comments_author_id_profiles_fkey(id, full_name, avatar_url)
+      `)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteComment(commentId: string) {
+    const { error } = await supabase
+      .from('social_comments')
+      .delete()
+      .eq('id', commentId);
+
+    if (error) throw error;
   },
 
   async toggleReaction(postId: string, reactionType: string) {
@@ -604,5 +644,199 @@ export const socialStorage = {
     return () => {
       supabase.removeChannel(channel);
     };
+  },
+
+  async reportPost(postId: string, reason: string, details?: string, clubId?: string, groupId?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('social_post_reports')
+      .insert({
+        post_id: postId,
+        reporter_id: user.id,
+        reason,
+        details: details || null,
+        club_id: clubId || null,
+        group_id: groupId || null,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    if (clubId) {
+      const { data: admins } = await supabase
+        .from('user_clubs')
+        .select('user_id')
+        .eq('club_id', clubId)
+        .in('role', ['admin', 'super_admin']);
+
+      if (admins && admins.length > 0) {
+        const { data: reporter } = await supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const reporterName = reporter ? `${reporter.first_name || ''} ${reporter.last_name || ''}`.trim() : 'A member';
+        const reasonLabel = reason.charAt(0).toUpperCase() + reason.slice(1).replace(/_/g, ' ');
+
+        const notifications = admins
+          .filter(admin => admin.user_id !== user.id)
+          .map(admin => ({
+            user_id: admin.user_id,
+            club_id: clubId,
+            type: 'community',
+            subject: 'Post Reported',
+            body: `${reporterName} reported a post for: ${reasonLabel}. Please review in Community > Post Reports.`,
+            notification_category: 'community',
+            push_status: 'pending',
+            link_url: '/community'
+          }));
+
+        if (notifications.length > 0) {
+          await supabase.from('notifications').insert(notifications);
+        }
+      }
+    }
+
+    return data;
+  },
+
+  async getPostReports(clubIds?: string[], status?: string) {
+    let query = supabase
+      .from('social_post_reports')
+      .select(`
+        *,
+        reporter:profiles!social_post_reports_reporter_id_profiles_fkey(id, first_name, last_name, avatar_url),
+        post:social_posts(id, content, author_id, author:profiles!social_posts_author_id_profiles_fkey(id, first_name, last_name, avatar_url))
+      `)
+      .order('created_at', { ascending: false });
+
+    if (clubIds && clubIds.length > 0) query = query.in('club_id', clubIds);
+    if (status) query = query.eq('status', status);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async reviewReport(reportId: string, action: 'dismissed' | 'actioned', actionTaken?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabase
+      .from('social_post_reports')
+      .update({
+        status: action,
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        action_taken: actionTaken || null
+      })
+      .eq('id', reportId);
+
+    if (error) throw error;
+  },
+
+  async deletePostAsAdmin(postId: string) {
+    const { error } = await supabase
+      .from('social_posts')
+      .delete()
+      .eq('id', postId);
+
+    if (error) throw error;
+  },
+
+  async getGroupModerators(groupId: string) {
+    const { data, error } = await supabase
+      .from('social_group_moderators')
+      .select(`
+        *,
+        user:profiles(id, first_name, last_name, avatar_url)
+      `)
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async addGroupModerator(groupId: string, userId: string, role: 'moderator' | 'admin' = 'moderator') {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('social_group_moderators')
+      .insert({
+        group_id: groupId,
+        user_id: userId,
+        role,
+        assigned_by: user.id
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async removeGroupModerator(groupId: string, userId: string) {
+    const { error } = await supabase
+      .from('social_group_moderators')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
+
+  async getBlockedUsers(groupId?: string, clubId?: string) {
+    let query = supabase
+      .from('social_blocked_users')
+      .select(`
+        *,
+        user:profiles(id, first_name, last_name, avatar_url)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (groupId) query = query.eq('group_id', groupId);
+    if (clubId) query = query.eq('club_id', clubId);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async blockUser(userId: string, blockType: 'muted' | 'banned', reason?: string, groupId?: string, clubId?: string, expiresAt?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('social_blocked_users')
+      .insert({
+        user_id: userId,
+        blocked_by: user.id,
+        block_type: blockType,
+        reason: reason || null,
+        group_id: groupId || null,
+        club_id: clubId || null,
+        expires_at: expiresAt || null
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async unblockUser(blockId: string) {
+    const { error } = await supabase
+      .from('social_blocked_users')
+      .delete()
+      .eq('id', blockId);
+
+    if (error) throw error;
   }
 };

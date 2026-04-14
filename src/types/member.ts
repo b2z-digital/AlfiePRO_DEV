@@ -40,6 +40,9 @@ export interface Member {
   country?: string | null;
   country_code?: string | null;
   category?: string | null;
+  activation_status?: string | null;
+  activation_sent_at?: string | null;
+  activated_at?: string | null;
 }
 
 export interface MemberFormData {

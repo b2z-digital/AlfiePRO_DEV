@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Globe, Users, Lock, Trash2, Flag, MapPin, Smile, ExternalLink, ShieldAlert } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { SocialPost } from '../../utils/socialStorage';
 import { socialStorage } from '../../utils/socialStorage';
 import CommentSection from './CommentSection';
 import { ConfirmationModal } from '../ConfirmationModal';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import ReportPostModal from './ReportPostModal';
 
 const extractYouTubeId = (url: string): string | null => {
   const patterns = [
@@ -32,11 +34,18 @@ interface PostCardProps {
 export default function PostCard({ post, onUpdate, darkMode = false }: PostCardProps) {
   const lightMode = !darkMode;
   const { addNotification } = useNotification();
-  const [showComments, setShowComments] = useState(false);
+  const { user, currentClub, isSuperAdmin, isStateOrgAdmin } = useAuth();
+  const [showComments, setShowComments] = useState(true);
   const [isLiked, setIsLiked] = useState(!!post.user_reaction);
   const [likeCount, setLikeCount] = useState(post.like_count);
+  const [commentCount, setCommentCount] = useState(post.comment_count || 0);
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  const isPostOwner = user?.id === post.author_id;
+  const isClubAdmin = currentClub?.role === 'admin' || currentClub?.role === 'super_admin';
+  const canDelete = isPostOwner || isClubAdmin || isSuperAdmin || isStateOrgAdmin;
 
   const handleLike = async () => {
     try {
@@ -55,14 +64,27 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
   const handleDelete = async () => {
     try {
-      await socialStorage.deletePost(post.id);
-      addNotification('Post deleted successfully', 'success');
+      if (isPostOwner) {
+        await socialStorage.deletePost(post.id);
+      } else {
+        await socialStorage.deletePostAsAdmin(post.id);
+      }
       setShowDeleteConfirmation(false);
+      addNotification('Post deleted successfully', 'success');
       onUpdate?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting post:', error);
-      addNotification('Failed to delete post', 'error');
+      const msg = error?.message?.includes('permission')
+        ? 'You do not have permission to delete this post'
+        : 'Failed to delete post. Please try again.';
+      addNotification(msg, 'error');
+      setShowDeleteConfirmation(false);
     }
+  };
+
+  const handleReportClick = () => {
+    setShowMenu(false);
+    setShowReportModal(true);
   };
 
   const getPrivacyIcon = () => {
@@ -122,17 +144,33 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
             {showMenu && (
               <div className={`absolute right-0 mt-2 w-48 rounded-xl shadow-xl border z-10 ${lightMode ? 'bg-white border-gray-200' : 'bg-slate-800 border-slate-700'}`}>
-                <button
-                  onClick={handleDeleteClick}
-                  className={`w-full flex items-center space-x-2 px-4 py-3 text-red-600 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Delete Post</span>
-                </button>
-                <button className={`w-full flex items-center space-x-2 px-4 py-3 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'text-gray-700 hover:bg-gray-50' : 'text-slate-300 hover:bg-slate-700/50'}`}>
-                  <Flag className="w-4 h-4" />
-                  <span>Report Post</span>
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={handleDeleteClick}
+                    className={`w-full flex items-center space-x-2 px-4 py-3 text-red-600 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'hover:bg-gray-50' : 'hover:bg-slate-700/50'}`}
+                  >
+                    {isPostOwner ? (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Post</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert className="w-4 h-4" />
+                        <span>Delete Post (Admin)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {!isPostOwner && (
+                  <button
+                    onClick={handleReportClick}
+                    className={`w-full flex items-center space-x-2 px-4 py-3 first:rounded-t-xl last:rounded-b-xl transition-colors ${lightMode ? 'text-gray-700 hover:bg-gray-50' : 'text-slate-300 hover:bg-slate-700/50'}`}
+                  >
+                    <Flag className="w-4 h-4" />
+                    <span>Report Post</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -188,16 +226,35 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
           <div className={`mt-4 grid gap-2 ${post.attachments.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {post.attachments.map((attachment, index) => {
               const youtubeId = attachment.file_type === 'video' ? extractYouTubeId(attachment.file_url) : null;
+              const isBlobUrl = attachment.file_url?.startsWith('blob:');
 
               return (
                 <div key={attachment.id} className="relative">
                   {attachment.file_type === 'image' ? (
+                    isBlobUrl ? (
+                      <div
+                        className={`w-full rounded-xl flex items-center justify-center ${lightMode ? 'bg-gray-100 text-gray-400' : 'bg-slate-700/50 text-slate-500'}`}
+                        style={{ height: post.attachments!.length === 1 ? '300px' : '200px' }}
+                      >
+                        <span className="text-sm">Image unavailable</span>
+                      </div>
+                    ) : (
                     <img
                       src={attachment.file_url}
                       alt={`Attachment ${index + 1}`}
                       className="w-full rounded-xl object-cover shadow-lg"
                       style={{ maxHeight: post.attachments!.length === 1 ? '500px' : '300px' }}
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = `w-full rounded-xl flex items-center justify-center ${lightMode ? 'bg-gray-100 text-gray-400' : 'bg-slate-700/50 text-slate-500'}`;
+                        placeholder.style.height = '200px';
+                        placeholder.innerHTML = '<span class="text-sm">Image unavailable</span>';
+                        target.parentNode?.appendChild(placeholder);
+                      }}
                     />
+                    )
                   ) : youtubeId ? (
                     <div className="relative w-full rounded-xl overflow-hidden shadow-lg" style={{ paddingTop: '56.25%' }}>
                       <iframe
@@ -232,7 +289,7 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
             onClick={() => setShowComments(!showComments)}
             className={`transition-colors ${lightMode ? 'hover:text-blue-600 hover:underline' : 'hover:text-blue-400 hover:underline'}`}
           >
-            {post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}
+            {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
           </button>
         </div>
       </div>
@@ -270,7 +327,7 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
 
       {showComments && (
         <div className={`border-t ${lightMode ? 'border-gray-200' : 'border-slate-700/50'}`}>
-          <CommentSection postId={post.id} darkMode={darkMode} />
+          <CommentSection postId={post.id} darkMode={darkMode} onCommentAdded={() => setCommentCount(prev => prev + 1)} onCommentDeleted={() => setCommentCount(prev => Math.max(0, prev - 1))} />
         </div>
       )}
 
@@ -284,6 +341,18 @@ export default function PostCard({ post, onUpdate, darkMode = false }: PostCardP
         cancelText="Cancel"
         darkMode={darkMode}
         variant="danger"
+      />
+
+      <ReportPostModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        postId={post.id}
+        clubId={post.club_id}
+        groupId={post.group_id}
+        darkMode={darkMode}
+        onReported={() => {
+          addNotification('Post reported. Club admins have been notified.', 'success');
+        }}
       />
     </div>
   );

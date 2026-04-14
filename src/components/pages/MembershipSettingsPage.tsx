@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  DollarSign, 
-  Calendar, 
-  Save, 
-  AlertTriangle,
-  Check,
-  CalendarDays,
-  X,
-  FileText
-} from 'lucide-react';
+import { Plus, Trash2, SquarePen as Edit2, DollarSign, Calendar, Save, TriangleAlert as AlertTriangle, Check, CalendarDays, X, FileText, ArrowRightLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../utils/supabase';
 import { MembershipType, MembershipSettings, RenewalMode } from '../../types/membership';
@@ -22,11 +10,13 @@ import { EmailTemplateEditor } from '../ui/EmailTemplateEditor';
 interface MembershipSettingsPageProps {
   darkMode: boolean;
   initialView?: 'types' | 'renewals' | 'emails' | 'conduct';
+  onSaveComplete?: () => void;
 }
 
-export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ darkMode, initialView }) => {
+export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ darkMode, initialView, onSaveComplete }) => {
   const { currentClub } = useAuth();
   const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
+  const [memberCountsByType, setMemberCountsByType] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +25,11 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
   const [showForm, setShowForm] = useState(false);
   const [showStripeConnect, setShowStripeConnect] = useState(false);
   const [codeOfConduct, setCodeOfConduct] = useState('');
-  const [renewalMode, setRenewalMode] = useState<RenewalMode>('anniversary');
-  const [fixedRenewalDate, setFixedRenewalDate] = useState<string>('07-01'); // Default to July 1st
+  const [renewalMode, setRenewalMode] = useState<RenewalMode>('fixed');
+  const [fixedRenewalDate, setFixedRenewalDate] = useState<string>('07-01');
   const [autoRenewEnabled, setAutoRenewEnabled] = useState(false);
   const [renewalNotificationDays, setRenewalNotificationDays] = useState(30);
-  const [renewalGracePeriodDays, setRenewalGracePeriodDays] = useState(7);
+  const [renewalGracePeriodDays, setRenewalGracePeriodDays] = useState(21);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeEmailTemplate, setActiveEmailTemplate] = useState<string | null>(null);
 
@@ -47,182 +37,19 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
   const defaultTemplates = {
     welcome: {
       subject: 'Welcome to {{clubName}}!',
-      body: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to {{clubName}}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 40px 30px;text-align:center">
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">{{clubName}}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">Welcome to the Club!</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Dear {{firstName}} {{lastName}},</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">We're thrilled to welcome you as a new member of {{clubName}}!</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">Your membership is now active, and you can start enjoying all the benefits of being a member, including participating in our racing events and club activities.</p>
-              <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #bfdbfe">
-                <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#1e40af">Getting Started</h2>
-                <ul style="margin:0;padding:0 0 0 20px;color:#374151;line-height:1.8">
-                  <li>Access your dashboard to manage your profile</li>
-                  <li>View upcoming events and register for races</li>
-                  <li>Connect with other club members</li>
-                  <li>Stay updated with club news and announcements</li>
-                </ul>
-              </div>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">If you have any questions or need assistance getting started, please don't hesitate to reach out to us.</p>
-              <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#374151">Welcome aboard!</p>
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">{{clubName}} Committee</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by {{clubName}}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+      body: `<p>Dear {{firstName}},</p><p>We're thrilled to welcome you as a new member of {{clubName}}!</p><p>Your membership is now active, and you can start enjoying all the benefits of being a member, including participating in our racing events and club activities.</p><h2>Getting Started</h2><ul><li>Access your dashboard to manage your profile</li><li>View upcoming events and register for races</li><li>Connect with other club members</li><li>Stay updated with club news and announcements</li></ul><p>If you have any questions or need assistance getting started, please don't hesitate to reach out to us.</p><p>Welcome aboard!</p>`
     },
     renewal: {
       subject: 'Time to renew your {{clubName}} membership',
-      body: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Membership Renewal - {{clubName}}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 40px 30px;text-align:center">
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">{{clubName}}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">Membership Renewal Reminder</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Hi {{firstName}},</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">Your {{membershipType}} membership with {{clubName}} is due for renewal.</p>
-              <div style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #fbbf24">
-                <h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:#92400e">Membership Details</h2>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#78350f;width:45%">Membership Type</td>
-                    <td style="padding:8px 0;font-size:15px;color:#1f2937;font-weight:600">{{membershipType}}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#78350f">Renewal Date</td>
-                    <td style="padding:8px 0;font-size:15px;color:#dc2626;font-weight:600">{{renewalDate}}</td>
-                  </tr>
-                </table>
-              </div>
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.7;color:#374151">To continue enjoying all the benefits of membership and participating in club racing, please renew your membership as soon as possible.</p>
-              <div style="text-align:center;margin:32px 0">
-                <a href="{{renewalLink}}" style="display:inline-block;padding:14px 40px;background-color:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 4px 6px rgba(22,163,74,.2)">Renew My Membership</a>
-              </div>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">If you have any questions about your membership or need assistance with renewal, please don't hesitate to contact us.</p>
-              <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#374151">Thank you for being a valued member of {{clubName}}!</p>
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">{{clubName}} Committee</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by {{clubName}}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+      body: `<p>Hi {{firstName}},</p><p>Your {{membershipType}} membership with {{clubName}} is due for renewal.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Renewal Date</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p class="ql-align-center">To keep racing and enjoying all club benefits without interruption,</p><p class="ql-align-center">you can renew your membership in just a few minutes:</p><p class="ql-align-center"><br></p><p class="ql-align-center">\u{1F449} <strong>Renew via AlfiePRO App</strong></p><p class="ql-align-center"><em>Open AlfiePRO \u2192 Tap your profile \u2192 Membership</em></p><p class="ql-align-center"><strong>OR</strong></p><p class="ql-align-center">\u{1F449} <strong>Renew Online</strong></p><p class="ql-align-center"><a href="{{renewalLink}}" rel="noopener noreferrer" target="_blank">Renew My Membership</a></p><h3><br></h3><h3><strong>\u26A0\uFE0F Why renew now?</strong></h3><p>Renewing before your expiry ensures:</p><ul><li>You stay eligible to race</li><li>Your results and rankings continue uninterrupted</li><li>You remain covered under association insurance</li><li>If you have any questions or need help, just email<strong> {{secretaryName}}</strong> - {{secretaryEmail}}</li></ul><p>Thank you for being a valued member of {{clubName}}!</p>`
+    },
+    payment_confirmation: {
+      subject: 'Payment confirmation for {{clubName}} membership',
+      body: `<p>Payment Received - Thank you {{firstName}} {{lastName}}!</p><p>We have successfully received your payment of {{amount}} {{currency}} for your <strong>{{clubName}}</strong> membership.</p><h2 class="ql-align-center"><strong>Membership Details</strong></h2><p class="ql-align-center"><strong>Membership Type</strong>: {{membershipType}}</p><p class="ql-align-center"><strong>Active Until</strong>: {{renewalDate}}</p><p class="ql-align-center"><br></p><p>Your membership is now active and you can continue enjoying all the benefits of being a member, including participating in racing events and club activities.</p><p>If you have any questions, please contact <strong>{{secretaryName}}</strong> - {{secretaryEmail}}</p><p>Thank you for your continued support of {{clubName}}!</p>`
     },
     event: {
       subject: 'New Event: {{eventName}}',
-      body: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Event Invitation - {{clubName}}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8fafc;padding:40px 20px">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.07)">
-          <tr>
-            <td style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%);padding:40px 40px 30px;text-align:center">
-              <h1 style="margin:0;color:#fff;font-size:28px;font-weight:700;letter-spacing:-.5px">{{clubName}}</h1>
-              <p style="margin:10px 0 0;color:rgba(255,255,255,.95);font-size:16px">You're Invited!</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px">
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#1f2937">Hi {{firstName}},</p>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">We're excited to announce a new upcoming event at {{clubName}}!</p>
-              <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);border-radius:10px;padding:28px;margin:32px 0;border:1px solid #bfdbfe">
-                <h2 style="margin:0 0 20px;font-size:20px;font-weight:600;color:#1e40af;text-align:center">{{eventName}}</h2>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#64748b;width:35%">📅 Date</td>
-                    <td style="padding:8px 0;font-size:15px;color:#1f2937;font-weight:600">{{eventDate}}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:8px 0;font-size:15px;color:#64748b">📍 Location</td>
-                    <td style="padding:8px 0;font-size:15px;color:#1f2937;font-weight:600">{{eventLocation}}</td>
-                  </tr>
-                </table>
-              </div>
-              <p style="margin:0 0 24px;font-size:16px;line-height:1.7;color:#374151">We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p>
-              <div style="text-align:center;margin:32px 0">
-                <a href="{{eventLink}}" style="display:inline-block;padding:14px 40px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 4px 6px rgba(37,99,235,.2)">View Event Details</a>
-              </div>
-              <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#374151">For more information and to RSVP, please log in to your account or contact us directly.</p>
-              <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#374151">See you on the water!</p>
-              <div style="margin:32px 0 0;padding:20px 0 0;border-top:1px solid #e5e7eb">
-                <p style="margin:0;font-size:16px;color:#374151">Best regards,</p>
-                <p style="margin:6px 0 0;font-size:16px;font-weight:600;color:#1f2937">{{clubName}} Committee</p>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:32px 40px;text-align:center;border-top:1px solid #e5e7eb">
-              <p style="margin:0 0 12px;font-size:14px;color:#64748b;line-height:1.5">This email was sent by {{clubName}}</p>
-              <p style="margin:0;font-size:13px;color:#94a3b8">Powered by <strong style="color:#2563eb">Alfie PRO</strong> - RC Yacht Management Software</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`
+      body: `<p>Hi {{firstName}},</p><p>We're excited to announce a new upcoming event at {{clubName}}!</p><h2>{{eventName}}</h2><p>\u{1F4C5} Date{{eventDate}}\u{1F4CD} Location{{eventLocation}}</p><p>We hope to see you there! This is a great opportunity to connect with fellow members and enjoy some great racing.</p><p><a href="{{eventLink}}" rel="noopener noreferrer" target="_blank">View Event Details</a></p><p>For more information and to RSVP, please log in to your account or contact us directly.</p><p>See you on the water!</p><p><br></p><p>Best regards,</p>`
     }
   };
 
@@ -235,7 +62,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     amount: '',
     currency: 'AUD',
     renewal_period: 'annual' as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
-    requires_association_fees: true // Default to primary/full membership
+    requires_association_fees: true,
+    replaces_membership_type_id: '' as string,
+    is_active: true
   });
 
   useEffect(() => {
@@ -259,7 +88,47 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         .order('created_at');
       
       if (typesError) throw typesError;
-      
+
+      const countsByTypeId: Record<string, number> = {};
+      const countsByName: Record<string, number> = {};
+
+      const { data: cmData } = await supabase
+        .from('club_memberships')
+        .select('membership_type_id')
+        .eq('club_id', currentClub.clubId)
+        .not('membership_type_id', 'is', null);
+
+      if (cmData) {
+        cmData.forEach(row => {
+          countsByTypeId[row.membership_type_id] = (countsByTypeId[row.membership_type_id] || 0) + 1;
+        });
+      }
+
+      const { data: membersData } = await supabase
+        .from('members')
+        .select('membership_level')
+        .eq('club_id', currentClub.clubId);
+
+      if (membersData) {
+        membersData.forEach(row => {
+          if (row.membership_level) {
+            countsByName[row.membership_level] = (countsByName[row.membership_level] || 0) + 1;
+          }
+        });
+      }
+
+      const merged: Record<string, number> = {};
+      if (typesData) {
+        typesData.forEach((t: any) => {
+          const fromId = countsByTypeId[t.id] || 0;
+          const fromName = countsByName[t.name] || 0;
+          const total = Math.max(fromId, fromName);
+          if (total > 0) merged[t.id] = total;
+        });
+      }
+
+      setMemberCountsByType(merged);
+
       // Fetch club settings including renewal settings
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
@@ -297,11 +166,11 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       // Set the data
       setMembershipTypes(typesData || []);
       setCodeOfConduct(clubData?.code_of_conduct || '');
-      setRenewalMode(clubData?.renewal_mode || 'anniversary');
-      setFixedRenewalDate(clubData?.fixed_renewal_date || '07-01'); // Default to July 1st
+      setRenewalMode(clubData?.renewal_mode || 'fixed');
+      setFixedRenewalDate(clubData?.fixed_renewal_date || '07-01');
       setAutoRenewEnabled(clubData?.auto_renew_enabled || false);
       setRenewalNotificationDays(clubData?.renewal_notification_days || 30);
-      setRenewalGracePeriodDays(clubData?.renewal_grace_period_days || 7);
+      setRenewalGracePeriodDays(clubData?.renewal_grace_period_days ?? 21);
       setEmailTemplates(loadedTemplates);
 
       // Reset unsaved changes flag after loading data
@@ -374,6 +243,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       setTimeout(() => setSuccess(null), 3000);
       setHasUnsavedChanges(false);
       setShowConfirmFixedDate(false);
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
@@ -436,6 +308,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       
       setSuccess('Code of Conduct saved successfully');
       setTimeout(() => setSuccess(null), 3000);
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (error) {
       console.error('Error saving Code of Conduct:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
@@ -469,28 +344,26 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         renewal_period = 'annual';
       }
       
-      // Prepare data
-      const newType = {
+      const newType: Record<string, any> = {
         club_id: currentClub.clubId,
         name: typeFormData.name,
         description: typeFormData.description || null,
         amount,
         currency: typeFormData.currency,
         renewal_period,
-        is_active: true,
-        requires_association_fees: typeFormData.requires_association_fees
+        is_active: typeFormData.is_active,
+        requires_association_fees: typeFormData.requires_association_fees,
+        replaces_membership_type_id: typeFormData.replaces_membership_type_id || null
       };
-      
-      // Insert new type
+
       const { data: memberData, error: insertError } = await supabase
         .from('membership_types')
         .insert(newType)
         .select()
         .single();
-      
+
       if (insertError) throw insertError;
-      
-      // Update state
+
       setMembershipTypes([...membershipTypes, memberData]);
       setShowForm(false);
       setTypeFormData({
@@ -499,13 +372,16 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount: '',
         currency: 'AUD',
         renewal_period: 'annual',
-        requires_association_fees: true
+        requires_association_fees: true,
+        replaces_membership_type_id: '',
+        is_active: true
       });
       setSuccess('Membership type added successfully');
-      
-      // Clear success message after 3 seconds
+
       setTimeout(() => setSuccess(null), 3000);
-      
+      if (onSaveComplete) {
+        setTimeout(() => onSaveComplete(), 500);
+      }
     } catch (err) {
       console.error('Error adding membership type:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -546,27 +422,26 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         renewal_period = 'annual';
       }
       
-      // Prepare data
-      const updatedType = {
+      const updatedType: Record<string, any> = {
         name: typeFormData.name,
         description: typeFormData.description || null,
         amount,
         currency: typeFormData.currency,
         renewal_period,
-        requires_association_fees: typeFormData.requires_association_fees
+        is_active: typeFormData.is_active,
+        requires_association_fees: typeFormData.requires_association_fees,
+        replaces_membership_type_id: typeFormData.replaces_membership_type_id || null
       };
-      
-      // Update type
+
       const { error: updateError } = await supabase
         .from('membership_types')
         .update(updatedType)
         .eq('id', editingType.id)
         .eq('club_id', currentClub.clubId);
-      
+
       if (updateError) throw updateError;
-      
-      // Update state
-      setMembershipTypes(membershipTypes.map(type => 
+
+      setMembershipTypes(membershipTypes.map(type =>
         type.id === editingType.id ? { ...type, ...updatedType } : type
       ));
       setEditingType(null);
@@ -577,10 +452,12 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
         amount: '',
         currency: 'AUD',
         renewal_period: 'annual',
-        requires_association_fees: true
+        requires_association_fees: true,
+        replaces_membership_type_id: '',
+        is_active: true
       });
       setSuccess('Membership type updated successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
       
@@ -593,7 +470,13 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
   const handleDeleteType = async (typeId: string) => {
     if (!currentClub?.clubId) return;
 
-    // Check if this is the last primary membership type
+    const memberCount = memberCountsByType[typeId] || 0;
+    if (memberCount > 0) {
+      setError(`Cannot delete this membership type because ${memberCount} member${memberCount === 1 ? ' is' : 's are'} currently assigned to it. Set it to inactive instead.`);
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+
     const typeToDelete = membershipTypes.find(t => t.id === typeId);
     if (typeToDelete?.requires_association_fees !== false) {
       const primaryTypes = membershipTypes.filter(t => t.requires_association_fees !== false);
@@ -604,7 +487,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       }
     }
 
-    if (!confirm('Are you sure you want to delete this membership type?')) {
+    if (!confirm('Are you sure you want to delete this membership type? This cannot be undone.')) {
       return;
     }
 
@@ -641,7 +524,9 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
       amount: type.amount.toString(),
       currency: type.currency,
       renewal_period: type.renewal_period as 'annual' | 'monthly' | 'quarterly' | 'lifetime',
-      requires_association_fees: type.requires_association_fees !== false // Default to true if not set
+      requires_association_fees: type.requires_association_fees !== false,
+      replaces_membership_type_id: type.replaces_membership_type_id || '',
+      is_active: type.is_active !== false
     });
     setShowForm(true);
   };
@@ -754,37 +639,28 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
     }
   };
 
-  // Handle send test email
-  const handleSendTestEmail = async (templateKey: string, subject: string, body: string) => {
+  const handleSendTestEmail = async (templateKey: string, subject: string, body: string, recipientEmail?: string) => {
     if (!currentClub?.clubId) return;
 
     try {
-      // Get current user's profile for email
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', user.id)
-        .single();
+      const targetEmail = recipientEmail || user.email;
+      if (!targetEmail) throw new Error('No email address provided');
 
-      if (profileError) throw profileError;
-      if (!profile?.email) throw new Error('No email address found for user');
-
-      // Send test email via edge function
-      // Note: We don't pass custom_template here so it uses the beautiful default templates
-      // from the edge function, which have proper HTML structure and inline CSS
       const { error: sendError } = await supabase.functions.invoke('send-membership-notifications', {
         body: {
           email_type: templateKey,
-          recipient_email: profile.email,
+          recipient_email: targetEmail,
           member_data: {
-            first_name: profile.first_name || 'John',
-            last_name: profile.last_name || 'Doe',
+            first_name: 'Test',
+            last_name: 'User',
             club_name: currentClub.club?.name || 'Your Club',
             membership_type: 'Full Member',
-            renewal_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            renewal_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            amount: 150,
+            currency: 'AUD',
             club_id: currentClub.clubId,
             user_id: user.id
           }
@@ -793,7 +669,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
 
       if (sendError) throw sendError;
 
-      setSuccess(`Test email sent to ${profile.email}`);
+      setSuccess(`Test email sent to ${targetEmail}`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (error) {
       console.error('Error sending test email:', error);
@@ -857,11 +733,14 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                     description: '',
                     amount: '',
                     currency: 'AUD',
-                    renewal_period: renewalMode === 'fixed' ? 'annual' : 'annual'
+                    renewal_period: renewalMode === 'fixed' ? 'annual' : 'annual',
+                    requires_association_fees: true,
+                    replaces_membership_type_id: '',
+                    is_active: true
                   });
                   setShowForm(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200"
+                className="flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200"
               >
                 <Plus size={18} />
                 Add Type
@@ -942,6 +821,37 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   </div>
                 </div>
 
+                {(() => {
+                  const inactiveTypes = membershipTypes.filter(t =>
+                    !t.is_active && (!editingType || t.id !== editingType.id)
+                  );
+                  if (inactiveTypes.length > 0) {
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-1">
+                          Replaces (optional)
+                        </label>
+                        <select
+                          value={typeFormData.replaces_membership_type_id}
+                          onChange={(e) => setTypeFormData(prev => ({ ...prev, replaces_membership_type_id: e.target.value }))}
+                          className="w-full px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">None - new membership type</option>
+                          {inactiveTypes.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.name} (${t.amount} {t.currency} - inactive)
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Members on the selected inactive type will be automatically moved to this type at renewal time.
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">
@@ -1011,7 +921,8 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   <input
                     type="checkbox"
                     id="is-active"
-                    checked={true}
+                    checked={typeFormData.is_active}
+                    onChange={(e) => setTypeFormData(prev => ({ ...prev, is_active: e.target.checked }))}
                     className="h-4 w-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
                   />
                   <label htmlFor="is-active" className="ml-2 block text-sm text-slate-300">
@@ -1030,7 +941,10 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                         description: '',
                         amount: '',
                         currency: 'AUD',
-                        renewal_period: 'annual'
+                        renewal_period: 'annual',
+                        requires_association_fees: true,
+                        replaces_membership_type_id: '',
+                        is_active: true
                       });
                     }}
                     className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
@@ -1077,52 +991,90 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {membershipTypes.map(type => (
-                      <div 
-                        key={type.id}
-                        className="p-4 rounded-lg bg-slate-800/70 border border-slate-700/50 hover:bg-slate-800 transition-colors"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="text-lg font-medium text-white">{type.name}</h3>
-                            {type.description && (
-                              <p className="text-sm text-slate-400 mt-1">{type.description}</p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2">
-                              <div className="flex items-center gap-1 text-sm">
-                                <DollarSign size={14} className="text-green-400" />
-                                <span className="text-slate-300">
-                                  {type.amount} {type.currency}
-                                </span>
+                    {membershipTypes.map(type => {
+                      const replacesType = type.replaces_membership_type_id
+                        ? membershipTypes.find(t => t.id === type.replaces_membership_type_id)
+                        : null;
+                      return (
+                        <div
+                          key={type.id}
+                          className={`p-4 rounded-lg border hover:bg-slate-800 transition-colors ${
+                            type.is_active
+                              ? 'bg-slate-800/70 border-slate-700/50'
+                              : 'bg-slate-900/50 border-slate-700/30 opacity-60'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-medium text-white">{type.name}</h3>
+                                {!type.is_active && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-slate-700 text-slate-400">
+                                    Inactive
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex items-center gap-1 text-sm">
-                                <Calendar size={14} className="text-blue-400" />
-                                <span className="text-slate-300">
-                                  {type.renewal_period === 'annual' ? 'Annual' : 
-                                   type.renewal_period === 'monthly' ? 'Monthly' : 
-                                   type.renewal_period === 'quarterly' ? 'Quarterly' : 
-                                   'Lifetime'}
-                                </span>
+                              {type.description && (
+                                <p className="text-sm text-slate-400 mt-1">{type.description}</p>
+                              )}
+                              <div className="flex items-center gap-4 mt-2 flex-wrap">
+                                <div className="flex items-center gap-1 text-sm">
+                                  <DollarSign size={14} className="text-green-400" />
+                                  <span className="text-slate-300">
+                                    {type.amount} {type.currency}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Calendar size={14} className="text-blue-400" />
+                                  <span className="text-slate-300">
+                                    {type.renewal_period === 'annual' ? 'Annual' :
+                                     type.renewal_period === 'monthly' ? 'Monthly' :
+                                     type.renewal_period === 'quarterly' ? 'Quarterly' :
+                                     'Lifetime'}
+                                  </span>
+                                </div>
+                                {replacesType && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <ArrowRightLeft size={14} className="text-amber-400" />
+                                    <span className="text-amber-300">
+                                      Replaces "{replacesType.name}"
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEditType(type)}
-                              className="p-2 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteType(type.id)}
-                              className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditType(type)}
+                                className="p-2 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              {(memberCountsByType[type.id] || 0) > 0 ? (
+                                <div className="relative group">
+                                  <button
+                                    disabled
+                                    className="p-2 rounded-lg text-slate-600 cursor-not-allowed"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                  <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 text-xs text-slate-300 rounded-lg border border-slate-600 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    {memberCountsByType[type.id]} member{memberCountsByType[type.id] === 1 ? '' : 's'} assigned - set inactive instead
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleDeleteType(type.id)}
+                                  className="p-2 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </>
@@ -1173,11 +1125,27 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                 </p>
               </div>
               
+              {/* Renewal Confirmation Template */}
+              <div className="p-4 rounded-lg bg-slate-700/50 border border-slate-600/50">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-medium text-slate-200">Renewal Confirmation</h4>
+                  <button
+                    onClick={() => handleEditEmailTemplate('payment_confirmation')}
+                    className="text-blue-400 hover:text-blue-300 text-sm"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <p className="text-sm text-slate-400">
+                  Sent to members when their membership renewal payment is confirmed
+                </p>
+              </div>
+
               {/* Event Invitation Template */}
               <div className="p-4 rounded-lg bg-slate-700/50 border border-slate-600/50">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="font-medium text-slate-200">Event Invitation</h4>
-                  <button 
+                  <button
                     onClick={() => handleEditEmailTemplate('event')}
                     className="text-blue-400 hover:text-blue-300 text-sm"
                   >
@@ -1216,7 +1184,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
               <button
                 onClick={handleSaveCodeOfConduct}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={18} />
                 {saving ? 'Saving...' : 'Save Code of Conduct'}
@@ -1373,12 +1341,12 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                     type="number"
                     value={renewalGracePeriodDays}
                     onChange={(e) => {
-                      setRenewalGracePeriodDays(parseInt(e.target.value) || 7);
+                      setRenewalGracePeriodDays(parseInt(e.target.value) || 0);
                       setHasUnsavedChanges(true);
                     }}
                     className="w-20 px-3 py-2 bg-slate-700 text-slate-200 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     min="0"
-                    max="30"
+                    max="90"
                   />
                   <span className="text-slate-300">days</span>
                 </div>
@@ -1391,7 +1359,7 @@ export const MembershipSettingsPage: React.FC<MembershipSettingsPageProps> = ({ 
                 <button
                   onClick={handleSaveSettings}
                   disabled={saving}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary-green w-full flex items-center justify-center gap-2 px-6 py-3 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={18} />
                   {saving ? 'Saving...' : 'Save Renewal Settings'}

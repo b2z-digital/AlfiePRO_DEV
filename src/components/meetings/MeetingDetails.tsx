@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, Edit2, Mail, Check, X, AlertTriangle, Play, Lock, Share } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, User, ArrowLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Users, Repeat, Navigation, ExternalLink } from 'lucide-react';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
 import { formatDate } from '../../utils/date';
@@ -12,6 +12,8 @@ import { supabase } from '../../utils/supabase';
 interface MeetingDetailsProps {
   meeting: Meeting;
   darkMode: boolean;
+  associationId?: string;
+  associationType?: 'state' | 'national';
   onClose: () => void;
   onEdit: () => void;
   onMarkAsCompleted: () => void;
@@ -21,6 +23,8 @@ interface MeetingDetailsProps {
 export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   meeting,
   darkMode,
+  associationId,
+  associationType,
   onClose,
   onEdit,
   onMarkAsCompleted,
@@ -54,10 +58,12 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
       if (error) throw error;
 
-      setAttendance(data?.map((a: any) => ({
-        member: a.member,
-        status: a.status
-      })) || []);
+      setAttendance((data || [])
+        .filter((a: any) => a.member)
+        .map((a: any) => ({
+          member: a.member,
+          status: a.status
+        })));
     } catch (error) {
       console.error('Error fetching attendance:', error);
     }
@@ -88,7 +94,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   const handleStartMeeting = async () => {
     // Store the attending members in session storage for the minute taking page to pre-select
     const attendingMemberIds = attendance
-      .filter(a => a.status === 'attending')
+      .filter(a => a.status === 'attending' && a.member)
       .map(a => a.member.id);
 
     if (attendingMemberIds.length > 0) {
@@ -157,33 +163,47 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         <div className="flex flex-wrap gap-2 justify-end">
           {meeting.status === 'upcoming' && (
             <>
-              <button
-                onClick={onEdit}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
-              >
-                <Edit2 size={16} />
-                Edit
-              </button>
+              {meeting.minutes_status !== 'in_progress' && (
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-all hover:scale-105"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+              )}
 
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
-              >
-                <Mail size={16} />
-                Send Invites
-              </button>
+              {meeting.minutes_status !== 'in_progress' && (
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                >
+                  <Mail size={16} />
+                  Send Invites
+                </button>
+              )}
 
-              <button
-                onClick={handleStartMeeting}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
-              >
-                <Play size={16} />
-                Start Meeting
-              </button>
+              {meeting.minutes_status === 'in_progress' ? (
+                <button
+                  onClick={handleStartMeeting}
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
+                >
+                  <Edit2 size={16} />
+                  Continue Minutes
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartMeeting}
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
+                >
+                  <Play size={16} />
+                  Start Meeting
+                </button>
+              )}
 
               <button
                 onClick={() => setShowStatusConfirm('cancel')}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-500/20"
               >
                 <X size={16} />
                 Cancel
@@ -191,10 +211,10 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             </>
           )}
 
-          {meeting.minutes_status === 'in_progress' && (
+          {meeting.status !== 'upcoming' && meeting.minutes_status === 'in_progress' && (
             <button
               onClick={handleStartMeeting}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
             >
               <Edit2 size={16} />
               Continue Minutes
@@ -205,7 +225,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             <>
               <button
                 onClick={handleStartMeeting}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20"
               >
                 <FileText size={16} />
                 View Minutes
@@ -214,7 +234,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               {!meeting.minutes_locked && (
                 <button
                   onClick={() => setShowLockConfirm(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-700 text-white rounded-lg hover:from-amber-700 hover:to-amber-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20"
+                  className="btn-primary-green flex items-center gap-2 px-4 py-2 from-amber-600 to-amber-700 text-white rounded-lg hover:from-amber-700 hover:to-amber-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-amber-500/20"
                 >
                   <Lock size={16} />
                   Confirm & Lock
@@ -223,7 +243,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all hover:scale-105 hover:shadow-lg hover:shadow-green-500/20"
+                className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-all hover:scale-105 hover:shadow-lg"
               >
                 <Share size={16} />
                 Share Minutes
@@ -260,7 +280,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
       )}
 
       <div className="bg-gradient-to-br from-slate-800/80 via-slate-800/60 to-slate-900/80 backdrop-blur-sm rounded-2xl border border-slate-700/50 overflow-hidden shadow-2xl">
-        <div className="relative p-8 bg-gradient-to-r from-blue-600/10 via-transparent to-emerald-600/10 border-b border-slate-700/50">
+        <div className="relative p-8 from-blue-600/10 via-transparent to-emerald-600/10 border-b border-slate-700/50">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-emerald-500/5"></div>
           <div className="relative">
             <div className="flex flex-col gap-4">
@@ -284,19 +304,19 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                 {meeting.status === 'upcoming' && (
                   <div className="flex items-center gap-4">
                     {/* Attendance Avatars */}
-                    {attendance.filter(a => a.status === 'attending').length > 0 && (
+                    {attendance.filter(a => a.status === 'attending' && a.member).length > 0 && (
                       <div className="flex items-center gap-2">
                         <div className="flex -space-x-2">
                           {attendance
-                            .filter(a => a.status === 'attending')
+                            .filter(a => a.status === 'attending' && a.member)
                             .slice(0, 5)
                             .map((att, idx) => (
                               <div
                                 key={idx}
                                 className="relative w-9 h-9 rounded-full border-2 border-slate-800 bg-slate-700 overflow-hidden"
-                                title={`${att.member.first_name} ${att.member.last_name}`}
+                                title={`${att.member?.first_name || ''} ${att.member?.last_name || ''}`}
                               >
-                                {att.member.avatar_url ? (
+                                {att.member?.avatar_url ? (
                                   <img
                                     src={att.member.avatar_url}
                                     alt={`${att.member.first_name} ${att.member.last_name}`}
@@ -304,30 +324,23 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-slate-300">
-                                    {att.member.first_name?.[0]}{att.member.last_name?.[0]}
+                                    {att.member?.first_name?.[0]}{att.member?.last_name?.[0]}
                                   </div>
                                 )}
                               </div>
                             ))}
-                          {attendance.filter(a => a.status === 'attending').length > 5 && (
+                          {attendance.filter(a => a.status === 'attending' && a.member).length > 5 && (
                             <div className="relative w-9 h-9 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center text-xs font-semibold text-slate-300">
-                              +{attendance.filter(a => a.status === 'attending').length - 5}
+                              +{attendance.filter(a => a.status === 'attending' && a.member).length - 5}
                             </div>
                           )}
                         </div>
                         <span className="text-sm text-slate-400 font-medium">
-                          {attendance.filter(a => a.status === 'attending').length} attending
+                          {attendance.filter(a => a.status === 'attending' && a.member).length} attending
                         </span>
                       </div>
                     )}
 
-                    <button
-                      onClick={() => setShowInviteModal(true)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 font-medium"
-                    >
-                      <Mail size={18} />
-                      Send Invites
-                    </button>
                   </div>
                 )}
               </div>
@@ -374,8 +387,38 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
 
                 {meeting.location && (
                   <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600/50">
-                    <MapPin size={16} className="text-amber-400" />
+                    <MapPin size={16} className="text-amber-400 flex-shrink-0" />
                     <span className="text-slate-200 font-medium">{meeting.location}</span>
+                    {(meeting as any).location_lat && (meeting as any).location_lng && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${(meeting as any).location_lat},${(meeting as any).location_lng}${(meeting as any).location_place_id ? `&destination_place_id=${(meeting as any).location_place_id}` : ''}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 text-xs font-medium transition-colors flex-shrink-0"
+                      >
+                        <Navigation size={12} />
+                        Directions
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {meeting.meeting_category && (
+                  <div className={`
+                    flex items-center gap-2 px-3 py-2 rounded-lg border font-medium
+                    ${meeting.meeting_category === 'committee'
+                      ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                      : 'bg-blue-500/20 border-blue-400/50 text-blue-300'}
+                  `}>
+                    {meeting.meeting_category === 'committee' ? <Shield size={16} /> : <Users size={16} />}
+                    <span>{meeting.meeting_category === 'committee' ? 'Committee Meeting' : 'General Meeting'}</span>
+                  </div>
+                )}
+
+                {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-teal-500/20 rounded-lg border border-teal-400/50 text-teal-300 font-medium">
+                    <Repeat size={16} />
+                    <span>{meeting.recurrence_type.charAt(0).toUpperCase() + meeting.recurrence_type.slice(1)}</span>
                   </div>
                 )}
               </div>
@@ -444,8 +487,8 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
             {meeting.conferencing_url && (
               <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
                 <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-purple-500/20">
-                    <Video size={16} className="text-purple-400" />
+                  <div className="p-1.5 rounded-lg bg-blue-500/20">
+                    <Video size={16} className="text-blue-400" />
                   </div>
                   Video Conference
                 </h3>
@@ -453,9 +496,44 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
                   href={meeting.conferencing_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 break-all font-medium underline decoration-blue-400/30 hover:decoration-blue-300 transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 hover:text-blue-200 font-medium transition-colors"
                 >
-                  {meeting.conferencing_url}
+                  <Video size={16} />
+                  Join Meeting
+                  <ExternalLink size={14} />
+                </a>
+                <p className="mt-2 text-xs text-slate-400 break-all">{meeting.conferencing_url}</p>
+              </div>
+            )}
+
+            {(meeting as any).location_lat && (meeting as any).location_lng && (
+              <div className="p-5 rounded-xl bg-gradient-to-br from-slate-700/40 to-slate-800/40 border border-slate-600/50 hover:border-slate-500/50 transition-all hover:shadow-lg col-span-full">
+                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-emerald-500/20">
+                    <MapPin size={16} className="text-emerald-400" />
+                  </div>
+                  Venue Location
+                </h3>
+                <div className="rounded-lg overflow-hidden border border-slate-600/50 mb-3">
+                  <iframe
+                    src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${(meeting as any).location_lat},${(meeting as any).location_lng}&zoom=15`}
+                    width="100%"
+                    height="250"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${(meeting as any).location_lat},${(meeting as any).location_lng}${(meeting as any).location_place_id ? `&destination_place_id=${(meeting as any).location_place_id}` : ''}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/30 hover:text-emerald-200 font-medium transition-colors"
+                >
+                  <Navigation size={16} />
+                  Get Directions
+                  <ExternalLink size={14} />
                 </a>
               </div>
             )}
@@ -481,7 +559,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
               <div className="overflow-hidden rounded-xl border border-slate-600/50 shadow-lg">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gradient-to-r from-slate-700/80 to-slate-800/80 border-b border-slate-600/50">
+                    <tr className="from-slate-700/80 to-slate-800/80 border-b border-slate-600/50">
                       <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider w-20">No.</th>
                       <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Item</th>
                       <th className="px-6 py-4 text-left text-xs font-bold text-slate-300 uppercase tracking-wider">Owner</th>
@@ -534,7 +612,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
           {meeting.minutes_status === 'completed' && (
             <div className="mt-8">
               <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <div className="w-1 h-8 bg-gradient-to-b from-emerald-500 to-blue-500 rounded-full"></div>
+                <div className="w-1 h-8 bg-gradient-to-b to-blue-500 rounded-full"></div>
                 Meeting Minutes
               </h3>
 
@@ -621,24 +699,28 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         </div>
       )}
 
-      {/* Meeting Invite Modal */}
       <MeetingInviteModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         meetingId={meeting.id}
         meetingName={meeting.name}
-        clubId={meeting.club_id}
+        clubId={meeting.club_id || undefined}
         darkMode={darkMode}
+        meetingCategory={meeting.meeting_category}
+        associationId={meeting.state_association_id || meeting.national_association_id || associationId}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : associationType}
       />
 
-      {/* Share Minutes Modal */}
       <ShareMinutesModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         meeting={meeting}
+        associationId={meeting.state_association_id || meeting.national_association_id || associationId || undefined}
+        associationType={meeting.state_association_id ? 'state' : meeting.national_association_id ? 'national' : associationType}
         agendaItems={agendaItems}
-        clubId={meeting.club_id}
+        clubId={meeting.club_id || undefined}
         darkMode={darkMode}
+        meetingCategory={meeting.meeting_category}
       />
     </div>
   );

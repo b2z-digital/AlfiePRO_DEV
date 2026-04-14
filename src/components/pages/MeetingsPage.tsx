@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, Filter, MapPin, Clock, Users, Edit2, Trash2, ChevronRight, AlertTriangle, Check } from 'lucide-react';
+import { Calendar, Plus, Search, ListFilter as Filter, MapPin, Clock, Users, SquarePen as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting } from '../../types/meeting';
 import { getMeetings, deleteMeeting, updateMeetingStatus } from '../../utils/meetingStorage';
@@ -59,6 +59,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       // Group attendance by meeting_id
       const attendanceByMeeting: Record<string, {member: any, status: string}[]> = {};
       data?.forEach((attendance: any) => {
+        if (!attendance.member) return;
         if (!attendanceByMeeting[attendance.meeting_id]) {
           attendanceByMeeting[attendance.meeting_id] = [];
         }
@@ -79,8 +80,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       setLoading(true);
       setError(null);
 
-      const isAssociation = !!currentOrganization && !currentClub;
-      const clubId = currentClub?.clubId;
+      const isAssociation = !!currentOrganization;
+      const clubId = isAssociation ? undefined : currentClub?.clubId;
       const associationId = currentOrganization?.id;
       const associationType = currentOrganization?.type;
 
@@ -234,7 +235,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
       <div className="h-full overflow-y-auto">
         <div className="p-16">
           <MeetingForm
-          clubId={currentClub?.clubId}
+          clubId={currentOrganization ? undefined : currentClub?.clubId}
           associationId={currentOrganization?.id}
           associationType={currentOrganization?.type}
           meeting={editingMeeting}
@@ -254,6 +255,8 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           <MeetingDetails
           meeting={selectedMeeting}
           darkMode={darkMode}
+          associationId={currentOrganization?.id}
+          associationType={currentOrganization?.type as 'state' | 'national' | undefined}
           onClose={handleCloseDetails}
           onEdit={() => handleEditMeeting(selectedMeeting)}
           onMarkAsCompleted={() => handleMarkAsCompleted(selectedMeeting.id)}
@@ -271,7 +274,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
             <Calendar className="text-white" size={28} />
           </div>
-          <h2 className="text-3xl font-bold text-white">Club Meetings</h2>
+          <h2 className="text-3xl font-bold text-white">{currentOrganization ? 'Association Meetings' : 'Club Meetings'}</h2>
         </div>
 
         {error && (
@@ -355,7 +358,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           {can('meetings.create') && (
             <button
               onClick={handleCreateMeeting}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 font-medium transition-all duration-200 animate-pulse"
+              className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 font-medium transition-all duration-200 animate-pulse"
             >
               <Plus size={18} />
               Create a New Meeting
@@ -379,7 +382,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
             </p>
             <button
               onClick={handleCreateMeeting}
-              className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg hover:shadow-green-500/20 hover:scale-105 transition-all duration-200"
+              className="btn-primary-green px-4 py-2 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-200"
             >
               Schedule a Meeting
             </button>
@@ -400,8 +403,9 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                     return (
                       <div
                         key={meeting.id}
+                        onClick={() => handleViewMeeting(meeting)}
                         className={`
-                          rounded-lg border transition-all overflow-hidden
+                          rounded-lg border transition-all overflow-hidden cursor-pointer
                           ${meeting.status === 'cancelled'
                             ? 'bg-red-900/10 border-red-900/30'
                             : meeting.status === 'completed'
@@ -448,17 +452,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                                             <div
                                               key={idx}
                                               className="relative w-8 h-8 rounded-full border-2 border-slate-800 bg-slate-700 overflow-hidden"
-                                              title={`${attendance.member.first_name} ${attendance.member.last_name}`}
+                                              title={`${attendance.member?.first_name || ''} ${attendance.member?.last_name || ''}`}
                                             >
-                                              {attendance.member.avatar_url ? (
+                                              {attendance.member?.avatar_url ? (
                                                 <img
                                                   src={attendance.member.avatar_url}
-                                                  alt={`${attendance.member.first_name} ${attendance.member.last_name}`}
+                                                  alt={`${attendance.member?.first_name || ''} ${attendance.member?.last_name || ''}`}
                                                   className="w-full h-full object-cover"
                                                 />
                                               ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-slate-300">
-                                                  {attendance.member.first_name?.[0]}{attendance.member.last_name?.[0]}
+                                                  {attendance.member?.first_name?.[0]}{attendance.member?.last_name?.[0]}
                                                 </div>
                                               )}
                                             </div>
@@ -487,6 +491,23 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                                       <span>{meeting.location}</span>
                                     </div>
                                   )}
+                                  {meeting.meeting_category && (
+                                    <div className={`
+                                      flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                                      ${meeting.meeting_category === 'committee'
+                                        ? 'bg-amber-900/30 text-amber-400'
+                                        : 'bg-blue-900/30 text-blue-400'}
+                                    `}>
+                                      {meeting.meeting_category === 'committee' ? <Shield size={12} /> : <Users size={12} />}
+                                      {meeting.meeting_category === 'committee' ? 'Committee' : 'General'}
+                                    </div>
+                                  )}
+                                  {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
+                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-900/30 text-teal-400">
+                                      <Repeat size={12} />
+                                      {meeting.recurrence_type.charAt(0).toUpperCase() + meeting.recurrence_type.slice(1)}
+                                    </div>
+                                  )}
                                   {meeting.status !== 'upcoming' && (
                                     <div className={`
                                       px-2 py-0.5 rounded-full text-xs font-medium
@@ -501,24 +522,17 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                               </div>
 
                               <div className="flex gap-2 flex-shrink-0">
-                                <button
-                                  onClick={() => handleViewMeeting(meeting)}
-                                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
-                                >
-                                  View Details
-                                </button>
-
                                 {meeting.status === 'upcoming' && (
                                   <>
                                     <button
-                                      onClick={() => handleEditMeeting(meeting)}
+                                      onClick={(e) => { e.stopPropagation(); handleEditMeeting(meeting); }}
                                       className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
                                       title="Edit meeting"
                                     >
                                       <Edit2 size={18} />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteClick(meeting)}
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(meeting); }}
                                       className="p-1.5 rounded-lg text-red-400 hover:bg-red-900/30 transition-colors"
                                       title="Delete meeting"
                                     >

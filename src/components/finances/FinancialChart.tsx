@@ -449,23 +449,21 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
   return (
     <div className={`
       rounded-xl border backdrop-blur-sm p-6 mb-8
-      ${darkMode
-        ? 'bg-slate-800/30 border-slate-700/50'
-        : 'bg-white/10 border-slate-200/20'}
+      ${darkMode ? 'bg-slate-800/30 border-slate-700/50' : 'bg-white border-slate-200'}
     `}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-600/20">
-            <TrendingUp className="text-blue-400" size={20} />
+          <div className="p-2 rounded-lg bg-blue-500/15">
+            <TrendingUp className="text-blue-500" size={20} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Financial Position</h3>
+            <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Financial Position</h3>
             <div className="flex items-center gap-2 text-sm">
-              <span className="text-slate-400">$</span>
+              <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>$</span>
               <div className={`flex items-center gap-1 ${
-                trend.direction === 'up' ? 'text-green-400' : 
-                trend.direction === 'down' ? 'text-red-400' : 'text-slate-400'
+                trend.direction === 'up' ? 'text-green-500' :
+                trend.direction === 'down' ? 'text-red-500' : (darkMode ? 'text-slate-400' : 'text-slate-500')
               }`}>
                 <TrendIcon size={14} />
                 <span>
@@ -482,7 +480,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
           {/* View Type Toggle */}
           <div className={`
             flex rounded-lg p-1
-            ${darkMode ? 'bg-slate-700/50' : 'bg-slate-200/50'}
+            ${darkMode ? 'bg-slate-700/50' : 'bg-slate-100'}
           `}>
             <button
               onClick={() => setViewType('daily')}
@@ -490,7 +488,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
                 px-3 py-1 rounded-md text-sm font-medium transition-all
                 ${viewType === 'daily'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-300'}
+                  : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}
               `}
             >
               Daily
@@ -501,7 +499,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
                 px-3 py-1 rounded-md text-sm font-medium transition-all
                 ${viewType === 'cumulative'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-300'}
+                  : darkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'}
               `}
             >
               Cumulative
@@ -523,7 +521,9 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
                   px-3 py-1 rounded-lg text-sm font-medium transition-all
                   ${period === key
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'}
+                    : darkMode
+                      ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700/30'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}
                 `}
               >
                 {label}
@@ -547,21 +547,21 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
       {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-6">
         <div className="text-center">
-          <p className="text-sm text-slate-400 mb-1">Period Total Income</p>
-          <p className="text-xl font-semibold text-green-400">
+          <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Period Total Income</p>
+          <p className="text-xl font-semibold text-green-500">
             ${formatCurrency(periodTotals.income)}
           </p>
         </div>
         <div className="text-center">
-          <p className="text-sm text-slate-400 mb-1">Period Total Expenses</p>
-          <p className="text-xl font-semibold text-red-400">
+          <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Period Total Expenses</p>
+          <p className="text-xl font-semibold text-red-500">
             ${formatCurrency(periodTotals.expenses)}
           </p>
         </div>
         <div className="text-center">
-          <p className="text-sm text-slate-400 mb-1">Net Position</p>
+          <p className={`text-sm mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Net Position</p>
           <p className={`text-xl font-semibold ${
-            periodTotals.net >= 0 ? 'text-blue-400' : 'text-red-400'
+            periodTotals.net >= 0 ? 'text-blue-500' : 'text-red-500'
           }`}>
             ${periodTotals.net >= 0 ? '' : '-'}${formatCurrency(Math.abs(periodTotals.net))}
           </p>

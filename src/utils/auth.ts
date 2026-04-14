@@ -153,7 +153,7 @@ export const getUserClubs = async () => {
     const clubDetailsPromises = userClubsData.map(async (uc) => {
       const { data: clubData, error: clubError } = await supabase
         .from('clubs')
-        .select('id, name, abbreviation, logo')
+        .select('id, name, abbreviation, logo, is_test')
         .eq('id', uc.club_id)
         .single();
 

@@ -196,6 +196,7 @@ export const PublicStateAssociationHomepage: React.FC = () => {
         .from('clubs')
         .select('id, name, logo_url')
         .eq('state_association_id', associationId)
+        .neq('is_test', true)
         .order('name')
         .limit(6);
 
@@ -414,7 +415,7 @@ export const PublicStateAssociationHomepage: React.FC = () => {
                     </div>
                   )}
                   {event.race_class && (
-                    <div className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-gradient-to-r from-rose-500 to-pink-500 text-white">
+                    <div className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold from-rose-500 to-pink-500 text-white">
                       {event.race_class}
                     </div>
                   )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowRight, ArrowLeft, Upload, Loader2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Upload, Loader as Loader2 } from 'lucide-react';
 import { loadGoogleMaps } from '../../../utils/googleMaps';
 
 const toTitleCase = (str: string): string => {
@@ -130,10 +130,11 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
         map.setCenter(place.geometry.location);
         marker.setPosition(place.geometry.location);
 
+        const address = place.formatted_address;
         onUpdate({
           latitude: place.geometry!.location.lat(),
           longitude: place.geometry!.location.lng(),
-          address: place.formatted_address || data.address
+          ...(address && address !== 'undefined' ? { address } : {}),
         });
       });
     }
@@ -356,7 +357,7 @@ export const ClubVenueStep: React.FC<ClubVenueStepProps> = ({
           </button>
           <button
             onClick={handleNext}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+            className="btn-primary-green inline-flex items-center gap-2 px-8 py-4 text-white rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg"
           >
             Continue
             <ArrowRight className="w-4 h-4" />

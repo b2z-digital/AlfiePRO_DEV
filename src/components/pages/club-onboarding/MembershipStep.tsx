@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Plus, Trash2, DollarSign, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Users, Plus, Trash2, DollarSign, Calendar, TriangleAlert as AlertTriangle, CircleCheck as CheckCircle } from 'lucide-react';
 import { StepProps, MembershipTypeEntry } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -101,7 +101,7 @@ export const MembershipStep: React.FC<StepProps> = ({
           </p>
           <button
             onClick={addType}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors text-sm"
+            className="btn-primary-green inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-medium transition-colors text-sm"
           >
             <Plus size={16} />
             Add Membership Type

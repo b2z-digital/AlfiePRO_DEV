@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Users, UserPlus, Upload, Download, Search, Edit2, Sailboat, Phone, Mail, Building, Grid, List, Filter, RefreshCw, Calendar, Check, AlertTriangle, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
+import { X, Plus, Trash2, Users, UserPlus, Upload, Download, Search, SquarePen as Edit2, Sailboat, Phone, Mail, Building, Grid2x2 as Grid, List, ListFilter as Filter, RefreshCw, Calendar, Check, TriangleAlert as AlertTriangle, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
 import { MemberImportExportModal } from './MemberImportExportModal';
 import { Member, MemberFormData, ImportedMember, BoatType, MembershipLevel } from '../types/member';
 import { getStoredMembers, addMember, updateMember, deleteMember, getEditSession, setEditSession, clearEditSession, isEditSessionValid, addMembers, parseDate, parseAmount } from '../utils/storage';
@@ -1266,7 +1266,7 @@ export const MembershipManager: React.FC<MembershipManagerProps> = ({
                 {activeTab === 'renewals' && (
                   <button
                     onClick={handleBulkRenewalReminders}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+                    className="btn-primary-green flex items-center gap-2 px-4 py-2 text-white rounded-lg font-medium transition-colors"
                   >
                     <Mail size={18} />
                     Send Renewal Reminders

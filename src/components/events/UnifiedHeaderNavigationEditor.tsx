@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Plus, Trash2, Eye, Palette, Layout, Type, Menu as MenuIcon } from 'lucide-react';
+import { Upload, Plus, Trash2, Eye, Palette, LayoutGrid as Layout, Type, Menu as MenuIcon } from 'lucide-react';
 import type { EventHeaderConfig, EventMenuConfig, EventCTAButton } from '../../types/eventWidgets';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -908,7 +908,7 @@ export const UnifiedHeaderNavigationEditor: React.FC<Props> = ({
               <label className="text-sm font-medium text-slate-300">Call-to-Action Buttons</label>
               <button
                 onClick={addCTAButton}
-                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+                className="btn-primary-green flex items-center gap-1 px-3 py-1.5 text-white rounded-lg text-sm transition-colors"
               >
                 <Plus size={14} />
                 Add Button

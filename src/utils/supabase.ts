@@ -340,8 +340,12 @@ supabase.auth.onAuthStateChange((event, session) => {
       console.warn('Failed to broadcast token refresh:', e);
     }
   } else if (event === 'SIGNED_OUT') {
-    console.log('User signed out, redirecting to login...');
-    window.location.href = '/login';
+    const isOnResetPage = window.location.pathname === '/reset-password';
+    const isOnForgotPage = window.location.pathname === '/forgot-password';
+    if (!isOnResetPage && !isOnForgotPage) {
+      console.log('User signed out, redirecting to login...');
+      window.location.href = '/login';
+    }
   } else if (event === 'USER_UPDATED') {
     console.log('User updated');
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Save, Loader2, Image, Type, Building2 } from 'lucide-react';
+import { Upload, Save, Loader as Loader2, Image, Type, Building2 } from 'lucide-react';
 import type { EventHeaderConfig } from '../../types/eventWidgets';
 import { supabase } from '../../utils/supabase';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -556,7 +556,7 @@ export const EventHeaderEditor: React.FC<Props> = ({ websiteId, config, onSave, 
         <button
           onClick={handleSubmit}
           disabled={saving || uploading}
-          className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:shadow-lg hover:shadow-green-500/20 transition-all hover:scale-[1.02] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary-green flex items-center gap-2 px-6 py-3 text-white rounded-xl hover:shadow-lg transition-all hover:scale-[1.02] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? (
             <>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save, Edit2 } from 'lucide-react';
+import { LogOut, Search, Calendar, DollarSign, Users, LayoutGrid, Sparkles, Save, SquarePen as Edit2 } from 'lucide-react';
 import { WIDGET_REGISTRY, getAllCategories, getWidgetsByCategory } from './WidgetRegistry';
 import { WidgetConfig, DashboardLayout } from '../../types/dashboard';
 import { DASHBOARD_TEMPLATES } from '../../constants/dashboardTemplates';
@@ -461,7 +461,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                                     onEditSystemTemplate(template.id);
                                     onClose();
                                   }}
-                                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-900/50 flex items-center gap-2"
+                                  className="px-4 py-2 rounded-lg from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-semibold transition-all shadow-lg shadow-amber-900/50 flex items-center gap-2"
                                   title="Edit this system template globally (affects all position assignments)"
                                 >
                                   <Edit2 size={14} />
@@ -521,7 +521,7 @@ export const WidgetLibraryModal: React.FC<WidgetLibraryModalProps> = ({
                               </div>
 
                               <div className="flex gap-2 justify-end">
-                                <button className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors">
+                                <button className="btn-primary-green px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors">
                                   Apply Template
                                 </button>
                               </div>
