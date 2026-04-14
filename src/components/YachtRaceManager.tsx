@@ -2418,11 +2418,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
     console.log('💾 Heat management state updated');
 
-    // CRITICAL: When clearing heat results, explicitly save to database immediately
-    // This ensures the cleared state persists and triggers live tracking updates
     const currentEvent = getCurrentEvent();
     if (currentEvent) {
-      console.log('💾 Explicitly saving cleared heat management to database...');
+      if (settings.observerSettings) {
+        currentEvent.enable_observers = settings.observerSettings.enable_observers;
+        currentEvent.observers_per_heat = settings.observerSettings.observers_per_heat;
+      }
+      if (settings.displaySettings) {
+        currentEvent.show_flag = settings.displaySettings.show_flag;
+        currentEvent.show_country = settings.displaySettings.show_country;
+      }
+      setCurrentEvent(currentEvent);
+
+      console.log('💾 Explicitly saving heat management to database...');
       try {
         await updateEventResults(
           currentEvent.isSeriesEvent ? currentEvent.seriesId : currentEvent.id,
@@ -2431,16 +2439,17 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
           lastCompletedRace,
           hasDeterminedInitialHcaps,
           isManualHandicaps,
-          false, // not completed
+          false,
           currentDay,
-          finalHM, // Use the new heat management (with safety-net rounds if needed)
+          finalHM,
           settings.numRaces,
           settings.dropRules as number[]
         );
         console.log('✅ Heat management saved to database successfully');
 
-        // Save display settings, observer settings, and start sequence if provided
-        if ((settings.displaySettings || settings.observerSettings) && currentEvent.id) {
+        const freshEvent = getCurrentEvent() || currentEvent;
+
+        if ((settings.displaySettings || settings.observerSettings) && freshEvent.id) {
           const updateData: any = {};
 
           if (settings.displaySettings) {
@@ -2456,18 +2465,57 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
           console.log('💾 Final update data to save:', updateData);
 
-          const { error } = await supabase
-            .from('quick_races')
-            .update(updateData)
-            .eq('id', currentEvent.id);
+          let saveError = null;
+          if (freshEvent.isSeriesEvent && freshEvent.seriesId) {
+            let roundId = freshEvent.seriesRoundId;
+            if (!roundId && freshEvent.roundName) {
+              const { data: roundRow } = await supabase
+                .from('race_series_rounds')
+                .select('id')
+                .eq('series_id', freshEvent.seriesId)
+                .eq('round_name', freshEvent.roundName)
+                .maybeSingle();
+              roundId = roundRow?.id;
+              if (roundId) {
+                freshEvent.seriesRoundId = roundId;
+                setCurrentEvent(freshEvent);
+              }
+            }
+            if (roundId) {
+              const { error } = await supabase
+                .from('race_series_rounds')
+                .update(updateData)
+                .eq('id', roundId);
+              saveError = error;
 
-          if (error) {
-            console.error('❌ Error saving display/observer settings:', error);
+              if (!saveError && settings.observerSettings && freshEvent.seriesId) {
+                const observerData: any = {
+                  enable_observers: settings.observerSettings.enable_observers,
+                  observers_per_heat: settings.observerSettings.observers_per_heat
+                };
+                await supabase
+                  .from('race_series_rounds')
+                  .update(observerData)
+                  .eq('series_id', freshEvent.seriesId)
+                  .neq('id', roundId);
+              }
+            } else {
+              console.error('Could not find series round ID for observer settings save');
+            }
+          } else {
+            const { error } = await supabase
+              .from('quick_races')
+              .update(updateData)
+              .eq('id', freshEvent.id);
+            saveError = error;
+          }
+
+          if (saveError) {
+            console.error('❌ Error saving display/observer settings:', saveError);
           } else {
             console.log('✅ Display/Observer settings saved successfully to database');
-            // Update the current event in localStorage
             const updatedEvent = {
-              ...currentEvent,
+              ...freshEvent,
               ...(settings.displaySettings && {
                 show_flag: settings.displaySettings.show_flag,
                 show_country: settings.displaySettings.show_country

@@ -263,6 +263,7 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
       raceFormat: seriesItem.raceFormat,
       isSeriesEvent: true,
       seriesId: seriesItem.id,
+      seriesRoundId: round.id || undefined,
       roundName: round.name,
       skippers: roundSkippers,
       raceResults: round.results || [],
@@ -279,7 +280,9 @@ export const RaceSeries: React.FC<RaceSeriesProps> = ({
       numRaces: round.numRaces,
       dropRules: round.dropRules || [4, 8, 16, 24, 32, 40],
       enableLiveTracking: seriesItem.enableLiveTracking,
-      enableLiveStream: round.enableLiveStream || seriesItem.enableLiveStream
+      enableLiveStream: round.enableLiveStream || seriesItem.enableLiveStream,
+      enable_observers: round.enable_observers || false,
+      observers_per_heat: round.observers_per_heat || 2
     };
 
     console.log('🎯 [RaceSeries] Created event from round:', {

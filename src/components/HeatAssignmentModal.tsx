@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Users, Shuffle, CreditCard as Edit3, Check, RefreshCw, Eye, UserPlus, CircleAlert as AlertCircle, Lock, ArrowRight, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react';
 import { Skipper } from '../types';
 import { HeatManagement, HeatDesignation, getHeatColorClasses, HeatAssignment, generateNextRoundAssignments, getSHRSPhase, getSHRSHeatLabel, getSHRSRoundLabel, isSHRSTransitionRound, isSHRSFinalsRound } from '../types/heat';
 import { RaceEvent } from '../types/race';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
-import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment } from '../utils/observerUtils';
+import { selectObservers, saveObserverAssignments, getObserverAssignments, getAllObserversForEvent, toggleObserver, preAllocateObserversForAllRounds, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
 import { supabase } from '../utils/supabase';
 import { exportSingleRoundPdf, exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
+import { validateHeatAssignments } from '../utils/hmsHeatSystem';
 
 interface HeatAssignmentModalProps {
   isOpen: boolean;
@@ -48,6 +49,23 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const [selectedSkipperToMove, setSelectedSkipperToMove] = useState<number | null>(null);
   const [localAssignments, setLocalAssignments] = useState<HeatAssignment[] | null>(null);
   const [previewRoundIndex, setPreviewRoundIndex] = useState<number | null>(null);
+
+  const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
+  const [resolvedObserverId, setResolvedObserverId] = useState<string | null>(syncObserverEventId);
+
+  useEffect(() => {
+    if (syncObserverEventId) {
+      setResolvedObserverId(syncObserverEventId);
+      return;
+    }
+    let cancelled = false;
+    resolveObserverEventId(currentEvent).then(id => {
+      if (!cancelled && id) setResolvedObserverId(id);
+    });
+    return () => { cancelled = true; };
+  }, [syncObserverEventId, currentEvent?.id, currentEvent?.seriesId, currentEvent?.roundName]);
+
+  const observerEventId = resolvedObserverId;
 
   const rankedSkipperIndices = useMemo(() => {
     const indices = (heatManagement.configuration as any)?.rankedSkipperIndices;
@@ -133,8 +151,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   const handleExportAllRoundsPdf = async () => {
     const stateObsMap = buildObserverMap();
     let obsMap = new Map<string, { skipperName: string; sailNumber: string; countryCode?: string }[]>();
-    if (currentEvent?.id) {
-      const rawMap = await getAllObserversForEvent(currentEvent.id);
+    if (observerEventId) {
+      const rawMap = await getAllObserversForEvent(observerEventId);
       rawMap.forEach((observers, key) => {
         obsMap.set(key, observers.map(o => {
           const matched = skippers.find(s =>
@@ -205,11 +223,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       return newMap;
     });
 
-    if (resolvedMap && currentEvent?.id && changedHeats.length > 0) {
+    if (resolvedMap && observerEventId && changedHeats.length > 0) {
       for (const heatNumber of changedHeats) {
         const observers = resolvedMap.get(heatNumber);
         if (observers && observers.length > 0) {
-          saveObserverAssignments(currentEvent.id, heatNumber, round, observers);
+          saveObserverAssignments(observerEventId, heatNumber, round, observers);
         }
       }
     }
@@ -280,17 +298,34 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     let cancelled = false;
 
     const loadObservers = async () => {
-      if (!isOpen || !currentEvent?.id) {
+      if (!isOpen) {
+        setObserversByHeat(new Map());
+        return;
+      }
+
+      let resolvedEventId = observerEventId;
+      if (!resolvedEventId) {
+        resolvedEventId = await resolveObserverEventId(currentEvent);
+        if (resolvedEventId && !cancelled) {
+          setResolvedObserverId(resolvedEventId);
+        }
+      }
+      if (!resolvedEventId) {
         setObserversByHeat(new Map());
         return;
       }
 
       let enableObs = currentEvent?.enable_observers;
       if (enableObs === undefined) {
+        const roundId = currentEvent?.isSeriesEvent
+          ? (currentEvent?.seriesRoundId || resolvedEventId)
+          : null;
+        const tableName = roundId ? 'race_series_rounds' : 'quick_races';
+        const queryId = roundId || resolvedEventId;
         const { data: eventData, error } = await supabase
-          .from('quick_races')
+          .from(tableName)
           .select('enable_observers, observers_per_heat')
-          .eq('id', currentEvent.id)
+          .eq('id', queryId)
           .maybeSingle();
 
         if (error || cancelled) {
@@ -326,7 +361,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         if (shrsPreAssign && !preAllocationDone.current) {
           preAllocationDone.current = true;
           await preAllocateObserversForAllRounds(
-            currentEvent.id,
+            resolvedEventId,
             rounds.map(r => ({
               round: r.round,
               heatAssignments: r.heatAssignments.map(h => ({
@@ -369,7 +404,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             if (cancelled) return;
             const heatNumber = i + 1;
             const existingObservers = await getObserverAssignments(
-              currentEvent.id,
+              resolvedEventId,
               heatNumber,
               roundNumberToLoad
             );
@@ -411,7 +446,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             }
 
             const existingObservers = await getObserverAssignments(
-              currentEvent.id,
+              resolvedEventId,
               heatNumber,
               roundNumberToLoad
             );
@@ -449,7 +484,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               newObserversByHeat.set(heatNumber, existingObservers);
             } else {
               const observersForThisHeat = await selectObservers(
-                currentEvent.id,
+                resolvedEventId,
                 heatNumber,
                 roundNumberToLoad,
                 heat.skipperIndices,
@@ -459,13 +494,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               );
 
               if (observersForThisHeat.length > 0) {
-                await saveObserverAssignments(
-                  currentEvent.id,
+                const saved = await saveObserverAssignments(
+                  resolvedEventId,
                   heatNumber,
                   roundNumberToLoad,
                   observersForThisHeat
                 );
-                newObserversByHeat.set(heatNumber, observersForThisHeat);
+                if (saved) {
+                  newObserversByHeat.set(heatNumber, observersForThisHeat);
+                }
               }
             }
           }
@@ -481,7 +518,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
     loadObservers();
     return () => { cancelled = true; };
-  }, [isOpen, currentEvent?.id, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
+  }, [isOpen, observerEventId, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
 
   if (!isOpen) return null;
 
@@ -962,15 +999,20 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               return (
                 <div
                   key={heatDesignation}
-                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 ${
+                  className={`rounded-lg border-2 overflow-hidden flex flex-col flex-1 min-w-0 relative ${
                     isDropTarget
                       ? 'border-amber-400 ring-2 ring-amber-400/50'
-                      : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
+                      : heatCompleted
+                        ? 'border-emerald-500/60'
+                        : darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'
                   }`}
                 >
+                  {heatCompleted && (
+                    <div className="absolute inset-0 bg-emerald-900/10 pointer-events-none z-10 rounded-lg" />
+                  )}
                   {/* Heat Header */}
                   <div
-                    className={`p-2 ${getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
+                    className={`p-2 ${heatCompleted ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
                       isDropTarget ? 'cursor-pointer' : ''
                     }`}
                     onClick={() => {
@@ -1001,11 +1043,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] text-white opacity-80">{skippersToDisplay.length} skippers</span>
                         {heatCompleted ? (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-white">
-                            Complete
+                          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-sm">
+                            <Check size={10} className="text-white" />
+                            Scored
                           </span>
                         ) : heatResults.length > 0 && !completed && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-500 text-white">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/80 text-white animate-pulse">
                             Scoring
                           </span>
                         )}
@@ -1020,7 +1063,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   </div>
 
                   {/* Skipper List - Vertical scroll within column */}
-                  <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
+                  <div className={`flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto relative ${
+                    heatCompleted && !editMode ? 'opacity-75' : ''
+                  }`}>
                     {sortedSkippers.map((skipperIndex, idx) => {
                       const skipper = skippers[skipperIndex];
                       const result = heatResults.find(r => r.skipperIndex === skipperIndex);
@@ -1509,9 +1554,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 <button
                                   key={observer.skipper_index}
                                   onClick={async () => {
-                                    if (!currentEvent?.id) return;
+                                    if (!observerEventId) return;
                                     const success = await toggleObserver(
-                                      currentEvent.id,
+                                      observerEventId,
                                       heatNumber,
                                       round,
                                       observer.skipper_index,
@@ -1521,7 +1566,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                     );
                                     if (success) {
                                       const updatedObservers = await getObserverAssignments(
-                                        currentEvent.id,
+                                        observerEventId,
                                         heatNumber,
                                         round
                                       );
@@ -1584,6 +1629,11 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               <button
                 onClick={() => {
                   if (localAssignments && onUpdateAssignments) {
+                    const problems = validateHeatAssignments(localAssignments, skippers.length);
+                    if (problems.length > 0) {
+                      alert('Heat assignment issues:\n' + problems.join('\n'));
+                      return;
+                    }
                     onUpdateAssignments(localAssignments, 1);
                   }
                   setInitialEditMode(false);
@@ -1718,37 +1768,53 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             configuration.numberOfHeats
                           );
 
-                          // If we're editing mid-round (no nextRound), update CURRENT round
-                          // If between rounds (nextRound exists), update NEXT round
+                          const problems = validateHeatAssignments(updatedAssignments, skippers.length);
+                          if (problems.length > 0) {
+                            alert('Heat assignment issues:\n' + problems.join('\n'));
+                            setIsApplyingChanges(false);
+                            return;
+                          }
+
                           const targetRoundNumber = nextRound ? nextRound.round : roundToDisplay.round;
 
-                          console.log('💾 Applying assignment changes to Round', targetRoundNumber);
-                          console.log('   Updated assignments:', updatedAssignments);
-
-                          // Update in parent state - pass targetRoundNumber so parent knows which round to update
                           onUpdateAssignments(updatedAssignments, targetRoundNumber);
 
-                          // Save to database if currentEvent exists
                           if (currentEvent?.id) {
                             try {
-                              const { error } = await supabase
-                                .from('quick_races')
-                                .update({
-                                  heat_management: {
-                                    ...heatManagement,
-                                    rounds: heatManagement.rounds.map(r =>
-                                      r.round === targetRoundNumber
-                                        ? { ...r, heatAssignments: updatedAssignments }
-                                        : r
-                                    )
-                                  }
-                                })
-                                .eq('id', currentEvent.id);
-
-                              if (error) {
-                                console.error('❌ Error saving assignment changes:', error);
+                              const updatedHM = {
+                                ...heatManagement,
+                                rounds: heatManagement.rounds.map(r =>
+                                  r.round === targetRoundNumber
+                                    ? { ...r, heatAssignments: updatedAssignments }
+                                    : r
+                                )
+                              };
+                              if (currentEvent.isSeriesEvent && currentEvent.seriesId) {
+                                let roundId = currentEvent.seriesRoundId;
+                                if (!roundId && currentEvent.roundName) {
+                                  const { data: rr } = await supabase
+                                    .from('race_series_rounds')
+                                    .select('id')
+                                    .eq('series_id', currentEvent.seriesId)
+                                    .eq('round_name', currentEvent.roundName)
+                                    .maybeSingle();
+                                  roundId = rr?.id;
+                                }
+                                if (roundId) {
+                                  const { error } = await supabase
+                                    .from('race_series_rounds')
+                                    .update({ heat_management: updatedHM })
+                                    .eq('id', roundId);
+                                  if (error) console.error('Error saving assignment changes:', error);
+                                  else console.log('Assignment changes saved to database');
+                                }
                               } else {
-                                console.log('✅ Assignment changes saved to database');
+                                const { error } = await supabase
+                                  .from('quick_races')
+                                  .update({ heat_management: updatedHM })
+                                  .eq('id', currentEvent.id);
+                                if (error) console.error('Error saving assignment changes:', error);
+                                else console.log('Assignment changes saved to database');
                               }
                             } catch (error) {
                               console.error('❌ Error updating assignments:', error);
@@ -1922,7 +1988,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           <button
                             key={index}
                             onClick={async () => {
-                              if (!currentEvent?.id) return;
+                              if (!observerEventId) return;
 
                               if (!isSelected && isAtLimit) {
                                 setLimitWarning(`Maximum of ${maxObservers} observer${maxObservers !== 1 ? 's' : ''} reached. Remove one first.`);
@@ -1933,7 +1999,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               const { data: existingObserver } = await supabase
                                 .from('heat_observers')
                                 .select('times_served')
-                                .eq('event_id', currentEvent.id)
+                                .eq('event_id', observerEventId)
                                 .eq('skipper_index', index)
                                 .order('times_served', { ascending: false })
                                 .limit(1)
@@ -1942,7 +2008,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               const timesServed = existingObserver?.times_served || 0;
 
                               const success = await toggleObserver(
-                                currentEvent.id,
+                                observerEventId,
                                 selectedHeatForObserver,
                                 round,
                                 index,
@@ -1953,7 +2019,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
                               if (success) {
                                 const updatedObservers = await getObserverAssignments(
-                                  currentEvent.id,
+                                  observerEventId,
                                   selectedHeatForObserver,
                                   round
                                 );
@@ -2083,7 +2149,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       </button>
                       <button
                         onClick={async () => {
-                          if (!currentEvent?.id || !customObserverName.trim()) return;
+                          if (!observerEventId || !customObserverName.trim()) return;
 
                           const customObserver: ObserverAssignment = {
                             skipper_index: undefined,
@@ -2097,7 +2163,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                           const updatedObservers = [...currentObs, customObserver];
 
                           const success = await saveObserverAssignments(
-                            currentEvent.id,
+                            observerEventId,
                             selectedHeatForObserver,
                             round,
                             updatedObservers
