@@ -563,7 +563,7 @@ export const SpreadsheetScoring: React.FC<SpreadsheetScoringProps> = ({
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[13px] border-collapse">
+                  <table className="text-[13px] border-collapse">
                     <colgroup>
                       <col style={{ width: '40px' }} />
                       {completedRounds.map(r => (
