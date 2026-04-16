@@ -234,7 +234,9 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               numberOfDays: roundData.number_of_days || initialEvent.numberOfDays || 1,
               dayResults: roundData.day_results || initialEvent.dayResults || {},
               currentDay: roundData.current_day || initialEvent.currentDay || 1,
-              enableLiveStream: roundData.enable_livestream || initialEvent.enableLiveStream || false
+              enableLiveStream: roundData.enable_livestream || initialEvent.enableLiveStream || false,
+              enable_observers: roundData.enable_observers ?? initialEvent.enable_observers ?? false,
+              observers_per_heat: roundData.observers_per_heat ?? initialEvent.observers_per_heat ?? 2
             };
             console.log('🔄 [EventDetails] Refetched event data, skippers:', updatedEvent.skippers?.length || 0);
             console.log('🔄 [EventDetails] Full updatedEvent.skippers:', updatedEvent.skippers);
@@ -268,7 +270,9 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
                   numRaces: round.numRaces || initialEvent.numRaces,
                   dropRules: round.dropRules || initialEvent.dropRules,
                   completed: round.completed || initialEvent.completed || false,
-                  enableLiveStream: round.enableLiveStream || initialEvent.enableLiveStream || false
+                  enableLiveStream: round.enableLiveStream || initialEvent.enableLiveStream || false,
+                  enable_observers: round.enable_observers ?? initialEvent.enable_observers ?? false,
+                  observers_per_heat: round.observers_per_heat ?? initialEvent.observers_per_heat ?? 2
                 };
                 setEvent(updatedEvent);
               }
@@ -341,6 +345,8 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
               heatManagement: data.heat_management || initialEvent.heatManagement || null,
               dayResults: data.day_results || initialEvent.dayResults || {},
               currentDay: data.current_day || initialEvent.currentDay || 1,
+              enable_observers: data.enable_observers ?? initialEvent.enable_observers ?? false,
+              observers_per_heat: data.observers_per_heat ?? initialEvent.observers_per_heat ?? 2,
             };
             console.log('Refetched event data, skippers:', updatedEvent.skippers?.length || 0, 'currentDay:', updatedEvent.currentDay);
             setEvent(updatedEvent);

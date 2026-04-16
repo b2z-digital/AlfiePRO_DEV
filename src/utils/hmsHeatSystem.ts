@@ -264,68 +264,64 @@ export function seedInitialHeats(
 }
 
 /**
- * Calculate HMS 2007 compliant heat sizes
- * Distributes extras to create balanced heat sizes where max difference is 1
+ * Calculate HMS Schedule A heat sizes (for Race 1 seeding and Race 2 redistribution).
+ * Per HMS rules: approximately equal heat sizes, extras go to the LOWEST (bottom) heat.
  *
- * Examples from HMS 2007 document with 29 skippers:
- * - 2 heats: [15, 14] - extra to A
- * - 3 heats: [10, 9, 10] - extras to A and C (balanced)
- * - 4 heats: [7, 8, 7, 7] - extra to B
+ * Examples with 34 skippers:
+ * - 3 heats: [11, 11, 12] - extra to C (bottom)
+ * - 2 heats: [17, 17]
+ *
+ * Examples with 29 skippers:
+ * - 3 heats: [9, 10, 10] - extras to B and C (bottom-first)
+ * - 2 heats: [14, 15] - extra to B (bottom)
  */
 export function calculateHMSHeatSizes(totalSkippers: number, numberOfHeats: number): number[] {
   const baseSize = Math.floor(totalSkippers / numberOfHeats);
   const remainder = totalSkippers % numberOfHeats;
 
-  // Initialize all heats with base size
   const heatSizes: number[] = Array(numberOfHeats).fill(baseSize);
 
-  if (remainder === 0) {
-    return heatSizes;
+  for (let i = 0; i < remainder; i++) {
+    heatSizes[numberOfHeats - 1 - i]++;
   }
 
-  // Distribute extras to create balanced heats
-  // Strategy: For odd number of heats, extras go to outer heats first (A, then last, alternating)
-  // For even number of heats with 1 extra, give to middle-upper heat (B)
+  return heatSizes;
+}
 
-  if (numberOfHeats === 2) {
-    // 2 heats: extra goes to Heat A
-    heatSizes[0] += remainder;
-  } else if (numberOfHeats === 3) {
-    // 3 heats: distribute to A and C first, then B
-    // For remainder 1: give to A
-    // For remainder 2: give to A and C
-    if (remainder >= 1) heatSizes[0]++;
-    if (remainder >= 2) heatSizes[2]++;
-  } else if (numberOfHeats === 4) {
-    // 4 heats: distribute extras starting from B, then A, then C, then D
-    // For remainder 1: give to B (middle-upper)
-    // For remainder 2: give to B and C
-    // For remainder 3: give to B, C, A
-    const distributionOrder = [1, 2, 0, 3]; // B, C, A, D
-    for (let i = 0; i < remainder && i < numberOfHeats; i++) {
-      heatSizes[distributionOrder[i]]++;
-    }
-  } else if (numberOfHeats === 5) {
-    // 5 heats: distribute to middle heats first, then outer
-    const distributionOrder = [2, 1, 3, 0, 4]; // C, B, D, A, E
-    for (let i = 0; i < remainder && i < numberOfHeats; i++) {
-      heatSizes[distributionOrder[i]]++;
-    }
-  } else if (numberOfHeats === 6) {
-    // 6 heats: distribute to middle heats first
-    const distributionOrder = [2, 3, 1, 4, 0, 5]; // C, D, B, E, A, F
-    for (let i = 0; i < remainder && i < numberOfHeats; i++) {
-      heatSizes[distributionOrder[i]]++;
-    }
-  } else {
-    // Default: distribute evenly starting from middle
-    for (let i = 0; i < remainder; i++) {
-      const targetIndex = Math.floor(numberOfHeats / 2) + (i % 2 === 0 ? i / 2 : -Math.ceil(i / 2));
-      if (targetIndex >= 0 && targetIndex < numberOfHeats) {
-        heatSizes[targetIndex]++;
-      }
-    }
+/**
+ * Calculate HMS Schedule B heat sizes (for Race 3+ redistribution).
+ *
+ * Per HMS 2022 v2 rules:
+ * - The BOTTOM heat (lowest) gets the most skippers since it has no promotions from below
+ * - Upper heats get fewer BASE skippers because they receive P promoted boats from the heat below
+ * - Goal: each heat SAILS approximately the same number of boats
+ *
+ * Formula:
+ *   upper_heat_base = floor((N - P) / H)
+ *   bottom_heat_base = N - (H - 1) * upper_heat_base
+ *   Remainder distributed to bottom heats first
+ *
+ * Each heat then SAILS: upper = base + P, bottom = base (no incoming promotions)
+ *
+ * Examples with P=4:
+ * - 34 boats, 3 heats: A=10, B=10, C=14 (each sails 14)
+ * - 29 boats, 3 heats: A=8, B=8, C=13 (A sails 12, B sails 12, C sails 13)
+ * - 34 boats, 2 heats: A=15, B=19 (A sails 19, B sails 19)
+ */
+export function calculateScheduleBHeatSizes(totalSkippers: number, numberOfHeats: number, promotionCount: number): number[] {
+  if (numberOfHeats <= 1) return [totalSkippers];
+
+  const adjustedTotal = totalSkippers - promotionCount;
+  const baseSize = Math.floor(adjustedTotal / numberOfHeats);
+  const remainder = adjustedTotal % numberOfHeats;
+
+  const heatSizes: number[] = Array(numberOfHeats).fill(baseSize);
+
+  for (let i = 0; i < remainder; i++) {
+    heatSizes[numberOfHeats - 1 - i]++;
   }
+
+  heatSizes[numberOfHeats - 1] += promotionCount;
 
   return heatSizes;
 }
@@ -413,13 +409,11 @@ function applyScheduleA(
     });
   });
 
-  // HMS SCHEDULE A: Complete redistribution based on overall fleet ranking
+  // HMS SCHEDULE A: Complete redistribution based on overall fleet ranking.
   // After seeding round, ALL skippers are re-ranked by their finish position and redistributed
-  // CRITICAL: Leave P promotion slots OPEN in upper heats (A, B, etc.) for mid-round promotions
-  // - Heat A: Gets (target - P) top skippers + P empty slots (filled when B completes)
-  // - Heat B: Gets (target - P) next skippers + P empty slots (filled when C completes)
-  // - Heat C (bottom): Gets ALL remaining skippers (no P slots)
-  console.log(`\n=== Schedule A: Full Redistribution with P=${promotionCount} Promotion Slots ===`);
+  // into balanced heats (extras go to bottom heat). Between-round swaps (Schedule B/C) then
+  // maintain heat size consistency by swapping equal P skippers between adjacent heats.
+  console.log(`\n=== Schedule A: Full Redistribution ===`);
 
   // Collect all skippers with their finish positions from ALL heats
   const allSkipperResults: Array<{
@@ -483,41 +477,11 @@ function applyScheduleA(
   console.log(`\nTotal skippers for next round: ${totalSkippers} (${validResults.length} valid + ${rdgResults.length} RDG/DPI + ${letterScoreResults.length} other letter scores)`);
   console.log(`Target Heat Sizes (after promotions): ${targetHeatSizes.join(', ')}`);
 
-  // HMS SCHEDULE A: Full redistribution based on overall fleet ranking
-  //
-  // Key rules for mid-round promotions (P = promotion count, typically 4):
-  // - Heat A: target - P (leaves P slots for promotions from Heat B)
-  // - Middle heats (B, D, etc.): target (gains P from lower heat, loses P to higher heat, net 0)
-  // - Bottom heat (C or F): remaining skippers (will lose P to the heat above)
-  //
-  // Example with 46 skippers, 3 heats, targets [16, 15, 15], P=4:
-  // - Heat A: 16 - 4 = 12 skippers (top 12 overall) + 4 P slots
-  // - Heat B: 15 skippers (positions 13-27) + 4 P slots (will gain 4 from C, lose 4 to A)
-  // - Heat C: 19 skippers (positions 28-46) - bottom heat (will lose 4 to B)
-  // - Total: 12 + 15 + 19 = 46
+  const initialHeatSizes: number[] = [...targetHeatSizes];
 
-  const initialHeatSizes: number[] = new Array(numberOfHeats).fill(0);
-
-  // Heat A: target - P (leaves room for promotions from Heat B)
-  initialHeatSizes[0] = Math.max(0, targetHeatSizes[0] - promotionCount);
-
-  // Middle heats (B, D, etc.): use target size
-  // They gain P from below and lose P to above, so net change is 0
-  for (let i = 1; i < numberOfHeats - 1; i++) {
-    initialHeatSizes[i] = targetHeatSizes[i];
-  }
-
-  // Bottom heat: gets all remaining skippers
-  const upperHeatsTotal = initialHeatSizes.slice(0, -1).reduce((sum, size) => sum + size, 0);
-  initialHeatSizes[numberOfHeats - 1] = totalSkippers - upperHeatsTotal;
-
-  console.log(`\nSchedule A Initial Assignment Sizes:`);
-  console.log(`  Heat A: ${initialHeatSizes[0]} skippers + ${promotionCount} P slots (top performers)`);
-  for (let i = 1; i < numberOfHeats; i++) {
-    const heatLetter = heats[i];
-    const isBottom = i === numberOfHeats - 1;
-    const pSlotInfo = isBottom ? ' (bottom heat, no P slots)' : ` + ${promotionCount} P slots`;
-    console.log(`  Heat ${heatLetter}: ${initialHeatSizes[i]} skippers${pSlotInfo}`);
+  console.log(`\nSchedule A Assignment Sizes:`);
+  for (let i = 0; i < numberOfHeats; i++) {
+    console.log(`  Heat ${heats[i]}: ${initialHeatSizes[i]} skippers`);
   }
   console.log(`  Total: ${initialHeatSizes.reduce((a, b) => a + b, 0)} skippers`);
 
@@ -561,10 +525,7 @@ function applyScheduleA(
     }
 
     newAssignments[heatIdx].skipperIndices = skipperIndices;
-    // All non-bottom heats have P slots for mid-round promotions
-    const isBottomHeat = heatIdx === numberOfHeats - 1;
-    const pSlotInfo = !isBottomHeat ? ` + ${promotionCount} P slots` : '';
-    console.log(`\nHeat ${heats[heatIdx]} (Round 2): ${skipperIndices.length} skippers${pSlotInfo} - [${skipperIndices.join(', ')}]`);
+    console.log(`\nHeat ${heats[heatIdx]} (Round 2): ${skipperIndices.length} skippers - [${skipperIndices.join(', ')}]`);
   }
 
   // Log final assignments
@@ -579,56 +540,241 @@ function applyScheduleA(
 /**
  * Apply Schedule B or C (for Race 3+)
  *
- * HMS Schedule B/C for BETWEEN-ROUND assignments:
- * - PRESERVE the FINAL heat composition from the previous round
- * - After all mid-round promotions/relegations, each heat has its final roster
- * - These rosters carry forward to the next round
- * - Mid-round promotions/relegations happen DURING the round (handled separately in completeHeat)
+ * Per HMS 2022 v2 rules: Full redistribution of ALL skippers based on overall
+ * fleet board ranking (cumulative across ALL rounds) into heats sized according
+ * to Schedule B4/B6.
  *
- * CRITICAL: Do NOT recalculate "top P from each heat" - that would undo the mid-round movements!
+ * Schedule B sizes ensure each heat SAILS approximately the same number of boats:
+ * - Upper heats get fewer BASE assignments (they receive P promoted from below)
+ * - Bottom heat gets the most BASE assignments (no promotions from below)
+ *
+ * Special handling:
+ * - RDG/DPI skippers are placed one heat LOWER than their ranking would indicate
+ * - Other letter scores (DNS, DNF, DSQ, etc.) go to the bottom heat
  */
 function applyScheduleBC(
   currentHeatAssignments: HeatAssignment[],
   heatResults: Map<HeatDesignation, HeatResult[]>,
-  config: HMSConfig
+  config: HMSConfig,
+  allRoundsResults?: HeatResult[]
 ): HeatAssignment[] {
-  const { numberOfHeats } = config;
+  const { numberOfHeats, promotionCount } = config;
   const heats: HeatDesignation[] = (['A', 'B', 'C', 'D', 'E', 'F'] as HeatDesignation[]).slice(0, numberOfHeats);
 
   console.log('\n========================================');
-  console.log('=== Apply Schedule B/C (Between-Round Assignments) ===');
-  console.log(`Number of heats: ${numberOfHeats}`);
-  console.log('PRESERVING final heat composition from previous round (after all mid-round movements)');
+  console.log('=== Apply Schedule B/C (Full Redistribution by Fleet Board Ranking) ===');
+  console.log(`Number of heats: ${numberOfHeats}, Promotion count (P): ${promotionCount}`);
 
-  // Simply preserve the current heat assignments
-  // The mid-round promotions/relegations have already been applied
-  // We just need to copy them forward to the next round
-  const newAssignments: HeatAssignment[] = currentHeatAssignments.map(assignment => ({
-    heatDesignation: assignment.heatDesignation,
-    skipperIndices: [...assignment.skipperIndices] // Copy the array
+  console.log('\nCurrent heat sizes:');
+  currentHeatAssignments.forEach(a => {
+    console.log(`  Heat ${a.heatDesignation}: ${a.skipperIndices.length} skippers`);
+  });
+
+  const newAssignments: HeatAssignment[] = heats.map(heat => ({
+    heatDesignation: heat,
+    skipperIndices: []
   }));
 
-  // Log final assignments
-  console.log('\n=== PRESERVED HEAT ASSIGNMENTS FOR NEXT ROUND ===');
-  newAssignments.forEach((assignment) => {
-    console.log(`Heat ${assignment.heatDesignation}: ${assignment.skipperIndices.length} skippers - [${assignment.skipperIndices.join(', ')}]`);
+  const currentRoundSkipperInfo: Array<{
+    skipperIndex: number;
+    heat: HeatDesignation;
+    hasLetterScore: boolean;
+    letterScore?: LetterScore;
+    originalHeatIndex: number;
+  }> = [];
+
+  heats.forEach((heat, heatIdx) => {
+    const heatResultsArray = heatResults.get(heat) || [];
+    heatResultsArray.forEach(result => {
+      currentRoundSkipperInfo.push({
+        skipperIndex: result.skipperIndex,
+        heat,
+        hasLetterScore: !!result.letterScore,
+        letterScore: result.letterScore,
+        originalHeatIndex: heatIdx
+      });
+    });
+  });
+
+  const rdgResults = currentRoundSkipperInfo.filter(r => r.letterScore === 'RDG' || r.letterScore === 'DPI');
+  const letterScoreResults = currentRoundSkipperInfo.filter(r =>
+    (r.hasLetterScore) &&
+    r.letterScore !== 'RDG' &&
+    r.letterScore !== 'DPI'
+  );
+  const rdgSkipperSet = new Set(rdgResults.map(r => r.skipperIndex));
+  const letterScoreSkipperSet = new Set(letterScoreResults.map(r => r.skipperIndex));
+
+  console.log(`\nSkipper categorization (current round):`);
+  console.log(`  RDG/DPI (drop 1 heat): ${rdgResults.length}`);
+  console.log(`  Other letter scores (bottom heat): ${letterScoreResults.length}`);
+
+  const fleetBoardRanking = computeFleetBoardFromRounds(allRoundsResults || [], currentRoundSkipperInfo, numberOfHeats);
+
+  const validRanked = fleetBoardRanking.filter(r =>
+    !rdgSkipperSet.has(r.skipperIndex) && !letterScoreSkipperSet.has(r.skipperIndex)
+  );
+
+  console.log(`\nFleet Board Ranking (${validRanked.length} valid skippers):`);
+  validRanked.forEach((r, idx) => {
+    console.log(`  Rank ${idx + 1}: Skipper #${r.skipperIndex} (total score: ${r.totalScore})`);
+  });
+
+  const totalSkippers = validRanked.length + rdgResults.length + letterScoreResults.length;
+  const targetHeatSizes = calculateScheduleBHeatSizes(totalSkippers, numberOfHeats, promotionCount);
+
+  console.log(`\nSchedule B Heat Sizes for ${totalSkippers} skippers, ${numberOfHeats} heats, P=${promotionCount}:`);
+  for (let i = 0; i < numberOfHeats; i++) {
+    const sailsWith = i < numberOfHeats - 1 ? `(sails ${targetHeatSizes[i] + promotionCount} with promotions)` : `(sails ${targetHeatSizes[i]})`;
+    console.log(`  Heat ${heats[i]}: ${targetHeatSizes[i]} base ${sailsWith}`);
+  }
+  console.log(`  Total base: ${targetHeatSizes.reduce((a, b) => a + b, 0)}`);
+
+  let currentRank = 0;
+
+  for (let heatIdx = 0; heatIdx < numberOfHeats; heatIdx++) {
+    const skipperIndices: number[] = [];
+    const heatSize = targetHeatSizes[heatIdx];
+
+    for (let i = 0; i < heatSize && currentRank < validRanked.length; i++) {
+      skipperIndices.push(validRanked[currentRank].skipperIndex);
+      currentRank++;
+    }
+
+    if (heatIdx > 0) {
+      const rdgDropToThisHeat = rdgResults.filter(r => r.originalHeatIndex === heatIdx - 1);
+      rdgDropToThisHeat.forEach(r => {
+        if (!skipperIndices.includes(r.skipperIndex)) {
+          skipperIndices.push(r.skipperIndex);
+          console.log(`  RDG/DPI relegation: Skipper #${r.skipperIndex} from Heat ${heats[heatIdx - 1]} -> Heat ${heats[heatIdx]}`);
+        }
+      });
+    }
+
+    if (heatIdx === numberOfHeats - 1) {
+      const rdgInLowestHeat = rdgResults.filter(r => r.originalHeatIndex === heatIdx);
+      rdgInLowestHeat.forEach(r => {
+        if (!skipperIndices.includes(r.skipperIndex)) {
+          skipperIndices.push(r.skipperIndex);
+          console.log(`  RDG/DPI in lowest heat: Skipper #${r.skipperIndex} stays in Heat ${heats[heatIdx]}`);
+        }
+      });
+    }
+
+    if (heatIdx === numberOfHeats - 1) {
+      letterScoreResults.forEach(r => {
+        if (!skipperIndices.includes(r.skipperIndex)) {
+          skipperIndices.push(r.skipperIndex);
+        }
+      });
+    }
+
+    newAssignments[heatIdx].skipperIndices = skipperIndices;
+  }
+
+  const seen = new Set<number>();
+  for (let i = 0; i < newAssignments.length; i++) {
+    const deduped: number[] = [];
+    for (const idx of newAssignments[i].skipperIndices) {
+      if (!seen.has(idx)) {
+        seen.add(idx);
+        deduped.push(idx);
+      } else {
+        console.warn(`DUPLICATE DETECTED: Skipper #${idx} already assigned to a higher heat, removing from Heat ${newAssignments[i].heatDesignation}`);
+      }
+    }
+    newAssignments[i].skipperIndices = deduped;
+  }
+
+  console.log('\n=== HEAT ASSIGNMENTS FOR NEXT ROUND (Schedule B redistribution) ===');
+  newAssignments.forEach(a => {
+    console.log(`Heat ${a.heatDesignation}: ${a.skipperIndices.length} skippers - [${a.skipperIndices.join(', ')}]`);
   });
 
   return newAssignments;
 }
 
 /**
- * Generate heat assignments for next race based on current results
- * Per HMS VBA: Race 2+ ALL use the same Schedule B/C promotion/relegation.
- * Mid-round promotions/relegations are handled in completeHeat().
- * Between rounds, we simply preserve the final heat composition.
+ * Compute fleet board ranking from all rounds' heat results.
+ * Converts within-heat positions to overall positions per round using heat order,
+ * then sums across all rounds to produce a cumulative ranking.
+ */
+function computeFleetBoardFromRounds(
+  allRoundsResults: HeatResult[],
+  currentRoundSkippers: Array<{ skipperIndex: number }>,
+  numberOfHeats: number
+): Array<{ skipperIndex: number; totalScore: number }> {
+  const heats: HeatDesignation[] = (['A', 'B', 'C', 'D', 'E', 'F'] as HeatDesignation[]).slice(0, numberOfHeats);
+  const allSkipperIndices = new Set(currentRoundSkippers.map(r => r.skipperIndex));
+
+  const roundNumbers = [...new Set(allRoundsResults.map(r => r.round))].sort((a, b) => a - b);
+
+  const skipperTotals = new Map<number, number>();
+  allSkipperIndices.forEach(idx => skipperTotals.set(idx, 0));
+
+  for (const roundNum of roundNumbers) {
+    const roundResults = allRoundsResults.filter(r => r.round === roundNum);
+
+    const resultsByHeat: Record<string, HeatResult[]> = {};
+    roundResults.forEach(r => {
+      if (!resultsByHeat[r.heatDesignation]) {
+        resultsByHeat[r.heatDesignation] = [];
+      }
+      resultsByHeat[r.heatDesignation].push(r);
+    });
+
+    let overallPosition = 1;
+    const roundPositions = new Map<number, number>();
+
+    for (const heat of heats) {
+      const heatResults = resultsByHeat[heat] || [];
+      const finishers = heatResults
+        .filter(r => r.position !== null && !r.letterScore)
+        .sort((a, b) => (a.position || 999) - (b.position || 999));
+
+      for (const result of finishers) {
+        roundPositions.set(result.skipperIndex, overallPosition);
+        overallPosition++;
+      }
+    }
+
+    const totalSkippersThisRound = overallPosition - 1;
+    const dnsScore = totalSkippersThisRound + 1;
+
+    for (const heat of heats) {
+      const heatResults = resultsByHeat[heat] || [];
+      const letterScoreResults = heatResults.filter(r => r.letterScore);
+      for (const result of letterScoreResults) {
+        if (!roundPositions.has(result.skipperIndex)) {
+          roundPositions.set(result.skipperIndex, dnsScore);
+        }
+      }
+    }
+
+    roundPositions.forEach((pos, skipperIdx) => {
+      const current = skipperTotals.get(skipperIdx) || 0;
+      skipperTotals.set(skipperIdx, current + pos);
+    });
+  }
+
+  const ranked = Array.from(skipperTotals.entries())
+    .map(([skipperIndex, totalScore]) => ({ skipperIndex, totalScore }))
+    .sort((a, b) => a.totalScore - b.totalScore);
+
+  return ranked;
+}
+
+/**
+ * Generate heat assignments for next race based on current results.
+ * Race 1->2: Schedule A (full redistribution based on seeding results)
+ * Race 2+: Schedule B/C (between-round promotion/relegation swaps)
  */
 export function generateHeatAssignmentsForNextRace(
   currentRace: number,
   currentRound: HeatRound,
-  config: HMSConfig
+  config: HMSConfig,
+  allRoundsResults?: HeatResult[]
 ): HeatAssignment[] {
-  // Group results by heat
   const heatResults = new Map<HeatDesignation, HeatResult[]>();
   currentRound.results.forEach(result => {
     if (!heatResults.has(result.heatDesignation)) {
@@ -637,9 +783,13 @@ export function generateHeatAssignmentsForNextRace(
     heatResults.get(result.heatDesignation)!.push(result);
   });
 
-  // All rounds use Schedule B/C: preserve current heat composition
-  // Mid-round promotions/relegations have already been applied by completeHeat()
-  return applyScheduleBC(currentRound.heatAssignments, heatResults, config);
+  if (currentRace === 1) {
+    console.log('HMS: Round 1 (seeding) complete → Using Schedule A (full redistribution) for Round 2');
+    return applyScheduleA(currentRound.heatAssignments, heatResults, config);
+  }
+
+  console.log(`HMS: Round ${currentRace} complete → Using Schedule B/C (promotion/relegation swaps) for Round ${currentRace + 1}`);
+  return applyScheduleBC(currentRound.heatAssignments, heatResults, config, allRoundsResults);
 }
 
 /**
@@ -710,13 +860,7 @@ export function calculateOptimalHeats(totalSkippers: number): {
 
   numberOfHeats = Math.max(2, Math.min(numberOfHeats, MAX_HEATS));
 
-  const baseSize = Math.floor(totalSkippers / numberOfHeats);
-  const remainder = totalSkippers % numberOfHeats;
-  const heatSizes = new Array(numberOfHeats).fill(baseSize);
-
-  if (remainder > 0) {
-    heatSizes[0] += remainder;
-  }
+  const heatSizes = calculateHMSHeatSizes(totalSkippers, numberOfHeats);
 
   return {
     numberOfHeats,

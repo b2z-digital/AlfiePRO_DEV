@@ -2,7 +2,6 @@ import { Skipper } from './index';
 import { LetterScore } from './letterScores';
 import { generateHeatAssignmentsForNextRace, HMSConfig } from '../utils/hmsHeatSystem';
 import { getNextHeat, getNonFinisherPriority, compareSailNumbers } from '../utils/shrsHeatSystem';
-import { LetterScore } from './letterScores';
 
 export type HeatDesignation = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
@@ -511,13 +510,43 @@ export const generateNextRoundAssignments = (
     };
 
     try {
-      // currentRound.round is the round that just completed
-      // generateHeatAssignmentsForNextRace expects the completed race number
+      const inputTotal = currentRound.heatAssignments.reduce((sum, a) => sum + a.skipperIndices.length, 0);
+      const inputAllSkippers = currentRound.heatAssignments.flatMap(a => a.skipperIndices);
+      const inputUnique = new Set(inputAllSkippers).size;
+      if (inputUnique !== inputTotal) {
+        console.error(`⚠️ INPUT DATA ALREADY HAS DUPLICATES: ${inputTotal} total entries but only ${inputUnique} unique skippers`);
+        currentRound.heatAssignments.forEach(a => {
+          console.error(`  Heat ${a.heatDesignation}: [${a.skipperIndices.join(', ')}]`);
+        });
+      }
+
+      const allRoundsResults: HeatResult[] = [];
+      for (const round of heatManagement.rounds) {
+        if (round.round <= currentRound.round && round.results.length > 0) {
+          allRoundsResults.push(...round.results);
+        }
+      }
+
       const hmsAssignments = generateHeatAssignmentsForNextRace(
-        currentRound.round, // The race/round that just completed
+        currentRound.round,
         currentRound,
-        hmsConfig
+        hmsConfig,
+        allRoundsResults
       );
+
+      const seen = new Set<number>();
+      for (const assignment of hmsAssignments) {
+        const deduped: number[] = [];
+        for (const idx of assignment.skipperIndices) {
+          if (!seen.has(idx)) {
+            seen.add(idx);
+            deduped.push(idx);
+          } else {
+            console.warn(`⚠️ DEDUP in generateNextRoundAssignments: Skipper #${idx} removed from Heat ${assignment.heatDesignation}`);
+          }
+        }
+        assignment.skipperIndices = deduped;
+      }
 
       console.log('✅ Successfully generated HMS heat assignments for next round');
       return hmsAssignments;

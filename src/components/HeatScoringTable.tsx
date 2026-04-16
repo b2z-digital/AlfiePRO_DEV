@@ -10,9 +10,11 @@ import { HeatAssignmentModal } from './HeatAssignmentModal';
 import { ManualHeatAssignmentModal } from './ManualHeatAssignmentModal';
 import { clearHeatRaceResults } from '../utils/heatUtils';
 import { LiveStatusControl } from './LiveStatusControl';
-import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX } from 'lucide-react';
+import { Hand, Eye, FileDown, ClipboardCheck, UserCheck, UserX, Table2, Grid3x2 as Grid3X3, Check } from 'lucide-react';
+import { SpreadsheetScoring } from './SpreadsheetScoring';
 import { exportAllRoundsPdf } from '../utils/heatAssignmentPdfExport';
 import { getObserverAssignments, getAllObserversForEvent, ObserverAssignment, getObserverEventId, resolveObserverEventId } from '../utils/observerUtils';
+import { supabase } from '../utils/supabase';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface HeatScoringTableProps {
@@ -23,6 +25,7 @@ interface HeatScoringTableProps {
   onUpdateSkipper?: (skipperIndex: number, updatedSkipper: Skipper) => void;
   onRemoveSkipper?: (skipperIndex: number) => void;
   onUpdateHeatResult: (result: any) => void;
+  onBatchUpdateHeatResults?: (results: any[]) => void;
   onCompleteHeat: (heat: HeatDesignation) => void;
   onReturnToRaceManagement: () => void;
   onCompleteScoring: () => void;
@@ -47,7 +50,9 @@ interface HeatScoringTableProps {
   onClearHeatRaceResults?: (heatDesignation: HeatDesignation, round: number, race: number, skipperIndices: number[]) => void;
   onUpdateHeatAssignments?: (assignments: any, targetRound?: number) => void;
   onSelectHeat?: (heat: HeatDesignation) => void;
+  onForceRoundComplete?: (roundNumber: number) => void;
   isFullscreen?: boolean;
+  scoringMode?: 'pro' | 'touch' | 'spreadsheet';
 }
 
 export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
@@ -58,6 +63,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onUpdateSkipper,
   onRemoveSkipper,
   onUpdateHeatResult,
+  onBatchUpdateHeatResults,
   onCompleteHeat,
   onReturnToRaceManagement,
   onCompleteScoring,
@@ -82,7 +88,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   onClearHeatRaceResults,
   onUpdateHeatAssignments,
   onSelectHeat,
-  isFullscreen
+  onForceRoundComplete,
+  isFullscreen,
+  scoringMode: initialScoringMode = 'touch'
 }) => {
   const syncObserverEventId = useMemo(() => getObserverEventId(currentEvent), [currentEvent?.id, currentEvent?.isSeriesEvent, currentEvent?.seriesRoundId]);
   const [resolvedObserverEventId, setResolvedObserverEventId] = React.useState<string | null>(syncObserverEventId);
@@ -113,7 +121,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       const fleetName = heat ? SHRS_FLEET_FULL_NAMES[heat] : null;
       return fleetName ? `Final ${finalNum} - ${fleetName}` : `Final ${finalNum}`;
     }
-    return `Round ${roundNum}`;
+    return `Race ${roundNum}`;
   };
 
   const isInQualifyingRound = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound <= shrsQualifyingRounds;
@@ -140,9 +148,15 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   const [shouldAutoShuffle, setShouldAutoShuffle] = useState(false);
   const [editingSkipperIndex, setEditingSkipperIndex] = useState<number | null>(null);
   const [manualSelection, setManualSelection] = useState(false); // Track manual heat selection
-  const [touchMode, setTouchMode] = useState(true); // Touch mode scoring state - default to Touch mode
-  const [touchModeResultsConfirmed, setTouchModeResultsConfirmed] = useState(false); // Track if touch mode results are confirmed
+  const [heatScoringMode, setHeatScoringMode] = useState<'pro' | 'touch' | 'spreadsheet'>(initialScoringMode);
+  React.useEffect(() => {
+    setHeatScoringMode(initialScoringMode);
+  }, [initialScoringMode]);
+  const touchMode = heatScoringMode === 'touch';
+  const [touchModeResultsConfirmed, setTouchModeResultsConfirmed] = useState(false);
+  const [spreadsheetVerifiedHeats, setSpreadsheetVerifiedHeats] = useState<Set<string>>(new Set());
   const [currentHeatObservers, setCurrentHeatObservers] = useState<ObserverAssignment[]>([]);
+  const [allHeatObserversMap, setAllHeatObserversMap] = useState<Record<string, ObserverAssignment[]>>({});
   const manualSelectionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const [rollCallActive, setRollCallActive] = useState(false);
   const [rollCallReady, setRollCallReady] = useState<Set<number>>(new Set());
@@ -153,14 +167,31 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   // Reset touch mode confirmation and roll call when heat or round changes
   React.useEffect(() => {
-    console.log('🔄 Resetting touch mode confirmation for Round', heatManagement.currentRound, 'Heat', selectedHeat);
     setTouchModeResultsConfirmed(false);
     setRollCallReady(new Set());
     setRollCallAbsent(new Set());
   }, [selectedHeat, heatManagement.currentRound]);
 
+  React.useEffect(() => {
+    if (currentEvent?.enable_roll_call === false && rollCallActive) {
+      setRollCallActive(false);
+    }
+  }, [currentEvent?.enable_roll_call]);
+
+  // Reset spreadsheet verified heats when round changes
+  const lastSpreadsheetRound = React.useRef<number>(heatManagement.currentRound);
+  React.useEffect(() => {
+    if (lastSpreadsheetRound.current !== heatManagement.currentRound) {
+      setSpreadsheetVerifiedHeats(new Set());
+      lastSpreadsheetRound.current = heatManagement.currentRound;
+    }
+  }, [heatManagement.currentRound]);
+
   // Track which heat was last auto-advanced to prevent loops
   const lastAutoAdvancedHeat = React.useRef<HeatDesignation | null>(null);
+
+  // Spreadsheet mode: pending advance after onCompleteHeat state update
+  const pendingSpreadsheetAdvance = React.useRef<{ nextHeat: HeatDesignation; fromHeat: HeatDesignation } | null>(null);
 
   // Track which round was last auto-advanced to prevent loops
   const lastAutoAdvancedRound = React.useRef<number | null>(null);
@@ -253,13 +284,14 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   }, [heatManagement.currentRound, availableHeats, currentRound?.results?.length, selectedHeat]);
 
   // Auto-trigger completeHeat when a heat becomes complete (for mid-round promotions/relegations)
+  // Only for touch/pro modes - spreadsheet mode calls onCompleteHeat directly in its callback
   const lastCompletedHeats = React.useRef<Set<string>>(new Set());
   const pendingModalShow = React.useRef<boolean>(false);
   React.useEffect(() => {
     if (!currentRound) return;
+    if (heatScoringMode === 'spreadsheet') return;
 
-    // In touch mode, wait for explicit confirmation before triggering
-    if (touchMode && !touchModeResultsConfirmed) {
+    if (!touchModeResultsConfirmed) {
       return;
     }
 
@@ -268,19 +300,17 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       const wasCompleted = lastCompletedHeats.current.has(heatKey);
       const isNowComplete = isHeatComplete(heat);
 
-      // If heat just became complete (wasn't complete before, but is now)
       if (!wasCompleted && isNowComplete) {
-        console.log(`🎯 Heat ${heat} just became complete! Triggering completeHeat for mid-round promotion/relegation...`);
+        console.log(`Heat ${heat} just became complete! Triggering completeHeat for mid-round promotion/relegation...`);
         lastCompletedHeats.current.add(heatKey);
         onCompleteHeat(heat);
 
-        // In Round 2+, show modal after heat completes to display promotions/relegations
         if (heatManagement.currentRound >= 2) {
           pendingModalShow.current = true;
         }
       }
     });
-  }, [currentRound?.results, heatManagement.currentRound, availableHeats, onCompleteHeat, touchMode, touchModeResultsConfirmed]);
+  }, [currentRound?.results, heatManagement.currentRound, availableHeats, onCompleteHeat, touchModeResultsConfirmed, heatScoringMode]);
 
   // Show modal after heat completion in Round 2+ (delayed to allow state to update)
   React.useEffect(() => {
@@ -317,14 +347,31 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     }
   }, [heatManagement.roundJustCompleted]);
 
-  // Auto-advance to next heat when current heat is complete
+  // Spreadsheet mode: process pending advance after heatManagement state updates
+  React.useEffect(() => {
+    if (pendingSpreadsheetAdvance.current) {
+      const { nextHeat, fromHeat } = pendingSpreadsheetAdvance.current;
+      pendingSpreadsheetAdvance.current = null;
+      console.log(`Spreadsheet: state updated after Heat ${fromHeat} - advancing to Heat ${nextHeat}`);
+      setSelectedHeat(nextHeat);
+      setManualSelection(false);
+      lastAutoAdvancedHeat.current = fromHeat;
+      setObserverReloadTrigger(prev => prev + 1);
+      setTimeout(() => {
+        setShowHeatAssignments(true);
+      }, 50);
+    }
+  }, [heatManagement]);
+
+  // Auto-advance to next heat when current heat is complete (touch/pro modes only)
+  // Spreadsheet mode handles its own advancement in onConfirmHeatResults callback
   React.useEffect(() => {
     if (!currentRound || availableHeats.length === 0) return;
-    if (manualSelection) return; // Respect manual selection
+    if (heatScoringMode === 'spreadsheet') return;
+    if (manualSelection) return;
     if (!selectedHeat) return;
 
-    // In touch mode, wait for explicit confirmation before auto-advancing
-    if (touchMode && !touchModeResultsConfirmed) return;
+    if (!touchModeResultsConfirmed) return;
 
     // Check if current heat is complete
     const progress = getHeatProgress(selectedHeat);
@@ -354,41 +401,18 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           console.log(`✅ Heat ${selectedHeat} complete! Auto-advancing to Heat ${nextHeat}`);
           lastAutoAdvancedHeat.current = selectedHeat; // Mark this heat as advanced
 
-          // In touch mode, show Heat Assignments modal for next heat to display observers
-          if (touchMode) {
-            console.log('📋 Touch mode: Showing Heat Assignments for next heat observers');
-            setShowHeatAssignments(true);
-            // Reset touch mode confirmation for next heat
-            setTouchModeResultsConfirmed(false);
-          }
+          setShowHeatAssignments(true);
+          setTouchModeResultsConfirmed(false);
 
           setTimeout(() => {
             setSelectedHeat(nextHeat);
           }, 500); // Small delay for visual feedback
         }
       } else {
-        // All heats complete - check if we should auto-advance to next round
-        if (areAllHeatsComplete() && !isRoundComplete && onAdvanceToNextRound) {
-          // Prevent advancing from the same round multiple times
-          if (lastAutoAdvancedRound.current === heatManagement.currentRound) {
-            console.log('⚠️ Already auto-advanced from Round', heatManagement.currentRound);
-            return;
-          }
-
-          console.log('✅ All heats complete! Auto-advancing to next round...');
-          lastAutoAdvancedRound.current = heatManagement.currentRound;
-
-          // Use a small delay to allow UI to update
-          setTimeout(() => {
-            const lastHeat = availableHeats[availableHeats.length - 1];
-            onAdvanceToNextRound(lastHeat);
-          }, 1000);
-        } else {
-          console.log('✅ All heats complete!');
-        }
+        console.log('✅ All heats complete! Waiting for user to click Progress to Next Round.');
       }
     }
-  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchMode, touchModeResultsConfirmed, onAdvanceToNextRound, currentRound]);
+  }, [currentRound?.results, manualSelection, selectedHeat, availableHeats, touchModeResultsConfirmed, onAdvanceToNextRound, currentRound, heatScoringMode]);
 
   // Handle manual heat selection
   const handleHeatSelection = (heat: HeatDesignation) => {
@@ -615,15 +639,40 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     });
   }, [heatRaceResults, heatSkipperIndices]);
 
+  const heatSkipperIndicesMap = useMemo(() => {
+    if (!currentRound) return {} as Record<HeatDesignation, number[]>;
+    const map: Record<string, number[]> = {};
+    for (const assignment of currentRound.heatAssignments) {
+      map[assignment.heatDesignation] = assignment.skipperIndices.filter(
+        idx => idx >= 0 && idx < skippers.length
+      );
+    }
+    return map as Record<HeatDesignation, number[]>;
+  }, [currentRound, skippers.length]);
+
+  const allHeatMappedResults = useMemo(() => {
+    if (!currentRound) return {} as Record<HeatDesignation, any[]>;
+    const map: Record<string, any[]> = {};
+    for (const assignment of currentRound.heatAssignments) {
+      const heat = assignment.heatDesignation;
+      const indices = assignment.skipperIndices.filter(idx => idx >= 0 && idx < skippers.length);
+      const indicesSet = new Set(indices);
+      const heatResults = raceResults.filter(r => indicesSet.has(r.skipperIndex));
+      map[heat] = heatResults.map(result => ({
+        ...result,
+        skipperIndex: indices.indexOf(result.skipperIndex)
+      }));
+    }
+    return map as Record<HeatDesignation, any[]>;
+  }, [currentRound, raceResults, skippers.length]);
+
   // Calculate heat-specific lastCompletedRace
   // In heat racing mode, we need to track which races are complete for THIS heat only
   const heatLastCompletedRace = useMemo(() => {
-    // Check each race in order to find the last completed one
     let lastCompleted = 0;
-    const numRaces = 12; // HMS heat racing uses 12 races per round
+    const numRaces = 12;
 
     for (let race = 1; race <= numRaces; race++) {
-      // Check if ALL skippers in this heat have results for this race
       const allScored = heatSkipperIndices.every(skipperIdx => {
         const result = raceResults.find(r =>
           r.race === race && r.skipperIndex === skipperIdx
@@ -634,7 +683,6 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
       if (allScored) {
         lastCompleted = race;
       } else {
-        // Once we find an incomplete race, stop checking
         break;
       }
     }
@@ -684,34 +732,46 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return `Heat ${heat}`;
   };
 
-  // Calculate heat progress
   const getHeatProgress = (heat: HeatDesignation) => {
     const assignment = currentRound?.heatAssignments.find(
       a => a.heatDesignation === heat
     );
     if (!assignment) return { scored: 0, total: 0 };
 
-    // Get ALL results for this heat designation, regardless of current assignments
-    // This is important because after promotions/relegations, assignments change
-    // but results remain for the skippers who actually sailed
+    const total = assignment.skipperIndices.length;
+
     const heatResults = currentRound?.results.filter(r =>
       r.heatDesignation === heat &&
       r.round === heatManagement.currentRound
     ) || [];
 
-    // Count how many skippers in this heat have valid results
-    // (position is not null OR has a letter score)
-    const scoredCount = heatResults.filter(r =>
+    let scoredCount = heatResults.filter(r =>
       r.position !== null || r.letterScore
     ).length;
 
+    if (scoredCount < total) {
+      const currentRace = heatManagement.currentRound;
+      const raceResultsCount = assignment.skipperIndices.filter(idx =>
+        raceResults.some(r =>
+          r.skipperIndex === idx &&
+          r.race === currentRace &&
+          (r.position !== null || r.letterScore)
+        )
+      ).length;
+      if (raceResultsCount > scoredCount) {
+        scoredCount = raceResultsCount;
+      }
+    }
+
     return {
       scored: scoredCount,
-      total: assignment.skipperIndices.length
+      total
     };
   };
 
   const isHeatComplete = (heat: HeatDesignation) => {
+    const roundKey = `${heatManagement.currentRound}-${heat}`;
+    if (spreadsheetVerifiedHeats.has(roundKey)) return true;
     const progress = getHeatProgress(heat);
     return progress.scored >= progress.total && progress.total > 0;
   };
@@ -806,12 +866,45 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
   }, [showHeatAssignments]);
 
   React.useEffect(() => {
+    let cancelled = false;
+
     const loadObservers = async () => {
       const resolvedId = observerEventId || await resolveObserverEventId(currentEvent);
-      if (!resolvedId || !selectedHeat || !currentEvent?.enable_observers) {
+      if (!resolvedId || !selectedHeat) {
         if (currentHeatObservers.length > 0) {
           setCurrentHeatObservers([]);
         }
+        return;
+      }
+
+      let enableObs = currentEvent?.enable_observers;
+      if (enableObs === undefined) {
+        const roundId = currentEvent?.isSeriesEvent
+          ? (currentEvent?.seriesRoundId || resolvedId)
+          : null;
+        const tableName = roundId ? 'race_series_rounds' : 'quick_races';
+        const queryId = roundId || resolvedId;
+        const { data: eventData, error } = await supabase
+          .from(tableName)
+          .select('enable_observers, observers_per_heat')
+          .eq('id', queryId)
+          .maybeSingle();
+
+        if (error || cancelled) {
+          if (!cancelled && currentHeatObservers.length > 0) setCurrentHeatObservers([]);
+          return;
+        }
+
+        if (eventData) {
+          (currentEvent as any).enable_observers = eventData.enable_observers ?? false;
+          (currentEvent as any).observers_per_heat = eventData.observers_per_heat ?? 2;
+        }
+
+        enableObs = eventData?.enable_observers;
+      }
+
+      if (!enableObs) {
+        if (currentHeatObservers.length > 0) setCurrentHeatObservers([]);
         return;
       }
 
@@ -822,26 +915,64 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           heatNumber,
           heatManagement.currentRound
         );
+        if (cancelled) return;
         console.log(`✅ Loaded ${observers?.length || 0} observers for Round ${heatManagement.currentRound}, Heat ${selectedHeat}:`, observers);
-        console.log(`📋 Observer details:`, observers?.map(o => ({
-          skipper_index: o.skipper_index,
-          skipper_name: o.skipper_name,
-          sail_number: o.skipper_sail_number,
-          round: o.round,
-          heat_number: o.heat_number
-        })));
 
-        // Always update state, even if empty, to trigger re-render
-        console.log(`🔄 Setting currentHeatObservers to ${observers?.length || 0} observers`);
         setCurrentHeatObservers(observers || []);
       } catch (error) {
         console.error('❌ Error loading observers for current heat:', error);
-        setCurrentHeatObservers([]);
+        if (!cancelled) setCurrentHeatObservers([]);
       }
     };
 
     loadObservers();
+    return () => { cancelled = true; };
   }, [observerEventId, selectedHeat, heatManagement.currentRound, currentEvent?.enable_observers, currentRound, observerReloadTrigger]);
+
+  React.useEffect(() => {
+    if (heatScoringMode !== 'spreadsheet' || !availableHeats.length) return;
+    let cancelled = false;
+
+    const loadAllObservers = async () => {
+      const resolvedId = observerEventId || await resolveObserverEventId(currentEvent);
+      if (!resolvedId || cancelled) return;
+
+      let enableObs = currentEvent?.enable_observers;
+      if (enableObs === undefined) {
+        const roundId = currentEvent?.isSeriesEvent
+          ? (currentEvent?.seriesRoundId || resolvedId)
+          : null;
+        const tableName = roundId ? 'race_series_rounds' : 'quick_races';
+        const queryId = roundId || resolvedId;
+        const { data: eventData } = await supabase
+          .from(tableName)
+          .select('enable_observers')
+          .eq('id', queryId)
+          .maybeSingle();
+        enableObs = eventData?.enable_observers;
+      }
+
+      if (!enableObs || cancelled) return;
+
+      const map: Record<string, ObserverAssignment[]> = {};
+      for (const heat of availableHeats) {
+        if (cancelled) return;
+        const heatNumber = heat.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
+        try {
+          const observers = await getObserverAssignments(resolvedId, heatNumber, heatManagement.currentRound);
+          map[heat] = observers || [];
+        } catch {
+          map[heat] = [];
+        }
+      }
+      if (!cancelled) {
+        setAllHeatObserversMap(map);
+      }
+    };
+
+    loadAllObservers();
+    return () => { cancelled = true; };
+  }, [heatScoringMode, observerEventId, availableHeats, heatManagement.currentRound, currentEvent?.enable_observers, observerReloadTrigger]);
 
   // Don't render until a heat is selected
   if (!selectedHeat) {
@@ -856,8 +987,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   return (
     <div className={`space-y-6 ${isFullscreen ? 'p-2' : 'p-8'} no-select`}>
-      {/* All Heats Complete - Show Actions (hidden in touch mode as it's shown in the button instead) */}
-      {areAllHeatsComplete() && !isRoundComplete && !touchMode && (
+      {/* All Heats Complete - Show Actions (hidden in touch/spreadsheet mode as it's shown in the button instead) */}
+      {areAllHeatsComplete() && !isRoundComplete && heatScoringMode === 'pro' && (
           <div className={`mt-4 p-4 rounded-lg ${
             darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
           }`}>
@@ -1032,22 +1163,31 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* Touch Mode Toggle Button */}
-              <button
-                onClick={() => setTouchMode(!touchMode)}
-                className={`p-2 rounded-lg transition-colors ${
-                  touchMode
-                    ? darkMode
-                      ? 'bg-cyan-600 text-white'
-                      : 'bg-cyan-500 text-white'
-                    : darkMode
-                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                }`}
-                title={touchMode ? "Exit Touch Mode" : "Enable Touch Mode"}
-              >
-                <Hand size={20} />
-              </button>
+              {/* Scoring Mode Buttons - show all non-current modes */}
+              {(['pro', 'touch', 'spreadsheet'] as const).filter(m => m !== heatScoringMode).map(mode => (
+                <button
+                  key={mode}
+                  onClick={async () => {
+                    setHeatScoringMode(mode);
+                    setTouchModeResultsConfirmed(false);
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                      await supabase.from('profiles').update({ scoring_mode_preference: mode }).eq('id', user.id);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                  title={`Switch to ${mode === 'pro' ? 'Pro' : mode === 'touch' ? 'Touch' : 'Spreadsheet'} Mode`}
+                >
+                  {mode === 'pro' ? <Table2 size={18} /> : mode === 'touch' ? <Hand size={18} /> : <Grid3X3 size={18} />}
+                  <span className="text-xs font-medium hidden sm:inline">
+                    {mode === 'pro' ? 'Pro' : mode === 'touch' ? 'Touch' : 'Sheet'}
+                  </span>
+                </button>
+              ))}
 
               <button
                 onClick={() => setShowHeatAssignments(true)}
@@ -1126,11 +1266,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         </div>
 
         {rollCallActive && selectedHeat ? (() => {
-          const observerSailNumbers = new Set(currentHeatObservers.map(o => String(o.skipper_sail_number)));
-          const racingSkippers = heatSkipperIndices.filter(idx => {
-            const s = skippers[idx];
-            return s && !observerSailNumbers.has(String(s.sailNumber || s.sailNo));
-          });
+          const racingSkippers = heatSkipperIndices.filter(idx => idx >= 0 && idx < skippers.length);
           const totalRacing = racingSkippers.length;
           const readyCount = rollCallReady.size;
           const absentCount = rollCallAbsent.size;
@@ -1368,7 +1504,7 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               </div>
             </div>
           );
-        })() : touchMode ? (
+        })() : heatScoringMode === 'touch' ? (
           <TouchModeScoring
             skippers={heatSkippers}
             currentRace={heatManagement.currentRound}
@@ -1442,6 +1578,142 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               onUpdateSkipper(index, updatedSkipper);
             } : undefined}
           />
+        ) : heatScoringMode === 'spreadsheet' ? (
+          <SpreadsheetScoring
+            skippers={skippers}
+            currentRace={heatManagement.currentRound}
+            numRaces={12}
+            isHeatScoring={true}
+            isFullscreen={isFullscreen}
+            isScoringLastHeat={isScoringLastHeat()}
+            roundLabel={getShrsRoundLabel(heatManagement.currentRound, selectedHeat)}
+            isSeedingRound={heatManagement.currentRound === 1}
+            raceResults={mappedRaceResults}
+            heatObservers={currentHeatObservers}
+            allHeatObserversMap={allHeatObserversMap}
+            heatManagement={heatManagement}
+            availableHeats={availableHeats}
+            heatSkipperIndicesMap={heatSkipperIndicesMap}
+            allHeatRaceResults={allHeatMappedResults}
+            selectedHeat={selectedHeat}
+            onSelectHeat={handleHeatSelection}
+            onUpdateHeatResults={(heat: HeatDesignation, updatedResults: any[]) => {
+              const currentRace = heatManagement.currentRound;
+              const indices = heatSkipperIndicesMap[heat] || [];
+
+              const currentRaceResults = updatedResults.filter(r => r.race === currentRace);
+
+              const mappedEntries = currentRaceResults.map(result => ({
+                skipperIndex: indices[result.skipperIndex],
+                position: result.position,
+                letterScore: result.letterScore,
+                customPoints: result.customPoints
+              })).filter(entry => entry.skipperIndex !== undefined);
+
+              replaceRaceResultsForSkippers(currentRace, indices, mappedEntries);
+
+              if (onClearHeatRaceResults) {
+                onClearHeatRaceResults(heat, heatManagement.currentRound, currentRace, indices);
+              }
+
+              const heatResults = mappedEntries.map(entry => ({
+                skipperIndex: entry.skipperIndex,
+                heatDesignation: heat,
+                position: entry.position,
+                letterScore: entry.letterScore,
+                round: heatManagement.currentRound,
+                race: currentRace
+              }));
+
+              if (onBatchUpdateHeatResults && heatResults.length > 0) {
+                onBatchUpdateHeatResults(heatResults);
+              } else {
+                heatResults.forEach(heatResult => {
+                  onUpdateHeatResult(heatResult);
+                });
+              }
+            }}
+            updateRaceResults={(updatedResults) => {
+              const currentRace = heatManagement.currentRound;
+              const currentRaceResults = updatedResults.filter(r => r.race === currentRace);
+              const mappedEntries = currentRaceResults.map(result => ({
+                skipperIndex: heatSkipperIndices[result.skipperIndex],
+                position: result.position,
+                letterScore: result.letterScore,
+                customPoints: result.customPoints
+              })).filter(entry => entry.skipperIndex !== undefined);
+              replaceRaceResultsForSkippers(currentRace, heatSkipperIndices, mappedEntries);
+              if (selectedHeat && onClearHeatRaceResults) {
+                onClearHeatRaceResults(selectedHeat, heatManagement.currentRound, currentRace, heatSkipperIndices);
+              }
+              const heatResults = mappedEntries.map(entry => ({
+                skipperIndex: entry.skipperIndex,
+                heatDesignation: selectedHeat,
+                position: entry.position,
+                letterScore: entry.letterScore,
+                round: heatManagement.currentRound,
+                race: currentRace
+              }));
+              if (onBatchUpdateHeatResults && heatResults.length > 0) {
+                onBatchUpdateHeatResults(heatResults);
+              } else {
+                heatResults.forEach(heatResult => {
+                  onUpdateHeatResult(heatResult);
+                });
+              }
+            }}
+            onConfirmHeatResults={(heat: HeatDesignation) => {
+              console.log('Spreadsheet per-heat results confirmed for heat', heat);
+              const roundKey = `${heatManagement.currentRound}-${heat}`;
+              const updatedVerified = new Set(spreadsheetVerifiedHeats).add(roundKey);
+              setSpreadsheetVerifiedHeats(updatedVerified);
+
+              const allHeatsNowVerified = availableHeats.every(h => {
+                const hRoundKey = `${heatManagement.currentRound}-${h}`;
+                return updatedVerified.has(hRoundKey);
+              });
+
+              const currentHeatIndex = availableHeats.indexOf(heat);
+              const nextIncomplete = availableHeats.find((h, idx) => {
+                if (idx <= currentHeatIndex) return false;
+                const hRoundKey = `${heatManagement.currentRound}-${h}`;
+                if (updatedVerified.has(hRoundKey)) return false;
+                const progress = getHeatProgress(h);
+                return progress.scored < progress.total || progress.total === 0;
+              });
+
+              if (nextIncomplete) {
+                pendingSpreadsheetAdvance.current = { nextHeat: nextIncomplete, fromHeat: heat };
+              }
+
+              onCompleteHeat(heat);
+
+              if (allHeatsNowVerified) {
+                console.log('Spreadsheet: ALL heats verified for Race', heatManagement.currentRound, '- scheduling modal show');
+                const roundNum = heatManagement.currentRound;
+                setTimeout(() => {
+                  console.log('Spreadsheet: timeout fired - forcing assignments modal for completed Race', roundNum);
+                  lastCompletedRoundShown.current = roundNum;
+                  if (onForceRoundComplete) {
+                    onForceRoundComplete(roundNum);
+                  }
+                  setShowHeatAssignments(true);
+                }, 300);
+              }
+            }}
+            onConfirmResults={() => {
+              console.log('Spreadsheet results confirmed for heat', selectedHeat);
+              if (selectedHeat) {
+                const roundKey = `${heatManagement.currentRound}-${selectedHeat}`;
+                setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+                onCompleteHeat(selectedHeat);
+              }
+              setTouchModeResultsConfirmed(true);
+            }}
+            darkMode={darkMode}
+            currentEvent={currentEvent}
+            parentVerifiedHeats={spreadsheetVerifiedHeats}
+          />
         ) : (
           <ScratchRaceTable
           skippers={heatSkippers}
@@ -1472,6 +1744,31 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           currentHeatRound={heatManagement.currentRound}
         />
         )}
+
+        {/* Pro Mode: Verify Results button - shown when heat is fully scored */}
+        {heatScoringMode === 'pro' && selectedHeat && !touchModeResultsConfirmed && (() => {
+          const progress = getHeatProgress(selectedHeat);
+          const allScored = progress.scored >= progress.total && progress.total > 0;
+          if (!allScored) return null;
+          return (
+            <div className={`px-4 py-3 border-t ${
+              darkMode ? 'bg-slate-800/80 border-slate-700/50' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <button
+                onClick={() => {
+                  setTouchModeResultsConfirmed(true);
+                  if (selectedHeat && isScoringLastHeat()) {
+                    onCompleteHeat(selectedHeat);
+                  }
+                }}
+                className="w-full py-3 rounded-xl text-white font-bold text-base bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-lg"
+              >
+                <Check size={20} />
+                {isScoringLastHeat() ? 'Verify Results & Complete Round' : 'Verify & Apply Results'}
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Heat Assignment Modal */}
@@ -1483,14 +1780,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
           if (heatManagement.roundJustCompleted) {
             delete heatManagement.roundJustCompleted;
           }
-          if (touchMode) {
-            setTouchModeResultsConfirmed(false);
-          }
+          setTouchModeResultsConfirmed(false);
           setObserverReloadTrigger(prev => prev + 1);
-          if (touchMode && selectedHeat) {
+          if (selectedHeat) {
             const progress = getHeatProgress(selectedHeat);
             const isComplete = progress.scored >= progress.total && progress.total > 0;
-            if (!isComplete) {
+            if (!isComplete && currentEvent?.enable_roll_call !== false) {
               setRollCallActive(true);
               setRollCallReady(new Set());
               setRollCallAbsent(new Set());

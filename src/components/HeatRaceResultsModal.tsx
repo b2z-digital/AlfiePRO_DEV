@@ -236,7 +236,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
           ? `Qualifying Rd ${roundNum}`
           : `Final ${roundNum - shrsQualifyingRounds}`;
       }
-      return `Round ${roundNum}`;
+      return `Race ${roundNum}`;
     };
 
     const header1 = ['Heat', 'Pos'];
@@ -523,7 +523,7 @@ export const HeatRaceResultsModal: React.FC<HeatRaceResultsModalProps> = ({
                                 </div>
                               </div>
                             ))
-                          : `Round ${round.round}`}
+                          : `Race ${round.round}`}
                       </th>
                     ))}
                   </tr>

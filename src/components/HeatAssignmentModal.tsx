@@ -236,12 +236,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   // Observer state - store per heat
   const [observersByHeat, setObserversByHeat] = useState<Map<number, ObserverAssignment[]>>(new Map());
   const [loadingObservers, setLoadingObservers] = useState(false);
+  const resolvedObserverSettings = useRef<{ enableObservers?: boolean; observersPerHeat?: number } | null>(null);
   const [showObserverSelector, setShowObserverSelector] = useState(false);
   const [selectedHeatForObserver, setSelectedHeatForObserver] = useState<number>(1);
   const [showCustomObserverInput, setShowCustomObserverInput] = useState(false);
   const [customObserverName, setCustomObserverName] = useState('');
 
-  // Reset edit state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setEditMode(false);
@@ -254,6 +254,8 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       setInitialEditMode(false);
       setSelectedSkipperToMove(null);
       setLocalAssignments(null);
+    } else {
+      resolvedObserverSettings.current = null;
     }
   }, [isOpen]);
 
@@ -276,15 +278,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     if (!roundData) return `${currentRound}-no-data`;
 
     const heatCount = roundData.heatAssignments.length;
-    const resultCount = roundData.results?.length || 0;
     const completionStatus = roundData.completed ? 'complete' : 'incomplete';
     const justCompletedFlag = roundJustCompleted ? `jc${roundJustCompleted}` : 'active';
     const assignmentHash = roundData.heatAssignments
       .map(h => `${h.heatDesignation}:${h.skipperIndices.slice().sort().join(',')}`)
       .join('|');
 
-    return `${targetRound}-${heatCount}-${resultCount}-${completionStatus}-${justCompletedFlag}-${assignmentHash}-preview${previewRoundIndex}`;
+    return `${targetRound}-${heatCount}-${completionStatus}-${justCompletedFlag}-${assignmentHash}-preview${previewRoundIndex}`;
   }, [heatManagement.currentRound, heatManagement.roundJustCompleted, heatManagement.rounds, previewRoundIndex]);
+
+  const skippersRef = useRef(skippers);
+  skippersRef.current = skippers;
 
   const preAllocationDone = React.useRef(false);
 
@@ -297,9 +301,14 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
   useEffect(() => {
     let cancelled = false;
 
+    const safetyTimeout = setTimeout(() => {
+      setLoadingObservers(false);
+    }, 8000);
+
     const loadObservers = async () => {
       if (!isOpen) {
         setObserversByHeat(new Map());
+        setLoadingObservers(false);
         return;
       }
 
@@ -312,10 +321,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       }
       if (!resolvedEventId) {
         setObserversByHeat(new Map());
+        setLoadingObservers(false);
         return;
       }
 
-      let enableObs = currentEvent?.enable_observers;
+      let enableObs = currentEvent?.enable_observers ?? resolvedObserverSettings.current?.enableObservers;
+      let resolvedObsPerHeat = currentEvent?.observers_per_heat ?? resolvedObserverSettings.current?.observersPerHeat;
       if (enableObs === undefined) {
         const roundId = currentEvent?.isSeriesEvent
           ? (currentEvent?.seriesRoundId || resolvedEventId)
@@ -329,22 +340,27 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
           .maybeSingle();
 
         if (error || cancelled) {
-          if (!cancelled) setObserversByHeat(new Map());
+          if (!cancelled) {
+            setObserversByHeat(new Map());
+            setLoadingObservers(false);
+          }
           return;
         }
 
-        if (eventData) {
-          (currentEvent as any).enable_observers = eventData.enable_observers ?? true;
-          (currentEvent as any).observers_per_heat = eventData.observers_per_heat ?? 2;
-        }
+        enableObs = eventData?.enable_observers ?? true;
+        resolvedObsPerHeat = eventData?.observers_per_heat ?? 2;
+        resolvedObserverSettings.current = { enableObservers: enableObs, observersPerHeat: resolvedObsPerHeat };
 
-        if (!eventData?.enable_observers) {
-          if (!cancelled) setObserversByHeat(new Map());
+        if (!enableObs) {
+          if (!cancelled) {
+            setObserversByHeat(new Map());
+            setLoadingObservers(false);
+          }
           return;
         }
-        enableObs = eventData?.enable_observers;
       } else if (!enableObs) {
         setObserversByHeat(new Map());
+        setLoadingObservers(false);
         return;
       }
 
@@ -352,7 +368,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
       try {
         const { currentRound, rounds, roundJustCompleted } = heatManagement;
         const isSHRSMode = heatManagement.configuration.scoringSystem === 'shrs';
-        const observersPerHeat = currentEvent.observers_per_heat || 2;
+        const observersPerHeat = resolvedObsPerHeat || currentEvent.observers_per_heat || 2;
 
         const shrsPreAssign = isSHRSMode &&
           rounds.length > 1 &&
@@ -369,7 +385,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 skipperIndices: h.skipperIndices
               }))
             })),
-            skippers,
+            skippersRef.current,
             observersPerHeat
           );
         }
@@ -386,7 +402,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         }
 
         if (!roundToLoadObserversFor) {
-          if (!cancelled) setObserversByHeat(new Map());
+          if (!cancelled) {
+            setObserversByHeat(new Map());
+            setLoadingObservers(false);
+          }
           return;
         }
 
@@ -468,9 +487,10 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               nextHeatIndices && nextHeatIndices.includes(obs.skipper_index)
             ) || [];
 
+            const currentSkippers = skippersRef.current;
             const observersStillExist = existingObservers?.filter(obs =>
               obs.skipper_index !== undefined && obs.skipper_index !== null &&
-              obs.skipper_index >= 0 && obs.skipper_index < skippers.length && skippers[obs.skipper_index]
+              obs.skipper_index >= 0 && obs.skipper_index < currentSkippers.length && currentSkippers[obs.skipper_index]
             ) || [];
 
             const hasValid = existingObservers &&
@@ -488,7 +508,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 heatNumber,
                 roundNumberToLoad,
                 heat.skipperIndices,
-                skippers,
+                currentSkippers,
                 observersPerHeat,
                 nextHeatIndices
               );
@@ -517,8 +537,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
     };
 
     loadObservers();
-    return () => { cancelled = true; };
-  }, [isOpen, observerEventId, currentEvent?.enable_observers, currentEvent?.observers_per_heat, roundDataKey, skippers]);
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimeout);
+      setLoadingObservers(false);
+    };
+  }, [isOpen, observerEventId, roundDataKey]);
 
   if (!isOpen) return null;
 
@@ -734,7 +758,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
             <Users className="text-blue-400" size={24} />
             <div>
               <h2 className="text-lg font-bold">
-                {isSHRS ? getSHRSRoundLabel(round, configuration) : `Round ${round}`} - {configuration.scoringSystem === 'shrs' ? `SHR-${configuration.shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
+                {isSHRS ? getSHRSRoundLabel(round, configuration) : `Race ${round}`} - {configuration.scoringSystem === 'shrs' ? `SHR-${configuration.shrsAssignmentMode === 'preset' ? 'B' : 'P'}` : configuration.scoringSystem.toUpperCase()} {completed ? 'Heat Results' : 'Heat Assignments'}
               </h2>
               <p className={`text-xs mt-0.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {isSHRS && shrsPhase ? (
@@ -742,7 +766,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                     {isFinalsPhase ? 'Finals Series' : 'Qualifying Series'}
                   </span>
                 ) : (
-                  completed ? 'Round Complete' : 'Current Round'
+                  completed ? 'Race Complete' : 'Current Race'
                 )}
                 {' '} • {heatAssignments.length} heats
                 {editMode && <span className="ml-2 text-amber-500 font-semibold">• Edit Mode</span>}
@@ -762,7 +786,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               title="Export this round as PDF"
             >
               <FileDown size={16} />
-              Export Round Assignments
+              Export Race Assignments
             </button>
             {shrsHasPreAssignments && (
               <button
@@ -900,15 +924,29 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 ? heatResults.map(r => r.skipperIndex)
                 : [];
 
-              // Check if this heat is completed (all assigned skippers have results)
-              const heatCompleted = heatResults.length > 0 && heatResults.length >= skipperIndices.length && heatResults.every(r =>
+              const allResultsScored = heatResults.length > 0 && heatResults.every(r =>
                 r.position !== null || r.letterScore || r.markedAsUP
               );
+              const heatCompleted = allResultsScored;
 
-              // Determine which skippers to show:
-              // - In EDIT mode: Show only who sailed in their original heat (hide promotions from lower heats)
-              // - In NORMAL mode: If heat completed: show who sailed (from results)
-              // - If heat not yet scored: show assignment
+              const heatIdx = ['A', 'B', 'C', 'D', 'E', 'F'].indexOf(heatDesignation);
+              const totalHeatsCount = roundToDisplay?.heatAssignments?.length || 0;
+              const isBottom = heatIdx === totalHeatsCount - 1;
+              const lowerLetter = ['A', 'B', 'C', 'D', 'E', 'F'][heatIdx + 1] as HeatDesignation;
+              let lowerCompleted = false;
+              if (!isBottom && lowerLetter) {
+                const lowerAssignment = heatAssignments.find(a => a.heatDesignation === lowerLetter);
+                if (lowerAssignment) {
+                  const lowerSkippers = lowerAssignment.skipperIndices;
+                  const lowerResults = results.filter(r => r.heatDesignation === lowerLetter);
+                  lowerCompleted = lowerSkippers.length > 0 && lowerSkippers.every(si => {
+                    const res = lowerResults.find(r => r.skipperIndex === si);
+                    return res && (res.position !== null || res.letterScore || res.markedAsUP);
+                  });
+                }
+              }
+              const scoringSys = heatManagement.configuration.scoringSystem;
+
               let skippersToDisplay;
               if (editMode) {
                 if (isLastCompletedHeat) {
@@ -947,13 +985,38 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   }
                 }
               } else {
-                // Normal mode: show completed heats' results or assignments
                 skippersToDisplay = heatCompleted && skippersWhoSailed.length > 0
                   ? skippersWhoSailed
                   : skipperIndices;
 
-                // Note: After Apply Changes, onUpdateAssignments already updates skipperIndices
-                // with the correct promoted skippers, so no additional manipulation is needed here.
+                if (!completed && !heatCompleted && !isBottom && lowerCompleted && round >= 2 && scoringSys !== 'shrs') {
+                  if (lowerLetter) {
+                    const lowerHeatResults = results.filter(r => r.heatDesignation === lowerLetter);
+                    const promotedFromBelow = lowerHeatResults
+                      .filter(r => r.position !== null && r.position <= promotionCount && !r.letterScore)
+                      .sort((a, b) => (a.position || 999) - (b.position || 999))
+                      .map(r => r.skipperIndex);
+
+                    promotedFromBelow.forEach(idx => {
+                      if (!skippersToDisplay.includes(idx)) {
+                        skippersToDisplay.push(idx);
+                      }
+                    });
+                  }
+                }
+              }
+
+              const isTopHeatVal = heatIdx === 0;
+              const skipPromotionGrouping = completed && isTopHeatVal;
+
+              const promotedFromBelowSet = new Set<number>();
+              if (round >= 2 && !isBottom && lowerLetter && scoringSys !== 'shrs' && !skipPromotionGrouping && !completed) {
+                const lowerHeatResultsForSort = results.filter(r => r.heatDesignation === lowerLetter);
+                lowerHeatResultsForSort.forEach(r => {
+                  if (r.position !== null && r.position <= promotionCount && !r.letterScore) {
+                    promotedFromBelowSet.add(r.skipperIndex);
+                  }
+                });
               }
 
               const sortedSkippers = [...skippersToDisplay].sort((a, b) => {
@@ -963,6 +1026,17 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 const aHasResult = resultA && resultA.position !== null;
                 const bHasResult = resultB && resultB.position !== null;
 
+                if (heatCompleted && aHasResult && bHasResult) {
+                  return resultA.position! - resultB.position!;
+                }
+
+                const aPromoted = promotedFromBelowSet.has(a);
+                const bPromoted = promotedFromBelowSet.has(b);
+
+                if (aPromoted !== bPromoted) {
+                  return aPromoted ? 1 : -1;
+                }
+
                 if (aHasResult && bHasResult) {
                   return resultA.position! - resultB.position!;
                 }
@@ -971,28 +1045,12 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                 return 0;
               });
 
-              // Calculate heat position info for header and P slots
-              const heatIndex = ['A', 'B', 'C', 'D', 'E', 'F'].indexOf(heatDesignation);
-              const totalHeats = roundToDisplay?.heatAssignments?.length || 0;
-              const isBottomHeat = heatIndex === totalHeats - 1;
-              const isTopHeat = heatIndex === 0;
-
-              // Check if the heat BELOW this one is completed (promotions have already happened)
-              // Heat B gets promotions from Heat C, Heat A gets promotions from Heat B, etc.
-              const heatLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
-              const lowerHeatLetter = heatLetters[heatIndex + 1] as typeof heatDesignation;
-              let lowerHeatCompleted = false;
-              if (!isBottomHeat && lowerHeatLetter) {
-                const lowerHeatAssignment = heatAssignments.find(a => a.heatDesignation === lowerHeatLetter);
-                if (lowerHeatAssignment) {
-                  const lowerHeatSkippers = lowerHeatAssignment.skipperIndices;
-                  const lowerHeatResults = results.filter(r => r.heatDesignation === lowerHeatLetter);
-                  lowerHeatCompleted = lowerHeatSkippers.length > 0 && lowerHeatSkippers.every(skipperIdx => {
-                    const result = lowerHeatResults.find(r => r.skipperIndex === skipperIdx);
-                    return result && (result.position !== null || result.letterScore || result.markedAsUP);
-                  });
-                }
-              }
+              const heatIndex = heatIdx;
+              const totalHeats = totalHeatsCount;
+              const isBottomHeat = isBottom;
+              const isTopHeat = heatIdx === 0;
+              const lowerHeatLetter = lowerLetter;
+              const lowerHeatCompleted = lowerCompleted;
 
               const isDropTarget = initialEditMode && selectedSkipperToMove !== null && !skipperIndices.includes(selectedSkipperToMove);
 
@@ -1012,7 +1070,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   )}
                   {/* Heat Header */}
                   <div
-                    className={`p-2 ${heatCompleted ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
+                    className={`px-2 py-3 ${heatCompleted ? 'bg-gradient-to-r from-emerald-600 to-emerald-700' : getHeatGradient(heatDesignation)} border-b-2 flex-shrink-0 ${
                       isDropTarget ? 'cursor-pointer' : ''
                     }`}
                     onClick={() => {
@@ -1082,7 +1140,9 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       let isRelegated = false;
                       let wasPromotedFromBelow = false;
 
-                      if (round >= 2 && !isBottomHeat && lowerHeatLetter) {
+                      const skipTopHeatPromotionDisplay = completed && isTopHeat && !editMode;
+
+                      if (round >= 2 && !isBottomHeat && lowerHeatLetter && !skipTopHeatPromotionDisplay) {
                         const lowerHeatResults = results.filter(r => r.heatDesignation === lowerHeatLetter);
 
                         if (editMode && lowerHeatLetter === lastCompletedHeatLetter) {
@@ -1093,38 +1153,15 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                             wasPromotedFromBelow = naturallyPromoted ? !manuallyToggled : manuallyToggled;
                           }
                         } else if (!editMode && !completed && lowerHeatCompleted) {
-                          const currentHeatAssignment = heatAssignments[heatIndex];
-                          const lowerHeatSkipperSet = new Set(lowerHeatResults.map(r => r.skipperIndex));
-                          const hasMidRoundOverrides = currentHeatAssignment?.skipperIndices.some(
-                            (idx: number) => lowerHeatSkipperSet.has(idx)
+                          wasPromotedFromBelow = lowerHeatResults.some(r =>
+                            r.skipperIndex === skipperIndex &&
+                            r.position !== null &&
+                            r.position <= promotionCount &&
+                            !r.letterScore
                           );
-                          if (hasMidRoundOverrides) {
-                            wasPromotedFromBelow = lowerHeatSkipperSet.has(skipperIndex);
-                          } else {
-                            wasPromotedFromBelow = lowerHeatResults.some(r =>
-                              r.skipperIndex === skipperIndex &&
-                              r.position !== null &&
-                              r.position <= promotionCount &&
-                              !r.letterScore
-                            );
-                          }
                         } else if (completed && !editMode) {
-                          const currentHeatAssignment = heatAssignments[heatIndex];
-                          const lowerHeatSkipperSet = new Set(lowerHeatResults.map(r => r.skipperIndex));
-                          const hasMidRoundOverrides = currentHeatAssignment?.skipperIndices.some(
-                            (idx: number) => lowerHeatSkipperSet.has(idx)
-                          );
-
-                          if (hasMidRoundOverrides) {
-                            wasPromotedFromBelow = lowerHeatSkipperSet.has(skipperIndex);
-                          } else {
-                            wasPromotedFromBelow = lowerHeatResults.some(r =>
-                              r.skipperIndex === skipperIndex &&
-                              r.position !== null &&
-                              r.position <= promotionCount &&
-                              !r.letterScore
-                            );
-                          }
+                          // Don't set wasPromotedFromBelow for completed rounds
+                          // The isPromoted flag is handled separately via position-based logic below
                         }
 
                         if (wasPromotedFromBelow) {
@@ -1365,7 +1402,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               </span>
                             )}
 
-                            <div className={`flex-shrink-0 px-1.5 py-0.5 text-xs rounded font-bold ${
+                            <div className={`flex-shrink-0 min-w-[3rem] px-1.5 py-0.5 text-xs rounded font-bold text-center ${
                               darkMode ? 'bg-slate-600 text-white' : 'bg-slate-200 text-slate-900'
                             }`}>
                               {currentEvent?.show_country && skipper.country_code && (
@@ -1382,7 +1419,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                               </div>
                             )}
 
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 flex items-center gap-1.5">
                               <p
                                 className={`font-medium truncate text-xs ${
                                   darkMode ? 'text-white' : 'text-slate-900'
@@ -1392,24 +1429,24 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                                 {skipper.name}
                               </p>
                               {isPromoted && (
-                                <p className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                <span className="flex-shrink-0 text-[9px] font-semibold text-green-600 dark:text-green-400">
                                   {wasPromotedFromBelow ? `From Heat ${lowerHeatLetter}` : 'Promoted'}
-                                </p>
+                                </span>
                               )}
                               {isRelegated && (
-                                <p className="text-[10px] font-semibold text-red-600 dark:text-red-400">
+                                <span className="flex-shrink-0 text-[9px] font-semibold text-red-600 dark:text-red-400">
                                   Relegate
-                                </p>
+                                </span>
                               )}
                               {initialEditMode && isRanked && (
-                                <p className="text-[10px] font-semibold text-green-600 dark:text-green-400 flex items-center gap-0.5">
+                                <span className="flex-shrink-0 text-[9px] font-semibold text-green-600 dark:text-green-400 flex items-center gap-0.5">
                                   <Lock size={8} /> Ranked
-                                </p>
+                                </span>
                               )}
                               {isSelectedForMove && (
-                                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                <span className="flex-shrink-0 text-[9px] font-semibold text-amber-600 dark:text-amber-400">
                                   Tap to swap
-                                </p>
+                                </span>
                               )}
                             </div>
 
@@ -1439,13 +1476,6 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                       );
                     })}
 
-                    {/* Show P (Promotion) slots for non-bottom heats in Round 2+ ONLY if:
-                        1. The round is not completed
-                        2. This specific heat is not completed
-                        3. The lower heat is not completed yet
-                        4. No manual changes have been applied (which would already show promoted skippers)
-                        5. NOT using SHRS (SHRS doesn't use promotion/relegation)
-                        Once lower heat is completed OR changes are applied, promoted skippers are shown in their positions above with green borders */}
                     {!completed && !heatCompleted && round >= 2 && !isBottomHeat && !lowerHeatCompleted && !hasAppliedChanges && !isSHRS && (
                       <>
                         {Array.from({ length: promotionCount }).map((_, idx) => (
@@ -1476,18 +1506,25 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
                   </div>
 
                   {/* Observers Section - Fixed to bottom using mt-auto */}
-                  {/* Show observers for uncompleted heats AND previous heat observers */}
+                  {/* In HMS mode, only show observers for the currently active heat */}
                   {currentEvent?.enable_observers && (() => {
                     const heatIndex = ['A', 'B', 'C', 'D', 'E', 'F'].indexOf(heatDesignation);
                     const heatNumber = heatIndex + 1;
                     const heatObservers = observersByHeat.get(heatNumber) || [];
 
-                    // Only render if there are observers for this heat
                     if (heatObservers.length === 0) {
                       return null;
                     }
 
-                    // Check if this is a completed heat showing previous observers
+                    const isHMS = heatManagement.configuration.scoringSystem === 'hms';
+                    if (isHMS && !completed) {
+                      const isActiveHeat = (isBottomHeat && !heatCompleted) ||
+                        (!isBottomHeat && lowerHeatCompleted && !heatCompleted);
+                      if (!isActiveHeat && !heatCompleted) {
+                        return null;
+                      }
+                    }
+
                     const isPreviousHeatObservers = heatCompleted;
 
                     return (
@@ -1606,7 +1643,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 2 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-2 px-5 py-3 border-t flex-shrink-0 ${
+        <div className={`flex ${isInitialAllocation || initialEditMode || editMode || (round >= 3 && !completed && results && results.length > 0 && !anyScoringInProgress) ? 'justify-between' : 'justify-end'} gap-2 px-5 py-3 border-t flex-shrink-0 ${
           darkMode ? 'border-slate-700' : 'border-slate-200'
         }`}>
           {/* Initial edit mode controls */}
@@ -1706,7 +1743,7 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
 
           {/* Edit mode controls for mid-round only (when at least one heat complete but round not finished) */}
           {/* Allow manual override of promotions/relegations */}
-          {!isInitialAllocation && !completed && round >= 2 && results && results.length > 0 && !anyScoringInProgress && (
+          {!isInitialAllocation && !completed && round >= 3 && results && results.length > 0 && !anyScoringInProgress && (
             <div className="flex gap-3">
               {!editMode ? (
                 <button
@@ -1869,20 +1906,20 @@ export const HeatAssignmentModal: React.FC<HeatAssignmentModalProps> = ({
               onClose();
             }}
             disabled={loadingObservers}
-            className={`px-4 py-1.5 rounded-lg transition-colors font-medium text-sm ${
+            className={`px-4 py-1.5 rounded-lg transition-all font-medium text-sm ${
               loadingObservers
                 ? 'bg-slate-400 text-slate-200 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 shadow-lg'
             }`}
           >
             {completed && shouldAllowProgression
                 ? isSHRS
                   ? `Progress to ${isSHRSFinalsRound(round + 1, configuration) ? `Final ${(round + 1) - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${round + 1}`}`
-                  : `Progress to Round ${round + 1}`
+                  : `Progress to Race ${round + 1}`
                 : completed && nextRound
                 ? isSHRS
                   ? `Score ${isSHRSFinalsRound(nextRound.round, configuration) ? `Final ${nextRound.round - (configuration.shrsQualifyingRounds || 0)}` : `Qualifying Rd ${nextRound.round}`}`
-                  : `Next Round (Round ${nextRound.round})`
+                  : `Next Race (Race ${nextRound.round})`
                 : completed
                 ? 'Close'
                 : isInitialAllocation

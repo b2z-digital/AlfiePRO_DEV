@@ -47,7 +47,7 @@ export const updateHeatResult = (
 };
 
 // Function to complete a heat and automatically move to the next heat
-// HMS PROMOTION-BEFORE-RELEGATION: Promotions happen WITHIN the same round
+// HMS: Each heat races with its assigned roster. Promotion/relegation swaps happen between rounds.
 // SHR uses different movement rules based on position
 export const completeHeat = (
   heatManagement: HeatManagement,
@@ -74,7 +74,6 @@ export const completeHeat = (
   const heatIndex = availableHeats.indexOf(heat);
   if (heatIndex === -1) return heatManagement;
 
-  // Determine the next heat to score (for auto-advance)
   let nextHeat: HeatDesignation | null = null;
   if (heatIndex < availableHeats.length - 1) {
     nextHeat = availableHeats[heatIndex + 1];
@@ -107,195 +106,29 @@ export const completeHeat = (
     console.log(`  ⚡ Per-race promotion override: ${effectivePromotionCount} (default: ${configuration.promotionCount})`);
   }
 
-  // HMS CRITICAL LOGIC: After a lower heat completes, IMMEDIATELY promote skippers to the HIGHER heat
-  // This happens WITHIN the same round, BEFORE the higher heat is scored
-  // Applies to Round 2+ (after initial seeding heats)
-  // HMS scores LOWER → HIGHER (B → A), so when B completes, promote to A
-  // ONLY do this if the higher heat hasn't been scored yet!
-  if (isHms && currentRound >= 2 && higherHeat && effectivePromotionCount) {
-    // Check if the higher heat has already been scored
-    const higherHeatSkippers = round.heatAssignments.find(a => a.heatDesignation === higherHeat)?.skipperIndices || [];
-    const higherHeatAlreadyScored = higherHeatSkippers.length > 0 && higherHeatSkippers.every(skipperIndex => {
-      const result = round.results.find(
-        r => r.skipperIndex === skipperIndex &&
-             r.heatDesignation === higherHeat &&
-             r.round === currentRound
-      );
-      return result && (result.position !== null || result.letterScore);
-    });
-
-    if (!higherHeatAlreadyScored) {
-      console.log(`\n🔼 HMS PROMOTION: Heat ${heat} complete. Promoting top ${effectivePromotionCount} to Heat ${higherHeat} (same round)`);
-
-      const completedHeatResults = round.results
-        .filter(r => r.heatDesignation === heat && r.position !== null && !r.letterScore)
-        .sort((a, b) => (a.position || 999) - (b.position || 999));
-
-      const promotedSkippers = completedHeatResults
-        .slice(0, effectivePromotionCount)
-        .map(r => r.skipperIndex);
-
-      if (promotedSkippers.length > 0) {
-        console.log(`  Promoting skippers:`, promotedSkippers);
-
-        // Track that promotions occurred
-        promotionsOccurred = true;
-        promotedSkipperIndices = promotedSkippers;
-        promotionTargetHeat = higherHeat;
-
-        // Find the higher heat's assignment
-        const higherHeatAssignmentIndex = round.heatAssignments.findIndex(
-          a => a.heatDesignation === higherHeat
-        );
-
-        if (higherHeatAssignmentIndex !== -1) {
-          // Update the heat assignments IN THE CURRENT ROUND
-          const updatedAssignments = [...round.heatAssignments];
-          const higherHeatAssignment = { ...updatedAssignments[higherHeatAssignmentIndex] };
-
-          // Add promoted skippers to the higher heat (but only if not already there)
-          const newPromotedSkippers = promotedSkippers.filter(
-            skipperIdx => !higherHeatAssignment.skipperIndices.includes(skipperIdx)
-          );
-
-          if (newPromotedSkippers.length > 0) {
-            higherHeatAssignment.skipperIndices = [
-              ...higherHeatAssignment.skipperIndices,
-              ...newPromotedSkippers
-            ];
-            console.log(`  Added ${newPromotedSkippers.length} new promoted skippers (${promotedSkippers.length - newPromotedSkippers.length} already present)`);
-          } else {
-            console.log(`  All promoted skippers already in Heat ${higherHeat}, skipping duplication`);
-          }
-
-          updatedAssignments[higherHeatAssignmentIndex] = higherHeatAssignment;
-
-          // Also remove promoted skippers from current heat assignment
-          const currentHeatAssignmentIndex = updatedAssignments.findIndex(a => a.heatDesignation === heat);
-          if (currentHeatAssignmentIndex !== -1) {
-            const currentHeatAssignment = { ...updatedAssignments[currentHeatAssignmentIndex] };
-            currentHeatAssignment.skipperIndices = currentHeatAssignment.skipperIndices.filter(
-              skipperIdx => !promotedSkippers.includes(skipperIdx)
-            );
-            updatedAssignments[currentHeatAssignmentIndex] = currentHeatAssignment;
-          }
-
-          // Update the round with new assignments
-          updatedRounds[roundIndex] = {
-            ...round,
-            heatAssignments: updatedAssignments
-          };
-
-          console.log(`  Heat ${higherHeat} now has ${higherHeatAssignment.skipperIndices.length} skippers (including promoted)`);
-          console.log(`  Heat ${heat} now has ${updatedAssignments[currentHeatAssignmentIndex].skipperIndices.length} skippers (after promotion)`);
-        }
-      }
-    } else {
-      console.log(`\n⏭️  Heat ${heat} complete, but Heat ${higherHeat} already scored. Skipping mid-round promotion.`);
-    }
+  // HMS: No mid-round roster changes. Each heat races with its assigned roster for the round.
+  // Promotion/relegation swaps happen BETWEEN rounds via generateNextRoundAssignments.
+  if (isHms && currentRound >= 2) {
+    console.log(`\n📋 HMS Round ${currentRound}: Heat ${heat} complete. Roster stays fixed for this round.`);
   }
 
-  // HMS RELEGATION LOGIC: After a HIGHER heat completes, IMMEDIATELY relegate bottom skippers to lower heat
-  // This happens WITHIN the same round, AFTER the higher heat is scored
-  // Applies to Round 2+ (after initial seeding heats)
-  // Only do this if there's a lower heat available and it hasn't been scored yet
-  if (isHms && currentRound >= 2 && lowerHeat && effectivePromotionCount) {
-    const lowerHeatSkippers = round.heatAssignments.find(a => a.heatDesignation === lowerHeat)?.skipperIndices || [];
-    const lowerHeatAlreadyScored = lowerHeatSkippers.length > 0 && lowerHeatSkippers.every(skipperIndex => {
-      const result = round.results.find(
-        r => r.skipperIndex === skipperIndex &&
-             r.heatDesignation === lowerHeat &&
-             r.round === currentRound
-      );
-      return result && (result.position !== null || result.letterScore);
-    });
-
-    const completedHeatResults = round.results
-      .filter(r => r.heatDesignation === heat && r.position !== null && !r.letterScore)
-      .sort((a, b) => (a.position || 999) - (b.position || 999));
-
-    const totalInHeat = completedHeatResults.length;
-    const relegatedSkippers = completedHeatResults
-      .slice(Math.max(0, totalInHeat - effectivePromotionCount))
-      .map(r => r.skipperIndex);
-
-    if (relegatedSkippers.length > 0) {
-      if (!lowerHeatAlreadyScored) {
-        console.log(`\n🔽 HMS RELEGATION: Heat ${heat} complete. Relegating bottom ${effectivePromotionCount} to Heat ${lowerHeat} (same round)`);
-      } else {
-        console.log(`\n🔽 HMS RELEGATION: Heat ${heat} complete. Relegating bottom ${effectivePromotionCount} to Heat ${lowerHeat} (Heat ${lowerHeat} already scored, relegation will apply to next round)`);
-      }
-
-      console.log(`  Relegating skippers:`, relegatedSkippers);
-
-      // Track that relegations occurred
-      relegationsOccurred = true;
-      relegatedSkipperIndices = relegatedSkippers;
-      relegationTargetHeat = lowerHeat;
-
-      // Find the lower heat's assignment
-      const lowerHeatAssignmentIndex = updatedRounds[roundIndex].heatAssignments.findIndex(
-        a => a.heatDesignation === lowerHeat
-      );
-
-      if (lowerHeatAssignmentIndex !== -1) {
-        // Update the heat assignments IN THE CURRENT ROUND
-        const updatedAssignments = [...updatedRounds[roundIndex].heatAssignments];
-        const lowerHeatAssignment = { ...updatedAssignments[lowerHeatAssignmentIndex] };
-
-        // Add relegated skippers to the lower heat (but only if not already there)
-        const newRelegatedSkippers = relegatedSkippers.filter(
-          skipperIdx => !lowerHeatAssignment.skipperIndices.includes(skipperIdx)
-        );
-
-        if (newRelegatedSkippers.length > 0) {
-          lowerHeatAssignment.skipperIndices = [
-            ...lowerHeatAssignment.skipperIndices,
-            ...newRelegatedSkippers
-          ];
-          console.log(`  Added ${newRelegatedSkippers.length} new relegated skippers (${relegatedSkippers.length - newRelegatedSkippers.length} already present)`);
-        } else {
-          console.log(`  All relegated skippers already in Heat ${lowerHeat}, skipping duplication`);
-        }
-
-        updatedAssignments[lowerHeatAssignmentIndex] = lowerHeatAssignment;
-
-        // Also remove relegated skippers from current heat assignment
-        const currentHeatAssignmentIndex = updatedAssignments.findIndex(a => a.heatDesignation === heat);
-        if (currentHeatAssignmentIndex !== -1) {
-          const currentHeatAssignment = { ...updatedAssignments[currentHeatAssignmentIndex] };
-          currentHeatAssignment.skipperIndices = currentHeatAssignment.skipperIndices.filter(
-            skipperIdx => !relegatedSkippers.includes(skipperIdx)
-          );
-          updatedAssignments[currentHeatAssignmentIndex] = currentHeatAssignment;
-        }
-
-        // Update the round with new assignments
-        updatedRounds[roundIndex] = {
-          ...updatedRounds[roundIndex],
-          heatAssignments: updatedAssignments
-        };
-
-        console.log(`  Heat ${lowerHeat} now has ${lowerHeatAssignment.skipperIndices.length} skippers (including relegated)`);
-        console.log(`  Heat ${heat} now has ${updatedAssignments[currentHeatAssignmentIndex].skipperIndices.length} skippers (after relegation)`);
-      }
-    }
-  }
-
-  // Check if all heats are complete
-  // Note: After mid-round movements, a skipper might be in a different heat than where they scored
-  // So we check if each skipper has a result from ANY heat in this round
+  console.log(`completeHeat: checking allHeatsComplete. availableHeats=${JSON.stringify(availableHeats)}, roundIndex=${roundIndex}, totalResults=${updatedRounds[roundIndex].results.length}`);
   const allHeatsComplete = availableHeats.every(h => {
     const heatSkippers = updatedRounds[roundIndex].heatAssignments.find(a => a.heatDesignation === h)?.skipperIndices || [];
-    return heatSkippers.every(skipperIndex => {
-      // Check if this skipper has a result in ANY heat for this round
+    const heatResultsForRound = updatedRounds[roundIndex].results.filter(
+      r => r.heatDesignation === h && r.round === currentRound
+    );
+    const missingSkippers = heatSkippers.filter(skipperIndex => {
       const result = updatedRounds[roundIndex].results.find(
         r => r.skipperIndex === skipperIndex &&
+             r.heatDesignation === h &&
              r.round === currentRound &&
              (r.position !== null || r.letterScore)
       );
-      return !!result;
+      return !result;
     });
+    console.log(`  Heat ${h}: ${heatSkippers.length} skippers, ${heatResultsForRound.length} results for round ${currentRound}, missing=${missingSkippers.length}${missingSkippers.length > 0 ? ` [${missingSkippers.join(',')}]` : ''}`);
+    return missingSkippers.length === 0 && heatSkippers.length > 0;
   });
 
   // Mark round as complete if all heats are done
@@ -307,9 +140,6 @@ export const completeHeat = (
   // If all heats are complete, prepare for the next round (with RELEGATIONS only)
   if (allHeatsComplete) {
     console.log(`\n🏁 All heats complete for Round ${currentRound}. Generating Round ${currentRound + 1} assignments...`);
-
-    // Set flag to trigger modal showing next round assignments
-    heatManagement.roundJustCompleted = currentRound;
 
     try {
       // Generate assignments for the next round based on current results
@@ -357,8 +187,8 @@ export const completeHeat = (
     ...heatManagement,
     rounds: updatedRounds,
     currentHeat: nextHeat,
-    // Don't auto-advance round - user must explicitly advance via "Advance to Round 2" button
-    currentRound: currentRound
+    currentRound: currentRound,
+    roundJustCompleted: allHeatsComplete ? currentRound : heatManagement.roundJustCompleted
   };
 
   // Add promotion/relegation info if mid-round changes occurred

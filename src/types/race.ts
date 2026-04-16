@@ -57,6 +57,8 @@ export interface SeriesRound {
   enableLiveStream?: boolean;
   enable_observers?: boolean;
   observers_per_heat?: number;
+  enable_roll_call?: boolean;
+  auto_complete_sail?: boolean;
 }
 
 export interface RaceSeries {
@@ -167,6 +169,8 @@ export interface RaceEvent {
   // Observer settings for heat racing
   enable_observers?: boolean; // Enable observer assignments for heats
   observers_per_heat?: number; // Number of observers per heat (default 2)
+  enable_roll_call?: boolean; // Enable roll call before heat scoring (default true)
+  auto_complete_sail?: boolean; // Auto-complete sail numbers in spreadsheet mode
   // Display settings for results table
   show_flag?: boolean;
   show_country?: boolean;

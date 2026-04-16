@@ -106,8 +106,8 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
         </div>
         
         <Trophy size={48} className="mx-auto mb-4 opacity-20" />
-        <p className="text-lg font-medium mb-2">No Round Data Available</p>
-        <p className="text-sm mb-6">There was an error loading the current round data</p>
+        <p className="text-lg font-medium mb-2">No Race Data Available</p>
+        <p className="text-sm mb-6">There was an error loading the current race data</p>
         <button
           onClick={onConfigureHeats}
           className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
@@ -467,7 +467,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
         >
           <div className="flex items-center gap-2">
             <Trophy size={20} className={darkMode ? 'text-blue-400' : 'text-blue-600'} />
-            <h4 className="font-medium">Overall Standings - Round {displayRound}</h4>
+            <h4 className="font-medium">Overall Standings - Race {displayRound}</h4>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm">
@@ -594,7 +594,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
     return (
       <div className="flex items-center gap-2 mb-4">
         <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-          View Round:
+          View Race:
         </span>
         <div className="flex gap-2">
           {availableRounds.map(round => (
@@ -638,7 +638,7 @@ export const HeatRaceTable: React.FC<HeatRaceTableProps> = ({
             px-3 py-1.5 rounded-lg text-sm font-medium
             ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700 border border-slate-200'}
           `}>
-            Round {displayRound}
+            Race {displayRound}
           </div>
           
           <button

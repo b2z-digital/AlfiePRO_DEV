@@ -711,7 +711,7 @@ export default function ProBroadcastView() {
             ? getHeatStatus(assignments[heatIdx + 1].heatDesignation).isComplete
             : false;
 
-          const shouldShowPromotionSlots = !isRound1 &&
+          const shouldShowPromotionSlots = currentRound >= 3 &&
             !isComplete &&
             !isBottomHeat &&
             totalHeats > 1 &&

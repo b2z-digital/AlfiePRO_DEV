@@ -403,7 +403,13 @@ export const Register: React.FC = () => {
                     className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     placeholder="Minimum 6 characters"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password.length >= 6 ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                    <p className={`text-xs ${password.length >= 6 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                      Minimum 6 characters {password.length > 0 && `(${password.length}/6)`}
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">No special characters required - just pick something memorable</p>
                 </div>
 
                 <div>
@@ -417,8 +423,16 @@ export const Register: React.FC = () => {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                     className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="••••••••"
+                    placeholder="Re-enter your password"
                   />
+                  {confirmPassword.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${password === confirmPassword ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                      <p className={`text-xs ${password === confirmPassword ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <button

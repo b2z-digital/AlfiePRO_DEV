@@ -104,6 +104,22 @@ export async function deleteSound(soundId: string, forceSystem?: boolean): Promi
   }
 }
 
+export async function getSoundById(soundId: string): Promise<StartBoxSound | null> {
+  try {
+    const { data, error } = await supabase
+      .from('start_box_sounds')
+      .select('*')
+      .eq('id', soundId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('Error fetching sound by id:', err);
+    return null;
+  }
+}
+
 export async function getSequences(clubId: string | null): Promise<StartSequence[]> {
   try {
     let query = supabase
