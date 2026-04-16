@@ -2632,7 +2632,13 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
 
       const convertedResults = convertHeatResultsToRaceResults(updatedHeatManagement, skippers);
       if (convertedResults.length > 0) {
-        setRaceResults(convertedResults);
+        const completedRoundNumbers = new Set(
+          updatedHeatManagement.rounds.filter(r => r.completed).map(r => r.round)
+        );
+        setRaceResults(prevResults => {
+          const inProgressResults = prevResults.filter(r => !completedRoundNumbers.has(r.race));
+          return [...convertedResults, ...inProgressResults];
+        });
 
         const currentRoundData = updatedHeatManagement.rounds.find(r => r.round === updatedHeatManagement.currentRound);
         if (currentRoundData?.completed) {

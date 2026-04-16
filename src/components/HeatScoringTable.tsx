@@ -309,6 +309,9 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
         lastCompletedHeats.current.add(heatKey);
         onCompleteHeat(heat);
 
+        const roundKey = `${heatManagement.currentRound}-${heat}`;
+        setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+
         if (heatManagement.currentRound >= 2) {
           pendingModalShow.current = true;
         }
@@ -1593,7 +1596,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               console.log('✅ Touch mode results confirmed for heat', selectedHeat);
               setTouchModeResultsConfirmed(true);
 
-              // If this is the last heat being scored, complete it now
+              if (selectedHeat) {
+                const roundKey = `${heatManagement.currentRound}-${selectedHeat}`;
+                setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+              }
+
               if (selectedHeat && isScoringLastHeat()) {
                 console.log('🏁 Last heat confirmed - completing heat', selectedHeat);
                 onCompleteHeat(selectedHeat);
@@ -1786,6 +1793,10 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
               <button
                 onClick={() => {
                   setTouchModeResultsConfirmed(true);
+                  if (selectedHeat) {
+                    const roundKey = `${heatManagement.currentRound}-${selectedHeat}`;
+                    setSpreadsheetVerifiedHeats(prev => new Set(prev).add(roundKey));
+                  }
                   if (selectedHeat && isScoringLastHeat()) {
                     onCompleteHeat(selectedHeat);
                   }
